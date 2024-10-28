@@ -16,8 +16,6 @@ and so on:
 
 - ``torchvision``  – PyTorch Core Team: image and video datasets and models for torch deep learning
 
-- ``py``  – holger krekel, Ronny Pfannschmidt, Benjamin Peterson and others: library with cross-python path, ini-parsing, io, code, log facilities
-
 - ``matplotlib``  – John D. Hunter, Michael Droettboom: Python plotting package
 
 - ``pytorch-ignite``  – PyTorch-Ignite Team: A lightweight library to help with training neural networks in PyTorch.
@@ -30,25 +28,17 @@ and so on:
 
 - ``seaborn`` : Statistical data visualization
 
-- ``joblib`` : Lightweight pipelining with Python functions
-
-- ``tensorboard``  – Google Inc.: TensorBoard lets you watch Tensors Flow
-
 - ``ConfigArgParse`` : A drop-in replacement for argparse that allows options to also be set via config files and/or environment variables.
 
 - ``torch-optimizer``  – Nikolay Novik: pytorch-optimizer
 
 - ``adabelief-pytorch``  – Juntang Zhuang: PyTorch implementation of AdaBelief Optimizer
 
-- ``dill``  – Mike McKerns: serialize all of Python
-
 - ``aislib``  – Arnor Sigurdsson: 
 
 - ``colorama`` : Cross-platform colored terminal text.
 
 - ``transformers``  – The Hugging Face team (past and future) with the help of all our contributors (https://github.com/huggingface/transformers/graphs/contributors): State-of-the-art Machine Learning for JAX, PyTorch and TensorFlow
-
-- ``sentencepiece``  – Taku Kudo: SentencePiece python wrapper
 
 - ``ipython``  – The IPython Development Team: IPython: Productive Interactive Computing
 
@@ -76,15 +66,19 @@ and so on:
 
 - ``pydantic`` : Data validation using Python type hints
 
-- ``tiktoken``  – Shantanu Jain: tiktoken is a fast BPE tokeniser for use with OpenAI's models
+- ``libdeeplake``  – activeloop.ai: C++ backend for Deep Lake
+
+- ``lifelines``  – Cameron Davidson-Pilon: Survival analysis in Python, including Kaplan Meier, Nelson Aalen and regression
+
+- ``websocket-client``  – liris: WebSocket client for Python with low level API options
+
+- ``pillow`` : Python Imaging Library (Fork)
+
+- ``pyyaml``  – Kirill Simonov: YAML parser and emitter for Python
+
+- ``starlette`` : The little ASGI library that shines.
 
 - ``websockets`` : An implementation of the WebSocket Protocol (RFC 6455 & 7692)
-
-- ``multimethod`` : Multiple argument dispatching.
-
-- ``zstandard``  – Gregory Szorc: Zstandard bindings for Python
-
-- ``libdeeplake``  – activeloop.ai: C++ backend for Deep Lake
 
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
@@ -135,4 +129,6 @@ and so on:
 - ``isort``  – Timothy Crosley: A Python utility / library to sort Python imports.
 
 - ``pytest-split``  – Jerry Pussinen: Pytest plugin which splits the test suite to equally sized sub suites based on test execution time.
+
+- ``deptry`` : A command line utility to check for unused, missing and transitive dependencies in a Python project.
 

@@ -1,5 +1,6 @@
 import math
 import reprlib
+from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
@@ -17,6 +18,7 @@ from typing import (
 import numpy as np
 import pandas as pd
 import torch
+from sklearn.preprocessing import KBinsDiscretizer
 from tqdm import tqdm
 
 from eir.data_load.data_source_modules.deeplake_ops import (
@@ -39,6 +41,7 @@ from eir.experiment_io.label_transformer_io import save_transformer_set
 from eir.setup import schemas
 from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_sequence import SequenceOutputTypeConfig
+from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.utils.logging import get_logger
 
@@ -74,16 +77,33 @@ def set_up_all_targets_wrapper(
 
 
 @dataclass
+class LinkedTargets:
+    """
+    This is specifically to track which targets should be treated as linked w.r.t.
+    to missingness, e.g. in survival analysis, the event column is linked to the time
+    column. While one could implicitly set this up my forcing them to have the
+    same NaN values, this allows us to track this explicitly, for example when
+    we filter missing outputs and target labels, we can check for this and properly
+    filter the time column even though it's not an output from the model.
+    """
+
+    target_name: str
+    linked_target_name: str
+
+
+@dataclass
 class MissingTargetsInfo:
     missing_ids_per_modality: dict[str, set[str]]
     missing_ids_within_modality: dict[str, dict[str, set[str]]]
     precomputed_missing_ids: dict[str, dict[str, set[str]]]
+    linked_targets: dict[str, LinkedTargets]
 
 
 def get_missing_targets_info(
     missing_ids_per_modality: dict[str, set[str]],
     missing_ids_within_modality: dict[str, dict[str, set[str]]],
     output_and_target_names: dict[str, list[str]],
+    output_configs: Sequence[schemas.OutputConfig],
 ) -> MissingTargetsInfo:
 
     precomputed_missing_ids = _precompute_missing_ids(
@@ -92,11 +112,36 @@ def get_missing_targets_info(
         output_and_target_names=output_and_target_names,
     )
 
+    linked_survival_targets = build_linked_survival_targets_for_missing_ids(
+        output_configs=output_configs
+    )
+
     return MissingTargetsInfo(
         missing_ids_per_modality=missing_ids_per_modality,
         missing_ids_within_modality=missing_ids_within_modality,
         precomputed_missing_ids=precomputed_missing_ids,
+        linked_targets=linked_survival_targets,
     )
+
+
+def build_linked_survival_targets_for_missing_ids(
+    output_configs: Sequence[schemas.OutputConfig],
+) -> dict[str, LinkedTargets]:
+    linked_survival_targets: dict[str, LinkedTargets] = {}
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+        output_type = output_config.output_info.output_type
+        if output_type == "survival":
+            output_type_info = output_config.output_type_info
+            assert isinstance(output_type_info, SurvivalOutputTypeConfig)
+            event_column = output_type_info.event_column
+            time_column = output_type_info.time_column
+            linked_survival_targets[output_name] = LinkedTargets(
+                target_name=event_column,
+                linked_target_name=time_column,
+            )
+
+    return linked_survival_targets
 
 
 def _precompute_missing_ids(
@@ -144,6 +189,10 @@ def get_all_output_and_target_names(
                 output_and_target_names[output_name] = all_columns
             case ArrayOutputTypeConfig() | SequenceOutputTypeConfig():
                 output_and_target_names[output_name] = [output_name]
+            case SurvivalOutputTypeConfig(
+                event_column=event_column, time_column=time_column
+            ):
+                output_and_target_names[output_name] = [event_column, time_column]
 
     return output_and_target_names
 
@@ -317,6 +366,25 @@ def set_up_all_target_labels_wrapper(
                     valid_labels_dict=valid_labels_dict,
                     dtypes=dtypes,
                 )
+            case "survival":
+                output_type_info = output_config.output_type_info
+                assert isinstance(output_type_info, SurvivalOutputTypeConfig)
+                n_bins = output_type_info.num_durations
+                process_survival_output(
+                    n_bins=n_bins,
+                    output_name=output_name,
+                    tabular_target_labels_info=tabular_target_labels_info,
+                    custom_label_ops=custom_label_ops,
+                    train_ids=train_ids,
+                    valid_ids=valid_ids,
+                    all_ids=all_ids,
+                    label_transformers=label_transformers,
+                    per_modality_missing_ids=per_modality_missing_ids,
+                    within_modality_missing_ids=within_modality_missing_ids,
+                    train_labels_dict=train_labels_dict,
+                    valid_labels_dict=valid_labels_dict,
+                    dtypes=dtypes,
+                )
             case _:
                 raise ValueError(f"Unknown output type: '{output_type}'.")
 
@@ -327,6 +395,7 @@ def set_up_all_target_labels_wrapper(
         missing_ids_per_modality=per_modality_missing_ids,
         missing_ids_within_modality=within_modality_missing_ids,
         output_and_target_names=output_and_target_names,
+        output_configs=output_configs,
     )
     log_missing_targets_info(missing_targets_info=missing_target_info, all_ids=all_ids)
 
@@ -474,36 +543,236 @@ def process_array_or_image_output(
     )
 
 
+def process_survival_output(
+    n_bins: int,
+    output_name: str,
+    tabular_target_labels_info: Dict[str, Any],
+    custom_label_ops: al_all_column_ops,
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+    all_ids: set[str],
+    label_transformers: Dict[str, Any],
+    per_modality_missing_ids: Dict[str, set[str]],
+    within_modality_missing_ids: Dict[str, Dict[str, set[str]]],
+    train_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    valid_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
+    dtypes: Dict[str, Dict[str, Any]],
+) -> None:
+    tabular_info = tabular_target_labels_info[output_name]
+
+    tabular_info_copy = copy(tabular_info)
+    tabular_info_copy.con_columns = []
+
+    cur_labels = set_up_train_and_valid_tabular_data(
+        tabular_file_info=tabular_info_copy,
+        custom_label_ops=custom_label_ops,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+        do_transform_labels=True,
+    )
+
+    assert len(tabular_info.con_columns) == 1
+    event_column = tabular_info.cat_columns[0]
+    time_column = tabular_info.con_columns[0]
+
+    df_time = pd.read_csv(
+        tabular_info.file_path,
+        usecols=["ID", time_column],
+        index_col="ID",
+    )
+    df_time_train = df_time.loc[df_time.index.isin(train_ids)]
+    df_time_valid = df_time.loc[df_time.index.isin(valid_ids)]
+
+    df_time_train, cur_labels.train_labels = synchronize_missing_survival_values(
+        df_time=df_time_train,
+        df_labels=cur_labels.train_labels,
+        time_column=time_column,
+        event_column=event_column,
+    )
+
+    df_time_valid, cur_labels.valid_labels = synchronize_missing_survival_values(
+        df_time=df_time_valid,
+        df_labels=cur_labels.valid_labels,
+        time_column=time_column,
+        event_column=event_column,
+    )
+
+    dur_input = _streamline_duration_transformer_input(
+        df_time_train=df_time_train,
+        time_column=time_column,
+    )
+    dur_transformer = fit_duration_transformer(durations=dur_input, n_bins=n_bins)
+
+    cur_labels.train_labels[time_column] = transform_durations_with_nans(
+        df=df_time_train,
+        time_column=time_column,
+        transformer=dur_transformer,
+    )
+
+    cur_labels.valid_labels[time_column] = transform_durations_with_nans(
+        df=df_time_valid,
+        time_column=time_column,
+        transformer=dur_transformer,
+    )
+
+    cur_labels.label_transformers[time_column] = dur_transformer
+    label_transformers[output_name] = cur_labels.label_transformers
+
+    all_labels = cur_labels.all_labels
+    cur_ids = set(all_labels.index)
+    missing_ids = all_ids.difference(cur_ids)
+    per_modality_missing_ids[output_name] = missing_ids
+
+    logger.debug("Estimating missing IDs for survival output %s.", output_name)
+    missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
+        all_labels_df=all_labels,
+        tabular_info=tabular_info,
+        output_name=output_name,
+    )
+
+    within_modality_missing_ids.update(missing_ids_per_target_column)
+
+    update_labels_dict(
+        labels_dict=train_labels_dict,
+        labels_df=cur_labels.train_labels,
+        output_name=output_name,
+    )
+    update_labels_dict(
+        labels_dict=valid_labels_dict,
+        labels_df=cur_labels.valid_labels,
+        output_name=output_name,
+    )
+
+    if output_name not in dtypes:
+        dtypes[output_name] = cur_labels.train_labels.dtypes.to_dict()
+
+
+def synchronize_missing_survival_values(
+    df_time: pd.DataFrame, df_labels: pd.DataFrame, time_column: str, event_column: str
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    df_time = df_time.copy()
+    df_labels = df_labels.copy()
+
+    na_ids_time = set(df_time.index[df_time[time_column].isna()])
+    na_ids_labels = set(df_labels.index[df_labels[event_column].isna()])
+
+    all_na_ids = list(na_ids_time.union(na_ids_labels))
+
+    df_time.loc[all_na_ids, time_column] = np.nan
+    df_labels.loc[all_na_ids, event_column] = np.nan
+
+    return df_time, df_labels
+
+
+def _streamline_duration_transformer_input(
+    df_time_train: pd.DataFrame,
+    time_column: str,
+) -> np.ndarray:
+    train_nan_mask = df_time_train[time_column].isna()
+
+    if train_nan_mask.any():
+        values = df_time_train[~train_nan_mask][time_column].to_numpy()
+    else:
+        values = df_time_train[time_column].to_numpy()
+
+    return values.reshape(-1, 1)
+
+
+def fit_duration_transformer(
+    durations: np.ndarray,
+    n_bins: int,
+) -> KBinsDiscretizer:
+    transformer = KBinsDiscretizer(
+        n_bins=n_bins,
+        encode="ordinal",
+        strategy="uniform",
+    )
+
+    transformer.fit(durations)
+
+    return transformer
+
+
+def transform_durations_with_nans(
+    df: pd.DataFrame,
+    time_column: str,
+    transformer: KBinsDiscretizer,
+) -> np.ndarray:
+    nan_mask = df[time_column].isna()
+
+    if not nan_mask.any():
+        return transformer.transform(
+            df[time_column].to_numpy().reshape(-1, 1)
+        ).flatten()
+
+    df_clean = df[~nan_mask]
+    transformed = transformer.transform(
+        df_clean[time_column].to_numpy().reshape(-1, 1)
+    ).flatten()
+
+    result = np.full(len(df), np.nan)
+    result[~nan_mask] = transformed
+    return result
+
+
+def discretize_durations(
+    df_time_train: pd.DataFrame,
+    df_time_valid: pd.DataFrame,
+    cur_labels: Labels,
+    time_column: str,
+    n_bins: int,
+) -> None:
+    train_nan_mask = df_time_train[time_column].isna()
+    dur = (
+        df_time_train[~train_nan_mask][time_column].to_numpy().reshape(-1, 1)
+        if train_nan_mask.any()
+        else df_time_train[time_column].to_numpy().reshape(-1, 1)
+    )
+
+    dur_transformer = fit_duration_transformer(durations=dur, n_bins=n_bins)
+
+    cur_labels.train_labels[time_column] = transform_durations_with_nans(
+        df=df_time_train,
+        time_column=time_column,
+        transformer=dur_transformer,
+    )
+
+    cur_labels.valid_labels[time_column] = transform_durations_with_nans(
+        df=df_time_valid,
+        time_column=time_column,
+        transformer=dur_transformer,
+    )
+
+
 def update_labels_dict(
     labels_dict: dict[str, dict[str, dict[str, Any]]],
     labels_df: pd.DataFrame,
     output_name: str,
-    dtypes: Optional[dict[str, dict[str, Any]]] = None,
+    dtypes: Optional[dict[str, dict[str, type]]] = None,
 ) -> None:
     """
     We skip storing nan / missing values all together here, as we have a
     data structure tracking missing IDs separately.
     """
-
     if "Output Name" in labels_df.columns:
         labels_df = labels_df.drop(columns=["Output Name"])
 
     if dtypes is None:
         dtypes = {}
 
-    cur_dtypes = dtypes.get(output_name, {})
+    cur_dtypes: dict[str, Any] = dtypes.get(output_name, {})
 
     records = labels_df.to_dict("records")
     for id_value, record in zip(labels_df.index, records):
+        parsed_record: dict[str, Any] = {}
 
-        parsed_record = {}
         for k, v in record.items():
             if pd.notna(v):
-                cur_dtype = cur_dtypes.get(k, None)
+                cur_dtype = cur_dtypes.get(str(k), None)
                 if cur_dtype:
                     v = cur_dtype(v)
 
-                parsed_record[k] = v
+                parsed_record[str(k)] = v
 
         if not parsed_record:
             continue
@@ -736,19 +1005,32 @@ def get_tabular_target_file_infos(
     tabular_files_info = {}
 
     for output_config in output_configs:
-        if output_config.output_info.output_type != "tabular":
-            continue
-
+        output_type = output_config.output_info.output_type
         output_name = output_config.output_info.output_name
-        output_type_info = output_config.output_type_info
-        assert isinstance(output_type_info, TabularOutputTypeConfig)
+        if output_type == "tabular":
+            output_type_info = output_config.output_type_info
+            assert isinstance(output_type_info, TabularOutputTypeConfig)
 
-        tabular_info = TabularFileInfo(
-            file_path=Path(output_config.output_info.output_source),
-            con_columns=output_type_info.target_con_columns,
-            cat_columns=output_type_info.target_cat_columns,
-            parsing_chunk_size=output_type_info.label_parsing_chunk_size,
-        )
-        tabular_files_info[output_name] = tabular_info
+            tabular_info = TabularFileInfo(
+                file_path=Path(output_config.output_info.output_source),
+                con_columns=output_type_info.target_con_columns,
+                cat_columns=output_type_info.target_cat_columns,
+                parsing_chunk_size=output_type_info.label_parsing_chunk_size,
+            )
+            tabular_files_info[output_name] = tabular_info
+        elif output_type == "survival":
+            output_type_info = output_config.output_type_info
+            assert isinstance(output_type_info, SurvivalOutputTypeConfig)
+
+            tabular_info = TabularFileInfo(
+                file_path=Path(output_config.output_info.output_source),
+                cat_columns=[output_type_info.event_column],
+                con_columns=[output_type_info.time_column],
+                parsing_chunk_size=output_type_info.label_parsing_chunk_size,
+            )
+            tabular_files_info[output_name] = tabular_info
+
+        else:
+            continue
 
     return tabular_files_info

@@ -2,10 +2,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Sequence
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
 from ignite.engine import Engine
+from lifelines import KaplanMeierFitter
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from eir.data_load.label_setup import al_label_transformers_object
@@ -14,6 +16,7 @@ from eir.setup.output_setup import (
     ComputedArrayOutputInfo,
     ComputedImageOutputInfo,
     ComputedSequenceOutputInfo,
+    ComputedSurvivalOutputInfo,
     ComputedTabularOutputInfo,
     al_output_objects_as_dict,
 )
@@ -117,6 +120,14 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
             iteration=iteration,
             auto_dataset_to_load_from=exp.valid_dataset,
             output_folder=gc.be.output_folder,
+        )
+
+        save_survival_evaluation_results_wrapper(
+            val_outputs=evaluation_results.gathered_outputs,
+            val_labels=evaluation_results.gathered_labels,
+            val_ids=evaluation_results.ids_per_output,
+            iteration=iteration,
+            experiment=handler_config.experiment,
         )
 
     exp.model.train()
@@ -400,7 +411,7 @@ def get_split_outputs_map(output_objects: al_output_objects_as_dict) -> dict[str
 
     for output_name, output_object in output_objects.items():
         match output_object:
-            case ComputedTabularOutputInfo():
+            case ComputedTabularOutputInfo() | ComputedSurvivalOutputInfo():
                 mapping[output_name] = "gather"
             case (
                 ComputedSequenceOutputInfo()
@@ -452,6 +463,133 @@ def compute_eval_metrics_wrapper(
     )
 
     return eval_metrics_dict_w_averages
+
+
+def save_survival_evaluation_results_wrapper(
+    val_outputs: dict[str, dict[str, torch.Tensor]],
+    val_labels: dict[str, dict[str, torch.Tensor]],
+    val_ids: dict[str, dict[str, list[str]]],
+    iteration: int,
+    experiment: "Experiment",
+) -> None:
+    for output_name, output_object in experiment.outputs.items():
+        output_type = output_object.output_config.output_info.output_type
+        if output_type != "survival":
+            continue
+
+        assert isinstance(output_object, ComputedSurvivalOutputInfo)
+
+        output_type_info = output_object.output_config.output_type_info
+        time_name = output_type_info.time_column
+        event_name = output_type_info.event_column
+
+        transformers = output_object.target_transformers
+        time_kbins_transformer = transformers[time_name]
+        time_bins = time_kbins_transformer.bin_edges_[0]
+
+        cur_sample_output_folder = utils.prepare_sample_output_folder(
+            output_folder=experiment.configs.gc.be.output_folder,
+            column_name=event_name,
+            output_name=output_name,
+            iteration=iteration,
+        )
+
+        ids = val_ids[output_name][event_name]
+        hazards_logits = val_outputs[output_name][event_name].cpu()
+        times_binned = val_labels[output_name][time_name].cpu().numpy()
+        events = val_labels[output_name][event_name].cpu().numpy().astype(int)
+
+        times = time_kbins_transformer.inverse_transform(times_binned.reshape(-1, 1))
+        times = times.flatten()
+
+        hazards = torch.sigmoid(hazards_logits).numpy()
+        survival_probs = np.cumprod(1 - hazards, 1)
+
+        time_bins_except_last = time_bins[:-1]
+        plot_survival_curves(
+            times=times,
+            events=events,
+            predicted_probs=survival_probs,
+            time_bins=time_bins_except_last,
+            output_folder=cur_sample_output_folder,
+        )
+
+        event_transformer = transformers[event_name]
+        events_untransformed = event_transformer.inverse_transform(events)
+
+        df = pd.DataFrame(
+            {
+                "ID": ids,
+                time_name: times,
+                event_name: events,
+                f"{event_name} Untransformed": events_untransformed,
+                "Predicted_Risk": hazards[:, -1],
+            }
+        )
+
+        for i, t in enumerate(time_bins_except_last):
+            df[f"Surv_Prob_t{i}"] = survival_probs[:, i]
+
+        csv_path = f"{cur_sample_output_folder}/survival_predictions.csv"
+        df.to_csv(csv_path, index=False)
+
+        plot_individual_survival_curves(
+            df=df,
+            time_bins=time_bins_except_last,
+            output_folder=str(cur_sample_output_folder),
+            n_samples=5,
+        )
+
+
+def plot_survival_curves(
+    times,
+    events,
+    predicted_probs,
+    time_bins,
+    output_folder,
+):
+    kmf = KaplanMeierFitter()
+    kmf.fit(times, events)
+
+    plt.figure(figsize=(10, 6))
+    kmf.plot_survival_function(label="Kaplan-Meier Estimate")
+
+    mean_predicted = predicted_probs.mean(axis=0)
+    plt.step(time_bins, mean_predicted, where="post", label="Mean Predicted")
+
+    plt.xlabel("Time")
+    plt.ylabel("Survival Probability")
+    plt.legend()
+    plt.title("Kaplan-Meier vs Mean Predicted Survival")
+    plt.savefig(f"{output_folder}/survival_curves.png")
+    plt.close()
+
+
+def plot_individual_survival_curves(
+    df: pd.DataFrame,
+    time_bins: np.ndarray,
+    output_folder: str,
+    n_samples: int = 5,
+) -> None:
+    random_samples = df.sample(n=n_samples)
+
+    plt.figure(figsize=(12, 8))
+
+    for _, row in random_samples.iterrows():
+        surv_probs = row[
+            [col for col in df.columns if col.startswith("Surv_Prob_t")]
+        ].to_numpy()
+
+        plt.step(x=time_bins, y=surv_probs, where="post", label=f"ID: {row['ID']}")
+
+    plt.xlabel("Time")
+    plt.ylabel("Survival Probability")
+    plt.title(f"Survival Curves for {n_samples} Random Samples")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    plt.savefig(f"{output_folder}/individual_survival_curves.pdf")
+    plt.close()
 
 
 def save_tabular_evaluation_results_wrapper(

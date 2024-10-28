@@ -1,0 +1,4 @@
+model_type: mlp-residual
+model_config:
+  rb_do: 0.20
+  fc_do: 0.20

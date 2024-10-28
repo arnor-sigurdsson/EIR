@@ -139,6 +139,7 @@ def get_output_test_init_base_func_map() -> Dict[str, Callable]:
         "test_output_sequence": get_test_sequence_base_output_inits,
         "test_output_array": get_test_array_base_output_inits,
         "test_output_image": get_test_image_base_output_inits,
+        "test_output_survival": get_test_survival_base_output_inits,
         # For diffusion compatibility
         "test_array": get_test_array_base_output_inits,
         "test_image": get_test_image_base_output_inits,
@@ -500,6 +501,29 @@ def get_test_image_base_output_inits(
         "model_config": {
             "model_type": "cnn",
         },
+    }
+
+    return test_target_init_kwargs
+
+
+def get_test_survival_base_output_inits(
+    test_path: Path, split_to_test: bool, *args, **kwargs
+) -> Dict:
+    label_file = test_path / "labels.csv"
+    if split_to_test:
+        label_file = test_path / "labels_train.csv"
+
+    test_target_init_kwargs = {
+        "output_info": {
+            "output_name": "test_output_tabular",
+            "output_type": "survival",
+            "output_source": str(label_file),
+        },
+        "output_type_info": {
+            "event_column": "Origin",
+            "time_column": "Height",
+        },
+        "model_config": {},
     }
 
     return test_target_init_kwargs

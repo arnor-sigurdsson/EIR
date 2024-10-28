@@ -26,7 +26,8 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from eir.setup.output_setup import ComputedTabularOutputInfo
+from eir.setup.output_setup import ComputedSurvivalOutputInfo, ComputedTabularOutputInfo
+from eir.setup.schemas import SurvivalOutputTypeConfig
 from eir.train_utils.utils import call_hooks_stage_iterable
 from eir.utils.logging import get_logger
 
@@ -131,10 +132,40 @@ def parse_tabular_target_labels(
                         dtype=torch.long, device=device
                     )
 
+    def handle_survival_object(
+        output_object_: "ComputedSurvivalOutputInfo",
+        output_name_: str,
+    ) -> None:
+        """
+        Mainly needed for MPS as to ensure we have float32 (as the often the default
+        is float64, which is not supported by MPS).
+        """
+
+        output_type_info = output_object_.output_config.output_type_info
+        assert isinstance(output_type_info, SurvivalOutputTypeConfig)
+
+        time_column = output_type_info.time_column
+        event_column = output_type_info.event_column
+
+        cur_labels_time = labels[output_name_][time_column]
+        labels_casted[output_name_][time_column] = cur_labels_time.to(
+            dtype=torch.float, device=device
+        )
+
+        cur_label_event = labels[output_name_][event_column]
+        labels_casted[output_name_][event_column] = cur_label_event.to(
+            dtype=torch.long, device=device
+        )
+
     for output_name, output_object in output_objects.items():
         match output_object:
             case ComputedTabularOutputInfo():
                 handle_tabular_object(
+                    output_object_=output_object,
+                    output_name_=output_name,
+                )
+            case ComputedSurvivalOutputInfo():
+                handle_survival_object(
                     output_object_=output_object,
                     output_name_=output_name,
                 )

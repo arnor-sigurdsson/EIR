@@ -8,7 +8,7 @@ from eir.experiment_io.label_transformer_io import load_transformers
 from eir.experiment_io.output_object_io import load_all_serialized_output_objects
 from eir.setup.config import Configs
 from eir.setup.output_setup import al_output_objects_as_dict
-from eir.train_utils.metrics import get_default_metrics
+from eir.train_utils.metrics import get_default_supervised_metrics
 from eir.train_utils.step_logic import get_default_hooks
 from eir.utils.logging import get_logger
 
@@ -53,7 +53,7 @@ def load_serialized_train_experiment(
 
     transformers = load_transformers(run_folder=run_folder)
     gc = configs_loaded.global_config
-    metrics = get_default_metrics(
+    metrics = get_default_supervised_metrics(
         target_transformers=transformers,
         cat_metrics=gc.metrics.cat_metrics,
         con_metrics=gc.metrics.con_metrics,

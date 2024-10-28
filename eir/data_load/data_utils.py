@@ -20,9 +20,13 @@ from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutpu
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
+)
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
+from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
 from eir.train_utils.distributed import in_distributed_env
 from eir.utils.logging import get_logger
 
@@ -49,6 +53,11 @@ def get_output_info_generator(
                 | ComputedImageOutputInfo()
             ):
                 yield output_name, "general", output_name
+            case ComputedSurvivalOutputInfo():
+                output_type_info = output_object.output_config.output_type_info
+                assert isinstance(output_type_info, SurvivalOutputTypeConfig)
+                event_name = output_type_info.event_column
+                yield output_name, "survival", event_name
             case _:
                 raise TypeError(f"Unknown output object: {output_object}")
 

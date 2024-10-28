@@ -1,0 +1,24 @@
+model_config:
+  model_init_config:
+    fc_do: 0.1
+    fc_task_dim: 128
+    final_layer_type: linear
+    layers:
+    - 1
+    rb_do: 0.1
+    stochastic_depth_p: 0.1
+  model_type: mlp_residual
+output_info:
+  output_inner_key: null
+  output_name: output_survival
+  output_source: ws://localhost:8000/ws
+  output_type: survival
+output_type_info:
+  event_column: Origin
+  label_parsing_chunk_size: null
+  loss_function: NegativeLogLikelihood
+  max_duration: null
+  num_durations: 10
+  time_column: Height
+sampling_config: {}
+tensor_broker_config: null

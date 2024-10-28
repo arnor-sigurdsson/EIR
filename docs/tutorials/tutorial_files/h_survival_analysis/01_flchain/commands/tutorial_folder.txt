@@ -1,0 +1,12 @@
+eir_tutorials/h_survival_analysis/01_flchain/
+├── conf
+│   ├── fusion.yaml
+│   ├── globals.yaml
+│   ├── input.yaml
+│   └── output.yaml
+└── data
+    ├── column_descriptions.txt
+    ├── flchain_test.csv
+    ├── flchain_train.csv
+    ├── test_ids.txt
+    └── train_ids.txt

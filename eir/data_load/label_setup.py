@@ -18,7 +18,7 @@ from typing import (
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 from tqdm import tqdm
 
 from eir.data_load.data_source_modules.csv_ops import ColumnOperation
@@ -42,7 +42,7 @@ al_sample_labels_raw = dict[str, al_label_values_raw]
 al_label_dict = dict[str, al_sample_labels_raw]
 al_target_label_dict = dict[str, al_label_dict]  # account for output name
 al_target_columns = dict[Literal["con", "cat"], list[str]]
-al_label_transformers_object = Union[StandardScaler, LabelEncoder]
+al_label_transformers_object = Union[StandardScaler, LabelEncoder, KBinsDiscretizer]
 al_label_transformers = dict[str, al_label_transformers_object]
 al_pd_dtypes = np.ndarray | pd.CategoricalDtype
 
@@ -72,6 +72,7 @@ def set_up_train_and_valid_tabular_data(
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     impute_missing: bool = False,
+    do_transform_labels: bool = True,
 ) -> Labels:
     """
     Splits and does split based processing (e.g. scaling validation set with training
@@ -105,12 +106,16 @@ def set_up_train_and_valid_tabular_data(
         cat_columns=tabular_file_info.cat_columns,
     )
 
-    df_labels_train, df_labels_valid, label_transformers = _process_train_and_label_dfs(
-        tabular_info=tabular_file_info,
-        df_labels_train=df_labels_train,
-        df_labels_valid=df_labels_valid,
-        impute_missing=impute_missing,
-    )
+    label_transformers: al_label_transformers = {}
+    if do_transform_labels:
+        df_labels_train, df_labels_valid, label_transformers = (
+            _process_train_and_label_dfs(
+                tabular_info=tabular_file_info,
+                df_labels_train=df_labels_train,
+                df_labels_valid=df_labels_valid,
+                impute_missing=impute_missing,
+            )
+        )
 
     labels_data_object = Labels(
         train_labels=df_labels_train,
@@ -211,7 +216,7 @@ def streamline_values_for_transformers(
     LabelEncoder() expects a 1D array, whereas StandardScaler() expects a 2D one.
     """
 
-    if isinstance(transformer, StandardScaler):
+    if isinstance(transformer, (StandardScaler, KBinsDiscretizer)):
         values_reshaped = values.reshape(-1, 1)
         return values_reshaped
 
@@ -245,6 +250,8 @@ def transform_label_df(
                     non_nan_mask = df_labels_copy[column_name].notna()
                 case LabelEncoder():
                     non_nan_mask = df_labels_copy[column_name] != "nan"
+                case KBinsDiscretizer():
+                    non_nan_mask = df_labels_copy[column_name].notna()
                 case _:
                     raise ValueError()
 

@@ -21,21 +21,21 @@ def get_base_parametrization(compiled: bool = False) -> dict:
             "global_configs": {
                 "basic_experiment": {
                     "output_folder": "multi_task_multi_modal",
-                    "n_epochs": 10,
+                    "n_epochs": 12,
                 },
                 "model": {
                     "compile_model": compiled,
                 },
                 "optimization": {
                     "gradient_clipping": 1.0,
-                    "lr": 0.001,
+                    "lr": 0.002,
                 },
             },
             "input_configs": [
                 {
                     "input_info": {"input_name": "test_genotype"},
                     "model_config": {
-                        "model_type": "cnn",
+                        "model_type": "genome-local-net",
                         "model_init_config": {"l1": 1e-04},
                     },
                 },
@@ -72,8 +72,7 @@ def get_base_parametrization(compiled: bool = False) -> dict:
             "fusion_configs": {
                 "model_config": {
                     "fc_task_dim": 256,
-                    "fc_do": 0.10,
-                    "rb_do": 0.10,
+                    "layers": [2],
                 },
             },
             "output_configs": [
@@ -113,6 +112,29 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                         },
                     },
                 },
+                {
+                    "output_info": {
+                        "output_name": "test_output_image",
+                    },
+                    "output_type_info": {
+                        "loss": "mse",
+                        "size": [16, 16],
+                    },
+                    "model_config": {
+                        "model_type": "cnn",
+                        "model_init_config": {
+                            "channel_exp_base": 4,
+                            "allow_pooling": False,
+                        },
+                    },
+                },
+                {
+                    "output_info": {"output_name": "test_output_survival"},
+                    "output_type_info": {
+                        "event_column": "BinaryOrigin",
+                        "time_column": "Time",
+                    },
+                },
             ],
         },
     }
@@ -146,7 +168,7 @@ def get_base_parametrization(compiled: bool = False) -> dict:
             ),
             "extras": {"array_dims": 1},
             "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
-            "random_samples_dropped_from_modalities": True,
+            "random_samples_dropped_from_modalities": False,
             "source": "deeplake",
         },
     ],

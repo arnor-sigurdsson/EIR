@@ -32,6 +32,9 @@ from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutpu
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
+)
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
@@ -142,6 +145,36 @@ def general_post_process(
 
                 array_base64 = _post_process_array_outputs(array=array_np)
                 post_processed[output_name] = array_base64
+
+            case ComputedSurvivalOutputInfo():
+                assert isinstance(
+                    output_model_config, schemas.TabularOutputModuleConfig
+                )
+
+                tabular_outputs = _ensure_streamlined_tabular_values(
+                    tabular_model_outputs=cur_model_outputs
+                )
+
+                output_type_info = output_object.output_config.output_type_info
+                assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
+
+                time_name = output_type_info.time_column
+                event_name = output_type_info.event_column
+
+                transformers = output_object.target_transformers
+                time_kbins_transformer = transformers[time_name]
+                time_bins = time_kbins_transformer.bin_edges_[0]
+                time_bins_except_last = time_bins[:-1]
+
+                hazards_logits = tabular_outputs[event_name]
+                hazards = torch.sigmoid(hazards_logits).numpy()
+                survival_probs = np.cumprod(1 - hazards, 0)
+
+                post_processed[output_name] = {}
+                post_processed[output_name][event_name] = {
+                    "time_bins": time_bins_except_last.tolist(),
+                    "survival_probs": survival_probs.tolist(),
+                }
 
             case _:
                 raise NotImplementedError(

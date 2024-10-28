@@ -79,7 +79,7 @@ def get_calculate_batch_metrics_data_test_kwargs():
             "Height": StandardScaler().fit(standard_scaler_fit_arr),
         }
     }
-    metrics_ = metrics.get_default_metrics(
+    metrics_ = metrics.get_default_supervised_metrics(
         target_transformers=target_transformers,
         cat_metrics=["mcc", "acc", "roc-auc-macro", "ap-macro"],
         con_metrics=["loss", "pcc", "r2", "rmse"],
@@ -223,6 +223,7 @@ def test_calculate_losses_good():
         targets=test_labels,
         inputs=test_outputs,
         log_empty_loss_callable=log_empty_once,
+        survival_links={},
     )
 
     assert perfect_pred_loss["test_output_tabular"]["Height"].item() == 0.0
@@ -245,6 +246,7 @@ def test_calculate_losses_bad():
         targets=test_labels,
         inputs=test_outputs,
         log_empty_loss_callable=log_empty_once,
+        survival_links={},
     )
 
     expected_rmse = 4.0
@@ -554,15 +556,13 @@ def setup_data():
     missing_per_modality = {"output1": set()}
     missing_within_modality = {"output1": {"inner1": set(), "inner2": set()}}
     output_and_target_names = {
-        "output1": {
-            "inner1": "inner1",
-            "inner2": "inner2",
-        },
+        "output1": ["inner1", "inner2"],
     }
     missing_ids_info = get_missing_targets_info(
         missing_ids_per_modality=missing_per_modality,
         missing_ids_within_modality=missing_within_modality,
         output_and_target_names=output_and_target_names,
+        output_configs=[],
     )
     return batch_ids, model_outputs, target_labels, missing_ids_info
 
@@ -598,7 +598,8 @@ def test_all_ids_missing(setup_data):
     missing_ids_info = get_missing_targets_info(
         missing_ids_per_modality={"output1": set(batch_ids)},
         missing_ids_within_modality={},
-        output_and_target_names={"output1": {"inner1": "inner1", "inner2": "inner2"}},
+        output_and_target_names={"output1": ["inner1", "inner2"]},
+        output_configs=[],
     )
 
     result = metrics.filter_missing_outputs_and_labels(
