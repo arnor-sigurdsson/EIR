@@ -19,7 +19,7 @@
         <img src="https://codecov.io/gh/arnor-sigurdsson/EIR/branch/master/graph/badge.svg" /></a>
   
   <a href='https://eir.readthedocs.io/'>
-        <img src='https://readthedocs.org/projects/eir/badge/?version=latest' alt='Documentation Status' /></a>
+        <img src='https://readthedocs.org/projects/eir/badge/?version=stable' alt='Documentation Status' /></a>
   
        
 </p>
@@ -61,7 +61,7 @@ docker exec -it eir_container bash
 
 ## Usage
 
-Please refer to the [Documentation](https://eir.readthedocs.io/en/latest/index.html) for examples and information.
+Please refer to the [Documentation](https://eir.readthedocs.io/en/stable/index.html) for examples and information.
 
 ## Use Cases
 
@@ -71,33 +71,33 @@ EIR allows for training and evaluating various deep-learning models directly fro
 - Establishing baselines to compare against other methods.
 - Fitting on data sources such as large-scale genomics, where DL implementations are not commonly available.
 
-If you are an ML/DL researcher developing new models, etc., it might not fit your use case. However, it might provide a quick baseline for comparison to the cool stuff you are developing, and there is some degree of [customization](https://eir.readthedocs.io/en/latest/tutorials/tutorial_index.html#customizing-eir) possible.
+If you are an ML/DL researcher developing new models, etc., it might not fit your use case. However, it might provide a quick baseline for comparison to the cool stuff you are developing, and there is some degree of [customization](https://eir.readthedocs.io/en/stable/tutorials/tutorial_index.html#customizing-eir) possible.
 
 ## Features
 
 - **General**
   - Train models directly from the command line through `.yaml` configuration files.
-  - Training on [genotype](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/01_basic_tutorial.html), [tabular](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/02_tabular_tutorial.html), [sequence](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/03_sequence_tutorial.html), [image](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/05_image_tutorial.html), [array](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/08_array_tutorial.html) and [binary](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/06_raw_bytes_tutorial.html) input data, with various modality-specific settings available.
-  - Seamless multi-modal (e.g., combining [text + image + tabular data](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/07_multimodal_tutorial.html), or any combination of the modalities above) training.
-  - Train multiple features extractors on the same data source, e.g., [combining vanilla transformer, Longformer and a pre-trained BERT variant](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/04_pretrained_sequence_tutorial.html) for text classification.
-  - Support for [checkpointing and continued training](https://eir.readthedocs.io/en/latest/tutorials/e_pretraining/01_checkpointing.html), as well as [pretraining and transferring parts of trained models to new tasks](https://eir.readthedocs.io/en/latest/tutorials/e_pretraining/02_mini_foundation.html).
+  - Training on [genotype](https://eir.readthedocs.io/en/stable/tutorials/a_using_eir/01_basic_tutorial.html), [tabular](https://eir.readthedocs.io/en/stable/tutorials/a_using_eir/02_tabular_tutorial.html), [sequence](https://eir.readthedocs.io/en/stable/tutorials/a_using_eir/03_sequence_tutorial.html), [image](https://eir.readthedocs.io/en/stable/tutorials/a_using_eir/05_image_tutorial.html), [array](https://eir.readthedocs.io/en/stable/tutorials/a_using_eir/08_array_tutorial.html) and [binary](https://eir.readthedocs.io/en/stable/tutorials/a_using_eir/06_raw_bytes_tutorial.html) input data, with various modality-specific settings available.
+  - Seamless multi-modal (e.g., combining [text + image + tabular data](https://eir.readthedocs.io/en/stable/tutorials/a_using_eir/07_multimodal_tutorial.html), or any combination of the modalities above) training.
+  - Train multiple features extractors on the same data source, e.g., [combining vanilla transformer, Longformer and a pre-trained BERT variant](https://eir.readthedocs.io/en/stable/tutorials/a_using_eir/04_pretrained_sequence_tutorial.html) for text classification.
+  - Support for [checkpointing and continued training](https://eir.readthedocs.io/en/stable/tutorials/e_pretraining/01_checkpointing.html), as well as [pretraining and transferring parts of trained models to new tasks](https://eir.readthedocs.io/en/stable/tutorials/e_pretraining/02_mini_foundation.html).
 - **Supervised Learning**
   - Supports continuous (i.e., regression) and categorical (i.e., classification) targets.
-  - [Multi-task / multi-label](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/07_multimodal_tutorial.html#appendix-b-multi-modal-multi-task-learning) prediction supported out-of-the-box.
+  - [Multi-task / multi-label](https://eir.readthedocs.io/en/stable/tutorials/a_using_eir/07_multimodal_tutorial.html#appendix-b-multi-modal-multi-task-learning) prediction supported out-of-the-box.
   - Model explainability for genotype, tabular, sequence, image and array data built in.
   - Computes and graphs various evaluation metrics (e.g., RMSE, PCC and R2 for regression tasks, accuracy, ROC-AUC, etc. for classification tasks) during training.
 - **Sequence Generation**
-  - Supports various sequence generation tasks, including basic sequence generation, sequence to sequence transformations, and image to sequence transformations. For more information, refer to the respective tutorials: [sequence generation](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/01_sequence_generation.html), [sequence to sequence](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/02_sequence_to_sequence.html), [image to sequence](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/03_image_to_sequence.html) and [tabular to sequence](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/04_tabular_to_sequence.html).
+  - Supports various sequence generation tasks, including basic sequence generation, sequence to sequence transformations, and image to sequence transformations. For more information, refer to the respective tutorials: [sequence generation](https://eir.readthedocs.io/en/stable/tutorials/c_sequence_output/01_sequence_generation.html), [sequence to sequence](https://eir.readthedocs.io/en/stable/tutorials/c_sequence_output/02_sequence_to_sequence.html), [image to sequence](https://eir.readthedocs.io/en/stable/tutorials/c_sequence_output/03_image_to_sequence.html) and [tabular to sequence](https://eir.readthedocs.io/en/stable/tutorials/c_sequence_output/04_tabular_to_sequence.html).
 - **Image Generation**
-  - Image generation is supported. For more information, refer to the respective tutorials: [Building a Simple Image Autoencoder](https://eir.readthedocs.io/en/latest/tutorials/f_image_output/01_foundational_autoencoder.html), [Image Colorization and Super-Resolution](https://eir.readthedocs.io/en/latest/tutorials/f_image_output/02_image_coloring_and_upscaling.html) and [Guided Diffusion for Image Generation](https://eir.readthedocs.io/en/stable/tutorials/f_image_output/03_mnist_diffusion.html).
+  - Image generation is supported. For more information, refer to the respective tutorials: [Building a Simple Image Autoencoder](https://eir.readthedocs.io/en/stable/tutorials/f_image_output/01_foundational_autoencoder.html), [Image Colorization and Super-Resolution](https://eir.readthedocs.io/en/stable/tutorials/f_image_output/02_image_coloring_and_upscaling.html) and [Guided Diffusion for Image Generation](https://eir.readthedocs.io/en/stable/tutorials/f_image_output/03_mnist_diffusion.html).
 - **Array Output**
-  - Supports array output tasks, such as building simple autoencoders for tasks like [MNIST Digit Generation](https://eir.readthedocs.io/en/latest/tutorials/d_array_output/01_autoencoder.html).
+  - Supports array output tasks, such as building simple autoencoders for tasks like [MNIST Digit Generation](https://eir.readthedocs.io/en/stable/tutorials/d_array_output/01_autoencoder.html).
 - **Time Series**
   - Time series inputs and outputs is possible, such as [Transformer-based Power Consumption Prediction](https://eir.readthedocs.io/en/stable/tutorials/g_time_series/01_time_series_power.html) and [Stock Price Prediction Using Transformers, One-shot and Diffusion Models](https://eir.readthedocs.io/en/stable/tutorials/g_time_series/02_time_series_stocks.html).
 - **Survival Analysis**
   - Time-to-event prediction is supported as an output type, demonstrated through [Patient Survival Prediction using Free Light Chain Data](https://eir.readthedocs.io/en/stable/tutorials/h_survival_analysis/01_survival_flchain.html).
 
-- [Many more settings](https://eir.readthedocs.io/en/latest/api_reference.html) and configurations (e.g., augmentation, regularization, optimizers) available.
+- [Many more settings](https://eir.readthedocs.io/en/stable/api_reference.html) and configurations (e.g., augmentation, regularization, optimizers) available.
 
 ## Supported Inputs and Outputs
 
@@ -111,7 +111,7 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
 | Binary     | x     |        |
 | Survival   | n/a   | x      |
 
-† While not directly supported, genotypes can be treated as arrays. For example see the [MNIST Digit Generation](https://eir.readthedocs.io/en/latest/tutorials/d_array_output/01_autoencoder.html) tutorial.
+† While not directly supported, genotypes can be treated as arrays. For example see the [MNIST Digit Generation](https://eir.readthedocs.io/en/stable/tutorials/d_array_output/01_autoencoder.html) tutorial.
 
 ## Related Projects
 
@@ -142,4 +142,4 @@ If you use `EIR` in a scientific publication, we would appreciate if you could u
 
 ## Acknowledgements
 
-Massive thanks to everyone publishing and developing the [packages](https://eir.readthedocs.io/en/latest/acknowledgements.html) this project directly and indirectly depends on.
+Massive thanks to everyone publishing and developing the [packages](https://eir.readthedocs.io/en/stable/acknowledgements.html) this project directly and indirectly depends on.
