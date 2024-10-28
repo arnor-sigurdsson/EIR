@@ -286,6 +286,9 @@ def _cox_ph_loss(
     time: torch.Tensor,
     event: torch.Tensor,
 ) -> torch.Tensor:
+
+    raise NotImplementedError("CoxPHLoss is not implemented yet.")
+
     # Sort by descending duration
     _, sorted_indices = torch.sort(time, descending=True)
     risk_scores = risk_scores[sorted_indices]
