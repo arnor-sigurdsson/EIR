@@ -110,6 +110,14 @@ def _get_image_out_parametrization(loss: str) -> dict[str, Any]:
                     "cache_fusion_type": "sum",
                     "projection_type": "interpolate",
                 },
+                {
+                    "name": "first_upscale_cnn_layer_lcl_and_mlp_residual",
+                    "layer_path": "output_modules.test_image.feature_extractor."
+                    "blocks.block_0",
+                    "use_from_cache": ["first_cnn_layer_copy"],
+                    "cache_fusion_type": "sum",
+                    "projection_type": "lcl+mlp_residual",
+                },
             ],
         }
 
