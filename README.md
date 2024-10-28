@@ -28,7 +28,7 @@
 
 Supervised modelling, sequence generation, image generation and array output on genotype, tabular, sequence, image, array, and binary input data.
 
-**WARNING:** This project is in alpha phase. Expect backwards incompatible changes and API changes.
+**WARNING:** This project is in alpha phase. Expect backwards incompatible changes and API changes between minor versions.
 
 # Table of Contents
 1. [Install](#install)
@@ -47,7 +47,7 @@ Supervised modelling, sequence generation, image generation and array output on 
 
 `pip install eir-dl`
 
-**Important:** The latest version of EIR supports [Python 3.12](https://www.python.org/downloads/). Using an older version of Python will install a outdated version of EIR, which likely be incompatible with the current documentation and might contain bugs. Please ensure that you are installing EIR in a Python 3.12 environment.
+**Important:** The latest version of EIR requires [Python 3.12](https://www.python.org/downloads/). Using an older version of Python will install an outdated version of EIR, which will likely be incompatible with the current documentation and might contain bugs. Please ensure you are using Python 3.12.
 
 ### Installing EIR via Container Engine
 
@@ -86,12 +86,16 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
   - [Multi-task / multi-label](https://eir.readthedocs.io/en/latest/tutorials/a_using_eir/07_multimodal_tutorial.html#appendix-b-multi-modal-multi-task-learning) prediction supported out-of-the-box.
   - Model explainability for genotype, tabular, sequence, image and array data built in.
   - Computes and graphs various evaluation metrics (e.g., RMSE, PCC and R2 for regression tasks, accuracy, ROC-AUC, etc. for classification tasks) during training.
-- **Sequence generation**
+- **Sequence Generation**
   - Supports various sequence generation tasks, including basic sequence generation, sequence to sequence transformations, and image to sequence transformations. For more information, refer to the respective tutorials: [sequence generation](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/01_sequence_generation.html), [sequence to sequence](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/02_sequence_to_sequence.html), [image to sequence](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/03_image_to_sequence.html) and [tabular to sequence](https://eir.readthedocs.io/en/latest/tutorials/c_sequence_output/04_tabular_to_sequence.html).
-- **Image generation**
-  - Image generation is supported. For more information, refer to the respective tutorials: [Building a Simple Image Autoencoder](https://eir.readthedocs.io/en/latest/tutorials/f_image_output/01_foundational_autoencoder.html) and [Image Colorization and Super-Resolution](https://eir.readthedocs.io/en/latest/tutorials/f_image_output/02_image_coloring_and_upscaling.html).
+- **Image Generation**
+  - Image generation is supported. For more information, refer to the respective tutorials: [Building a Simple Image Autoencoder](https://eir.readthedocs.io/en/latest/tutorials/f_image_output/01_foundational_autoencoder.html), [Image Colorization and Super-Resolution](https://eir.readthedocs.io/en/latest/tutorials/f_image_output/02_image_coloring_and_upscaling.html) and [Guided Diffusion for Image Generation](https://eir.readthedocs.io/en/stable/tutorials/f_image_output/03_mnist_diffusion.html).
 - **Array Output**
-  - Supports array output tasks, such as building simple autoencoders for tasks like [MNIST Digit Generation](https://eir.readthedocs.io/en/latest/tutorials/d_array_output/01_autoencoder.html). 
+  - Supports array output tasks, such as building simple autoencoders for tasks like [MNIST Digit Generation](https://eir.readthedocs.io/en/latest/tutorials/d_array_output/01_autoencoder.html).
+- **Time Series**
+  - Time series inputs and outputs is possible, such as [Transformer-based Power Consumption Prediction](https://eir.readthedocs.io/en/stable/tutorials/g_time_series/01_time_series_power.html) and [Stock Price Prediction Using Transformers, One-shot and Diffusion Models](https://eir.readthedocs.io/en/stable/tutorials/g_time_series/02_time_series_stocks.html).
+- **Survival Analysis**
+  - Time-to-event prediction is supported as an output type, demonstrated through [Patient Survival Prediction using Free Light Chain Data](https://eir.readthedocs.io/en/stable/tutorials/h_survival_analysis/01_survival_flchain.html).
 
 - [Many more settings](https://eir.readthedocs.io/en/latest/api_reference.html) and configurations (e.g., augmentation, regularization, optimizers) available.
 
@@ -105,6 +109,7 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
 | Image      | x     | x      |
 | Array      | x     | x      |
 | Binary     | x     |        |
+| Survival   | n/a   | x      |
 
 † While not directly supported, genotypes can be treated as arrays. For example see the [MNIST Digit Generation](https://eir.readthedocs.io/en/latest/tutorials/d_array_output/01_autoencoder.html) tutorial.
 
