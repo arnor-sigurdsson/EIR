@@ -1,9 +1,10 @@
 import json
 import logging
 from contextlib import contextmanager
+from typing import Generator
 
 import websocket
-from websocket._exceptions import WebSocketTimeoutException
+from websocket._exceptions import WebSocketBadStatusException, WebSocketTimeoutException
 
 from eir.setup.streaming_data_setup.protocol import (
     FROM_SERVER_MESSAGE_TYPES,
@@ -38,38 +39,53 @@ def connect_to_server(
     websocket_url: str,
     protocol_version: str,
     max_size: int = 10_000_000,
-):
-    ws = websocket.create_connection(
-        url=websocket_url,
-        max_size=max_size,
-    )
+) -> Generator[websocket.WebSocket, None, None]:
+    logger.debug(f"Attempting WebSocket connection to: {websocket_url}")
 
     try:
-        ws.send(
-            json.dumps(
-                {
-                    "type": "handshake",
-                    "version": protocol_version,
-                }
-            )
+        ws = websocket.create_connection(
+            url=websocket_url,
+            max_size=max_size,
         )
+    except WebSocketBadStatusException as e:
+        logger.error(f"Failed to establish WebSocket connection: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected connection error: {type(e).__name__} - {str(e)}")
+        raise
+
+    try:
+        handshake_payload = {
+            "type": "handshake",
+            "version": protocol_version,
+        }
+        ws.send(json.dumps(handshake_payload))
 
         response_data = receive_with_timeout(websocket=ws)
-        is_not_handshake = response_data["type"] != "handshake"
-        is_incompatible_version = response_data["version"] != protocol_version
-        if is_not_handshake or is_incompatible_version:
-            raise ValueError("Incompatible server version")
+        if response_data is None:
+            raise ValueError("No handshake response received from server")
 
-        logger.info(
-            "Successfully connected to server with protocol version %s",
-            protocol_version,
-        )
+        if response_data["type"] != "handshake":
+            raise ValueError(
+                f"Expected handshake response, got: {response_data['type']}"
+            )
+
+        if response_data["version"] != protocol_version:
+            raise ValueError(
+                f"Protocol version mismatch. Expected: {protocol_version}, "
+                f"Got: {response_data.get('version', 'unknown')}"
+            )
+
+        logger.info(f"Connected to server with protocol version {protocol_version}")
         yield ws
     except Exception as e:
-        logger.error(f"Error during connection or handshake: {e}")
+        logger.error(f"Error during handshake: {str(e)}")
         raise
     finally:
-        ws.close()
+        try:
+            ws.close()
+        except Exception as e:
+            logger.warning(f"Error closing WebSocket connection: {str(e)}")
 
 
 def receive_with_timeout(websocket: websocket.WebSocket, timeout: int = 30):
