@@ -6,7 +6,6 @@ on:
       - '*.*.*'
 
 jobs:
-
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -37,8 +36,7 @@ jobs:
     steps:
       - name: Get the tag version
         id: getversiontag
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
-
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
 
   build:
     name: Build packages
@@ -47,17 +45,15 @@ jobs:
     strategy:
       matrix:
         include:
-
           - os: ubuntu-22.04
             TARGET: ubuntu
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Release
         id: release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
