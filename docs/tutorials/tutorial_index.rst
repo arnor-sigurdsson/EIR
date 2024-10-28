@@ -54,6 +54,15 @@ Time Series
     g_time_series/01_time_series_power.rst
     g_time_series/02_time_series_stocks.rst
 
+Survival Analysis
+=================
+
+.. toctree::
+    :maxdepth: 2
+
+    h_survival_analysis/01_survival_flchain.rst
+
+
 Pretraining
 ============
 

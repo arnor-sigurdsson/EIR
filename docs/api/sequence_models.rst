@@ -803,7 +803,7 @@ Args:
     classifier_dropout (`float`, *optional*):
         The dropout ratio for the classification head.
 
-.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, attention_bias=False, attention_dropout=0.0, mlp_bias=False, **kwargs)
+.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, attention_bias=False, attention_dropout=0.0, mlp_bias=False, head_dim=None, **kwargs)
 
 The Code Llama model was proposed in `Code Llama: Open Foundation Models for Code <https://ai.meta.com/research/publications/code-llama-open-foundation-models-for-code/>`__ by Baptiste Rozière, Jonas Gehring, Fabian Gloeckle, Sten Sootla, Itai Gat, Xiaoqing Ellen Tan, Yossi Adi, Jingyu Liu, Tal Remez, Jérémy Rapin, Artyom Kozhevnikov, Ivan Evtimov, Joanna Bitton, Manish Bhatt, Cristian Canton Ferrer, Aaron Grattafiori, Wenhan Xiong, Alexandre Défossez, Jade Copet, Faisal Azhar, Hugo Touvron, Louis Martin, Nicolas Usunier, Thomas Scialom, Gabriel Synnaeve.
 
@@ -977,6 +977,8 @@ Args:
         The dropout ratio for the attention probabilities.
     mlp_bias (`bool`, *optional*, defaults to `False`):
         Whether to use a bias in up_proj, down_proj and gate_proj layers in the MLP layers.
+    head_dim (`int`, *optional*):
+        The attention head dimension. If None, it will default to hidden_size // num_heads
 
 ::
 
@@ -1045,7 +1047,7 @@ Args:
         Whether the model's input and output word embeddings should be tied. Note that this is only relevant if the
         model has a output word embedding layer.
 
-.. class:: transformers.models.cohere.configuration_cohere.CohereConfig(vocab_size=256000, hidden_size=8192, intermediate_size=22528, logit_scale=0.0625, num_hidden_layers=40, num_attention_heads=64, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=8192, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, pad_token_id=0, bos_token_id=5, eos_token_id=255001, tie_word_embeddings=True, rope_theta=10000.0, attention_bias=False, attention_dropout=0.0, use_qk_norm=False, **kwargs)
+.. class:: transformers.models.cohere.configuration_cohere.CohereConfig(vocab_size=256000, hidden_size=8192, intermediate_size=22528, logit_scale=0.0625, num_hidden_layers=40, num_attention_heads=64, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=8192, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, pad_token_id=0, bos_token_id=5, eos_token_id=255001, tie_word_embeddings=True, rope_theta=10000.0, rope_scaling=None, attention_bias=False, attention_dropout=0.0, use_qk_norm=False, **kwargs)
 
 The Cohere Command-R model was proposed in the blogpost `Command-R: Retrieval Augmented Generation at Production Scale <https://txt.cohere.com/command-r/>`__ by the Cohere Team.
 
@@ -1106,6 +1108,43 @@ Args:
         Whether to tie weight embeddings
     rope_theta (`float`, *optional*, defaults to 10000.0):
         The base period of the RoPE embeddings.
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     attention_bias (`bool`, defaults to `False`, *optional*, defaults to `False`):
         Whether to use a bias in the query, key, value and output projection layers during self-attention.
     attention_dropout (`float`, *optional*, defaults to 0.0):
@@ -1315,7 +1354,7 @@ This model was contributed by `DeBERTa <https://huggingface.co/DeBERTa>`__. This
 contributed by `kamalkraj <https://huggingface.co/kamalkraj>`__ . The original code can be found `here <https://github.com/microsoft/DeBERTa>`__.
 
 Arguments:
-    vocab_size (`int`, *optional*, defaults to 30522):
+    vocab_size (`int`, *optional*, defaults to 50265):
         Vocabulary size of the DeBERTa model. Defines the number of different tokens that can be represented by the
         `inputs_ids` passed when calling ``DebertaModel`` or ``TFDebertaModel``.
     hidden_size (`int`, *optional*, defaults to 768):
@@ -1337,7 +1376,7 @@ Arguments:
     max_position_embeddings (`int`, *optional*, defaults to 512):
         The maximum sequence length that this model might ever be used with. Typically set this to something large
         just in case (e.g., 512 or 1024 or 2048).
-    type_vocab_size (`int`, *optional*, defaults to 2):
+    type_vocab_size (`int`, *optional*, defaults to 0):
         The vocabulary size of the `token_type_ids` passed when calling ``DebertaModel`` or ``TFDebertaModel``.
     initializer_range (`float`, *optional*, defaults to 0.02):
         The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
@@ -1739,13 +1778,42 @@ Args:
     rope_theta (`float`, *optional*, defaults to 10000.0):
         The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
-        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
-        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
-        these scaling strategies behave:
-        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
-        experimental feature, subject to breaking API changes in future versions.
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     bos_token_id (`int`, *optional*, defaults to 11):
         The id of the "beginning-of-sequence" token.
     eos_token_id (`int`, *optional*, defaults to 11):
@@ -1755,6 +1823,141 @@ Args:
         defaults to 4x hidden dim
     activation (`str`, *optional*, defaults to `"gelu"`):
         The activation function used in the feedforward layer.
+
+.. class:: transformers.models.falcon_mamba.configuration_falcon_mamba.FalconMambaConfig(vocab_size=50280, hidden_size=768, state_size=16, num_hidden_layers=32, layer_norm_epsilon=1e-05, pad_token_id=0, bos_token_id=0, eos_token_id=0, expand=2, conv_kernel=4, use_bias=False, use_conv_bias=True, hidden_act='silu', initializer_range=0.1, residual_in_fp32=True, time_step_rank='auto', time_step_scale=1.0, time_step_min=0.001, time_step_max=0.1, time_step_init_scheme='random', time_step_floor=0.0001, rescale_prenorm_residual=False, use_cache=True, use_mambapy=False, mixer_rms_eps=1e-06, **kwargs)
+
+The FalconMamba model was proposed by TII UAE (Technology Innovation Institute) in their release.
+
+The abstract from the paper is the following:
+
+*We present FalconMamba, a new base large language model based on the novel Mamba architecture. FalconMamba is trained on 5.8 trillion tokens with carefully selected data mixtures. As a pure Mamba-based model, FalconMamba surpasses leading open-weight models based on Transformers, such as Mistral 7B, Llama3 8B, and Falcon2 11B. It is on par with Gemma 7B and outperforms models with different architecture designs, such as RecurrentGemma 9B. Currently, FalconMamba is the best-performing Mamba model in the literature at this scale, surpassing both existing Mamba and hybrid Mamba-Transformer models.
+Due to its architecture, FalconMamba is significantly faster at inference and requires substantially less memory for long sequence generation. Despite recent studies suggesting that hybrid Mamba-Transformer models outperform pure architecture designs, we argue and demonstrate that the pure Mamba design can achieve similar, even superior results compared to the hybrid design. We make the weights of our implementation of FalconMamba publicly available under a permissive license.*
+
+Tips:
+
+- FalconMamba is mostly based on Mamba architecture, the same `tips and best practices <./mamba>`__ would be relevant here.
+
+The model has been trained on approximtely 6T tokens consisting a mixture of many data sources such as RefineWeb, Cosmopedia and Math data.
+
+For more details about the training procedure and the architecture, have a look at `the technical paper of FalconMamba <>`__ (coming soon).
+
+# Usage
+
+Below we demonstrate how to use the model:
+
+```python 
+from transformers import FalconMambaForCausalLM, AutoTokenizer
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained("tiiuae/falcon-mamba-7b")
+model = FalconMambaForCausalLM.from_pretrained("tiiuae/falcon-mamba-7b")
+
+input_ids = tokenizer("Hey how are you doing?", return_tensors= "pt")["input_ids"]
+
+out = model.generate(input_ids, max_new_tokens=10)
+print(tokenizer.batch_decode(out))
+```
+
+The architecture is also compatible with `torch.compile` for faster generation:
+
+```python 
+from transformers import FalconMambaForCausalLM, AutoTokenizer
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained("tiiuae/falcon-mamba-7b")
+model = FalconMambaForCausalLM.from_pretrained("tiiuae/falcon-mamba-7b", torch_dtype=torch.bfloat16).to(0)
+model = torch.compile(model)
+
+input_ids = tokenizer("Hey how are you doing?", return_tensors= "pt")["input_ids"]
+
+out = model.generate(input_ids, max_new_tokens=10)
+print(tokenizer.batch_decode(out))
+```
+
+If you have access to a GPU that is compatible with `bitsandbytes`, you can also quantize the model in 4-bit precision:
+
+```python 
+from transformers import FalconMambaForCausalLM, AutoTokenizer, BitsAndBytesConfig
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained("tiiuae/falcon-mamba-7b")
+quantization_config = BitsAndBytesConfig(load_in_4bit=True)
+model = FalconMambaForCausalLM.from_pretrained("tiiuae/falcon-mamba-7b", quantization_config=quantization_config)
+
+input_ids = tokenizer("Hey how are you doing?", return_tensors= "pt")["input_ids"]
+
+out = model.generate(input_ids, max_new_tokens=10)
+print(tokenizer.batch_decode(out))
+```
+
+You can also play with the instruction fine-tuned model:
+
+```python 
+from transformers import FalconMambaForCausalLM, AutoTokenizer
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained("tiiuae/falcon-mamba-7b-instruct")
+model = FalconMambaForCausalLM.from_pretrained("tiiuae/falcon-mamba-7b-instruct")
+
+# We use the tokenizer's chat template to format each message - see https://huggingface.co/docs/transformers/main/en/chat_templating
+messages = [
+    {"role": "user", "content": "How many helicopters can a human eat in one sitting?"},
+]
+input_ids = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True).input_ids
+
+outputs = model.generate(input_ids)
+print(tokenizer.decode(outputs[0]))
+```
+
+Args:
+    vocab_size (`int`, *optional*, defaults to 50280):
+        Vocabulary size of the FALCON_MAMBA model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``FalconMambaModel``.
+    hidden_size (`int`, *optional*, defaults to 768):
+        Dimensionality of the embeddings and hidden states.
+    state_size (`int`, *optional*, defaults to 16): shape of the state space latents.
+    num_hidden_layers (`int`, *optional*, defaults to 32):
+        Number of hidden layers in the model.
+    layer_norm_epsilon (`float`, *optional*, defaults to 1e-05):
+        The epsilon to use in the layer normalization layers.
+    pad_token_id (`int`, *optional*, defaults to 0):
+        Padding token id.
+    bos_token_id (`int`, *optional*, defaults to 0):
+        The id of the beginning of sentence token in the vocabulary.
+    eos_token_id (`int`, *optional*, defaults to 0):
+        The id of the end of sentence token in the vocabulary.
+    expand (`int`, *optional*, defaults to 2): Expanding factor used to determine the intermediate size.
+    conv_kernel (`int`, *optional*, defaults to 4): Size of the convolution kernel.
+    use_bias (`bool`, *optional*, defaults to `False`):
+        Whether or not to use bias in ["in_proj", "out_proj"] of the mixer block
+    use_conv_bias (`bool`, *optional*, defaults to `True`):
+        Whether or not to use bias in the convolution layer of the mixer block.
+    hidden_act (`str`, *optional*, defaults to `"silu"`):
+        The non-linear activation function (function or string) in the decoder.
+    initializer_range (`float`, *optional*, defaults to 0.1):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    residual_in_fp32 (`bool`, *optional*, defaults to `True`):
+        Whether or not residuals should be in `float32`. If set to `False` residuals will keep the same `dtype` as the rest of the model
+    time_step_rank (`Union[int,str]`, *optional*, defaults to `"auto"`):
+        Rank of the discretization projection matrix. `"auto"` means that it will default to `math.ceil(self.hidden_size / 16)`
+    time_step_scale (`float`, *optional*, defaults to 1.0):
+        Scale used used to scale `dt_proj.bias`.
+    time_step_min (`float`, *optional*, defaults to 0.001):
+        Minimum `time_step` used to bound `dt_proj.bias`.
+    time_step_max (`float`, *optional*, defaults to 0.1):
+        Maximum `time_step` used to bound `dt_proj.bias`.
+    time_step_init_scheme (`float`, *optional*, defaults to `"random"`):
+        Init scheme used for `dt_proj.weight`. Should be one of `["random","uniform"]`
+    time_step_floor (`float`, *optional*, defaults to 0.0001):
+        Minimum clamping value of the `dt_proj.bias` layer initialization.
+    rescale_prenorm_residual (`bool`, *optional*, defaults to `False`):
+        Whether or not to rescale `out_proj` weights when initializing.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the cache should be used.
+    use_mambapy (`bool`, *optional*, defaults to `False`):
+        Determines the fallback strategy during training if the CUDA-based official implementation of FalconMamba is not avaiable. If `True`, the falcon_mamba.py implementation is used. If `False`, the naive and slower implementation is used. Consider switching to the naive version if memory is limited.
+    mixer_rms_eps (`float`, *optional*, defaults to 1e-06):
+        The RMS norm epsilon value that is used in the Mixer RMS norm for B, C and dt states.
 
 .. class:: transformers.models.flaubert.configuration_flaubert.FlaubertConfig(pre_norm=False, layerdrop=0.0, vocab_size=30145, emb_dim=2048, n_layers=12, n_heads=16, dropout=0.1, attention_dropout=0.1, gelu_activation=True, sinusoidal_embeddings=False, causal=False, asm=False, n_langs=1, use_lang_emb=True, max_position_embeddings=512, embed_init_std=0.02209708691207961, layer_norm_eps=1e-12, init_std=0.02, bos_index=0, eos_index=1, pad_index=2, unk_index=3, mask_index=5, is_encoder=True, summary_type='first', summary_use_proj=True, summary_activation=None, summary_proj_to_labels=True, summary_first_dropout=0.1, start_n_top=5, end_n_top=5, mask_token_id=0, lang_id=0, pad_token_id=2, bos_token_id=0, **kwargs)
 
@@ -2011,7 +2214,7 @@ Args:
 >>> # Accessing the model configuration
 >>> configuration = model.config
 
-.. class:: transformers.models.gemma2.configuration_gemma2.Gemma2Config(vocab_size=256000, hidden_size=3072, intermediate_size=24576, num_hidden_layers=28, num_attention_heads=16, num_key_value_heads=16, head_dim=256, hidden_activation='gelu_pytorch_tanh', max_position_embeddings=8192, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, eos_token_id=1, bos_token_id=2, tie_word_embeddings=True, rope_theta=10000.0, attention_bias=False, attention_dropout=0.0, final_logit_softcapping=30.0, attn_logit_softcapping=50.0, query_pre_attn_scalar=224, sliding_window=4096, **kwargs)
+.. class:: transformers.models.gemma2.configuration_gemma2.Gemma2Config(vocab_size=256000, hidden_size=3072, intermediate_size=24576, num_hidden_layers=28, num_attention_heads=16, num_key_value_heads=16, head_dim=256, hidden_activation='gelu_pytorch_tanh', max_position_embeddings=8192, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=0, eos_token_id=1, bos_token_id=2, tie_word_embeddings=True, rope_theta=10000.0, attention_bias=False, attention_dropout=0.0, query_pre_attn_scalar=224, sliding_window=4096, final_logit_softcapping=30.0, attn_logit_softcapping=50.0, cache_implementation='hybrid', **kwargs)
 
 The Gemma2 model was proposed in `Gemma2: Open Models Based on Gemini Technology and Research <https://blog.google/technology/developers/google-gemma-2/>`__ by Gemma2 Team, Google.
 Two Gemma2 models are released, with parameters sizes of 9 billion (9B) and 27 billion (27B).
@@ -2050,7 +2253,8 @@ Args:
     head_dim (`int`, *optional*, defaults to 256):
         The attention head dimension.
     hidden_activation (`str` or `function`, *optional*, defaults to `"gelu_pytorch_tanh"`):
-        The non-linear activation function (function or string) in the decoder.
+        The non-linear activation function (function or string) in the decoder. Will default to `"gelu_pytorch_tanh"`
+        if not specified. `"gelu_pytorch_tanh"` uses an approximation of the `"gelu"` activation function.
     max_position_embeddings (`int`, *optional*, defaults to 8192):
         The maximum sequence length that this model might ever be used with.
     initializer_range (`float`, *optional*, defaults to 0.02):
@@ -2074,17 +2278,19 @@ Args:
         Whether to use a bias in the query, key, value and output projection layers during self-attention.
     attention_dropout (`float`, *optional*, defaults to 0.0):
         The dropout ratio for the attention probabilities.
-    final_logit_softcapping (`float`, *optional*, defaults to 30.0): scaling factor when applying tanh softcapping on the logits.
-    attn_logit_softcapping (`float`, *optional*, defaults to 50.0): scaling factor when applying tanh softcapping on the attention scores.
     query_pre_attn_scalar (`float`, *optional*, defaults to 224): scaling factor used on the attention scores
     sliding_window (`int`, *optional*, defaults to 4096): in Gemma2, every other layer uses sliding window attention. This is the
         size of the sliding window.
+    final_logit_softcapping (`float`, *optional*, defaults to 30.0): scaling factor when applying tanh softcapping on the logits.
+    attn_logit_softcapping (`float`, *optional*, defaults to 50.0): scaling factor when applying tanh softcapping on the attention scores.
+    cache_implementation (`str`, *optional*, defaults to `"hybrid"`): the cache type to be used with `generate`.
+
 ::
 
 >>> from transformers import Gemma2Model, Gemma2Config
->>> # Initializing a Gemma2 gemma2-9b style configuration
+>>> # Initializing a Gemma2 gemma2-7b style configuration
 >>> configuration = Gemma2Config()
->>> # Initializing a model from the gemma2-9b style configuration
+>>> # Initializing a model from the gemma2-7b style configuration
 >>> model = Gemma2Model(configuration)
 >>> # Accessing the model configuration
 >>> configuration = model.config
@@ -2152,183 +2358,6 @@ Args:
     num_image_with_embedding (`int`, *optional*):
         The number of temporal embeddings to add, in case the model is used for video captioning/VQA.
 
-.. class:: transformers.models.gpt2.configuration_gpt2.GPT2Config(vocab_size=50257, n_positions=1024, n_embd=768, n_layer=12, n_head=12, n_inner=None, activation_function='gelu_new', resid_pdrop=0.1, embd_pdrop=0.1, attn_pdrop=0.1, layer_norm_epsilon=1e-05, initializer_range=0.02, summary_type='cls_index', summary_use_proj=True, summary_activation=None, summary_proj_to_labels=True, summary_first_dropout=0.1, scale_attn_weights=True, use_cache=True, bos_token_id=50256, eos_token_id=50256, scale_attn_by_inverse_layer_idx=False, reorder_and_upcast_attn=False, **kwargs)
-
-The GPT-Sw3 model was first proposed in
-`Lessons Learned from GPT-SW3: Building the First Large-Scale Generative Language Model for Swedish <http://www.lrec-conf.org/proceedings/lrec2022/pdf/2022.lrec-1.376.pdf>`__
-by Ariel Ekgren, Amaru Cuba Gyllensten, Evangelia Gogoulou, Alice Heiman, Severine Verlinden, Joey Öhman,
-Fredrik Carlsson, Magnus Sahlgren.
-
-Since that first paper the authors have extended their work and trained new models on their new 1.2TB corpora named The Nordic Pile.
-
-GPT-Sw3 is a collection of large decoder-only pretrained transformer language models that were developed by AI Sweden
-in collaboration with RISE and the WASP WARA for Media and Language. GPT-Sw3 has been trained on a dataset containing
-320B tokens in Swedish, Norwegian, Danish, Icelandic, English, and programming code. The model was pretrained using a
-causal language modeling (CLM) objective utilizing the NeMo Megatron GPT implementation.
-
-This model was contributed by `AI Sweden <https://huggingface.co/AI-Sweden>`__.
-
-The implementation uses the `GPT2Model <https://huggingface.co/docs/transformers/model_doc/gpt2>`__ coupled
-with our `GPTSw3Tokenizer`. This means that `AutoTokenizer` and `AutoModelForCausalLM` map to our tokenizer
-implementation and the corresponding GPT2 model implementation respectively.
-*Note that sentencepiece is required to use our tokenizer and can be installed with:* `pip install transformers[sentencepiece]` or `pip install sentencepiece`
-
-.. class:: transformers.models.gpt2.configuration_gpt2.GPT2Config(vocab_size=50257, n_positions=1024, n_embd=768, n_layer=12, n_head=12, n_inner=None, activation_function='gelu_new', resid_pdrop=0.1, embd_pdrop=0.1, attn_pdrop=0.1, layer_norm_epsilon=1e-05, initializer_range=0.02, summary_type='cls_index', summary_use_proj=True, summary_activation=None, summary_proj_to_labels=True, summary_first_dropout=0.1, scale_attn_weights=True, use_cache=True, bos_token_id=50256, eos_token_id=50256, scale_attn_by_inverse_layer_idx=False, reorder_and_upcast_attn=False, **kwargs)
-
-OpenAI GPT-2 model was proposed in `Language Models are Unsupervised Multitask Learners <https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf>`__ by Alec
-Radford, Jeffrey Wu, Rewon Child, David Luan, Dario Amodei and Ilya Sutskever from `OpenAI <https://huggingface.co/openai>`__. It's a causal (unidirectional)
-transformer pretrained using language modeling on a very large corpus of ~40 GB of text data.
-
-The abstract from the paper is the following:
-
-*GPT-2 is a large transformer-based language model with 1.5 billion parameters, trained on a dataset`1] of 8 million
-web pages. GPT-2 is trained with a simple objective: predict the next word, given all of the previous words within some
-text. The diversity of the dataset causes this simple goal to contain naturally occurring demonstrations of many tasks
-across diverse domains. GPT-2 is a direct scale-up of GPT, with more than 10X the parameters and trained on more than
-10X the amount of data.*
-
-Tips:
-
-- GPT-2 is a model with absolute position embeddings so it's usually advised to pad the inputs on the right rather than
-  the left.
-- GPT-2 was trained with a causal language modeling (CLM) objective and is therefore powerful at predicting the next
-  token in a sequence. Leveraging this feature allows GPT-2 to generate syntactically coherent text as it can be
-  observed in the *run_generation.py* example script.
-- The model can take the *past_key_values* (for PyTorch) or *past* (for TF) as input, which is the previously computed
-  key/value attention pairs. Using this (*past_key_values* or *past*) value prevents the model from re-computing
-  pre-computed values in the context of text generation. For PyTorch, see *past_key_values* argument of the
-  ``GPT2Model.forward`` method, or for TF the *past* argument of the
-  ``TFGPT2Model.call`` method for more information on its usage.
-- Enabling the *scale_attn_by_inverse_layer_idx* and *reorder_and_upcast_attn* flags will apply the training stability
-  improvements from [Mistral <https://github.com/stanford-crfm/mistral/>`__ (for PyTorch only).
-
-`Write With Transformer <https://transformer.huggingface.co/doc/gpt2-large>`__ is a webapp created and hosted by
-Hugging Face showcasing the generative capabilities of several models. GPT-2 is one of them and is available in five
-different sizes: small, medium, large, xl and a distilled version of the small checkpoint: *distilgpt-2*.
-
-This model was contributed by `thomwolf <https://huggingface.co/thomwolf>`__. The original code can be found `here <https://openai.com/blog/better-language-models/>`__.
-
-Args:
-    vocab_size (`int`, *optional*, defaults to 50257):
-        Vocabulary size of the GPT-2 model. Defines the number of different tokens that can be represented by the
-        `inputs_ids` passed when calling ``GPT2Model`` or ``TFGPT2Model``.
-    n_positions (`int`, *optional*, defaults to 1024):
-        The maximum sequence length that this model might ever be used with. Typically set this to something large
-        just in case (e.g., 512 or 1024 or 2048).
-    n_embd (`int`, *optional*, defaults to 768):
-        Dimensionality of the embeddings and hidden states.
-    n_layer (`int`, *optional*, defaults to 12):
-        Number of hidden layers in the Transformer encoder.
-    n_head (`int`, *optional*, defaults to 12):
-        Number of attention heads for each attention layer in the Transformer encoder.
-    n_inner (`int`, *optional*):
-        Dimensionality of the inner feed-forward layers. `None` will set it to 4 times n_embd
-    activation_function (`str`, *optional*, defaults to `"gelu_new"`):
-        Activation function, to be selected in the list `["relu", "silu", "gelu", "tanh", "gelu_new"]`.
-    resid_pdrop (`float`, *optional*, defaults to 0.1):
-        The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
-    embd_pdrop (`float`, *optional*, defaults to 0.1):
-        The dropout ratio for the embeddings.
-    attn_pdrop (`float`, *optional*, defaults to 0.1):
-        The dropout ratio for the attention.
-    layer_norm_epsilon (`float`, *optional*, defaults to 1e-05):
-        The epsilon to use in the layer normalization layers.
-    initializer_range (`float`, *optional*, defaults to 0.02):
-        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-    summary_type (`string`, *optional*, defaults to `"cls_index"`):
-        Argument used when doing sequence summary, used in the models ``GPT2DoubleHeadsModel`` and
-        ``TFGPT2DoubleHeadsModel``.
-
-        Has to be one of the following options:
-
-            - `"last"`: Take the last token hidden state (like XLNet).
-            - `"first"`: Take the first token hidden state (like BERT).
-            - `"mean"`: Take the mean of all tokens hidden states.
-            - `"cls_index"`: Supply a Tensor of classification token position (like GPT/GPT-2).
-            - `"attn"`: Not implemented now, use multi-head attention.
-    summary_use_proj (`bool`, *optional*, defaults to `True`):
-        Argument used when doing sequence summary, used in the models ``GPT2DoubleHeadsModel`` and
-        ``TFGPT2DoubleHeadsModel``.
-
-        Whether or not to add a projection after the vector extraction.
-    summary_activation (`str`, *optional*):
-        Argument used when doing sequence summary. Used in for the multiple choice head in
-        ``GPT2DoubleHeadsModel``.
-
-        Pass `"tanh"` for a tanh activation to the output, any other value will result in no activation.
-    summary_proj_to_labels (`bool`, *optional*, defaults to `True`):
-        Argument used when doing sequence summary, used in the models ``GPT2DoubleHeadsModel`` and
-        ``TFGPT2DoubleHeadsModel``.
-
-        Whether the projection outputs should have `config.num_labels` or `config.hidden_size` classes.
-    summary_first_dropout (`float`, *optional*, defaults to 0.1):
-        Argument used when doing sequence summary, used in the models ``GPT2DoubleHeadsModel`` and
-        ``TFGPT2DoubleHeadsModel``.
-
-        The dropout ratio to be used after the projection and activation.
-    scale_attn_weights (`bool`, *optional*, defaults to `True`):
-        Scale attention weights by dividing by sqrt(hidden_size)..
-    use_cache (`bool`, *optional*, defaults to `True`):
-        Whether or not the model should return the last key/values attentions (not used by all models).
-    bos_token_id (`int`, *optional*, defaults to 50256):
-        Id of the beginning of sentence token in the vocabulary.
-    eos_token_id (`int`, *optional*, defaults to 50256):
-        Id of the end of sentence token in the vocabulary.
-    scale_attn_by_inverse_layer_idx (`bool`, *optional*, defaults to `False`):
-        Whether to additionally scale attention weights by `1 / layer_idx + 1`.
-    reorder_and_upcast_attn (`bool`, *optional*, defaults to `False`):
-        Whether to scale keys (K) prior to computing attention (dot-product) and upcast attention
-        dot-product/softmax to float() when training with mixed precision.
-
-.. class:: transformers.models.gpt_bigcode.configuration_gpt_bigcode.GPTBigCodeConfig(vocab_size=50257, n_positions=1024, n_embd=768, n_layer=12, n_head=12, n_inner=None, activation_function='gelu_pytorch_tanh', resid_pdrop=0.1, embd_pdrop=0.1, attn_pdrop=0.1, layer_norm_epsilon=1e-05, initializer_range=0.02, scale_attn_weights=True, use_cache=True, bos_token_id=50256, eos_token_id=50256, attention_softmax_in_fp32=True, scale_attention_softmax_in_fp32=True, multi_query=True, **kwargs)
-
-The GPTBigCode model was proposed in `SantaCoder: don't reach for the stars! <https://arxiv.org/abs/2301.03988>`__ by BigCode. The listed authors are: Loubna Ben Allal, Raymond Li, Denis Kocetkov, Chenghao Mou, Christopher Akiki, Carlos Munoz Ferrandis, Niklas Muennighoff, Mayank Mishra, Alex Gu, Manan Dey, Logesh Kumar Umapathi, Carolyn Jane Anderson, Yangtian Zi, Joel Lamy Poirier, Hailey Schoelkopf, Sergey Troshin, Dmitry Abulkhanov, Manuel Romero, Michael Lappert, Francesco De Toni, Bernardo García del Río, Qian Liu, Shamik Bose, Urvashi Bhattacharyya, Terry Yue Zhuo, Ian Yu, Paulo Villegas, Marco Zocca, Sourab Mangrulkar, David Lansky, Huu Nguyen, Danish Contractor, Luis Villa, Jia Li, Dzmitry Bahdanau, Yacine Jernite, Sean Hughes, Daniel Fried, Arjun Guha, Harm de Vries, Leandro von Werra.
-
-The abstract from the paper is the following:uery
-
-*The BigCode project is an open-scientific collaboration working on the responsible development of large language models for code. This tech report describes the progress of the collaboration until December 2022, outlining the current state of the Personally Identifiable Information (PII) redaction pipeline, the experiments conducted to de-risk the model architecture, and the experiments investigating better preprocessing methods for the training data. We train 1.1B parameter models on the Java, JavaScript, and Python subsets of The Stack and evaluate them on the MultiPL-E text-to-code benchmark. We find that more aggressive filtering of near-duplicates can further boost performance and, surprisingly, that selecting files from repositories with 5+ GitHub stars deteriorates performance significantly. Our best model outperforms previous open-source multilingual code generation models (InCoder-6.7B and CodeGen-Multi-2.7B) in both left-to-right generation and infilling on the Java, JavaScript, and Python portions of MultiPL-E, despite being a substantially smaller model. All models are released under an OpenRAIL license at `this https URL. <https://huggingface.co/bigcode>`__*
-
-The model is a an optimized `GPT2 model <https://huggingface.co/docs/transformers/model_doc/gpt2>`__ with support for Multi-Query Attention.
-
-Args:
-    vocab_size (`int`, *optional*, defaults to 50257):
-        Vocabulary size of the GPT-2 model. Defines the number of different tokens that can be represented by the
-        `inputs_ids` passed when calling ``GPTBigCodeModel``.
-    n_positions (`int`, *optional*, defaults to 1024):
-        The maximum sequence length that this model might ever be used with. Typically set this to something large
-        just in case (e.g., 512 or 1024 or 2048).
-    n_embd (`int`, *optional*, defaults to 768):
-        Dimensionality of the embeddings and hidden states.
-    n_layer (`int`, *optional*, defaults to 12):
-        Number of hidden layers in the Transformer encoder.
-    n_head (`int`, *optional*, defaults to 12):
-        Number of attention heads for each attention layer in the Transformer encoder.
-    n_inner (`int`, *optional*, defaults to None):
-        Dimensionality of the inner feed-forward layers. `None` will set it to 4 times n_embd
-    activation_function (`str`, *optional*, defaults to `"gelu_pytorch_tanh"`):
-        Activation function, to be selected in the list `["relu", "silu", "gelu", "tanh", "gelu_new",
-        "gelu_pytorch_tanh"]`.
-    resid_pdrop (`float`, *optional*, defaults to 0.1):
-        The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
-    embd_pdrop (`float`, *optional*, defaults to 0.1):
-        The dropout ratio for the embeddings.
-    attn_pdrop (`float`, *optional*, defaults to 0.1):
-        The dropout ratio for the attention.
-    layer_norm_epsilon (`float`, *optional*, defaults to 1e-5):
-        The epsilon to use in the layer normalization layers.
-    initializer_range (`float`, *optional*, defaults to 0.02):
-        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-    scale_attn_weights (`bool`, *optional*, defaults to `True`):
-        Scale attention weights by dividing by sqrt(hidden_size)..
-    use_cache (`bool`, *optional*, defaults to `True`):
-        Whether or not the model should return the last key/values attentions (not used by all models).
-    attention_softmax_in_fp32 (`bool`, *optional*, defaults to `True`):
-        Whether to call the fused softmax in float32.
-    scale_attention_softmax_in_fp32 (`bool`, *optional*, defaults to `True`):
-        Whether to scale the attention softmax in float32.
-    attention_type (`bool`, *optional*, defaults to `True`):
-        Whether to use Multi-Query Attion (`True`) or Multi-Head Attention (`False`).
-
 .. class:: transformers.models.gpt_neox.configuration_gpt_neox.GPTNeoXConfig(vocab_size=50432, hidden_size=6144, num_hidden_layers=44, num_attention_heads=64, intermediate_size=24576, hidden_act='gelu', rotary_pct=0.25, rotary_emb_base=10000, attention_dropout=0.0, hidden_dropout=0.0, classifier_dropout=0.1, max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, bos_token_id=0, eos_token_id=2, tie_word_embeddings=False, use_parallel_residual=True, rope_scaling=None, attention_bias=True, **kwargs)
 
 We introduce GPT-NeoX-20B, a 20 billion parameter autoregressive language model trained on the Pile, whose weights will
@@ -2393,17 +2422,46 @@ additional tokens to whitespace characters, making the model more suitable for c
         Whether to use a "parallel" formulation in each Transformer layer, which can provide a slight training
         speedup at large scales (e.g. 20B).
     rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
-        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
-        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
-        these scaling strategies behave:
-        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
-        experimental feature, subject to breaking API changes in future versions.
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     attention_bias (`bool`, *optional*, defaults to `True`):
         Whether to use a bias in the query, key, value and output projection layers during self-attention.
 
-.. class:: transformers.models.gpt_neox_japanese.configuration_gpt_neox_japanese.GPTNeoXJapaneseConfig(vocab_size=32000, hidden_size=2560, num_hidden_layers=32, num_attention_heads=32, intermediate_multiple_size=4, hidden_act='gelu', rotary_pct=1.0, rotary_emb_base=10000, max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, bos_token_id=31996, eos_token_id=31999, attention_dropout=0.1, hidden_dropout=0.0, **kwargs)
+.. class:: transformers.models.gpt_neox_japanese.configuration_gpt_neox_japanese.GPTNeoXJapaneseConfig(vocab_size=32000, hidden_size=2560, num_hidden_layers=32, num_attention_heads=32, intermediate_multiple_size=4, hidden_act='gelu', rotary_pct=1.0, rotary_emb_base=10000, max_position_embeddings=2048, initializer_range=0.02, layer_norm_eps=1e-05, use_cache=True, bos_token_id=31996, eos_token_id=31999, rope_scaling=None, attention_dropout=0.1, hidden_dropout=0.0, **kwargs)
 
 We introduce GPT-NeoX-Japanese, which is an autoregressive language model for Japanese, trained on top of `https://github.com/EleutherAI/gpt-neox <https://github.com/EleutherAI/gpt-neox>`__.
 Japanese is a unique language with its large vocabulary and a combination of hiragana, katakana, and kanji writing scripts.
@@ -2440,149 +2498,47 @@ Development of the model was led by `Shinya Otani <https://github.com/SO0529>`__
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models). Only
         relevant if `config.is_decoder=True`.
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     attention_dropout (`float`, *optional*, defaults to 0.1):
         The dropout ratio for the attention.
     hidden_dropout (`float`, *optional*, defaults to 0.0):
         The dropout ratio for the hidden layer.
-
-.. class:: transformers.models.gptj.configuration_gptj.GPTJConfig(vocab_size=50400, n_positions=2048, n_embd=4096, n_layer=28, n_head=16, rotary_dim=64, n_inner=None, activation_function='gelu_new', resid_pdrop=0.0, embd_pdrop=0.0, attn_pdrop=0.0, layer_norm_epsilon=1e-05, initializer_range=0.02, use_cache=True, bos_token_id=50256, eos_token_id=50256, tie_word_embeddings=False, **kwargs)
-
-The GPT-J model was released in the `kingoflolz/mesh-transformer-jax <https://github.com/kingoflolz/mesh-transformer-jax>`__ repository by Ben Wang and Aran Komatsuzaki. It is a GPT-2-like
-causal language model trained on `the Pile <https://pile.eleuther.ai/>`__ dataset.
-
-This model was contributed by `Stella Biderman <https://huggingface.co/stellaathena>`__.
-
-Tips:
-
-- To load `GPT-J <https://huggingface.co/EleutherAI/gpt-j-6B>`__ in float32 one would need at least 2x model size
-  RAM: 1x for initial weights and another 1x to load the checkpoint. So for GPT-J it would take at least 48GB
-  RAM to just load the model. To reduce the RAM usage there are a few options. The `torch_dtype` argument can be
-  used to initialize the model in half-precision on a CUDA device only. There is also a fp16 branch which stores the fp16 weights,
-  which could be used to further minimize the RAM usage:
-
-::
-
->>> from transformers import GPTJForCausalLM
->>> import torch
-
->>> device = "cuda"
->>> model = GPTJForCausalLM.from_pretrained(
-...     "EleutherAI/gpt-j-6B",
-...     revision="float16",
-...     torch_dtype=torch.float16,
-... ).to(device)
-
-- The model should fit on 16GB GPU for inference. For training/fine-tuning it would take much more GPU RAM. Adam
-  optimizer for example makes four copies of the model: model, gradients, average and squared average of the gradients.
-  So it would need at least 4x model size GPU memory, even with mixed precision as gradient updates are in fp32. This
-  is not including the activations and data batches, which would again require some more GPU RAM. So one should explore
-  solutions such as DeepSpeed, to train/fine-tune the model. Another option is to use the original codebase to
-  train/fine-tune the model on TPU and then convert the model to Transformers format for inference. Instructions for
-  that could be found `here <https://github.com/kingoflolz/mesh-transformer-jax/blob/master/howto_finetune.md>`__
-
-- Although the embedding matrix has a size of 50400, only 50257 entries are used by the GPT-2 tokenizer. These extra
-  tokens are added for the sake of efficiency on TPUs. To avoid the mismatch between embedding matrix size and vocab
-  size, the tokenizer for `GPT-J <https://huggingface.co/EleutherAI/gpt-j-6B>`__ contains 143 extra tokens
-  `<|extratoken_1|>... <|extratoken_143|>`, so the `vocab_size` of tokenizer also becomes 50400.
-
-#Args:
-    vocab_size (`int`, *optional*, defaults to 50400):
-        Vocabulary size of the GPT-J model. Defines the number of different tokens that can be represented by the
-        `inputs_ids` passed when calling ``GPTJModel``.
-    n_positions (`int`, *optional*, defaults to 2048):
-        The maximum sequence length that this model might ever be used with. Typically set this to something large
-        just in case (e.g., 512 or 1024 or 2048).
-    n_embd (`int`, *optional*, defaults to 4096):
-        Dimensionality of the embeddings and hidden states.
-    n_layer (`int`, *optional*, defaults to 28):
-        Number of hidden layers in the Transformer encoder.
-    n_head (`int`, *optional*, defaults to 16):
-        Number of attention heads for each attention layer in the Transformer encoder.
-    rotary_dim (`int`, *optional*, defaults to 64):
-        Number of dimensions in the embedding that Rotary Position Embedding is applied to.
-    n_inner (`int`, *optional*, defaults to None):
-        Dimensionality of the inner feed-forward layers. `None` will set it to 4 times n_embd
-    activation_function (`str`, *optional*, defaults to `"gelu_new"`):
-        Activation function, to be selected in the list `["relu", "silu", "gelu", "tanh", "gelu_new"]`.
-    resid_pdrop (`float`, *optional*, defaults to 0.1):
-        The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
-    embd_pdrop (`int`, *optional*, defaults to 0.1):
-        The dropout ratio for the embeddings.
-    attn_pdrop (`float`, *optional*, defaults to 0.1):
-        The dropout ratio for the attention.
-    layer_norm_epsilon (`float`, *optional*, defaults to 1e-5):
-        The epsilon to use in the layer normalization layers.
-    initializer_range (`float`, *optional*, defaults to 0.02):
-        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-    use_cache (`bool`, *optional*, defaults to `True`):
-        Whether or not the model should return the last key/values attentions (not used by all models).
-
-.. class:: transformers.models.ibert.configuration_ibert.IBertConfig(vocab_size=30522, hidden_size=768, num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072, hidden_act='gelu', hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, max_position_embeddings=512, type_vocab_size=2, initializer_range=0.02, layer_norm_eps=1e-12, pad_token_id=1, bos_token_id=0, eos_token_id=2, position_embedding_type='absolute', quant_mode=False, force_dequant='none', **kwargs)
-
-The I-BERT model was proposed in `I-BERT: Integer-only BERT Quantization <https://arxiv.org/abs/2101.01321>`__ by
-Sehoon Kim, Amir Gholami, Zhewei Yao, Michael W. Mahoney and Kurt Keutzer. It's a quantized version of RoBERTa running
-inference up to four times faster.
-
-The abstract from the paper is the following:
-
-*Transformer based models, like BERT and RoBERTa, have achieved state-of-the-art results in many Natural Language
-Processing tasks. However, their memory footprint, inference latency, and power consumption are prohibitive for
-efficient inference at the edge, and even at the data center. While quantization can be a viable solution for this,
-previous work on quantizing Transformer based models use floating-point arithmetic during inference, which cannot
-efficiently utilize integer-only logical units such as the recent Turing Tensor Cores, or traditional integer-only ARM
-processors. In this work, we propose I-BERT, a novel quantization scheme for Transformer based models that quantizes
-the entire inference with integer-only arithmetic. Based on lightweight integer-only approximation methods for
-nonlinear operations, e.g., GELU, Softmax, and Layer Normalization, I-BERT performs an end-to-end integer-only BERT
-inference without any floating point calculation. We evaluate our approach on GLUE downstream tasks using
-RoBERTa-Base/Large. We show that for both cases, I-BERT achieves similar (and slightly higher) accuracy as compared to
-the full-precision baseline. Furthermore, our preliminary implementation of I-BERT shows a speedup of 2.4 - 4.0x for
-INT8 inference on a T4 GPU system as compared to FP32 inference. The framework has been developed in PyTorch and has
-been open-sourced.*
-
-This model was contributed by `kssteven <https://huggingface.co/kssteven>`__. The original code can be found `here <https://github.com/kssteven418/I-BERT>`__.
-
-Args:
-    vocab_size (`int`, *optional*, defaults to 30522):
-        Vocabulary size of the I-BERT model. Defines the number of different tokens that can be represented by the
-        `inputs_ids` passed when calling ``IBertModel``
-    hidden_size (`int`, *optional*, defaults to 768):
-        Dimensionality of the encoder layers and the pooler layer.
-    num_hidden_layers (`int`, *optional*, defaults to 12):
-        Number of hidden layers in the Transformer encoder.
-    num_attention_heads (`int`, *optional*, defaults to 12):
-        Number of attention heads for each attention layer in the Transformer encoder.
-    intermediate_size (`int`, *optional*, defaults to 3072):
-        Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-    hidden_act (`str` or `Callable`, *optional*, defaults to `"gelu"`):
-        The non-linear activation function (function or string) in the encoder and pooler. If string, `"gelu"`,
-        `"relu"`, `"silu"` and `"gelu_new"` are supported.
-    hidden_dropout_prob (`float`, *optional*, defaults to 0.1):
-        The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
-    attention_probs_dropout_prob (`float`, *optional*, defaults to 0.1):
-        The dropout ratio for the attention probabilities.
-    max_position_embeddings (`int`, *optional*, defaults to 512):
-        The maximum sequence length that this model might ever be used with. Typically set this to something large
-        just in case (e.g., 512 or 1024 or 2048).
-    type_vocab_size (`int`, *optional*, defaults to 2):
-        The vocabulary size of the `token_type_ids` passed when calling ``IBertModel``
-    initializer_range (`float`, *optional*, defaults to 0.02):
-        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-    layer_norm_eps (`float`, *optional*, defaults to 1e-12):
-        The epsilon used by the layer normalization layers.
-    position_embedding_type (`str`, *optional*, defaults to `"absolute"`):
-        Type of position embedding. Choose one of `"absolute"`, `"relative_key"`, `"relative_key_query"`. For
-        positional embeddings use `"absolute"`. For more information on `"relative_key"`, please refer to
-        `Self-Attention with Relative Position Representations (Shaw et al.) <https://arxiv.org/abs/1803.02155>`__.
-        For more information on `"relative_key_query"`, please refer to *Method 4* in `Improve Transformer Models
-        with Better Relative Position Embeddings (Huang et al.) <https://arxiv.org/abs/2009.13658>`__.
-    quant_mode (`bool`, *optional*, defaults to `False`):
-        Whether to quantize the model or not.
-    force_dequant (`str`, *optional*, defaults to `"none"`):
-        Force dequantize specific nonlinear layer. Dequatized layers are then executed with full precision.
-        `"none"`, `"gelu"`, `"softmax"`, `"layernorm"` and `"nonlinear"` are supported. As deafult, it is set as
-        `"none"`, which does not dequantize any layers. Please specify `"gelu"`, `"softmax"`, or `"layernorm"` to
-        dequantize GELU, Softmax, or LayerNorm, respectively. `"nonlinear"` will dequantize all nonlinear layers,
-        i.e., GELU, Softmax, and LayerNorm.
 
 .. class:: transformers.models.imagegpt.configuration_imagegpt.ImageGPTConfig(vocab_size=513, n_positions=1024, n_embd=512, n_layer=24, n_head=8, n_inner=None, activation_function='quick_gelu', resid_pdrop=0.1, embd_pdrop=0.1, attn_pdrop=0.1, layer_norm_epsilon=1e-05, initializer_range=0.02, scale_attn_weights=True, use_cache=True, tie_word_embeddings=False, scale_attn_by_inverse_layer_idx=False, reorder_and_upcast_attn=False, **kwargs)
 
@@ -2869,7 +2825,7 @@ Args:
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models)
 
-.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, attention_bias=False, attention_dropout=0.0, mlp_bias=False, **kwargs)
+.. class:: transformers.models.llama.configuration_llama.LlamaConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, pretraining_tp=1, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, attention_bias=False, attention_dropout=0.0, mlp_bias=False, head_dim=None, **kwargs)
 
 The LLaMA model was proposed in `LLaMA: Open and Efficient Foundation Language Models <https://arxiv.org/abs/2302.13971>`__ by Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, Aurelien Rodriguez, Armand Joulin, Edouard Grave, Guillaume Lample. It is a collection of foundation language models ranging from 7B to 65B parameters.
 
@@ -2993,6 +2949,8 @@ Args:
         The dropout ratio for the attention probabilities.
     mlp_bias (`bool`, *optional*, defaults to `False`):
         Whether to use a bias in up_proj, down_proj and gate_proj layers in the MLP layers.
+    head_dim (`int`, *optional*):
+        The attention head dimension. If None, it will default to hidden_size // num_heads
 
 ::
 
@@ -3977,6 +3935,100 @@ Args:
     classifier_dropout (`float`, *optional*):
         The dropout ratio for the classification head.
 
+.. class:: transformers.models.moshi.configuration_moshi.MoshiConfig(vocab_size=32000, hidden_size=4096, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, audio_vocab_size=None, max_position_embeddings=3000, rope_theta=10000.0, hidden_act='silu', head_dim=None, initializer_range=0.02, use_cache=True, sliding_window=3000, attention_dropout=0.0, ffn_dim=22528, rms_norm_eps=1e-08, num_codebooks=8, tie_word_embeddings=False, **kwargs)
+
+The Moshi model was proposed in `Moshi: a speech-text foundation model for real-time dialogue <https://kyutai.org/Moshi.pdf>`__ by Alexandre Défossez, Laurent Mazaré, Manu Orsini, Amélie Royer, Patrick Pérez, Hervé Jégou, Edouard Grave and Neil Zeghidour.
+
+Moshi is a speech-text foundation model that casts spoken dialogue as speech-to-speech generation. Starting from a text language model backbone, Moshi generates speech as tokens from the residual quantizer of a neural audio codec, while modeling separately its own speech and that of the user into parallel streams. This allows for the removal of explicit speaker turns, and the modeling of arbitrary conversational dynamics. Moshi also predicts time-aligned text tokens as a prefix to audio tokens. This “Inner Monologue” method significantly improves the linguistic quality of generated speech and provides streaming speech recognition and text-to-speech. As a result, Moshi is the first real-time full-duplex spoken large language model, with a theoretical latency of 160ms, 200ms in practice.
+
+<div style="text-align: center">
+<img src="https://huggingface.co/datasets/ylacombe/benchmark-comparison/resolve/main/moshi_architecture.png">
+</div>
+
+The abstract from the paper is the following:
+
+*We introduce Moshi, a speech-text foundation model and full-duplex spoken dialogue framework. Current systems for spoken dialogue rely on pipelines of independent components, namely voice activity detection, speech recognition, textual dialogue and text-to-speech. Such frameworks cannot emulate the experience of real conversations. First, their complexity induces a latency of several seconds between interactions. Second, text being the intermediate modality for dialogue, non-linguistic information that modifies meaning— such as emotion or non-speech sounds— is lost in the interaction. Finally, they rely on a segmentation into speaker turns, which does not take into account overlapping speech, interruptions and interjections. Moshi solves these independent issues altogether by casting spoken dialogue as speech-to-speech generation. Starting from a text language model backbone, Moshi generates speech as tokens from the residual quantizer of a neural audio codec, while modeling separately its own speech and that of the user into parallel streams. This allows for the removal of explicit speaker turns, and the modeling of arbitrary conversational dynamics. We moreover extend the hierarchical semantic-to-acoustic token generation of previous work to first predict time-aligned text tokens as a prefix to audio tokens. Not only this “Inner Monologue” method significantly improves the linguistic quality of generated speech, but we also illustrate how it can provide streaming speech recognition and text-to-speech. Our resulting model is the first real-time full-duplex spoken large language model, with a theoretical latency of 160ms, 200ms in practice, and is available at github.com/kyutai-labs/moshi.* 
+
+Moshi deals with 3 streams of information:
+1. The user's audio
+2. Moshi's audio
+3. Moshi's textual output
+
+Similarly to ``~MusicgenModel``, audio is represented with audio codebooks, which can be interpreted like tokens. The main difference between text tokens and audio codebooks is that audio codebooks introduce an additional dimension of information.
+Text tokens are typically of dim `(batch_size, sequence_length)` but audio tokens are of dim `(batch_size, num_codebooks, sequence_length)`.
+
+Moshi's made of 3 components:
+
+**1. The main decoder (Helium in the paper)**
+
+It corresponds to ``MoshiForCausalLM``. It is strictly a classic text LLM, that uses an architecture similar to `` ~GemmaForCausalLM``. In other words, it takes text tokens, embeds them, pass them through the decoder and a language head, to get text logits.
+
+**2. The depth decoder**
+
+On its own, it's also a classic LLM, but this time, instead of generating over the time dimension, it generates over the codebook dimension.
+
+It also means that its context length is `num_codebooks`, thus it can't generate more than `num_codebooks`.
+
+Note that each timestamp - i.e each codebook - gets its own set of Linear Layers and Embeddings.
+
+**3. ``MimiModel``**
+
+It's the audio encoder from Kyutai, that has recently been integrated to transformers, which is used to "tokenize" audio. It has the same use that ``~EncodecModel`` has in ``~MusicgenModel``.
+
+
+Args:
+    vocab_size (`int`, *optional*, defaults to 32000):
+        Vocabulary size of the MoshiDecoder model. Defines the number of different tokens that can be
+        represented by the `inputs_ids` passed when calling ``MoshiDecoder``.
+    hidden_size (`int`, *optional*, defaults to 4096):
+        Dimensionality of the layers and the pooler layer of the main decoder.
+    num_hidden_layers (`int`, *optional*, defaults to 32):
+        Number of decoder layers.
+    num_attention_heads (`int`, *optional*, defaults to 32):
+        Number of attention heads for each attention layer in the main decoder block.
+    num_key_value_heads (`int`, *optional*):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to `num_attention_heads`.
+    audio_vocab_size (`int`, *optional*):
+        Vocabulary size of the audio part of model. Defines the number of different tokens that can be
+        represented by the `audio_codes` passed when calling the Moshi models.
+    max_position_embeddings (`int`, *optional*, defaults to 3000):
+        The maximum sequence length that this model might ever be used with. Typically, set this to something large
+        just in case (e.g., 512 or 1024 or 2048).
+    rope_theta (`float`, *optional*, defaults to 10000.0):
+        The base period of the RoPE embeddings.
+    hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
+        The non-linear activation function (function or string) in the decoder.
+    head_dim (`int`, *optional*, defaults to `hidden_size // num_attention_heads`):
+        The attention head dimension.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models). Only
+        relevant if `config.is_decoder=True`.
+    sliding_window (`int`, *optional*, defaults to 3000):
+        Sliding window attention window size. If not specified, will default to `3000`.
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for the attention probabilities.
+    ffn_dim (`int`, *optional*, defaults to 22528):
+        Dimensionality of the "intermediate" (often named feed-forward) layer in the main decoder block. Must be even.
+    rms_norm_eps (`float`, *optional*, defaults to 1e-08):
+        The epsilon used by the rms normalization layers.
+    num_codebooks (`int`, *optional*, defaults to 8):
+        The number of audio codebooks for each audio channels.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
+        Whether to tie weight embeddings
+    kwargs (*optional*):
+        Dictionary of keyword arguments. Notably:
+            - **audio_encoder_config** (``PretrainedConfig``, *optional*) -- An instance of a configuration object that
+              defines the audio encoder config.
+            - **depth__config** (``PretrainedConfig``, *optional*) -- An instance of a configuration object that
+              defines the depth decoder config.
+
 .. class:: transformers.models.mpnet.configuration_mpnet.MPNetConfig(vocab_size=30527, hidden_size=768, num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072, hidden_act='gelu', hidden_dropout_prob=0.1, attention_probs_dropout_prob=0.1, max_position_embeddings=512, initializer_range=0.02, layer_norm_eps=1e-12, relative_attention_num_buckets=32, pad_token_id=1, bos_token_id=0, eos_token_id=2, **kwargs)
 
 The MPNet model was proposed in `MPNet: Masked and Permuted Pre-training for Language Understanding <https://arxiv.org/abs/2004.09297>`__ by Kaitao Song, Xu Tan, Tao Qin, Jianfeng Lu, Tie-Yan Liu.
@@ -4599,6 +4651,101 @@ Args:
 >>> # Accessing the model configuration
 >>> configuration = model.config
 
+.. class:: transformers.models.olmoe.configuration_olmoe.OlmoeConfig(vocab_size=50304, hidden_size=2048, intermediate_size=2048, num_hidden_layers=16, num_attention_heads=16, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=4096, initializer_range=0.02, rms_norm_eps=1e-05, use_cache=True, pad_token_id=1, bos_token_id=None, eos_token_id=50279, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, attention_bias=False, attention_dropout=0.0, clip_qkv=None, num_experts_per_tok=8, num_experts=64, output_router_logits=False, router_aux_loss_coef=0.01, norm_topk_prob=False, **kwargs)
+
+The OLMoE model was proposed in `OLMoE: Open Mixture-of-Experts Language Models <https://arxiv.org/abs/2409.02060>`__ by Niklas Muennighoff, Luca Soldaini, Dirk Groeneveld, Kyle Lo, Jacob Morrison, Sewon Min, Weijia Shi, Pete Walsh, Oyvind Tafjord, Nathan Lambert, Yuling Gu, Shane Arora, Akshita Bhagia, Dustin Schwenk, David Wadden, Alexander Wettig, Binyuan Hui, Tim Dettmers, Douwe Kiela, Ali Farhadi, Noah A. Smith, Pang Wei Koh, Amanpreet Singh, Hannaneh Hajishirzi.
+
+OLMoE is a series of **O**pen **L**anguage **Mo**dels using sparse **M**ixture-**o**f-**E**xperts designed to enable the science of language models. We release all code, checkpoints, logs, and details involved in training these models.
+
+The abstract from the paper is the following:
+
+*We introduce OLMoE, a fully open, state-of-the-art language model leveraging sparse Mixture-of-Experts (MoE). OLMoE-1B-7B has 7 billion (B) parameters but uses only 1B per input token. We pretrain it on 5 trillion tokens and further adapt it to create OLMoE-1B-7B-Instruct. Our models outperform all available models with similar active parameters, even surpassing larger ones like Llama2-13B-Chat and DeepSeekMoE-16B. We present various experiments on MoE training, analyze routing in our model showing high specialization, and open-source all aspects of our work: model weights, training data, code, and logs.*
+
+This model was contributed by `Muennighoff <https://hf.co/Muennighoff>`__.
+The original code can be found `here <https://github.com/allenai/OLMoE>`__.
+
+
+Args:
+    vocab_size (`int`, *optional*, defaults to 50304):
+        Vocabulary size of the OLMoE model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``OlmoeModel``
+    hidden_size (`int`, *optional*, defaults to 2048):
+        Dimension of the hidden representations.
+    intermediate_size (`int`, *optional*, defaults to 2048):
+        Dimension of the MLP representations.
+    num_hidden_layers (`int`, *optional*, defaults to 16):
+        Number of hidden layers in the Transformer decoder.
+    num_attention_heads (`int`, *optional*, defaults to 16):
+        Number of attention heads for each attention layer in the Transformer decoder.
+    num_key_value_heads (`int`, *optional*):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
+        `num_attention_heads`.
+    hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
+        The non-linear activation function (function or string) in the decoder.
+    max_position_embeddings (`int`, *optional*, defaults to 4096):
+        The maximum sequence length that this model might ever be used with.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    rms_norm_eps (`float`, *optional*, defaults to 1e-05):
+        The epsilon used by the rms normalization layers.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models). Only
+        relevant if `config.is_decoder=True`.
+    pad_token_id (`int`, *optional*, defaults to 1):
+        Padding token id.
+    bos_token_id (`int`, *optional*):
+        Beginning of stream token id.
+    eos_token_id (`int`, *optional*, defaults to 50279):
+        End of stream token id.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
+        Whether to tie weight embeddings
+    rope_theta (`float`, *optional*, defaults to 10000.0):
+        The base period of the RoPE embeddings.
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
+        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
+        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
+        these scaling strategies behave:
+        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
+        experimental feature, subject to breaking API changes in future versions.
+    attention_bias (`bool`, defaults to `False`, *optional*, defaults to `False`):
+        Whether to use a bias in the query, key, value and output projection layers during self-attention.
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for the attention probabilities.
+    clip_qkv (`float`, *optional*):
+        If not `None`, elements of query, key and value attention states are clipped so that their
+        absolute value does not exceed this value.
+    num_experts_per_tok (`int`, *optional*, defaults to 8):
+        Number of selected experts.
+    num_experts (`int`, *optional*, defaults to 64):
+        Number of routed experts.
+    output_router_logits (`bool`, *optional*, defaults to `False`):
+        Whether or not the router logits should be returned by the model. Enabeling this will also
+        allow the model to output the auxiliary loss, including load balancing loss and router z-loss.
+    router_aux_loss_coef (`float`, *optional*, defaults to 0.01):
+        The aux loss factor for the total loss.
+    norm_topk_prob (`bool`, *optional*, defaults to `False`):
+        Whether to normalize the topk probabilities.
+
+::
+
+>>> from transformers import OlmoeModel, OlmoeConfig
+
+>>> # Initializing a OLMoE 7B A1B style configuration
+>>> configuration = OlmoeConfig()
+
+>>> # Initializing a model from the OLMoE 7B A1B style configuration
+>>> model = OlmoeModel(configuration)
+
+>>> # Accessing the model configuration
+>>> configuration = model.config
+
 .. class:: transformers.models.openai.configuration_openai.OpenAIGPTConfig(vocab_size=40478, n_positions=512, n_embd=768, n_layer=12, n_head=12, afn='gelu', resid_pdrop=0.1, embd_pdrop=0.1, attn_pdrop=0.1, layer_norm_epsilon=1e-05, initializer_range=0.02, summary_type='cls_index', summary_use_proj=True, summary_activation=None, summary_proj_to_labels=True, summary_first_dropout=0.1, **kwargs)
 
 OpenAI GPT model was proposed in `Improving Language Understanding by Generative Pre-Training <https://s3-us-west-2.amazonaws.com/openai-assets/research-covers/language-unsupervised/language_understanding_paper.pdf>`__
@@ -4978,13 +5125,42 @@ Args:
     rope_theta (`float`, *optional*, defaults to 25000.0):
         The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
-        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
-        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
-        these scaling strategies behave:
-        https://www.reddit.com/r/LocalPersimmon/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This
-        is an experimental feature, subject to breaking API changes in future versions.
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     qk_layernorm (`bool`, *optional*, default to `True`):
         Whether or not to normalize the Queries and Keys after projecting the hidden states
     hidden_dropout (`float`, *optional*, default to 0.0):
@@ -5043,13 +5219,42 @@ The Phi-1.5 model was proposed in `Textbooks Are All You Need II: phi-1.5 techni
     rope_theta (`float`, *optional*, defaults to 10000.0):
         The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be an float greater than 1. The expected format
-        is `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
-        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
-        these scaling strategies behave:
-        https://www.reddit.com/r/LocalPersimmon/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This
-        is an experimental feature, subject to breaking API changes in future versions.
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     partial_rotary_factor (`float`, *optional*, defaults to 0.5):
         Percentage of the query and keys which will have rotary embedding.
     qk_layernorm (`bool`, *optional*, defaults to `False`):
@@ -5120,6 +5325,77 @@ The Phi-3 model was proposed in `Phi-3 Technical Report: A Highly Capable Langua
         The id of the padding token.
     sliding_window (`int`, *optional*):
         Sliding window attention window size. If `None`, no sliding window is applied.
+
+.. class:: transformers.models.phimoe.configuration_phimoe.PhimoeConfig(vocab_size=32064, hidden_size=4096, intermediate_size=6400, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=8, hidden_act='silu', max_position_embeddings=131072, initializer_range=0.02, rms_norm_eps=1e-05, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, rope_theta=1000000.0, rope_scaling=None, sliding_window=None, attention_dropout=0.0, num_experts_per_tok=2, num_local_experts=16, output_router_logits=False, router_aux_loss_coef=0.001, router_jitter_noise=0.01, input_jitter_noise=0.0, attention_bias=False, lm_head_bias=False, **kwargs)
+
+The PhiMoE model was proposed in `Phi-3 Technical Report: A Highly Capable Language Model Locally on Your Phone <https://arxiv.org/abs/2404.14219>`__ by Microsoft.
+
+#Args:
+    vocab_size (`int`, *optional*, defaults to 32064):
+        Vocabulary size of the Phimoe model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``PhimoeModel``
+    hidden_size (`int`, *optional*, defaults to 4096):
+        Dimension of the hidden representations.
+    intermediate_size (`int`, *optional*, defaults to 6400):
+        Dimension of the MLP representations.
+    num_hidden_layers (`int`, *optional*, defaults to 32):
+        Number of hidden layers in the Transformer encoder.
+    num_attention_heads (`int`, *optional*, defaults to 32):
+        Number of attention heads for each attention layer in the Transformer encoder.
+    num_key_value_heads (`int`, *optional*, defaults to 8):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to `8`.
+    hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
+        The non-linear activation function (function or string) in the decoder.
+    max_position_embeddings (`int`, *optional*, defaults to `4096*32`):
+        The maximum sequence length that this model might ever be used with. Mixtral's sliding window attention
+        allows sequence of up to 4096*32 tokens.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    rms_norm_eps (`float`, *optional*, defaults to 1e-05):
+        The epsilon used by the rms normalization layers.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models). Only
+        relevant if `config.is_decoder=True`.
+    pad_token_id (`int`, *optional*):
+        The id of the padding token.
+    bos_token_id (`int`, *optional*, defaults to 1):
+        The id of the "beginning-of-sequence" token.
+    eos_token_id (`int`, *optional*, defaults to 2):
+        The id of the "end-of-sequence" token.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
+        Whether the model's input and output word embeddings should be tied.
+    rope_theta (`float`, *optional*, defaults to 1000000.0):
+        The base period of the RoPE embeddings.
+    rope_scaling (`dict`, *optional*):
+        The scaling strategy for the RoPE embeddings. If `None`, no scaling is applied. If a dictionary, it must
+        contain the following keys: `type`, `short_factor`, `long_factor`, `short_mscale`, `long_mscale` and
+        `original_max_position_embeddings`. The `type` must be `longrope`, the `short_mscale` and `long_scale` must
+        be numbers, the `short_factor` and `long_factor` must be lists of numbers with the same length as half of
+        the attention head size and the `original_max_position_embeddings` must be an integer.
+    sliding_window (`int`, *optional*):
+        Sliding window attention window size. If not specified, will default to `262144`.
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for the attention probabilities.
+    num_experts_per_tok (`int`, *optional*, defaults to 2):
+        The number of experts to root per-token, can be also interpreted as the `top-p` routing
+        parameter
+    num_local_experts (`int`, *optional*, defaults to 16):
+        Number of experts per Sparse MLP layer.
+    output_router_logits (`bool`, *optional*, defaults to `False`):
+        Whether or not the router logits should be returned by the model. Enabeling this will also
+        allow the model to output the auxiliary loss. See `here <>`__ for more details
+    router_aux_loss_coef (`float`, *optional*, defaults to 0.001):
+        The aux loss factor for the total loss.
+    router_jitter_noise (`float`, *optional*, defaults to 0.01):
+        Amount of noise to add to the router.
+    input_jitter_noise (`float`, *optional*, defaults to 0.0): Input jitter noise
+    attention_bias (`bool`, *optional*, defaults to `False`): Attention bias
+    lm_head_bias (`bool`, *optional*, defaults to `False`): LM head bias
 
 .. class:: transformers.models.plbart.configuration_plbart.PLBartConfig(vocab_size=50005, max_position_embeddings=1024, encoder_layers=6, encoder_ffn_dim=3072, encoder_attention_heads=12, decoder_layers=6, decoder_ffn_dim=3072, decoder_attention_heads=12, encoder_layerdrop=0.0, decoder_layerdrop=0.0, use_cache=True, is_encoder_decoder=True, activation_function='gelu', d_model=768, dropout=0.1, attention_dropout=0.1, activation_dropout=0.0, init_std=0.02, classifier_dropout=0.0, scale_embedding=True, pad_token_id=1, bos_token_id=0, eos_token_id=2, forced_eos_token_id=2, **kwargs)
 
@@ -5279,7 +5555,7 @@ Args:
     use_cache (`bool`, *optional*, defaults to `True`):
         Whether or not the model should return the last key/values attentions (not used by all models).
 
-.. class:: transformers.models.qwen2.configuration_qwen2.Qwen2Config(vocab_size=151936, hidden_size=4096, intermediate_size=22016, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=32, hidden_act='silu', max_position_embeddings=32768, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, tie_word_embeddings=False, rope_theta=10000.0, use_sliding_window=False, sliding_window=4096, max_window_layers=28, attention_dropout=0.0, **kwargs)
+.. class:: transformers.models.qwen2.configuration_qwen2.Qwen2Config(vocab_size=151936, hidden_size=4096, intermediate_size=22016, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=32, hidden_act='silu', max_position_embeddings=32768, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, use_sliding_window=False, sliding_window=4096, max_window_layers=28, attention_dropout=0.0, **kwargs)
 
 Qwen2 is the new model series of large language models from the Qwen team. Previously, we released the Qwen series, including Qwen-72B, Qwen-1.8B, Qwen-VL, Qwen-Audio, etc.
 
@@ -5317,6 +5593,43 @@ Qwen2 is the new model series of large language models from the Qwen team. Previ
         Whether the model's input and output word embeddings should be tied.
     rope_theta (`float`, *optional*, defaults to 10000.0):
         The base period of the RoPE embeddings.
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     use_sliding_window (`bool`, *optional*, defaults to `False`):
         Whether to use sliding window attention.
     sliding_window (`int`, *optional*, defaults to 4096):
@@ -5339,7 +5652,7 @@ Qwen2 is the new model series of large language models from the Qwen team. Previ
 >>> # Accessing the model configuration
 >>> configuration = model.config
 
-.. class:: transformers.models.qwen2_moe.configuration_qwen2_moe.Qwen2MoeConfig(vocab_size=151936, hidden_size=2048, intermediate_size=5632, num_hidden_layers=24, num_attention_heads=16, num_key_value_heads=16, hidden_act='silu', max_position_embeddings=32768, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, tie_word_embeddings=False, rope_theta=10000.0, use_sliding_window=False, sliding_window=4096, max_window_layers=28, attention_dropout=0.0, decoder_sparse_step=1, moe_intermediate_size=1408, shared_expert_intermediate_size=5632, num_experts_per_tok=4, num_experts=60, norm_topk_prob=False, output_router_logits=False, router_aux_loss_coef=0.001, mlp_only_layers=None, **kwargs)
+.. class:: transformers.models.qwen2_moe.configuration_qwen2_moe.Qwen2MoeConfig(vocab_size=151936, hidden_size=2048, intermediate_size=5632, num_hidden_layers=24, num_attention_heads=16, num_key_value_heads=16, hidden_act='silu', max_position_embeddings=32768, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, use_sliding_window=False, sliding_window=4096, max_window_layers=28, attention_dropout=0.0, decoder_sparse_step=1, moe_intermediate_size=1408, shared_expert_intermediate_size=5632, num_experts_per_tok=4, num_experts=60, norm_topk_prob=False, output_router_logits=False, router_aux_loss_coef=0.001, mlp_only_layers=None, **kwargs)
 
 Qwen2MoE is the new model series of large language models from the Qwen team. Previously, we released the Qwen series, including Qwen-72B, Qwen-1.8B, Qwen-VL, Qwen-Audio, etc.
 
@@ -5377,6 +5690,43 @@ Qwen2MoE is the new model series of large language models from the Qwen team. Pr
         Whether the model's input and output word embeddings should be tied.
     rope_theta (`float`, *optional*, defaults to 10000.0):
         The base period of the RoPE embeddings.
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     use_sliding_window (`bool`, *optional*, defaults to `False`):
         Whether to use sliding window attention.
     sliding_window (`int`, *optional*, defaults to 4096):
@@ -6230,13 +6580,42 @@ Args:
     rope_theta (`float`, *optional*, defaults to `10000.0`):
         The base period of the RoPE embeddings.
     rope_scaling (`Dict`, *optional*):
-        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
-        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
-        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
-        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
-        these scaling strategies behave:
-        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This
-        is an experimental feature, subject to breaking API changes in future versions.
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     use_qkv_bias (`bool`, *optional*, defaults to `False`):
         Whether or not the model should use bias for qkv layers.
     qk_layernorm (`bool`, *optional*, defaults to `False`):
@@ -6255,7 +6634,7 @@ Args:
     eos_token_id (int, *optional*, defaults to 0):
         The id of the `EOS` token in the vocabulary.
 
-.. class:: transformers.models.starcoder2.configuration_starcoder2.Starcoder2Config(vocab_size=49152, hidden_size=3072, intermediate_size=12288, num_hidden_layers=30, num_attention_heads=24, num_key_value_heads=2, hidden_act='gelu_pytorch_tanh', max_position_embeddings=4096, initializer_range=0.018042, norm_epsilon=1e-05, use_cache=True, bos_token_id=50256, eos_token_id=50256, rope_theta=10000.0, sliding_window=None, attention_dropout=0.0, residual_dropout=0.0, embedding_dropout=0.0, use_bias=True, **kwargs)
+.. class:: transformers.models.starcoder2.configuration_starcoder2.Starcoder2Config(vocab_size=49152, hidden_size=3072, intermediate_size=12288, num_hidden_layers=30, num_attention_heads=24, num_key_value_heads=2, hidden_act='gelu_pytorch_tanh', max_position_embeddings=4096, initializer_range=0.018042, norm_epsilon=1e-05, use_cache=True, bos_token_id=50256, eos_token_id=50256, rope_theta=10000.0, rope_scaling=None, sliding_window=None, attention_dropout=0.0, residual_dropout=0.0, embedding_dropout=0.0, use_bias=True, **kwargs)
 
 StarCoder2 is a family of open LLMs for code and comes in 3 different sizes with 3B, 7B and 15B parameters. The flagship StarCoder2-15B model is trained on over 4 trillion tokens and 600+ programming languages from The Stack v2. All models use Grouped Query Attention, a context window of 16,384 tokens with a sliding window attention of 4,096 tokens, and were trained using the Fill-in-the-Middle objective. The models have been released with the paper `StarCoder 2 and The Stack v2: The Next Generation <https://arxiv.org/abs/2402.19173>`__ by Anton Lozhkov, Raymond Li, Loubna Ben Allal, Federico Cassano, Joel Lamy-Poirier, Nouamane Tazi, Ao Tang, Dmytro Pykhtar, Jiawei Liu, Yuxiang Wei, Tianyang Liu, Max Tian, Denis Kocetkov, Arthur Zucker, Younes Belkada, Zijian Wang, Qian Liu, Dmitry Abulkhanov, Indraneil Paul, Zhuang Li, Wen-Ding Li, Megan Risdal, Jia Li, Jian Zhu, Terry Yue Zhuo, Evgenii Zheltonozhskii, Nii Osae Osae Dade, Wenhao Yu, Lucas Krauß, Naman Jain, Yixuan Su, Xuanli He, Manan Dey, Edoardo Abati, Yekun Chai, Niklas Muennighoff, Xiangru Tang, Muhtasham Oblokulov, Christopher Akiki, Marc Marone, Chenghao Mou, Mayank Mishra, Alex Gu, Binyuan Hui, Tri Dao, Armel Zebaze, Olivier Dehaene, Nicolas Patry, Canwen Xu, Julian McAuley, Han Hu, Torsten Scholak, Sebastien Paquet, Jennifer Robinson, Carolyn Jane Anderson, Nicolas Chapados, Mostofa Patwary, Nima Tajbakhsh, Yacine Jernite, Carlos Muñoz Ferrandis, Lingming Zhang, Sean Hughes, Thomas Wolf, Arjun Guha, Leandro von Werra, and Harm de Vries.
 
@@ -6299,6 +6678,43 @@ Args:
         The id of the "end-of-sequence" token.
     rope_theta (`float`, *optional*, defaults to 10000.0):
         The base period of the RoPE embeddings.
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+        and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value
+        accordingly.
+        Expected contents:
+            `rope_type` (`str`):
+                The sub-variant of RoPE to use. Can be one of ['default', 'linear', 'dynamic', 'yarn', 'longrope',
+                'llama3'], with 'default' being the original RoPE implementation.
+            `factor` (`float`, *optional*):
+                Used with all rope types except 'default'. The scaling factor to apply to the RoPE embeddings. In
+                most scaling types, a `factor` of x will enable the model to handle sequences of length x *
+                original maximum pre-trained length.
+            `original_max_position_embeddings` (`int`, *optional*):
+                Used with 'dynamic', 'longrope' and 'llama3'. The original max position embeddings used during
+                pretraining.
+            `attention_factor` (`float`, *optional*):
+                Used with 'yarn' and 'longrope'. The scaling factor to be applied on the attention
+                computation. If unspecified, it defaults to value recommended by the implementation, using the
+                `factor` field to infer the suggested value.
+            `beta_fast` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for extrapolation (only) in the linear
+                ramp function. If unspecified, it defaults to 32.
+            `beta_slow` (`float`, *optional*):
+                Only used with 'yarn'. Parameter to set the boundary for interpolation (only) in the linear
+                ramp function. If unspecified, it defaults to 1.
+            `short_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to short contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `long_factor` (`List[float]`, *optional*):
+                Only used with 'longrope'. The scaling factor to be applied to long contexts (<
+                `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden
+                size divided by the number of attention heads divided by 2
+            `low_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
+            `high_freq_factor` (`float`, *optional*):
+                Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
     sliding_window (`int`, *optional*):
         Sliding window attention window size. If not specified, will default to `None` (no sliding window).
     attention_dropout (`float`, *optional*, defaults to 0.0):

@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import List, Optional, Sequence
 
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
@@ -40,7 +40,15 @@ def get_flchain_run_1_tabular_info() -> AutoDocExperimentInfo:
     mapping = [
         (
             "training_curve_C-INDEX",
-            "figures/flchain_training_curve_ACC_tabular_1.pdf",
+            "figures/flchain_training_curve_C-INDEX_tabular_1.pdf",
+        ),
+        (
+            "1100/survival_curves.png",
+            "figures/survival_curves.png",
+        ),
+        (
+            "1100/individual_survival_curves.pdf",
+            "figures/individual_survival_curves.pdf",
         ),
     ]
 
@@ -168,7 +176,10 @@ def create_all_survival_plots(base_path: Path):
     output_folder = Path(base_path) / "figures/survival_analysis"
 
     plot_configs = [
-        {"stratify_by": "sex", "title": "Survival Probability over Time by Sex"},
+        {
+            "stratify_by": "sex",
+            "title": "Survival Probability over Time by Sex",
+        },
         {
             "stratify_by": "mgus",
             "title": "Survival Probability over Time by MGUS Status",
@@ -176,6 +187,10 @@ def create_all_survival_plots(base_path: Path):
         {
             "stratify_by": "flcgrp",
             "title": "Survival Probability over Time by FLC Group",
+        },
+        {
+            "stratify_by": "age",
+            "title": "Survival Probability over Time by Age Group",
         },
     ]
 
@@ -192,23 +207,20 @@ def generate_survival_analysis_requests(
     df = pd.read_csv(filepath_or_buffer=test_data_path)
     df = df.dropna(subset=["creatinine"])
 
-    sampled_df = df.sample(n=n_samples, replace=False)
-
-    age_points = np.linspace(25, 85, 60)
+    sampled_df = df
     requests = []
 
     for _, row in sampled_df.iterrows():
-        for age in age_points:
-            request = {
-                "age": float(age),
-                "sex": row["sex"],
-                "flcgrp": str(row["flcgrp"]),
-                "kappa": float(row["kappa"]),
-                "lambdaport": float(row["lambdaport"]),
-                "creatinine": float(row["creatinine"]),
-                "mgus": row["mgus"],
-            }
-            requests.append({"flchain": request})
+        request = {
+            "age": row["age"],
+            "sex": row["sex"],
+            "flcgrp": str(row["flcgrp"]),
+            "kappa": float(row["kappa"]),
+            "lambdaport": float(row["lambdaport"]),
+            "creatinine": float(row["creatinine"]),
+            "mgus": row["mgus"],
+        }
+        requests.append({"flchain": request})
 
     return [requests]
 
@@ -245,8 +257,8 @@ def plot_survival_analysis_results(
     request_file: Path,
     output_folder: Path,
     stratify_by: str = "sex",
-    color_dict: Optional[Dict[str, str]] = None,
-    label_dict: Optional[Dict[str, str]] = None,
+    color_dict: Optional[dict[str, str]] = None,
+    label_dict: Optional[dict[str, str]] = None,
     title: Optional[str] = None,
 ):
     plt.style.use("seaborn-v0_8-whitegrid")
@@ -266,9 +278,31 @@ def plot_survival_analysis_results(
         }
     )
 
+    def get_age_group(age: float) -> str:
+        if age < 55:
+            return "1"
+        elif age < 65:
+            return "2"
+        elif age < 75:
+            return "3"
+        else:
+            return "4"
+
     default_color_schemes = {
-        "sex": {"M": "#2E5EAA", "F": "#AA2E87"},
-        "mgus": {"yes": "#CC3311", "no": "#009988"},
+        "sex": {
+            "M": "#2E5EAA",
+            "F": "#AA2E87",
+        },
+        "mgus": {
+            "yes": "#CC3311",
+            "no": "#009988",
+        },
+        "age": {
+            "1": "#332288",
+            "2": "#88CCEE",
+            "3": "#44AA99",
+            "4": "#117733",
+        },
         "flcgrp": {
             "1": "#332288",
             "2": "#88CCEE",
@@ -279,12 +313,25 @@ def plot_survival_analysis_results(
             "7": "#CC6677",
             "8": "#882255",
             "9": "#AA4499",
+            "10": "#EE7733",
         },
     }
 
     default_label_schemes = {
-        "sex": {"M": "Male", "F": "Female"},
-        "mgus": {"yes": "MGUS Present", "no": "No MGUS"},
+        "sex": {
+            "M": "Male",
+            "F": "Female",
+        },
+        "mgus": {
+            "yes": "MGUS Present",
+            "no": "No MGUS",
+        },
+        "age": {
+            "1": "<55 years",
+            "2": "55-64 years",
+            "3": "65-74 years",
+            "4": "≥75 years",
+        },
         "flcgrp": {str(i): f"Group {i}" for i in range(1, 10)},
     }
 
@@ -298,7 +345,11 @@ def plot_survival_analysis_results(
     stratified_data = {}
 
     for request, response in zip(data[0]["request"], data[0]["response"]["result"]):
-        strat_value = request["flchain"][stratify_by]
+        strat_value = (
+            get_age_group(request["flchain"]["age"])
+            if stratify_by == "age"
+            else request["flchain"][stratify_by]
+        )
         survival_prob = response["flchain_prediction"]["event"]["survival_probs"]
 
         if times is None:

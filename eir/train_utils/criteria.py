@@ -282,7 +282,9 @@ def _negative_log_likelihood_loss(
 
 
 def _cox_ph_loss(
-    risk_scores: torch.Tensor, time: torch.Tensor, event: torch.Tensor
+    risk_scores: torch.Tensor,
+    time: torch.Tensor,
+    event: torch.Tensor,
 ) -> torch.Tensor:
     # Sort by descending duration
     _, sorted_indices = torch.sort(time, descending=True)
