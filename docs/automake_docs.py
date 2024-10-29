@@ -31,7 +31,7 @@ from docs.doc_modules.f_image_outputs import (
     c_mnist_diffusion,
 )
 from docs.doc_modules.g_time_series import a_time_series_power, b_time_series_stocks
-from docs.doc_modules.h_survival_analysis import a_flchain
+from docs.doc_modules.h_survival_analysis import a_flchain, b_flchain_cox
 from docs.doc_modules.serving_experiments import (
     AutoDocServingInfo,
     make_serving_tutorial_data,
@@ -124,9 +124,11 @@ def get_g_time_series_experiments() -> Iterable[AutoDocExperimentInfo]:
 
 def get_h_survival_analysis_experiments() -> Iterable[AutoDocExperimentInfo]:
     a_experiments = a_flchain.get_experiments()
+    b_experiments = b_flchain_cox.get_experiments()
 
     return chain(
         a_experiments,
+        b_experiments,
     )
 
 

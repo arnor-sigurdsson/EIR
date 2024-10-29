@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/h_survival_analysis/02_flchain_cox/conf/globals.yaml \
+--input_configs eir_tutorials/h_survival_analysis/02_flchain_cox/conf/input.yaml \
+--fusion_configs eir_tutorials/h_survival_analysis/02_flchain_cox/conf/fusion.yaml \
+--output_configs eir_tutorials/h_survival_analysis/02_flchain_cox/conf/output.yaml

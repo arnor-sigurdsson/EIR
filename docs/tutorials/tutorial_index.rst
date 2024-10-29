@@ -61,6 +61,7 @@ Survival Analysis
     :maxdepth: 2
 
     h_survival_analysis/01_survival_flchain.rst
+    h_survival_analysis/02_survival_flchain_cox.rst
 
 
 Pretraining

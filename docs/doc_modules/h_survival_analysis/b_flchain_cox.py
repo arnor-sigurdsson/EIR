@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 from typing import List, Optional, Sequence
 
-import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -17,7 +16,7 @@ from docs.doc_modules.serving_experiments import (
 from docs.doc_modules.utils import get_saved_model_path
 
 CONTENT_ROOT = CR = get_content_root()
-TUTORIAL_NAME = TN = "01_flchain"
+TUTORIAL_NAME = TN = "02_flchain_cox"
 
 
 def get_flchain_run_1_tabular_info() -> AutoDocExperimentInfo:
@@ -43,12 +42,24 @@ def get_flchain_run_1_tabular_info() -> AutoDocExperimentInfo:
             "figures/flchain_training_curve_C-INDEX_tabular_1.pdf",
         ),
         (
-            "1100/survival_curves.png",
-            "figures/survival_curves.png",
+            "2400/cox_survival_curves.pdf",
+            "figures/survival_curves.pdf",
         ),
         (
-            "1100/individual_survival_curves.pdf",
+            "2400/cox_individual_curves.pdf",
             "figures/individual_survival_curves.pdf",
+        ),
+        (
+            "2400/attributions/flchain/feature_importance.pdf",
+            "figures/feature_importance.pdf",
+        ),
+        (
+            "2400/attributions/flchain/event/continuous_attributions_event.pdf",
+            "figures/continuous_attributions.pdf",
+        ),
+        (
+            "2400/attributions/flchain/event/categorical_attributions_sex_event.pdf",
+            "figures/sex_attributions.pdf",
         ),
     ]
 
@@ -180,18 +191,18 @@ def create_all_survival_plots(base_path: Path):
             "stratify_by": "sex",
             "title": "Survival Probability over Time by Sex",
         },
-        # {
-        #     "stratify_by": "mgus",
-        #     "title": "Survival Probability over Time by MGUS Status",
-        # },
-        # {
-        #     "stratify_by": "flcgrp",
-        #     "title": "Survival Probability over Time by FLC Group",
-        # },
-        # {
-        #     "stratify_by": "age",
-        #     "title": "Survival Probability over Time by Age Group",
-        # },
+        {
+            "stratify_by": "mgus",
+            "title": "Survival Probability over Time by MGUS Status",
+        },
+        {
+            "stratify_by": "flcgrp",
+            "title": "Survival Probability over Time by FLC Group",
+        },
+        {
+            "stratify_by": "age",
+            "title": "Survival Probability over Time by Age Group",
+        },
     ]
 
     for config in plot_configs:
@@ -374,20 +385,6 @@ def plot_survival_analysis_results(
         ci_lower = np.clip(ci_lower, 0, 1)
         ci_upper = np.clip(ci_upper, 0, 1)
 
-        ax.step(
-            times,
-            mean_curve,
-            color=color,
-            label=f"{label} (n={n_samples})",
-            linewidth=2,
-            where="post",
-            alpha=1.0,
-            path_effects=[
-                pe.Stroke(linewidth=3, foreground=color, alpha=0.3),
-                pe.Normal(),
-            ],
-        )
-
         times_extended = np.append(times, times[-1])
         ci_lower_extended = np.append(ci_lower, ci_lower[-1])
         ci_upper_extended = np.append(ci_upper, ci_upper[-1])
@@ -401,12 +398,14 @@ def plot_survival_analysis_results(
             step="post",
         )
 
-        ax.plot(times, mean_curve, "o", color=color, markersize=4, alpha=0.5)
+        ax.plot(times, mean_curve, color=color, label=label, lw=2, zorder=10)
 
     for strat_value, curves in stratified_data.items():
         color = colors.get(strat_value, f"C{len(colors)}")
         label = labels.get(strat_value, str(strat_value))
-        plot_survival_curves(np.array(curves), color, label)
+        plot_survival_curves(
+            curves=np.array(curves).squeeze(), color=color, label=label
+        )
 
     if title is None:
         title = f"Survival Probability over Time by {stratify_by.upper()}"

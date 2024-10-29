@@ -5,3 +5,6 @@ output_info:
 output_type_info:
   time_column: time
   event_column: event
+  loss_function: CoxPHLoss
+  num_durations: 0
+

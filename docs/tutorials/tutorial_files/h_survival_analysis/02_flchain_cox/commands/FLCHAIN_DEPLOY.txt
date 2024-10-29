@@ -1,0 +1,2 @@
+eirserve \
+--model-path eir_tutorials/tutorial_runs/h_survival_analysis/02_flchain_cox/saved_models/02_flchain_cox_model_3200_perf-average=0.8087.pt

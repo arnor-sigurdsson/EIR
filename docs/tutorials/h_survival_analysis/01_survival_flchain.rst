@@ -126,7 +126,16 @@ Here is how that looks:
     :width: 80%
     :align: center
 
-Here we can see, as expected, that older patients have lower survival probabilities.
+.. image:: ../tutorial_files/h_survival_analysis/01_flchain/figures/survival_analysis/survival_curve_by_sex.pdf
+    :width: 80%
+    :align: center
+
+.. image:: ../tutorial_files/h_survival_analysis/01_flchain/figures/survival_analysis/survival_curve_by_flcgrp.pdf
+    :width: 80%
+    :align: center
+
+Here we can see for example, as expected,
+that older patients have lower survival probabilities.
 
 Conclusion
 ---------
