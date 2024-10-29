@@ -38,10 +38,10 @@ from eir.setup.output_setup_modules.survival_output_setup import (
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
-from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
+from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
     remove_special_tokens,
 )
-from eir.train_utils.evaluation_handlers.train_handlers_sequence_output import (
+from eir.train_utils.evaluation_modules.train_handlers_sequence_output import (
     decode_tokens,
     get_special_tokens,
     remove_special_tokens_from_string,
@@ -68,6 +68,8 @@ def general_post_process(
         - tabular outputs: torch.Tensor
         - sequence outputs: list[int]
         - array outputs: np.ndarray
+        - image outputs: np.ndarray
+        - survival outputs: torch.Tensor
     """
     post_processed: dict[str, Any] = {}
 
@@ -151,30 +153,19 @@ def general_post_process(
                     output_model_config, schemas.TabularOutputModuleConfig
                 )
 
-                tabular_outputs = _ensure_streamlined_tabular_values(
-                    tabular_model_outputs=cur_model_outputs
-                )
-
                 output_type_info = output_object.output_config.output_type_info
                 assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
 
-                time_name = output_type_info.time_column
                 event_name = output_type_info.event_column
 
-                transformers = output_object.target_transformers
-                time_kbins_transformer = transformers[time_name]
-                time_bins = time_kbins_transformer.bin_edges_[0]
-                time_bins_except_last = time_bins[:-1]
-
-                hazards_logits = tabular_outputs[event_name]
-                hazards = torch.sigmoid(hazards_logits).numpy()
-                survival_probs = np.cumprod(1 - hazards, 0)
+                processed_outputs = process_survival_prediction(
+                    output_object=output_object,
+                    output_model_config=output_model_config,
+                    cur_model_outputs=cur_model_outputs,
+                )
 
                 post_processed[output_name] = {}
-                post_processed[output_name][event_name] = {
-                    "time_bins": time_bins_except_last.tolist(),
-                    "survival_probs": survival_probs.tolist(),
-                }
+                post_processed[output_name][event_name] = processed_outputs
 
             case _:
                 raise NotImplementedError(
@@ -260,3 +251,108 @@ def _serialize_array_to_base64(array: np.ndarray) -> str:
     array_bytes = array.tobytes()
     base64_encoded = base64.b64encode(array_bytes).decode("utf-8")
     return base64_encoded
+
+
+def process_survival_prediction(
+    output_object: ComputedSurvivalOutputInfo,
+    output_model_config: schemas.TabularOutputModuleConfig,
+    cur_model_outputs: dict[str, torch.Tensor | list[int] | np.ndarray],
+) -> dict:
+
+    assert isinstance(output_model_config, schemas.TabularOutputModuleConfig)
+    assert isinstance(
+        output_object.output_config.output_type_info, schemas.SurvivalOutputTypeConfig
+    )
+
+    tabular_outputs = _ensure_streamlined_tabular_values(
+        tabular_model_outputs=cur_model_outputs
+    )
+
+    output_type_info = output_object.output_config.output_type_info
+    model_type = "cox" if output_type_info.loss_function == "CoxPHLoss" else "discrete"
+
+    if model_type == "discrete":
+        processed_outputs = _process_discrete_survival_prediction(
+            output_object=output_object,
+            cur_model_outputs=tabular_outputs,
+        )
+    else:
+        processed_outputs = _process_cox_survival_prediction(
+            output_object=output_object,
+            cur_model_outputs=tabular_outputs,
+        )
+
+    return processed_outputs
+
+
+def _process_discrete_survival_prediction(
+    output_object: ComputedSurvivalOutputInfo,
+    cur_model_outputs: dict[str, torch.Tensor],
+) -> dict:
+
+    processed_outputs: dict[str, dict[str, Any]] = {}
+
+    output_type_info = output_object.output_config.output_type_info
+    assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
+
+    time_name = output_type_info.time_column
+    event_name = output_type_info.event_column
+
+    transformers = output_object.target_transformers
+    time_kbins_transformer = transformers[time_name]
+    time_bins = time_kbins_transformer.bin_edges_[0]
+    time_bins_except_last = time_bins[:-1]
+
+    hazards_logits = cur_model_outputs[event_name]
+    hazards = torch.sigmoid(hazards_logits).numpy()
+    survival_probs = np.cumprod(1 - hazards, 0)
+
+    processed_outputs["time_points"] = time_bins_except_last.tolist()
+    processed_outputs["survival_probs"] = survival_probs.tolist()
+
+    return processed_outputs
+
+
+def _process_cox_survival_prediction(
+    output_object: ComputedSurvivalOutputInfo,
+    cur_model_outputs: dict[str, torch.Tensor],
+) -> dict:
+
+    processed_outputs: dict[str, dict[str, Any]] = {}
+
+    output_type_info = output_object.output_config.output_type_info
+    assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
+
+    event_name = output_type_info.event_column
+
+    risk_scores = cur_model_outputs[event_name].numpy()
+
+    msg_1 = "Baseline hazard not found. Make sure it was computed during validation."
+    assert output_object.baseline_hazard is not None, msg_1
+
+    msg_2 = (
+        "Baseline unique times not found. Make sure they were computed "
+        "during validation."
+    )
+    assert output_object.baseline_unique_times is not None, msg_2
+
+    baseline_survival = np.exp(-np.cumsum(output_object.baseline_hazard))
+
+    max_time = output_object.baseline_unique_times[-1]
+    time_points = np.linspace(0, max_time, 100)
+
+    interpolated_baseline = np.interp(
+        time_points,
+        output_object.baseline_unique_times,
+        baseline_survival,
+        right=baseline_survival[-1],
+    )
+
+    survival_probs = np.zeros((len(risk_scores), len(time_points)))
+    for i, risk_score in enumerate(risk_scores):
+        survival_probs[i] = interpolated_baseline ** np.exp(risk_score)
+
+    processed_outputs["survival_probs"] = survival_probs.tolist()
+    processed_outputs["time_points"] = time_points.tolist()
+
+    return processed_outputs

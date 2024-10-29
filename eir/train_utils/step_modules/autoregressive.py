@@ -4,7 +4,7 @@ import torch
 from torch._C._nn import pad
 
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
-from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
+from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
     SpecialTokens,
     get_special_tokens,
 )

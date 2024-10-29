@@ -53,13 +53,19 @@ from eir.interpretation.interpret_omics import (
 )
 from eir.interpretation.interpret_sequence import analyze_sequence_input_attributions
 from eir.interpretation.interpret_tabular import analyze_tabular_input_attributions
-from eir.interpretation.interpretation_utils import MyIntegratedGradients
+from eir.interpretation.interpretation_utils import (
+    MyIntegratedGradients,
+    get_appropriate_target_transformer,
+)
 from eir.models.input.omics.omics_models import CNNModel, LinearModel
 from eir.models.model_training_utils import gather_data_loader_samples
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
+)
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
-from eir.setup.schemas import InputConfig, OutputConfig
+from eir.setup.schemas import InputConfig, OutputConfig, SurvivalOutputTypeConfig
 from eir.target_setup.target_label_setup import MissingTargetsInfo
 from eir.train_utils.evaluation import validation_handler
 from eir.train_utils.utils import (
@@ -242,8 +248,19 @@ def tabular_attribution_analysis_wrapper(
     for output_name, target_column_type, target_column_name in target_columns_gen:
         output_type = exp.outputs[output_name].output_config.output_info.output_type
 
-        if output_type != "tabular":
+        if output_type not in ("tabular", "survival"):
             continue
+
+        if output_type == "survival":
+            output_type_info = exp.outputs[output_name].output_config.output_type_info
+            assert isinstance(output_type_info, SurvivalOutputTypeConfig)
+            if target_column_name == output_type_info.time_column:
+                continue
+
+            if output_type_info.loss_function == "CoxPHLoss":
+                target_column_type = "con"
+            else:
+                target_column_type = "cat"
 
         ao = get_attribution_object(
             experiment=exp,
@@ -289,8 +306,15 @@ def tabular_attribution_analysis_wrapper(
         )
 
         output_object = exp.outputs[output_name]
-        assert isinstance(output_object, ComputedTabularOutputInfo)
-        target_transformer = output_object.target_transformers[target_column_name]
+        assert isinstance(
+            output_object, (ComputedTabularOutputInfo, ComputedSurvivalOutputInfo)
+        )
+
+        target_transformer = get_appropriate_target_transformer(
+            output_object=output_object,
+            target_column_name=target_column_name,
+            target_column_type=target_column_type,
+        )
 
         act_consumers = get_attribution_consumers(
             input_names_and_types=input_names_and_types,
@@ -851,7 +875,9 @@ def _get_interpretation_data_producer(
     dataset: al_local_datasets,
 ) -> Generator[Tuple[Batch, dict[str, Any]], None, None]:
     output_object = experiment.outputs[output_name]
-    assert isinstance(output_object, ComputedTabularOutputInfo)
+    assert isinstance(
+        output_object, (ComputedTabularOutputInfo, ComputedSurvivalOutputInfo)
+    )
 
     target_transformer = output_object.target_transformers[column_name]
     gc = experiment.configs.global_config
@@ -879,10 +905,23 @@ def _get_interpretation_data_producer(
 
         batch = state["batch"]
 
+        target_labels = batch.target_labels
+        match (output_object, column_type):
+            case (ComputedSurvivalOutputInfo(), "cat"):
+                # here we inject the *time* target label as the event target label
+                # as we will be looking at attributions towards each output node
+                # (time bin) in the case of discrete survival outputs
+                output_type_info = output_object.output_config.output_type_info
+                assert isinstance(output_type_info, SurvivalOutputTypeConfig)
+                time_column = output_type_info.time_column
+                event_column = output_type_info.event_column
+                time_bin = target_labels[output_name][time_column].to(torch.long)
+                target_labels[output_name][event_column] = time_bin
+
         inputs_detached = _detach_all_inputs(tensor_inputs=batch.inputs)
         batch_interpretation = Batch(
             inputs=inputs_detached,
-            target_labels=batch.target_labels,
+            target_labels=target_labels,
             ids=batch.ids,
         )
 

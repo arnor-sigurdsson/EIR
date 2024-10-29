@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from eir.train_utils.evaluation_handlers.train_handlers_array_output import (
+from eir.train_utils.evaluation_modules.train_handlers_array_output import (
     array_out_single_sample_evaluation_wrapper,
 )
 

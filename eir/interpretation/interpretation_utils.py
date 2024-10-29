@@ -30,9 +30,17 @@ from captum.attr._utils.approximation_methods import approximation_parameters
 from captum.attr._utils.common import _reshape_and_sum
 from matplotlib import pyplot as plt
 from scipy.stats import bootstrap
+from sklearn.preprocessing import KBinsDiscretizer
 from torch import Tensor
 
 from eir.setup import schemas
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
+    SurvivalOutputTypeConfig,
+)
+from eir.setup.output_setup_modules.tabular_output_setup import (
+    ComputedTabularOutputInfo,
+)
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -53,9 +61,48 @@ def get_target_class_name(
         return target_column_name
 
     tt_it = target_transformer.inverse_transform
-    cur_trn_label = tt_it([sample_label.item()])[0]
+
+    match target_transformer:
+        case KBinsDiscretizer():
+            bin_idx = sample_label.item()
+
+            bin_edges = target_transformer.bin_edges_[0]
+
+            lower_bound = bin_edges[bin_idx]
+            upper_bound = bin_edges[bin_idx + 1]
+
+            return f"time_{lower_bound:.1f}_to_{upper_bound:.1f}"
+        case _:
+            cur_trn_label = tt_it([sample_label.item()])[0]
 
     return cur_trn_label
+
+
+def get_appropriate_target_transformer(
+    output_object: Union[ComputedTabularOutputInfo, ComputedSurvivalOutputInfo],
+    target_column_name: str,
+    target_column_type: str,
+) -> "al_label_transformers_object":
+    """
+    We have this so we can inject the time binning transformer for discrete
+    survival outputs. Note that this is coupled with other injections done for the
+    interpretation of discrete survival outputs (e.g. injecting the current
+    time bin as an event target, which then correctly indexes into a given
+    time bin node in the model output).
+    """
+    target_transformer = output_object.target_transformers[target_column_name]
+
+    match output_object:
+        case ComputedSurvivalOutputInfo():
+            output_type_info = output_object.output_config.output_type_info
+            assert isinstance(output_type_info, SurvivalOutputTypeConfig)
+
+            if target_column_type == "cat":
+                target_transformer = output_object.target_transformers[
+                    output_type_info.time_column
+                ]
+
+    return target_transformer
 
 
 def stratify_attributions_by_target_classes(

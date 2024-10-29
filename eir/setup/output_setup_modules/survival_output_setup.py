@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Optional
 
+import numpy as np
 from sklearn.preprocessing import KBinsDiscretizer
 
 from eir.data_load.label_setup import (
@@ -10,6 +11,7 @@ from eir.data_load.label_setup import (
 )
 from eir.setup import schemas
 from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
+from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
@@ -24,10 +26,15 @@ class ComputedSurvivalOutputInfo:
     target_columns: al_target_columns
     target_transformers: al_label_transformers
 
+    baseline_hazard: Optional[np.ndarray] = None
+    baseline_unique_times: Optional[np.ndarray] = None
+
 
 def set_up_survival_output(
     output_config: schemas.OutputConfig,
     target_transformers: Dict[str, al_label_transformers],
+    baseline_hazard: Optional[np.ndarray] = None,
+    baseline_unique_times: Optional[np.ndarray] = None,
     *args,
     **kwargs,
 ) -> ComputedSurvivalOutputInfo:
@@ -50,6 +57,8 @@ def set_up_survival_output(
         num_outputs_per_target=num_outputs_per_target,
         target_columns=target_columns,
         target_transformers=cur_target_transformers,
+        baseline_hazard=baseline_hazard,
+        baseline_unique_times=baseline_unique_times,
     )
 
     return tabular_output_info
@@ -61,11 +70,16 @@ def set_up_num_survival_outputs(
     num_outputs_per_target_dict = {}
     assert len(target_transformers) == 2
     for column, transformer in target_transformers.items():
-        if not isinstance(transformer, KBinsDiscretizer):
+        if not isinstance(transformer, (KBinsDiscretizer, IdentityTransformer)):
             continue
 
         time_column = column
         event_column = next(i for i in target_transformers if i != time_column)
-        num_outputs_per_target_dict[event_column] = transformer.n_bins
+
+        match transformer:
+            case IdentityTransformer():
+                num_outputs_per_target_dict[event_column] = 1
+            case KBinsDiscretizer(n_bins=transformer.n_bins):
+                num_outputs_per_target_dict[event_column] = transformer.n_bins
 
     return num_outputs_per_target_dict

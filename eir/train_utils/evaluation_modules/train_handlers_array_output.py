@@ -40,7 +40,7 @@ from eir.setup.schemas import (
     OutputConfig,
 )
 from eir.train_utils import utils
-from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
+from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
     convert_model_inputs_to_raw,
     general_pre_process_prepared_inputs,
     get_batch_generator,

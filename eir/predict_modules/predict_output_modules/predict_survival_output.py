@@ -10,9 +10,9 @@ from eir.setup.output_setup_modules.survival_output_setup import (
     ComputedSurvivalOutputInfo,
 )
 from eir.setup.schemas import SurvivalOutputTypeConfig
-from eir.train_utils.evaluation import (
-    plot_individual_survival_curves,
-    plot_survival_curves,
+from eir.train_utils.evaluation_modules.evaluation_output_survival import (
+    plot_discrete_individual_survival_curves,
+    plot_discrete_survival_curves,
 )
 
 if TYPE_CHECKING:
@@ -63,7 +63,7 @@ def predict_survival_wrapper_with_labels(
                 times_binned.reshape(-1, 1)
             ).flatten()
 
-            plot_survival_curves(
+            plot_discrete_survival_curves(
                 times=times,
                 events=events,
                 predicted_probs=survival_probs,
@@ -88,7 +88,7 @@ def predict_survival_wrapper_with_labels(
         csv_path = output_folder / "survival_predictions.csv"
         df.to_csv(csv_path, index=False)
 
-        plot_individual_survival_curves(
+        plot_discrete_individual_survival_curves(
             df=df,
             time_bins=time_bins_except_last,
             output_folder=str(output_folder),
@@ -136,7 +136,7 @@ def predict_survival_wrapper_no_labels(
         csv_path = output_folder / "survival_predictions.csv"
         df.to_csv(csv_path, index=False)
 
-        plot_individual_survival_curves(
+        plot_discrete_individual_survival_curves(
             df=df,
             time_bins=time_bins_except_last,
             output_folder=str(output_folder),

@@ -41,6 +41,7 @@ from eir.target_setup.target_label_setup import (
     transform_durations_with_nans,
     update_labels_dict,
 )
+from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -167,7 +168,7 @@ def parse_labels_for_predict(
 def _extract_target_con_transformers(
     label_transformers: al_label_transformers,
     con_columns: Sequence[str],
-) -> Dict[str, StandardScaler | KBinsDiscretizer]:
+) -> Dict[str, StandardScaler | KBinsDiscretizer | IdentityTransformer]:
     con_transformers = {}
 
     for target_column, transformer_object in label_transformers.items():
@@ -175,7 +176,9 @@ def _extract_target_con_transformers(
             continue
 
         assert target_column not in con_transformers
-        assert isinstance(transformer_object, (StandardScaler, KBinsDiscretizer))
+        assert isinstance(
+            transformer_object, (StandardScaler, KBinsDiscretizer, IdentityTransformer)
+        )
 
         con_transformers[target_column] = transformer_object
 

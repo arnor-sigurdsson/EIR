@@ -52,6 +52,7 @@ from eir.setup.streaming_data_setup.streaming_data_utils import (
     connect_to_server,
     receive_with_timeout,
 )
+from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -398,7 +399,7 @@ def apply_tabular_transformers(
                 transformed_value = transformer.transform([[value]])[0]
             elif isinstance(transformer, LabelEncoder):
                 transformed_value = transformer.transform([value])
-            elif isinstance(transformer, KBinsDiscretizer):
+            elif isinstance(transformer, (KBinsDiscretizer, IdentityTransformer)):
                 transformed_value = transformer.transform([[value]])[0]
             else:
                 raise ValueError(f"Unknown transformer type for column {column}")

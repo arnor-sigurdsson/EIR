@@ -6,8 +6,8 @@ import pytest
 import torch
 
 from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
-from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import decode_tokens
-from eir.train_utils.evaluation_handlers.train_handlers_sequence_output import (
+from eir.train_utils.evaluation_modules.evaluation_handlers_utils import decode_tokens
+from eir.train_utils.evaluation_modules.train_handlers_sequence_output import (
     SequenceOutputEvalSample,
     SequenceOutputSamplingConfig,
     _compute_target_index,

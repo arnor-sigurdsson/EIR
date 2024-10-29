@@ -549,7 +549,7 @@ def _validate_survival_output(
 
     actual_output = actual_output["BinaryOrigin"]
 
-    if not {"time_bins", "survival_probs"}.issubset(actual_output.keys()):
+    if not {"time_points", "survival_probs"}.issubset(actual_output.keys()):
         logger.error("Missing required keys in survival output")
         return False
 

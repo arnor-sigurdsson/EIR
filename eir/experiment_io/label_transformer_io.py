@@ -6,6 +6,7 @@ import numpy as np
 from aislib.misc_utils import ensure_path_exists
 from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 
+from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.train_utils.utils import get_run_folder
 
 if TYPE_CHECKING:
@@ -139,6 +140,12 @@ def serialize_kbins_discretizer(kbins: KBinsDiscretizer) -> dict[str, Any]:
     }
 
 
+def serialize_identity_transformer(transformer: IdentityTransformer) -> dict[str, Any]:
+    return {
+        "type": "IdentityTransformer",
+    }
+
+
 def serialize_transformer(
     transformer: "al_label_transformers_object",
 ) -> dict[str, Any]:
@@ -146,6 +153,7 @@ def serialize_transformer(
         StandardScaler: serialize_standard_scaler,
         LabelEncoder: serialize_label_encoder,
         KBinsDiscretizer: serialize_kbins_discretizer,
+        IdentityTransformer: serialize_identity_transformer,
     }
     serializer = serializers.get(type(transformer))
     if serializer is None:
@@ -185,11 +193,16 @@ def deserialize_kbins_discretizer(data: dict[str, Any]) -> KBinsDiscretizer:
     return kbins
 
 
+def deserialize_identity_transformer(data: dict[str, Any]) -> IdentityTransformer:
+    return IdentityTransformer()
+
+
 def deserialize_transformer(data: dict[str, Any]) -> "al_label_transformers_object":
     deserializers: dict[str, Callable] = {
         "StandardScaler": deserialize_standard_scaler,
         "LabelEncoder": deserialize_label_encoder,
         "KBinsDiscretizer": deserialize_kbins_discretizer,
+        "IdentityTransformer": deserialize_identity_transformer,
     }
     deserializer = deserializers.get(data["type"])
     if deserializer is None:
