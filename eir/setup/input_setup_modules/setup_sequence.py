@@ -214,7 +214,6 @@ def init_vocab(
     tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
 ) -> Vocab:
     if tokenizer_name == "bpe":
-        assert gathered_stats.total_count > 0
         tokenizer_object = extract_tokenizer_object_from_function(
             tokenizer_callable=tokenizer
         )
@@ -649,14 +648,20 @@ def yield_tokens_from_source(
     elif data_source_path.is_dir():
         iterator = tqdm(Path(data_source).iterdir(), desc="Vocabulary Setup")
         for file in iterator:
+            preserve_full = split_on is None
             yield from yield_tokens_from_file(
-                file_path=str(file), split_on=split_on, gathered_stats=gathered_stats
+                file_path=str(file),
+                split_on=split_on,
+                gathered_stats=gathered_stats,
+                preserve_full_content=preserve_full,
             )
 
     elif data_source_path.is_file():
         assert data_source_path.suffix == ".csv"
         yield from yield_tokens_from_csv(
-            file_path=data_source, split_on=split_on, gathered_stats=gathered_stats
+            file_path=data_source,
+            split_on=split_on,
+            gathered_stats=gathered_stats,
         )
 
     return gathered_stats
@@ -692,8 +697,19 @@ def yield_tokens_from_file(
     file_path: str,
     split_on: Optional[str],
     gathered_stats: GatheredSequenceStats,
+    preserve_full_content: bool = False,
 ) -> Generator[Sequence[str], None, None]:
     gathered_stats.total_files += 1
+
+    if preserve_full_content:
+        with open(file_path, "r") as f:
+            content = f.read()
+            gathered_stats.total_count += 1
+            cur_length = len(content)
+            if cur_length > gathered_stats.max_length:
+                gathered_stats.max_length = cur_length
+            yield [content]
+        return
 
     split_func = get_sequence_split_function(split_on=split_on)
 

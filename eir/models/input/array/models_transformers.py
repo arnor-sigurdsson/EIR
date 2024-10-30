@@ -3,13 +3,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Union
 
 from torch import Tensor, nn
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 from eir.models.input.array.models_locally_connected import FlattenFunc
 from eir.models.input.sequence.transformer_models import (
     get_positional_representation_class,
     parse_dim_feedforward,
 )
+from eir.models.layers.attention_layers import Transformer
 
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
@@ -102,19 +102,13 @@ class ArrayTransformer(nn.Module):
             embedding_dim=self.embedding_dim,
         )
 
-        encoder_layer_base = TransformerEncoderLayer(
+        self.transformer_encoder = Transformer(
             d_model=self.embedding_dim,
             nhead=self.model_config.num_heads,
+            num_layers=self.model_config.num_layers,
             dim_feedforward=dim_feed_forward,
             dropout=self.model_config.dropout,
-            activation="gelu",
-            batch_first=True,
             norm_first=True,
-        )
-        self.transformer_encoder = TransformerEncoder(
-            encoder_layer=encoder_layer_base,
-            num_layers=self.model_config.num_layers,
-            enable_nested_tensor=False,
         )
 
         self.output_shape = (1, self.num_patches, self.embedding_dim)

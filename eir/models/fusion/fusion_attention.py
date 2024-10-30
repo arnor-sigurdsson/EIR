@@ -4,6 +4,7 @@ import torch
 from einops import rearrange
 from torch import Tensor, einsum, nn
 
+from eir.models.layers.attention_layers import Transformer
 from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
 from eir.models.layers.projection_layers import get_1d_projection_layer
 
@@ -91,20 +92,13 @@ class SequenceProjection(nn.Module):
             projection_layer_type=self.projection_layer_type,
         )
 
-        encoder_layer_base = nn.TransformerEncoderLayer(
+        self.encoder = Transformer(
             d_model=target_embedding_dim,
             nhead=8,
+            num_layers=1,
             dim_feedforward=target_embedding_dim * 4,
             dropout=0.1,
-            activation="gelu",
-            batch_first=True,
             norm_first=True,
-        )
-
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer_base,
-            num_layers=1,
-            enable_nested_tensor=False,
         )
 
         self.downsample_identity: nn.Linear | nn.Identity | LCL | LCLResidualBlock = (
@@ -166,19 +160,13 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
         self.norm_1_target = nn.LayerNorm(normalized_shape=target_embedding_dim)
         self.norm_1_context = nn.LayerNorm(normalized_shape=in_embedding_dim)
 
-        encoder_layer_base = nn.TransformerEncoderLayer(
+        self.encoder = Transformer(
             d_model=target_embedding_dim,
             nhead=8,
+            num_layers=1,
             dim_feedforward=target_embedding_dim * 4,
             dropout=0.1,
-            activation="gelu",
-            batch_first=True,
             norm_first=True,
-        )
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer_base,
-            num_layers=1,
-            enable_nested_tensor=False,
         )
 
         ca_mask = torch.ones((1, self.target_max_length)).bool()
