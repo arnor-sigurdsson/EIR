@@ -27,6 +27,7 @@ from eir.data_load.data_source_modules.deeplake_ops import (
     load_deeplake_dataset,
 )
 from eir.setup.schemas import InputConfig
+from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.train_utils.utils import get_seed
 from eir.utils.logging import get_logger
 
@@ -42,7 +43,9 @@ al_sample_labels_raw = dict[str, al_label_values_raw]
 al_label_dict = dict[str, al_sample_labels_raw]
 al_target_label_dict = dict[str, al_label_dict]  # account for output name
 al_target_columns = dict[Literal["con", "cat"], list[str]]
-al_label_transformers_object = Union[StandardScaler, LabelEncoder, KBinsDiscretizer]
+al_label_transformers_object = Union[
+    StandardScaler, LabelEncoder, KBinsDiscretizer, IdentityTransformer
+]
 al_label_transformers = dict[str, al_label_transformers_object]
 al_pd_dtypes = np.ndarray | pd.CategoricalDtype
 
@@ -216,7 +219,7 @@ def streamline_values_for_transformers(
     LabelEncoder() expects a 1D array, whereas StandardScaler() expects a 2D one.
     """
 
-    if isinstance(transformer, (StandardScaler, KBinsDiscretizer)):
+    if isinstance(transformer, (StandardScaler, KBinsDiscretizer, IdentityTransformer)):
         values_reshaped = values.reshape(-1, 1)
         return values_reshaped
 
@@ -250,7 +253,7 @@ def transform_label_df(
                     non_nan_mask = df_labels_copy[column_name].notna()
                 case LabelEncoder():
                     non_nan_mask = df_labels_copy[column_name] != "nan"
-                case KBinsDiscretizer():
+                case KBinsDiscretizer() | IdentityTransformer():
                     non_nan_mask = df_labels_copy[column_name].notna()
                 case _:
                     raise ValueError()

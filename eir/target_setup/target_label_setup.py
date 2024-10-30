@@ -43,6 +43,7 @@ from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_sequence import SequenceOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
+from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -681,7 +682,11 @@ def _streamline_duration_transformer_input(
 def fit_duration_transformer(
     durations: np.ndarray,
     n_bins: int,
-) -> KBinsDiscretizer:
+) -> KBinsDiscretizer | IdentityTransformer:
+
+    if not n_bins:
+        return IdentityTransformer()
+
     transformer = KBinsDiscretizer(
         n_bins=n_bins,
         encode="ordinal",
@@ -696,7 +701,7 @@ def fit_duration_transformer(
 def transform_durations_with_nans(
     df: pd.DataFrame,
     time_column: str,
-    transformer: KBinsDiscretizer,
+    transformer: KBinsDiscretizer | IdentityTransformer,
 ) -> np.ndarray:
     nan_mask = df[time_column].isna()
 

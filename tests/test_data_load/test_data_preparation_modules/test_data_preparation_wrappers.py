@@ -4,7 +4,7 @@ import torch
 from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
     _should_skip_modality,
 )
-from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
+from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
     _streamline_tabular_data_for_transformers,
 )
 

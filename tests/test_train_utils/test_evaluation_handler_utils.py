@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 
 from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
 from eir.train import Experiment
-from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
+from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
     convert_image_input_to_raw,
     convert_tabular_input_to_raw,
     prepare_manual_sample_data,

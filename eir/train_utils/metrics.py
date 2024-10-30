@@ -43,6 +43,7 @@ from eir.data_load.data_utils import get_output_info_generator
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.setup.schemas import OutputConfig, SurvivalOutputTypeConfig
 from eir.target_setup.target_label_setup import MissingTargetsInfo
+from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -565,7 +566,7 @@ def calc_survival_c_index(
     outputs: np.ndarray,
     labels: np.ndarray,
     times: np.ndarray,
-    target_transformers: dict[str, dict[str, KBinsDiscretizer]],
+    target_transformers: dict[str, dict[str, KBinsDiscretizer | IdentityTransformer]],
     output_name: str,
     event_name: str,
     time_name: str,

@@ -180,18 +180,18 @@ def create_all_survival_plots(base_path: Path):
             "stratify_by": "sex",
             "title": "Survival Probability over Time by Sex",
         },
-        {
-            "stratify_by": "mgus",
-            "title": "Survival Probability over Time by MGUS Status",
-        },
-        {
-            "stratify_by": "flcgrp",
-            "title": "Survival Probability over Time by FLC Group",
-        },
-        {
-            "stratify_by": "age",
-            "title": "Survival Probability over Time by Age Group",
-        },
+        # {
+        #     "stratify_by": "mgus",
+        #     "title": "Survival Probability over Time by MGUS Status",
+        # },
+        # {
+        #     "stratify_by": "flcgrp",
+        #     "title": "Survival Probability over Time by FLC Group",
+        # },
+        # {
+        #     "stratify_by": "age",
+        #     "title": "Survival Probability over Time by Age Group",
+        # },
     ]
 
     for config in plot_configs:
@@ -332,7 +332,7 @@ def plot_survival_analysis_results(
             "3": "65-74 years",
             "4": "≥75 years",
         },
-        "flcgrp": {str(i): f"Group {i}" for i in range(1, 10)},
+        "flcgrp": {str(i): f"Group {i}" for i in range(1, 11)},
     }
 
     colors = color_dict or default_color_schemes.get(stratify_by, {})
@@ -353,7 +353,7 @@ def plot_survival_analysis_results(
         survival_prob = response["flchain_prediction"]["event"]["survival_probs"]
 
         if times is None:
-            times = response["flchain_prediction"]["event"]["time_bins"]
+            times = response["flchain_prediction"]["event"]["time_points"]
 
         if strat_value not in stratified_data:
             stratified_data[strat_value] = []

@@ -92,7 +92,7 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
         _delete_random_cells_from_csv(csv_file=label_file, fraction_to_drop=0.10)
         _delete_random_cells_from_csv(
             csv_file=label_file,
-            fraction_to_drop=0.95,
+            fraction_to_drop=0.85,
             columns=["SparseHeight", "SparseOrigin"],
         )
 

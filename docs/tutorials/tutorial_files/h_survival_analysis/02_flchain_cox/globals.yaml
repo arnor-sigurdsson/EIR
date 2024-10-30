@@ -1,0 +1,11 @@
+basic_experiment:
+  n_epochs: 50
+  output_folder: eir_tutorials/tutorial_runs/h_survival_analysis/02_flchain_cox
+evaluation_checkpoint:
+  checkpoint_interval: 100
+  n_saved_models: 1
+  sample_interval: 100
+attribution_analysis:
+  attributions_every_sample_factor: 4
+  compute_attributions: true
+  max_attributions_per_class: 512

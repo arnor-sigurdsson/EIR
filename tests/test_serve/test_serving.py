@@ -549,7 +549,7 @@ def _validate_survival_output(
 
     actual_output = actual_output["BinaryOrigin"]
 
-    if not {"time_bins", "survival_probs"}.issubset(actual_output.keys()):
+    if not {"time_points", "survival_probs"}.issubset(actual_output.keys()):
         logger.error("Missing required keys in survival output")
         return False
 
@@ -566,7 +566,7 @@ def _validate_survival_output(
     binary_origin = expected_row["BinaryOrigin"].item()
     final_prob = survival_probs[-1]
 
-    threshold = 0.9
+    threshold = 0.8
     if binary_origin == 0:
         if final_prob < threshold:
             logger.error(

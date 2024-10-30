@@ -285,22 +285,54 @@ def _cox_ph_loss(
     risk_scores: torch.Tensor,
     time: torch.Tensor,
     event: torch.Tensor,
+    ties_method: str = "efron",
 ) -> torch.Tensor:
+    if torch.sum(event) == 0:
+        return torch.tensor(0.0, device=risk_scores.device, requires_grad=True)
 
-    raise NotImplementedError("CoxPHLoss is not implemented yet.")
+    sorted_time, indices = torch.sort(time)
+    sorted_risk_scores = risk_scores[indices]
+    sorted_event = event[indices]
 
-    # Sort by descending duration
-    _, sorted_indices = torch.sort(time, descending=True)
-    risk_scores = risk_scores[sorted_indices]
-    event = event[sorted_indices]
+    if ties_method == "breslow":
+        log_risk = torch.logcumsumexp(sorted_risk_scores.flip(0), dim=0).flip(0)
+        loss = sorted_risk_scores - log_risk
+        loss = loss[sorted_event == 1]
+        return -torch.nanmean(loss)
 
-    # Calculate log of cumulative hazard
-    cumulative_hazard = torch.logcumsumexp(risk_scores, dim=0)
+    elif ties_method == "efron":
+        unique_times = torch.unique(sorted_time)
 
-    # Calculate the loss
-    loss = -torch.sum(event * (risk_scores - cumulative_hazard))
+        # Get risk sets and event sets for each unique time
+        log_likelihood = torch.tensor(0.0, device=risk_scores.device)
 
-    return loss / torch.sum(event)
+        for t in unique_times:
+            # Events at this time
+            events_at_t = (sorted_time == t) & (sorted_event == 1)
+            if not torch.any(events_at_t):
+                continue
+
+            # Risk set (samples still at risk at time t)
+            risk_set = sorted_time >= t
+
+            # Calculate Efron's correction for ties
+            n_events = events_at_t.sum()
+            tied_scores = sorted_risk_scores[events_at_t]
+            risk_scores_exp = torch.exp(sorted_risk_scores)
+            risk_set_scores = risk_scores_exp[risk_set]
+            tied_scores_exp = risk_scores_exp[events_at_t]
+
+            for j in range(n_events):
+                factor = j / n_events
+                log_likelihood += tied_scores[j].squeeze() - torch.log(
+                    torch.sum(risk_set_scores) - factor * torch.sum(tied_scores_exp)
+                )
+
+        n_events_total = torch.sum(event)
+        return -log_likelihood / n_events_total
+
+    else:
+        raise ValueError(f"Unsupported ties method: {ties_method}")
 
 
 def get_survival_criterion(

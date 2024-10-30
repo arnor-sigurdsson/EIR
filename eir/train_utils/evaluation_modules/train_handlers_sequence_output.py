@@ -24,7 +24,7 @@ from eir.setup.schema_modules.output_schemas_sequence import (
 )
 from eir.setup.schemas import OutputConfig, SequenceOutputTypeConfig
 from eir.train_utils import utils
-from eir.train_utils.evaluation_handlers.evaluation_handlers_utils import (
+from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
     SpecialTokens,
     convert_model_inputs_to_raw,
     decode_tokens,

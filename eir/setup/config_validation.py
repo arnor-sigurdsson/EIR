@@ -115,12 +115,21 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                             "image model type 'cnn'. Please check the model type for "
                             f"output '{name}'."
                         )
-            case SurvivalOutputTypeConfig(time_column, event_column, _, _, _, _):
+            case SurvivalOutputTypeConfig(
+                time_column, event_column, num_durations, loss_function, _, _
+            ):
                 validate_tabular_source(
                     source_to_check=Path(output_source),
                     expected_columns=[time_column, event_column],
                     name="Survival output",
                 )
+
+                if loss_function == "CoxPHLoss" and num_durations != 0:
+                    raise ValueError(
+                        "CoxPHLoss is only supported with num_durations=0. "
+                        f"Please check the output '{name}'. "
+                        f"Got num_durations={num_durations}."
+                    )
 
 
 def base_validate_output_info(output_info: schemas.OutputInfoConfig) -> None:

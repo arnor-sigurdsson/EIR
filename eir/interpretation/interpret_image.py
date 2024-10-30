@@ -9,10 +9,14 @@ from captum.attr._utils.visualization import visualize_image_attr_multiple
 from torchvision.transforms import Normalize
 
 from eir.interpretation.interpretation_utils import (
+    get_appropriate_target_transformer,
     get_basic_sample_attributions_to_analyse_generator,
     get_target_class_name,
 )
 from eir.setup.input_setup_modules.setup_image import ComputedImageInputInfo
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
+)
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
@@ -36,9 +40,15 @@ def analyze_image_input_attributions(
     exp = experiment
 
     output_object = exp.outputs[output_name]
-    assert isinstance(output_object, ComputedTabularOutputInfo)
+    assert isinstance(
+        output_object, (ComputedTabularOutputInfo, ComputedSurvivalOutputInfo)
+    )
 
-    target_transformer = output_object.target_transformers[target_column_name]
+    target_transformer = get_appropriate_target_transformer(
+        output_object=output_object,
+        target_column_name=target_column_name,
+        target_column_type=target_column_type,
+    )
 
     input_object = exp.inputs[input_name]
     assert isinstance(input_object, ComputedImageInputInfo)

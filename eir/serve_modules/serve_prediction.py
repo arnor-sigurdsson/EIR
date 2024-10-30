@@ -11,12 +11,12 @@ from eir.setup.schema_modules.output_schemas_sequence import (
     SequenceOutputSamplingConfig,
 )
 from eir.setup.schemas import SequenceOutputTypeConfig
-from eir.train_utils.evaluation_handlers.train_handlers_array_output import (
+from eir.train_utils.evaluation_modules.train_handlers_array_output import (
     ArrayOutputEvalSample,
     one_shot_array_generation,
     reverse_diffusion_array_generation,
 )
-from eir.train_utils.evaluation_handlers.train_handlers_sequence_output import (
+from eir.train_utils.evaluation_modules.train_handlers_sequence_output import (
     SequenceOutputEvalSample,
     autoregressive_sequence_generation,
 )

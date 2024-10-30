@@ -10,6 +10,7 @@ from sklearn.preprocessing import LabelEncoder
 
 from eir.experiment_io.label_transformer_io import load_transformers
 from eir.interpretation.interpretation_utils import (
+    get_appropriate_target_transformer,
     get_long_format_attribution_df,
     plot_attributions_bar,
     stratify_attributions_by_target_classes,
@@ -19,6 +20,9 @@ from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
+from eir.setup.output_setup_modules.survival_output_setup import (
+    ComputedSurvivalOutputInfo,
+)
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
@@ -85,8 +89,15 @@ def analyze_tabular_input_attributions(
     df_attributions.to_csv(attribution_outfolder / "feature_importances.csv")
 
     output_object = exp.outputs[output_name]
-    assert isinstance(output_object, ComputedTabularOutputInfo)
-    target_transformer = output_object.target_transformers[target_column_name]
+    assert isinstance(
+        output_object, (ComputedTabularOutputInfo, ComputedSurvivalOutputInfo)
+    )
+
+    target_transformer = get_appropriate_target_transformer(
+        output_object=output_object,
+        target_column_name=target_column_name,
+        target_column_type=target_column_type,
+    )
 
     all_attributions_class_stratified = stratify_attributions_by_target_classes(
         all_attributions=all_attributions,
