@@ -54,10 +54,15 @@ def _load_model_weights(
         weights_only=True,
     )
 
+    loaded_weights_state_dict = strip_orig_mod_prefix(
+        state_dict=loaded_weights_state_dict
+    )
+
     if state_dict_keys_to_keep:
         no_keys_before = len(loaded_weights_state_dict)
         loaded_weights_state_dict = _filter_state_dict_keys(
-            state_dict=loaded_weights_state_dict, keys_to_keep=state_dict_keys_to_keep
+            state_dict=loaded_weights_state_dict,
+            keys_to_keep=state_dict_keys_to_keep,
         )
         logger.info(
             "Extracting %d/%d modules for feature extractors: '%s' from %s.",
@@ -125,6 +130,23 @@ def _load_model_weights(
     model = model.to(device=torch_device)
 
     return model
+
+
+def strip_orig_mod_prefix(state_dict: dict[str, Any]) -> OrderedDict[str, Any]:
+    """
+    Needed as if the original model was trained with torch.compile(...), the
+    state dict keys will have a prefix of "_orig_mod." which we need to strip
+    to match the current model's state dict keys.
+    """
+    prefix = "_orig_mod."
+    offset = len(prefix)
+    stripped_dict = OrderedDict()
+
+    for key, value in state_dict.items():
+        new_key = key[offset:] if key.startswith(prefix) else key
+        stripped_dict[new_key] = value
+
+    return stripped_dict
 
 
 def _replace_dict_key_names(

@@ -15,7 +15,7 @@ from eir.models.model_setup_modules.meta_setup import (
     get_default_meta_class,
     get_meta_model_class_and_kwargs_from_configs,
 )
-from eir.models.model_setup_modules.model_io import load_model
+from eir.models.model_setup_modules.model_io import load_model, strip_orig_mod_prefix
 from eir.models.model_setup_modules.pretrained_setup import (
     overload_meta_model_feature_extractors_with_pretrained,
 )
@@ -65,6 +65,7 @@ def get_model(
         loaded_meta_model = overload_embeddings_with_pretrained(
             model=loaded_meta_model,
             inputs=inputs_as_dict,
+            device=global_config.be.device,
             pretrained_checkpoint=global_config.m.pretrained_checkpoint,
         )
 
@@ -99,6 +100,7 @@ def get_model(
 def overload_embeddings_with_pretrained(
     model: "al_meta_model",
     inputs: "al_input_objects_as_dict",
+    device: str,
     pretrained_checkpoint: str,
 ) -> "al_meta_model":
     """
@@ -151,8 +153,10 @@ def overload_embeddings_with_pretrained(
 
     loaded_state_dict = torch.load(
         f=pretrained_checkpoint,
+        map_location=device,
         weights_only=True,
     )
+    loaded_state_dict = strip_orig_mod_prefix(state_dict=loaded_state_dict)
 
     for input_name, input_object in inputs.items():
         input_type = input_object.input_config.input_info.input_type
