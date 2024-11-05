@@ -70,10 +70,10 @@ input_array = np.array(
         32,
         32,
     ],
-    dtype=np.float64,
+    dtype=np.float32,
 )
 
-output_base = np.zeros(shape=input_array.shape, dtype=np.float64)
+output_base = np.zeros(shape=input_array.shape, dtype=np.float32)
 
 
 def encode_array_to_base64(array_np: np.ndarray) -> str:

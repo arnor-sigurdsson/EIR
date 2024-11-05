@@ -6,7 +6,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.experiments import (
+    AutoDocExperimentInfo,
+    get_data,
+    run_capture_and_save,
+)
 from docs.doc_modules.h_survival_analysis.utils import get_content_root
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
 from docs.doc_modules.serving_experiments import (
@@ -460,6 +464,8 @@ def _add_model_path_to_command(command: List[str]) -> List[str]:
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo | AutoDocServingInfo]:
     exp_1 = get_flchain_run_1_tabular_info()
+    get_data(url=exp_1.data_url, output_path=exp_1.data_output_path)
+
     exp_2 = get_flchain_run_1_predict_info()
     exp_3 = get_flchain_run_1_serve_info()
 

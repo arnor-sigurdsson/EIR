@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/g_time_series/01_time_series_power_transformer_real/saved_models/01_time_series_power_transformer_real_model_3500_perf-average=-1.9239.pt
+--model-path eir_tutorials/tutorial_runs/g_time_series/01_time_series_power_transformer_real/saved_models/01_time_series_power_transformer_real_model_1900_perf-average=-1.9153.pt

@@ -5,7 +5,6 @@ eir_tutorials/g_time_series/02_time_series_stocks
 │   ├── globals.yaml
 │   ├── globals_diffusion.yaml
 │   ├── globals_one_shot.yaml
-│   ├── input_array.yaml
 │   ├── input_array_diffusion.yaml
 │   ├── input_array_prior.yaml
 │   ├── input_sequence.yaml
