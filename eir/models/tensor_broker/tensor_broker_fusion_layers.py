@@ -137,7 +137,9 @@ class ConcatenationFusionLayer(nn.Module):
         self.ls = LayerScale(dim=1, init_values=1e-05)
 
     def forward(
-        self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
+        self,
+        input_tensor: torch.Tensor,
+        projected_context_tensor: torch.Tensor,
     ) -> torch.Tensor:
         residual = input_tensor
         out = torch.cat((input_tensor, projected_context_tensor), dim=1)
