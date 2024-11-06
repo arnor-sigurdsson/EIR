@@ -16,10 +16,10 @@ from typing import (
 
 import torch
 from torch import Tensor, nn
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.functional import pad
 from transformers import PretrainedConfig, PreTrainedModel
 
+from eir.models.layers.attention_layers import Transformer
 from eir.models.layers.lcl_layers import _find_lcl_padding_needed
 from eir.utils.logging import get_logger
 
@@ -436,19 +436,13 @@ class TransformerFeatureExtractor(nn.Module):
             embedding_dim=self.embedding_dim,
         )
 
-        encoder_layer_base = TransformerEncoderLayer(
+        self.transformer_encoder = Transformer(
             d_model=self.embedding_dim,
             nhead=self.model_config.num_heads,
+            num_layers=self.model_config.num_layers,
             dim_feedforward=dim_feed_forward,
             dropout=self.model_config.dropout,
-            activation="gelu",
-            batch_first=True,
             norm_first=True,
-        )
-        self.transformer_encoder = TransformerEncoder(
-            encoder_layer=encoder_layer_base,
-            num_layers=self.model_config.num_layers,
-            enable_nested_tensor=False,
         )
 
     @property

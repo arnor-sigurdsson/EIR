@@ -9,6 +9,7 @@ from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     parse_dim_feedforward,
 )
+from eir.models.layers.attention_layers import Transformer
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -89,26 +90,19 @@ class SequenceOutputModule(nn.Module):
             embedding_dim=self.embedding_dim,
         )
 
-        transformer_output_layer_base = nn.TransformerEncoderLayer(
-            d_model=self.embedding_dim,
-            nhead=self.output_model_init_config.num_heads,
-            dim_feedforward=dim_feed_forward,
-            dropout=self.output_model_init_config.dropout,
-            activation="gelu",
-            batch_first=True,
-            norm_first=True,
-        )
-
         mask = torch.triu(
             torch.ones(self.max_length, self.max_length) * float("-inf"),
             diagonal=1,
         )
         self.register_buffer("mask", mask)
 
-        self.output_transformer = nn.TransformerEncoder(
-            encoder_layer=transformer_output_layer_base,
+        self.output_transformer = Transformer(
+            d_model=self.embedding_dim,
+            nhead=self.output_model_init_config.num_heads,
             num_layers=self.output_model_init_config.num_layers,
-            enable_nested_tensor=False,
+            dim_feedforward=dim_feed_forward,
+            dropout=self.output_model_init_config.dropout,
+            norm_first=True,
         )
 
         self.match_projections = nn.ModuleDict()

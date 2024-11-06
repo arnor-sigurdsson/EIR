@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_combined/saved_models/tutorial_05_is_it_a_hot_dog_pretrained_combined_model_1400_perf-average=0.9743.pt
+--model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_combined/saved_models/tutorial_05_is_it_a_hot_dog_pretrained_combined_model_2100_perf-average=0.9743.pt

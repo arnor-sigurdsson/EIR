@@ -9,7 +9,11 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
+from docs.doc_modules.experiments import (
+    AutoDocExperimentInfo,
+    get_data,
+    run_capture_and_save,
+)
 from docs.doc_modules.g_time_series.utils import get_content_root
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
 from docs.doc_modules.serving_experiments import (
@@ -475,7 +479,7 @@ def plot_time_series_with_uncertainty(
             ]
         elif data_format == "array":
             cur_b64 = data[0]["request"][i * repeat]["stock_input"]
-            input_array = decode_base64_to_array(base64_str=cur_b64)
+            input_array = decode_base64_to_array(base64_str=cur_b64, dtype=np.float32)
             input_sequence = input_array.squeeze().tolist()
         else:
             raise ValueError(f"Invalid data format: {data_format}")
@@ -595,14 +599,14 @@ def generate_example_requests_arrays(
     example_requests = []
     ids = []
 
-    output_array_placeholder = np.zeros((64,))
+    output_array_placeholder = np.zeros((64,), dtype=np.float32)
     cur_placeholder_base64 = encode_array_to_base64(array_np=output_array_placeholder)
 
     for idx in random_rows:
         sample = deeplake_ds[int(idx)]
 
         cur_id = sample["ID"].numpy().item()
-        cur_arr = sample["input_array"].numpy()
+        cur_arr = sample["input_array"].numpy().astype(np.float32)
         cur_arr_base64 = encode_array_to_base64(array_np=cur_arr)
 
         for cur_repeat in range(repeat):
@@ -625,7 +629,7 @@ def encode_array_to_base64(array_np: np.ndarray) -> str:
 
 def decode_base64_to_array(
     base64_str: str,
-    dtype: np.dtype = np.int64,
+    dtype: np.dtype = np.float32,
 ) -> np.ndarray:
     array_bytes = base64.b64decode(base64_str)
     return np.frombuffer(array_bytes, dtype=dtype)
@@ -704,10 +708,10 @@ def example_request_function_python():
             32,
             32,
         ],
-        dtype=np.float64,
+        dtype=np.float32,
     )
 
-    output_base = np.zeros(shape=input_array.shape, dtype=np.float64)
+    output_base = np.zeros(shape=input_array.shape, dtype=np.float32)
 
     def encode_array_to_base64(array_np: np.ndarray) -> str:
         array_bytes = array_np.tobytes()
@@ -734,10 +738,12 @@ def example_request_function_python():
 
 def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_time_series_stocks_01_transformer(target_iteration=20000)
+    get_data(url=exp_1.data_url, output_path=exp_1.data_output_path)
+
     exp_2 = get_time_series_stocks_transformer_serve_experiment()
     exp_3 = get_time_series_stocks_02_one_shot(target_iteration=20000)
     exp_4 = get_time_series_stocks_serve_experiment_one_shot()
-    exp_5 = get_time_series_stocks_03_diffusion(target_iteration=20000)
+    exp_5 = get_time_series_stocks_03_diffusion(target_iteration=15000)
     exp_6 = get_time_series_stocks_serve_experiment_diffusion()
 
     return [

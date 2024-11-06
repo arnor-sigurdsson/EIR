@@ -415,7 +415,7 @@ class UpSamplingResidualBlock(nn.Module):
         self.upsample = nn.Upsample(
             scale_factor=(self.stride_h, self.stride_w),
             mode="bilinear",
-            align_corners=True,
+            align_corners=None,
         )
 
         self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=in_channels)

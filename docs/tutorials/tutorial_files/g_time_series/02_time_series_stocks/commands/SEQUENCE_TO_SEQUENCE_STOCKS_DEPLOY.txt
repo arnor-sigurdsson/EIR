@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/g_time_series/02_time_series_stocks_one_shot/saved_models/02_time_series_stocks_one_shot_model_19500_perf-average=0.9643.pt
+--model-path eir_tutorials/tutorial_runs/g_time_series/02_time_series_stocks_one_shot/saved_models/02_time_series_stocks_one_shot_model_18500_perf-average=0.9588.pt

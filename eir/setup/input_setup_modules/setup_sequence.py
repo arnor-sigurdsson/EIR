@@ -214,7 +214,6 @@ def init_vocab(
     tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
 ) -> Vocab:
     if tokenizer_name == "bpe":
-        assert gathered_stats.total_count > 0
         tokenizer_object = extract_tokenizer_object_from_function(
             tokenizer_callable=tokenizer
         )
@@ -431,10 +430,57 @@ def get_bpe_tokenizer(
         return cast(TokenizerProtocolPreSplit, _tokenize_pre_split)
 
 
+class TokenizerVocabSizeError(Exception):
+    pass
+
+
+@dataclass
+class TokenizerValidationResult:
+    is_valid: bool
+    actual_vocab_size: int
+    requested_vocab_size: Optional[int]
+    error_message: Optional[str] = None
+
+
+def validate_tokenizer_vocab_size(
+    tokenizer: Tokenizer,
+    requested_vocab_size: Optional[int],
+) -> TokenizerValidationResult:
+    if requested_vocab_size is None:
+        return TokenizerValidationResult(
+            is_valid=True,
+            actual_vocab_size=tokenizer.get_vocab_size(),
+            requested_vocab_size=None,
+        )
+
+    actual_size = tokenizer.get_vocab_size()
+
+    if actual_size > requested_vocab_size:
+        return TokenizerValidationResult(
+            is_valid=False,
+            actual_vocab_size=actual_size,
+            requested_vocab_size=requested_vocab_size,
+            error_message=(
+                f"The final vocabulary size ({actual_size}) exceeds the requested "
+                f"maximum size ({requested_vocab_size}). This can happen when the "
+                f"requested vocabulary size is too small for the complexity of your "
+                f"training data. Please increase the vocab_size parameter to at least "
+                f"{actual_size} tokens."
+            ),
+        )
+
+    return TokenizerValidationResult(
+        is_valid=True,
+        actual_vocab_size=actual_size,
+        requested_vocab_size=requested_vocab_size,
+    )
+
+
 def _get_bpe_tokenizer_object(
     vocab_iterator: Optional[Iterator],
     vocab_file: Optional[str],
     vocab_size: Optional[int],
+    raise_on_validation_error: bool = True,
 ) -> Tokenizer:
     if vocab_file:
         logger.info("Loading BPE vocabulary from file %s.", vocab_file)
@@ -447,7 +493,8 @@ def _get_bpe_tokenizer_object(
 
         tokenizer = Tokenizer.from_file(path=vocab_file)
     else:
-        assert vocab_iterator is not None
+        if vocab_iterator is None:
+            raise ValueError("Either vocab_iterator or vocab_file must be provided.")
 
         logger.info("Training BPE tokenizer from source data.")
 
@@ -465,6 +512,17 @@ def _get_bpe_tokenizer_object(
             )
 
         tokenizer.train_from_iterator(iterator=vocab_iterator, trainer=trainer)
+
+        validation_result = validate_tokenizer_vocab_size(
+            tokenizer=tokenizer,
+            requested_vocab_size=vocab_size,
+        )
+
+        if not validation_result.is_valid:
+            logger.warning(validation_result.error_message)
+
+            if raise_on_validation_error:
+                raise TokenizerVocabSizeError(validation_result.error_message)
 
     return tokenizer
 
@@ -649,14 +707,20 @@ def yield_tokens_from_source(
     elif data_source_path.is_dir():
         iterator = tqdm(Path(data_source).iterdir(), desc="Vocabulary Setup")
         for file in iterator:
+            preserve_full = split_on is None
             yield from yield_tokens_from_file(
-                file_path=str(file), split_on=split_on, gathered_stats=gathered_stats
+                file_path=str(file),
+                split_on=split_on,
+                gathered_stats=gathered_stats,
+                preserve_full_content=preserve_full,
             )
 
     elif data_source_path.is_file():
         assert data_source_path.suffix == ".csv"
         yield from yield_tokens_from_csv(
-            file_path=data_source, split_on=split_on, gathered_stats=gathered_stats
+            file_path=data_source,
+            split_on=split_on,
+            gathered_stats=gathered_stats,
         )
 
     return gathered_stats
@@ -692,8 +756,19 @@ def yield_tokens_from_file(
     file_path: str,
     split_on: Optional[str],
     gathered_stats: GatheredSequenceStats,
+    preserve_full_content: bool = False,
 ) -> Generator[Sequence[str], None, None]:
     gathered_stats.total_files += 1
+
+    if preserve_full_content:
+        with open(file_path, "r") as f:
+            content = f.read()
+            gathered_stats.total_count += 1
+            cur_length = len(content)
+            if cur_length > gathered_stats.max_length:
+                gathered_stats.max_length = cur_length
+            yield [content]
+        return
 
     split_func = get_sequence_split_function(split_on=split_on)
 

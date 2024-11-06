@@ -117,13 +117,21 @@ Here's the training curve for our transformer-based model:
 
 Let's look at some example predictions:
 
-.. image:: ../tutorial_files/g_time_series/02_time_series_stocks/figures/02_time_series_stocks/sample_0_plot.pdf
+.. image:: ../tutorial_files/g_time_series/02_time_series_stocks/figures/02_time_series_stocks/sample_6_plot.pdf
     :width: 80%
     :align: center
 
-.. image:: ../tutorial_files/g_time_series/02_time_series_stocks/figures/02_time_series_stocks/sample_1_plot.pdf
+.. image:: ../tutorial_files/g_time_series/02_time_series_stocks/figures/02_time_series_stocks/sample_7_plot.pdf
     :width: 80%
     :align: center
+
+.. note::
+    Since the training and validation samples are from the same companies,
+    this and subsequent models are likely to perform (very) well on the validation set
+    (due to potential data leakage). However, we will look at the test set
+    later to get a better idea of model performance on unseen data. However,
+    performing well here does tell us that the models are learning something
+    from the data (even though this learning might just be memorizing).
 
 2. One-shot Prediction Model
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
