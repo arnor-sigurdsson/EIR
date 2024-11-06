@@ -1,3 +1,4 @@
+import math
 from typing import Literal, Tuple
 
 import torch
@@ -47,6 +48,54 @@ class SEBlock(nn.Module):
         out = self.sigmoid(out)
 
         return out
+
+
+def get_eca_kernel_size(
+    channels: int,
+    gamma: int = 2,
+    b: int = 1,
+) -> int:
+    t = int(abs(math.log2(channels) / gamma + b / gamma))
+    return t if t % 2 else t + 1
+
+
+class ECABlock(nn.Module):
+    def __init__(
+        self,
+        channels: int,
+        gamma: int = 2,
+        b: int = 1,
+    ):
+        super().__init__()
+
+        kernel_size = get_eca_kernel_size(
+            channels=channels,
+            gamma=gamma,
+            b=b,
+        )
+        padding = (kernel_size - 1) // 2
+
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=kernel_size,
+            padding=padding,
+            bias=False,
+        )
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        y = self.avg_pool(x)  # [B, C, 1, 1]
+
+        y = y.squeeze(-1).transpose(-1, -2)  # [B, 1, C]
+        y = self.conv(y)
+
+        y = y.transpose(-1, -2).unsqueeze(-1)  # [B, C, 1, 1]
+        y = self.sigmoid(y)
+
+        return x * y
 
 
 class ConvAttentionBlock(nn.Module):
@@ -237,7 +286,7 @@ class CNNResidualBlockBase(nn.Module):
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
 
-        self.se_block = SEBlock(channels=out_channels, reduction=16)
+        self.eca_block = ECABlock(channels=out_channels)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError()
@@ -268,7 +317,7 @@ class FirstCNNBlock(CNNResidualBlockBase):
         delattr(self, "grn")
         delattr(self, "rb_do")
         delattr(self, "conv_2")
-        delattr(self, "se_block")
+        delattr(self, "eca_block")
         delattr(self, "stochastic_depth")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -301,7 +350,7 @@ class CNNResidualBlock(CNNResidualBlockBase):
         out = self.rb_do(out)
         out = self.conv_2(out)
 
-        channel_recalibrations = self.se_block(out)
+        channel_recalibrations = self.eca_block(out)
         out = out * channel_recalibrations
 
         out = self.stochastic_depth(out)

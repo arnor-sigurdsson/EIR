@@ -8,7 +8,7 @@ import torch.nn as nn
 from eir.models.fusion.fusion_attention import UniDirectionalCrossAttention
 from eir.models.layers.cnn_layers import (
     ConvAttentionBlock,
-    SEBlock,
+    ECABlock,
     StochasticDepth,
     UpSamplingResidualBlock,
 )
@@ -143,9 +143,8 @@ class CNNUpscaleResidualBlock(nn.Module):
             mode="batch",
         )
 
-        self.se_block = SEBlock(
+        self.eca_block = ECABlock(
             channels=out_channels,
-            reduction=16,
         )
 
     def forward(self, x: Any) -> Any:
@@ -162,7 +161,7 @@ class CNNUpscaleResidualBlock(nn.Module):
         out = self.rb_do(out)
         out = self.conv_2(out)
 
-        channel_recalibrations = self.se_block(out)
+        channel_recalibrations = self.eca_block(out)
         out = out * channel_recalibrations
 
         out = self.stochastic_depth(out)
