@@ -48,6 +48,7 @@ class InterpolateProjection(nn.Module):
                 kernel_size=1,
                 stride=1,
                 padding=0,
+                bias=True,
             )
         else:
             self.downsample_identity = nn.Identity()

@@ -79,7 +79,7 @@ class MLPResidualBlock(nn.Module):
             self.downsample_identity = nn.Linear(
                 in_features=in_features,
                 out_features=out_features,
-                bias=False,
+                bias=True,
             )
             ls_init = 1.0
 

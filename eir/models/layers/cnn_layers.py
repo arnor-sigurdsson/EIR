@@ -281,7 +281,7 @@ class CNNResidualBlockBase(nn.Module):
                 stride=(self.down_stride_h, self.down_stride_w),
                 padding=(self.conv_1_padding_h, self.conv_1_padding_w),
                 dilation=(self.dilation_h, self.dilation_w),
-                bias=False,
+                bias=True,
             )
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")

@@ -48,7 +48,7 @@ def get_1d_projection_layer(
         return nn.Linear(
             in_features=input_dimension,
             out_features=target_dimension,
-            bias=False,
+            bias=True,
         )
 
     elif projection_layer_type == "lcl_residual":
@@ -92,7 +92,7 @@ def get_1d_projection_layer(
             return nn.Linear(
                 in_features=input_dimension,
                 out_features=target_dimension,
-                bias=False,
+                bias=True,
             )
 
     elif projection_layer_type == "cnn":
