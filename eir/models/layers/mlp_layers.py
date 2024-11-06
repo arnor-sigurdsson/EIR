@@ -58,13 +58,13 @@ class MLPResidualBlock(nn.Module):
         self.norm_1 = nn.RMSNorm(normalized_shape=in_features)
 
         self.fc_1 = nn.Linear(
-            in_features=in_features, out_features=out_features, bias=True
+            in_features=in_features, out_features=out_features, bias=False
         )
 
         self.act_1 = nn.GELU()
         self.do = nn.Dropout(p=dropout_p)
         self.fc_2 = nn.Linear(
-            in_features=out_features, out_features=out_features, bias=True
+            in_features=out_features, out_features=out_features, bias=False
         )
 
         if in_features == out_features:
@@ -74,7 +74,7 @@ class MLPResidualBlock(nn.Module):
             self.downsample_identity = nn.Linear(
                 in_features=in_features,
                 out_features=out_features,
-                bias=True,
+                bias=False,
             )
             ls_init = 1.0
 

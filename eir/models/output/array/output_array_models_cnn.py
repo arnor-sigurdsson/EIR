@@ -98,7 +98,7 @@ class CNNUpscaleResidualBlock(nn.Module):
             kernel_size=3,
             stride=stride,
             padding=1,
-            bias=True,
+            bias=False,
             groups=in_channels,
         )
 
@@ -110,7 +110,7 @@ class CNNUpscaleResidualBlock(nn.Module):
             kernel_size=3,
             stride=stride,
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.rb_do = nn.Dropout2d(rb_do)
@@ -124,7 +124,7 @@ class CNNUpscaleResidualBlock(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.upsample_identity: nn.Module = nn.Identity()
@@ -135,7 +135,7 @@ class CNNUpscaleResidualBlock(nn.Module):
                 kernel_size=3,
                 stride=stride,
                 padding=1,
-                bias=True,
+                bias=False,
             )
 
         self.stochastic_depth = StochasticDepth(
@@ -614,7 +614,7 @@ class CrossAttentionArrayOutBlock(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=True,
+            bias=False,
             groups=input_channels,
         )
 
@@ -645,7 +645,7 @@ class CrossAttentionArrayOutBlock(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.grn = GRN(in_channels=input_channels)

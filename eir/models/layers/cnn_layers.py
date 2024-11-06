@@ -24,7 +24,7 @@ class SEBlock(nn.Module):
             out_channels=reduced_channels,
             kernel_size=1,
             padding=0,
-            bias=True,
+            bias=False,
         )
         self.act_1 = nn.GELU()
 
@@ -33,7 +33,7 @@ class SEBlock(nn.Module):
             out_channels=channels,
             kernel_size=1,
             padding=0,
-            bias=True,
+            bias=False,
         )
 
         self.sigmoid = nn.Sigmoid()
@@ -235,7 +235,7 @@ class CNNResidualBlockBase(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=True,
+            bias=False,
             groups=in_channels,
         )
 
@@ -249,7 +249,7 @@ class CNNResidualBlockBase(nn.Module):
             stride=(self.down_stride_h, self.down_stride_w),
             padding=(self.conv_1_padding_h, self.conv_1_padding_w),
             dilation=(self.dilation_h, self.dilation_w),
-            bias=True,
+            bias=False,
         )
 
         conv_2_kernel_h, conv_2_padding_h = _compute_conv_2_parameters(
@@ -269,7 +269,7 @@ class CNNResidualBlockBase(nn.Module):
             stride=(1, 1),
             padding=(conv_2_padding_h, conv_2_padding_w),
             dilation=(dilation_h, dilation_w),
-            bias=True,
+            bias=False,
         )
 
         self.downsample_identity: nn.Module = nn.Identity()
@@ -281,7 +281,7 @@ class CNNResidualBlockBase(nn.Module):
                 stride=(self.down_stride_h, self.down_stride_w),
                 padding=(self.conv_1_padding_h, self.conv_1_padding_w),
                 dilation=(self.dilation_h, self.dilation_w),
-                bias=True,
+                bias=False,
             )
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
@@ -392,7 +392,7 @@ class DownSamplingResidualBlock(nn.Module):
             kernel_size=3,
             stride=(self.stride_h, self.stride_w),
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.identity = nn.Conv2d(
@@ -401,7 +401,7 @@ class DownSamplingResidualBlock(nn.Module):
             kernel_size=3,
             stride=(self.stride_h, self.stride_w),
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.grn = GRN(in_channels=self.out_channels)
@@ -476,7 +476,7 @@ class UpSamplingResidualBlock(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.identity = nn.Conv2d(
@@ -485,7 +485,7 @@ class UpSamplingResidualBlock(nn.Module):
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=True,
+            bias=False,
         )
 
         self.grn = GRN(in_channels=self.out_channels)
