@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from torchvision.ops import StochasticDepth
 
+from eir.models.layers.attention_layers import SwiGLU
 from eir.models.layers.norm_layers import LayerScale
 
 
@@ -61,7 +62,13 @@ class MLPResidualBlock(nn.Module):
             in_features=in_features, out_features=out_features, bias=False
         )
 
-        self.act_1 = nn.GELU()
+        self.act_1 = SwiGLU(
+            in_features=out_features,
+            hidden_features=out_features,
+            out_features=out_features,
+            bias=False,
+        )
+
         self.do = nn.Dropout(p=dropout_p)
         self.fc_2 = nn.Linear(
             in_features=out_features, out_features=out_features, bias=False

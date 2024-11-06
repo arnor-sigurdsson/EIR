@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Dict, Literal, Sequence, Union
 import torch
 from torch import nn
 
+from eir.models.layers.attention_layers import SwiGLU
 from eir.models.layers.mlp_layers import MLPResidualBlock, ResidualMLPConfig
 from eir.models.models_utils import (
     calculate_module_dict_outputs,
@@ -101,7 +102,15 @@ def get_linear_final_act_spec(in_features: int, dropout_p: float):
     spec = OrderedDict(
         {
             "norm_final": (nn.RMSNorm, {"normalized_shape": in_features}),
-            "act_final": (nn.GELU, {}),
+            "act_final": (
+                SwiGLU,
+                {
+                    "in_features": in_features,
+                    "hidden_features": in_features,
+                    "out_features": in_features,
+                    "bias": False,
+                },
+            ),
             "do_final": (nn.Dropout, {"p": dropout_p}),
         }
     )

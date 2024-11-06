@@ -67,9 +67,21 @@ class SwiGLU(nn.Module):
         bias: bool = True,
     ):
         super().__init__()
-        self.w1 = nn.Linear(in_features, hidden_features, bias=bias)
-        self.w2 = nn.Linear(in_features, hidden_features, bias=bias)
-        self.w3 = nn.Linear(hidden_features, out_features, bias=bias)
+        self.w1 = nn.Linear(
+            in_features=in_features,
+            out_features=hidden_features,
+            bias=bias,
+        )
+        self.w2 = nn.Linear(
+            in_features=in_features,
+            out_features=hidden_features,
+            bias=bias,
+        )
+        self.w3 = nn.Linear(
+            in_features=hidden_features,
+            out_features=out_features,
+            bias=bias,
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         x1 = self.w1(x)

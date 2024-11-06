@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from eir.models.fusion.fusion_attention import UniDirectionalCrossAttention
+from eir.models.layers.attention_layers import SwiGLU
 from eir.models.layers.cnn_layers import adjust_num_heads
 from eir.models.layers.norm_layers import LayerScale
 from eir.models.tensor_broker.projection_modules.sequence import (
@@ -174,7 +175,12 @@ class CrossAttentionFusionLayer(nn.Module):
         self.n_heads = adjust_num_heads(num_heads=8, embedding_dim=self.embedding_dim)
 
         self.norm_1 = nn.RMSNorm(self.embedding_dim)
-        self.act_1 = nn.GELU()
+        self.act_1 = SwiGLU(
+            in_features=self.embedding_dim,
+            hidden_features=self.embedding_dim,
+            out_features=self.embedding_dim,
+            bias=False,
+        )
 
         self.cross_attention = UniDirectionalCrossAttention(
             dim=self.embedding_dim,
