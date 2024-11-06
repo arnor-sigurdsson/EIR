@@ -109,8 +109,8 @@ class TransformerBlock(nn.Module):
         self.v_proj = nn.Linear(d_model, d_model, bias=False)
         self.out_proj = nn.Linear(d_model, d_model, bias=False)
 
-        self.norm1 = RMSNorm(d_model)
-        self.norm2 = RMSNorm(d_model)
+        self.norm1 = nn.RMSNorm(normalized_shape=d_model)
+        self.norm2 = nn.RMSNorm(normalized_shape=d_model)
 
         self.ffn = SwiGLU(
             in_features=d_model,

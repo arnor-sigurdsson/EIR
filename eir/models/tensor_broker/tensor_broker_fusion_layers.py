@@ -173,7 +173,7 @@ class CrossAttentionFusionLayer(nn.Module):
 
         self.n_heads = adjust_num_heads(num_heads=8, embedding_dim=self.embedding_dim)
 
-        self.norm_1 = nn.LayerNorm(self.embedding_dim)
+        self.norm_1 = nn.RMSNorm(self.embedding_dim)
         self.act_1 = nn.GELU()
 
         self.cross_attention = UniDirectionalCrossAttention(

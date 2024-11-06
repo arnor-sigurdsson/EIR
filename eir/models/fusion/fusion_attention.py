@@ -83,7 +83,7 @@ class SequenceProjection(nn.Module):
 
         self.out_dim = self.target_max_length * self.target_embedding_dim
 
-        self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
+        self.norm_1 = nn.RMSNorm(normalized_shape=in_features)
         self.act = nn.GELU()
 
         self.projection_layer = get_1d_projection_layer(
@@ -157,8 +157,8 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
         )
 
         self.act = nn.GELU()
-        self.norm_1_target = nn.LayerNorm(normalized_shape=target_embedding_dim)
-        self.norm_1_context = nn.LayerNorm(normalized_shape=in_embedding_dim)
+        self.norm_1_target = nn.RMSNorm(normalized_shape=target_embedding_dim)
+        self.norm_1_context = nn.RMSNorm(normalized_shape=in_embedding_dim)
 
         self.encoder = Transformer(
             d_model=target_embedding_dim,
@@ -178,7 +178,7 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
         )
         self.register_buffer("encoder_mask", encoder_mask)
 
-        self.norm_2_target = nn.LayerNorm(normalized_shape=target_embedding_dim)
+        self.norm_2_target = nn.RMSNorm(normalized_shape=target_embedding_dim)
 
         self.downsample_identity = UniDirectionalCrossAttention(
             dim=self.target_embedding_dim,
@@ -239,9 +239,9 @@ class UniDirectionalCrossAttention(nn.Module):
         super().__init__()
         context_dim = default(val=context_dim, d=dim)
 
-        self.norm = nn.LayerNorm(normalized_shape=dim) if pre_norm else nn.Identity()
+        self.norm = nn.RMSNorm(normalized_shape=dim) if pre_norm else nn.Identity()
         self.context_norm = (
-            nn.LayerNorm(normalized_shape=context_dim) if pre_norm else nn.Identity()
+            nn.RMSNorm(normalized_shape=context_dim) if pre_norm else nn.Identity()
         )
 
         self.heads = heads

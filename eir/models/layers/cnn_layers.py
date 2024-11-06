@@ -125,7 +125,7 @@ class ConvAttentionBlock(nn.Module):
 
         self.attention: nn.MultiheadAttention | LinearAttention
         if attention_type == "full":
-            self.norm = nn.LayerNorm(normalized_shape=self.embedding_dim)
+            self.norm = nn.RMSNorm(normalized_shape=self.embedding_dim)
             self.attention = nn.MultiheadAttention(
                 embed_dim=self.embedding_dim,
                 num_heads=self.num_heads,
@@ -133,7 +133,7 @@ class ConvAttentionBlock(nn.Module):
                 dropout=dropout_p,
             )
         elif attention_type == "linear":
-            self.norm = nn.LayerNorm(normalized_shape=[channels, height, width])
+            self.norm = nn.RMSNorm(normalized_shape=[channels, height, width])
             self.attention = LinearAttention(
                 embed_dim=self.embedding_dim,
                 heads=self.num_heads,

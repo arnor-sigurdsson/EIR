@@ -67,7 +67,7 @@ class SequenceProjectionLayer(nn.Module):
             # above to get 1 and 2
             layers.extend(
                 [
-                    nn.LayerNorm(normalized_shape=target_embedding_dim),
+                    nn.RMSNorm(normalized_shape=target_embedding_dim),
                     nn.GELU(),
                     Transpose(1, 2),
                     linear_layer,

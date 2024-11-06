@@ -100,7 +100,7 @@ class ResidualMLPOutputModule(nn.Module):
 def get_linear_final_act_spec(in_features: int, dropout_p: float):
     spec = OrderedDict(
         {
-            "norm_final": (nn.LayerNorm, {"normalized_shape": in_features}),
+            "norm_final": (nn.RMSNorm, {"normalized_shape": in_features}),
             "act_final": (nn.GELU, {}),
             "do_final": (nn.Dropout, {"p": dropout_p}),
         }

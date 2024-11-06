@@ -55,7 +55,7 @@ class MLPResidualBlock(nn.Module):
         self.full_preactivation = full_preactivation
         self.stochastic_depth_p = stochastic_depth_p
 
-        self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
+        self.norm_1 = nn.RMSNorm(normalized_shape=in_features)
 
         self.fc_1 = nn.Linear(
             in_features=in_features, out_features=out_features, bias=True

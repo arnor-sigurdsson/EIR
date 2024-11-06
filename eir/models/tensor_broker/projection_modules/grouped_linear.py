@@ -149,7 +149,7 @@ class GroupedLinearProjectionWrapper(nn.Module):
                 target_shape=target_shape_list,
             )
 
-        self.norm = nn.LayerNorm(normalized_shape=input_shape, eps=1e-05)
+        self.norm = nn.RMSNorm(normalized_shape=input_shape, eps=1e-05)
         self.activation = nn.GELU()
 
         self.ls = LayerScale(dim=1, init_values=1e-5)
@@ -273,7 +273,7 @@ class GroupedDownProjectionLayerFactorized(nn.Module):
             projections=self.projections,
         )
 
-        self.norm_1 = nn.LayerNorm(normalized_shape=retracted_shape)
+        self.norm_1 = nn.RMSNorm(normalized_shape=retracted_shape)
         self.act_1 = nn.GELU()
 
         self.ls = LayerScale(dim=1, init_values=1e-5)
