@@ -5,7 +5,6 @@ import torch
 from torch import nn
 from torchvision.ops import StochasticDepth
 
-from eir.models.layers.attention_layers import SwiGLU
 from eir.models.layers.norm_layers import LayerScale
 
 
@@ -59,23 +58,22 @@ class MLPResidualBlock(nn.Module):
         self.norm_1 = nn.RMSNorm(normalized_shape=in_features)
 
         self.fc_1 = nn.Linear(
-            in_features=in_features, out_features=out_features, bias=False
-        )
-
-        self.act_1 = SwiGLU(
-            in_features=out_features,
-            hidden_features=out_features,
+            in_features=in_features,
             out_features=out_features,
             bias=False,
         )
 
+        self.act_1 = nn.GELU()
         self.do = nn.Dropout(p=dropout_p)
         self.fc_2 = nn.Linear(
-            in_features=out_features, out_features=out_features, bias=False
+            in_features=out_features,
+            out_features=out_features,
+            bias=False,
         )
 
+        self.downsample_identity: nn.Module
         if in_features == out_features:
-            self.downsample_identity = lambda x: x
+            self.downsample_identity = nn.Identity()
             ls_init = 1e-05
         else:
             self.downsample_identity = nn.Linear(
@@ -85,9 +83,15 @@ class MLPResidualBlock(nn.Module):
             )
             ls_init = 1.0
 
-        self.ls = LayerScale(dim=out_features, init_values=ls_init)
+        self.ls = LayerScale(
+            dim=out_features,
+            init_values=ls_init,
+        )
 
-        self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
+        self.stochastic_depth = StochasticDepth(
+            p=self.stochastic_depth_p,
+            mode="batch",
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.norm_1(x)

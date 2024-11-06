@@ -83,10 +83,15 @@ class SwiGLU(nn.Module):
             bias=bias,
         )
 
+    def _init_weights(self):
+        torch.nn.init.normal_(self.w1.weight, mean=0.0, std=0.02)
+        torch.nn.init.normal_(self.w1.weight, mean=0.0, std=0.02)
+        torch.nn.init.normal_(self.w1.weight, mean=0.0, std=0.02)
+
     def forward(self, x: Tensor) -> Tensor:
-        x1 = self.w1(x)
-        x2 = self.w2(x)
-        hidden = F.silu(x1) * x2
+        hidden = self.w1(x)
+        gate = self.w2(x)
+        hidden = F.silu(hidden) * gate
         return self.w3(hidden)
 
 
