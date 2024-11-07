@@ -7,3 +7,4 @@ exclude =
     data,
     runs,
     eir_tutorials,
+    eir/train_utils/optimization_modules/soap.py,

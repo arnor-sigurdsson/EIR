@@ -143,7 +143,15 @@ def set_up_collector_instance(
 
 
 def get_base_optimizer_names() -> set:
-    base_names = {"sgdm", "adam", "adamw", "adahessian", "adabelief", "adabeliefw"}
+    base_names = {
+        "sgdm",
+        "adam",
+        "adamw",
+        "adahessian",
+        "adabelief",
+        "adabeliefw",
+        "soap",
+    }
 
     return base_names
 
