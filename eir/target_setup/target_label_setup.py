@@ -580,6 +580,7 @@ def process_survival_output(
         tabular_info.file_path,
         usecols=["ID", time_column],
         index_col="ID",
+        dtype={"ID": str},
     )
     df_time_train = df_time.loc[df_time.index.isin(train_ids)]
     df_time_valid = df_time.loc[df_time.index.isin(valid_ids)]
