@@ -246,13 +246,13 @@ def train_image_col_03_both() -> AutoDocExperimentInfo:
         )
         mapping.append(
             (
-                f"samples/25000/auto/{i}_generated.png",
+                f"samples/20000/auto/{i}_generated.png",
                 f"figures/02_both/examples/auto_generated_iter_25000_{i}.png",
             )
         )
         mapping.append(
             (
-                f"samples/25000/auto/{i}_inputs/image.png",
+                f"samples/20000/auto/{i}_inputs/image.png",
                 f"figures/02_both/examples/auto_inputs_iter_25000_{i}.png",
             )
         )

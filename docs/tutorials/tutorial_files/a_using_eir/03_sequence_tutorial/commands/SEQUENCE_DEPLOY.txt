@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_03_imdb_run/saved_models/tutorial_03_imdb_run_model_4500_perf-average=0.8032.pt
+--model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_03_imdb_run/saved_models/tutorial_03_imdb_run_model_5000_perf-average=0.7950.pt

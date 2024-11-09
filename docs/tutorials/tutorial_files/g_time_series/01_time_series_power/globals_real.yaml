@@ -1,5 +1,5 @@
 basic_experiment:
-  batch_size: 32
+  batch_size: 64
   device: mps
   memory_dataset: true
   n_epochs: 40

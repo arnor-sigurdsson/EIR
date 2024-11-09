@@ -1,13 +1,13 @@
 basic_experiment:
-  batch_size: 32
+  batch_size: 128
   device: mps
   memory_dataset: true
   n_epochs: 20
   output_folder: eir_tutorials/tutorial_runs/g_time_series/01_time_series_power_transformer_sim
 evaluation_checkpoint:
-  checkpoint_interval: 100
+  checkpoint_interval: 500
   n_saved_models: 1
-  sample_interval: 100
+  sample_interval: 500
 optimization:
-  lr: 0.0005
+  lr: 0.001
   optimizer: adabelief
