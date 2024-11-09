@@ -84,20 +84,17 @@ class SequenceProjection(nn.Module):
         self.out_dim = self.target_max_length * self.target_embedding_dim
 
         self.norm_1 = nn.RMSNorm(normalized_shape=in_features)
-        swiglu_hidden = _calc_sequence_projection_swiglu_hidden_dim(
-            in_features=in_features,
-        )
-        self.act = SwiGLU(
-            in_features=in_features,
-            hidden_features=swiglu_hidden,
-            out_features=in_features,
-            bias=False,
-        )
-
         self.projection_layer = get_1d_projection_layer(
             input_dimension=in_features,
             target_dimension=self.out_dim,
             projection_layer_type=self.projection_layer_type,
+        )
+
+        self.act = SwiGLU(
+            in_features=target_embedding_dim,
+            hidden_features=target_embedding_dim * 4,
+            out_features=target_embedding_dim,
+            bias=False,
         )
 
         self.encoder = Transformer(
@@ -124,33 +121,24 @@ class SequenceProjection(nn.Module):
 
         identity = self.downsample_identity(input_flat)[..., : self.out_dim]
         identity = identity.reshape(
-            identity.shape[0], self.target_max_length, self.target_embedding_dim
+            identity.shape[0],
+            self.target_max_length,
+            self.target_embedding_dim,
         )
 
         out = self.norm_1(input_flat)
-        out = self.act(out)
         out = self.projection_layer(out)[..., : self.out_dim]
 
         out = out.reshape(
-            out.shape[0], self.target_max_length, self.target_embedding_dim
+            out.shape[0],
+            self.target_max_length,
+            self.target_embedding_dim,
         )
+        out = self.act(out)
 
         out = self.encoder(out)
 
         return out + identity
-
-
-def _calc_sequence_projection_swiglu_hidden_dim(
-    in_features: int,
-) -> int:
-    """
-    Used as a little failsafe as the input features above can grow quite large to
-    avoid extremely large weight matrices in the SwiGLU layer.
-    """
-    if in_features <= 512:
-        return in_features
-
-    return 256
 
 
 class SequenceResidualCrossAttentionProjection(nn.Module):
