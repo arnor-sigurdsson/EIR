@@ -95,7 +95,7 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
 - **Time Series**
   - Time series inputs and outputs is possible, such as [Transformer-based Power Consumption Prediction](https://eir.readthedocs.io/en/stable/tutorials/g_time_series/01_time_series_power.html) and [Stock Price Prediction Using Transformers, One-shot and Diffusion Models](https://eir.readthedocs.io/en/stable/tutorials/g_time_series/02_time_series_stocks.html).
 - **Survival Analysis**
-  - Time-to-event prediction is supported as an output type, demonstrated through [Patient Survival Prediction using Free Light Chain Data](https://eir.readthedocs.io/en/stable/tutorials/h_survival_analysis/01_survival_flchain.html).
+  - Time-to-event prediction is supported as an output type, demonstrated through [Patient Survival Prediction using Free Light Chain Data](https://eir.readthedocs.io/en/stable/tutorials/h_survival_analysis/01_survival_flchain.html) and [Survival Analysis Using Cox Proportional Hazards Model](https://eir.readthedocs.io/en/stable/tutorials/h_survival_analysis/02_survival_flchain_cox.html).
 
 - [Many more settings](https://eir.readthedocs.io/en/stable/api_reference.html) and configurations (e.g., augmentation, regularization, optimizers) available.
 
