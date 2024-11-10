@@ -8,7 +8,7 @@ import torch.nn as nn
 from eir.models.fusion.fusion_attention import UniDirectionalCrossAttention
 from eir.models.layers.cnn_layers import (
     ConvAttentionBlock,
-    SEBlock,
+    ECABlock,
     StochasticDepth,
     UpSamplingResidualBlock,
 )
@@ -98,7 +98,7 @@ class CNNUpscaleResidualBlock(nn.Module):
             kernel_size=3,
             stride=stride,
             padding=1,
-            bias=True,
+            bias=False,
             groups=in_channels,
         )
 
@@ -110,7 +110,7 @@ class CNNUpscaleResidualBlock(nn.Module):
             kernel_size=3,
             stride=stride,
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.rb_do = nn.Dropout2d(rb_do)
@@ -124,7 +124,7 @@ class CNNUpscaleResidualBlock(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.upsample_identity: nn.Module = nn.Identity()
@@ -135,7 +135,7 @@ class CNNUpscaleResidualBlock(nn.Module):
                 kernel_size=3,
                 stride=stride,
                 padding=1,
-                bias=True,
+                bias=False,
             )
 
         self.stochastic_depth = StochasticDepth(
@@ -143,9 +143,8 @@ class CNNUpscaleResidualBlock(nn.Module):
             mode="batch",
         )
 
-        self.se_block = SEBlock(
+        self.eca_block = ECABlock(
             channels=out_channels,
-            reduction=16,
         )
 
     def forward(self, x: Any) -> Any:
@@ -162,7 +161,7 @@ class CNNUpscaleResidualBlock(nn.Module):
         out = self.rb_do(out)
         out = self.conv_2(out)
 
-        channel_recalibrations = self.se_block(out)
+        channel_recalibrations = self.eca_block(out)
         out = out * channel_recalibrations
 
         out = self.stochastic_depth(out)
@@ -615,7 +614,7 @@ class CrossAttentionArrayOutBlock(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=True,
+            bias=False,
             groups=input_channels,
         )
 
@@ -646,7 +645,7 @@ class CrossAttentionArrayOutBlock(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.grn = GRN(in_channels=input_channels)

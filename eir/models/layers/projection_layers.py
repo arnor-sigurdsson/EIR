@@ -1,4 +1,5 @@
 import math
+from functools import lru_cache
 from typing import Literal, Sequence, Tuple, Type
 
 import numpy as np
@@ -106,8 +107,8 @@ def get_lcl_projection_layer(
     input_dimension: int,
     target_dimension: int,
     layer_type: Literal["lcl_residual", "lcl"] = "lcl_residual",
-    kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
-    out_feature_sets_candidates: Sequence[int] = tuple(range(1, 512 + 1)),
+    kernel_width_candidates: Sequence[int] = tuple(range(1, 4096 + 1)),
+    out_feature_sets_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     diff_tolerance: int = 0,
 ) -> LCLResidualBlock | LCL | None:
     layer_class: Type[LCLResidualBlock] | Type[LCL]
@@ -144,6 +145,7 @@ def get_lcl_projection_layer(
     return best_layer
 
 
+@lru_cache(maxsize=512)
 def _find_best_lcl_kernel_width_and_out_feature_sets(
     input_dimension: int,
     target_dimension: int,

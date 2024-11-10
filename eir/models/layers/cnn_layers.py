@@ -1,3 +1,4 @@
+import math
 from typing import Literal, Tuple
 
 import torch
@@ -23,7 +24,7 @@ class SEBlock(nn.Module):
             out_channels=reduced_channels,
             kernel_size=1,
             padding=0,
-            bias=True,
+            bias=False,
         )
         self.act_1 = nn.GELU()
 
@@ -32,7 +33,7 @@ class SEBlock(nn.Module):
             out_channels=channels,
             kernel_size=1,
             padding=0,
-            bias=True,
+            bias=False,
         )
 
         self.sigmoid = nn.Sigmoid()
@@ -47,6 +48,54 @@ class SEBlock(nn.Module):
         out = self.sigmoid(out)
 
         return out
+
+
+def get_eca_kernel_size(
+    channels: int,
+    gamma: int = 2,
+    b: int = 1,
+) -> int:
+    t = int(abs(math.log2(channels) / gamma + b / gamma))
+    return t if t % 2 else t + 1
+
+
+class ECABlock(nn.Module):
+    def __init__(
+        self,
+        channels: int,
+        gamma: int = 2,
+        b: int = 1,
+    ):
+        super().__init__()
+
+        kernel_size = get_eca_kernel_size(
+            channels=channels,
+            gamma=gamma,
+            b=b,
+        )
+        padding = (kernel_size - 1) // 2
+
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=kernel_size,
+            padding=padding,
+            bias=False,
+        )
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        y = self.avg_pool(x)  # [B, C, 1, 1]
+
+        y = y.squeeze(-1).transpose(-1, -2)  # [B, 1, C]
+        y = self.conv(y)
+
+        y = y.transpose(-1, -2).unsqueeze(-1)  # [B, C, 1, 1]
+        y = self.sigmoid(y)
+
+        return x * y
 
 
 class ConvAttentionBlock(nn.Module):
@@ -76,7 +125,7 @@ class ConvAttentionBlock(nn.Module):
 
         self.attention: nn.MultiheadAttention | LinearAttention
         if attention_type == "full":
-            self.norm = nn.LayerNorm(normalized_shape=self.embedding_dim)
+            self.norm = nn.RMSNorm(normalized_shape=self.embedding_dim)
             self.attention = nn.MultiheadAttention(
                 embed_dim=self.embedding_dim,
                 num_heads=self.num_heads,
@@ -84,7 +133,7 @@ class ConvAttentionBlock(nn.Module):
                 dropout=dropout_p,
             )
         elif attention_type == "linear":
-            self.norm = nn.LayerNorm(normalized_shape=[channels, height, width])
+            self.norm = nn.RMSNorm(normalized_shape=[channels, height, width])
             self.attention = LinearAttention(
                 embed_dim=self.embedding_dim,
                 heads=self.num_heads,
@@ -186,7 +235,7 @@ class CNNResidualBlockBase(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=True,
+            bias=False,
             groups=in_channels,
         )
 
@@ -200,7 +249,7 @@ class CNNResidualBlockBase(nn.Module):
             stride=(self.down_stride_h, self.down_stride_w),
             padding=(self.conv_1_padding_h, self.conv_1_padding_w),
             dilation=(self.dilation_h, self.dilation_w),
-            bias=True,
+            bias=False,
         )
 
         conv_2_kernel_h, conv_2_padding_h = _compute_conv_2_parameters(
@@ -220,7 +269,7 @@ class CNNResidualBlockBase(nn.Module):
             stride=(1, 1),
             padding=(conv_2_padding_h, conv_2_padding_w),
             dilation=(dilation_h, dilation_w),
-            bias=True,
+            bias=False,
         )
 
         self.downsample_identity: nn.Module = nn.Identity()
@@ -237,7 +286,7 @@ class CNNResidualBlockBase(nn.Module):
 
         self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
 
-        self.se_block = SEBlock(channels=out_channels, reduction=16)
+        self.eca_block = ECABlock(channels=out_channels)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError()
@@ -268,7 +317,7 @@ class FirstCNNBlock(CNNResidualBlockBase):
         delattr(self, "grn")
         delattr(self, "rb_do")
         delattr(self, "conv_2")
-        delattr(self, "se_block")
+        delattr(self, "eca_block")
         delattr(self, "stochastic_depth")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -301,7 +350,7 @@ class CNNResidualBlock(CNNResidualBlockBase):
         out = self.rb_do(out)
         out = self.conv_2(out)
 
-        channel_recalibrations = self.se_block(out)
+        channel_recalibrations = self.eca_block(out)
         out = out * channel_recalibrations
 
         out = self.stochastic_depth(out)
@@ -343,7 +392,7 @@ class DownSamplingResidualBlock(nn.Module):
             kernel_size=3,
             stride=(self.stride_h, self.stride_w),
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.identity = nn.Conv2d(
@@ -352,7 +401,7 @@ class DownSamplingResidualBlock(nn.Module):
             kernel_size=3,
             stride=(self.stride_h, self.stride_w),
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.grn = GRN(in_channels=self.out_channels)
@@ -427,7 +476,7 @@ class UpSamplingResidualBlock(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=True,
+            bias=False,
         )
 
         self.identity = nn.Conv2d(
@@ -436,7 +485,7 @@ class UpSamplingResidualBlock(nn.Module):
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=True,
+            bias=False,
         )
 
         self.grn = GRN(in_channels=self.out_channels)

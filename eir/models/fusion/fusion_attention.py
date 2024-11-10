@@ -4,7 +4,7 @@ import torch
 from einops import rearrange
 from torch import Tensor, einsum, nn
 
-from eir.models.layers.attention_layers import Transformer
+from eir.models.layers.attention_layers import SwiGLU, Transformer
 from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
 from eir.models.layers.projection_layers import get_1d_projection_layer
 
@@ -83,13 +83,18 @@ class SequenceProjection(nn.Module):
 
         self.out_dim = self.target_max_length * self.target_embedding_dim
 
-        self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
-        self.act = nn.GELU()
-
+        self.norm_1 = nn.RMSNorm(normalized_shape=in_features)
         self.projection_layer = get_1d_projection_layer(
             input_dimension=in_features,
             target_dimension=self.out_dim,
             projection_layer_type=self.projection_layer_type,
+        )
+
+        self.act = SwiGLU(
+            in_features=target_embedding_dim,
+            hidden_features=target_embedding_dim * 4,
+            out_features=target_embedding_dim,
+            bias=False,
         )
 
         self.encoder = Transformer(
@@ -116,16 +121,20 @@ class SequenceProjection(nn.Module):
 
         identity = self.downsample_identity(input_flat)[..., : self.out_dim]
         identity = identity.reshape(
-            identity.shape[0], self.target_max_length, self.target_embedding_dim
+            identity.shape[0],
+            self.target_max_length,
+            self.target_embedding_dim,
         )
 
         out = self.norm_1(input_flat)
-        out = self.act(out)
         out = self.projection_layer(out)[..., : self.out_dim]
 
         out = out.reshape(
-            out.shape[0], self.target_max_length, self.target_embedding_dim
+            out.shape[0],
+            self.target_max_length,
+            self.target_embedding_dim,
         )
+        out = self.act(out)
 
         out = self.encoder(out)
 
@@ -156,9 +165,21 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
             pre_norm=False,
         )
 
-        self.act = nn.GELU()
-        self.norm_1_target = nn.LayerNorm(normalized_shape=target_embedding_dim)
-        self.norm_1_context = nn.LayerNorm(normalized_shape=in_embedding_dim)
+        self.norm_1_target = nn.RMSNorm(normalized_shape=target_embedding_dim)
+        self.act_1 = SwiGLU(
+            in_features=target_embedding_dim,
+            hidden_features=target_embedding_dim,
+            out_features=target_embedding_dim,
+            bias=False,
+        )
+
+        self.norm_1_context = nn.RMSNorm(normalized_shape=in_embedding_dim)
+        self.act_context = SwiGLU(
+            in_features=in_embedding_dim,
+            hidden_features=in_embedding_dim,
+            out_features=in_embedding_dim,
+            bias=False,
+        )
 
         self.encoder = Transformer(
             d_model=target_embedding_dim,
@@ -178,7 +199,13 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
         )
         self.register_buffer("encoder_mask", encoder_mask)
 
-        self.norm_2_target = nn.LayerNorm(normalized_shape=target_embedding_dim)
+        self.norm_2_target = nn.RMSNorm(normalized_shape=target_embedding_dim)
+        self.act_2 = SwiGLU(
+            in_features=target_embedding_dim,
+            hidden_features=target_embedding_dim,
+            out_features=target_embedding_dim,
+            bias=False,
+        )
 
         self.downsample_identity = UniDirectionalCrossAttention(
             dim=self.target_embedding_dim,
@@ -195,15 +222,15 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
         identity = self.downsample_identity(x=x, context=context, mask=self.ca_mask)
 
         out = self.norm_1_target(x)
-        out = self.act(out)
+        out = self.act_1(out)
 
         out_context = self.norm_1_context(context)
-        out_context = self.act(out_context)
+        out_context = self.act_context(out_context)
 
         out = self.projection_layer(x=out, context=out_context, mask=self.ca_mask)
 
         out = self.norm_2_target(out)
-        out = self.act(out)
+        out = self.act_2(out)
         out = self.encoder(out, mask=self.encoder_mask)
 
         return out + identity
@@ -239,9 +266,9 @@ class UniDirectionalCrossAttention(nn.Module):
         super().__init__()
         context_dim = default(val=context_dim, d=dim)
 
-        self.norm = nn.LayerNorm(normalized_shape=dim) if pre_norm else nn.Identity()
+        self.norm = nn.RMSNorm(normalized_shape=dim) if pre_norm else nn.Identity()
         self.context_norm = (
-            nn.LayerNorm(normalized_shape=context_dim) if pre_norm else nn.Identity()
+            nn.RMSNorm(normalized_shape=context_dim) if pre_norm else nn.Identity()
         )
 
         self.heads = heads

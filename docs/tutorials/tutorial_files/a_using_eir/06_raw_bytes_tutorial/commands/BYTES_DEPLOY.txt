@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_06_imdb_sentiment_binary/saved_models/tutorial_06_imdb_sentiment_binary_model_6000_perf-average=0.5607.pt
+--model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_06_imdb_sentiment_binary/saved_models/tutorial_06_imdb_sentiment_binary_model_5000_perf-average=0.5645.pt

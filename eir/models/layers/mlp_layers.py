@@ -55,20 +55,25 @@ class MLPResidualBlock(nn.Module):
         self.full_preactivation = full_preactivation
         self.stochastic_depth_p = stochastic_depth_p
 
-        self.norm_1 = nn.LayerNorm(normalized_shape=in_features)
+        self.norm_1 = nn.RMSNorm(normalized_shape=in_features)
 
         self.fc_1 = nn.Linear(
-            in_features=in_features, out_features=out_features, bias=True
+            in_features=in_features,
+            out_features=out_features,
+            bias=False,
         )
 
         self.act_1 = nn.GELU()
         self.do = nn.Dropout(p=dropout_p)
         self.fc_2 = nn.Linear(
-            in_features=out_features, out_features=out_features, bias=True
+            in_features=out_features,
+            out_features=out_features,
+            bias=False,
         )
 
+        self.downsample_identity: nn.Module
         if in_features == out_features:
-            self.downsample_identity = lambda x: x
+            self.downsample_identity = nn.Identity()
             ls_init = 1e-05
         else:
             self.downsample_identity = nn.Linear(
@@ -78,9 +83,15 @@ class MLPResidualBlock(nn.Module):
             )
             ls_init = 1.0
 
-        self.ls = LayerScale(dim=out_features, init_values=ls_init)
+        self.ls = LayerScale(
+            dim=out_features,
+            init_values=ls_init,
+        )
 
-        self.stochastic_depth = StochasticDepth(p=self.stochastic_depth_p, mode="batch")
+        self.stochastic_depth = StochasticDepth(
+            p=self.stochastic_depth_p,
+            mode="batch",
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.norm_1(x)

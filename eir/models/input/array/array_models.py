@@ -226,7 +226,7 @@ class ArrayWrapperModel(nn.Module):
 def get_pre_normalization_layer(
     normalization: al_pre_normalization,
     data_dimensions: "DataDimensions",
-) -> Union[nn.InstanceNorm2d, nn.LayerNorm, nn.Identity]:
+) -> Union[nn.InstanceNorm2d, nn.RMSNorm, nn.Identity]:
     channels = data_dimensions.channels
     height = data_dimensions.height
     width = data_dimensions.width
@@ -237,6 +237,6 @@ def get_pre_normalization_layer(
                 num_features=channels, affine=True, track_running_stats=True
             )
         case "layernorm":
-            return nn.LayerNorm(normalized_shape=[channels, height, width])
+            return nn.RMSNorm(normalized_shape=[channels, height, width])
         case None:
             return nn.Identity()

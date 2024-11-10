@@ -314,34 +314,11 @@ inputs (e.g. ``input_source``, ``snp_file``) and outputs
 (e.g. ``output_source``, ``target_cat_columns`` or ``target_con_columns``
 if you have continuous targets).
 
-.. important::
-    If you are interested in quickly training deep learning models for genomic prediction,
-    the `EIR-auto-GP`_ project might be of use to you.
-
-When moving to large scale data such as the UK Biobank, the configurations we used
+However, when moving to large scale data such as the UK Biobank, the configurations we used
 on the ancestry toy data in this tutorial will likely not be sufficient. For example,
-the learning rate is likely too high. For this, here are some baseline configurations
-that we have found to work well as a starting point:
-
-.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/large_scale_globals.yaml
-    :language: yaml
-    :caption: globals.yaml
-
-.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/large_scale_input_gln.yaml
-    :language: yaml
-    :caption: input_genotype.yaml
-
-.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/large_scale_input_tabular.yaml
-    :language: yaml
-    :caption: input_tabular.yaml
-
-.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/large_scale_fusion.yaml
-    :language: yaml
-    :caption: fusion.yaml
-
-.. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/large_scale_output.yaml
-    :language: yaml
-    :caption: output.yaml
+the learning rate is likely too high. For this, we specifically designed the
+`EIR-auto-GP`_ project, which focuses on allow you to quickly train deep learning models
+for genomic prediction.
 
 
 E - Serving

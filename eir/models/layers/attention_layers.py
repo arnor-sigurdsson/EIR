@@ -67,14 +67,31 @@ class SwiGLU(nn.Module):
         bias: bool = True,
     ):
         super().__init__()
-        self.w1 = nn.Linear(in_features, hidden_features, bias=bias)
-        self.w2 = nn.Linear(in_features, hidden_features, bias=bias)
-        self.w3 = nn.Linear(hidden_features, out_features, bias=bias)
+        self.w1 = nn.Linear(
+            in_features=in_features,
+            out_features=hidden_features,
+            bias=bias,
+        )
+        self.w2 = nn.Linear(
+            in_features=in_features,
+            out_features=hidden_features,
+            bias=bias,
+        )
+        self.w3 = nn.Linear(
+            in_features=hidden_features,
+            out_features=out_features,
+            bias=bias,
+        )
+
+    def _init_weights(self):
+        torch.nn.init.normal_(self.w1.weight, mean=0.0, std=0.02)
+        torch.nn.init.normal_(self.w1.weight, mean=0.0, std=0.02)
+        torch.nn.init.normal_(self.w1.weight, mean=0.0, std=0.02)
 
     def forward(self, x: Tensor) -> Tensor:
-        x1 = self.w1(x)
-        x2 = self.w2(x)
-        hidden = F.silu(x1) * x2
+        hidden = self.w1(x)
+        gate = self.w2(x)
+        hidden = F.silu(hidden) * gate
         return self.w3(hidden)
 
 
@@ -109,8 +126,8 @@ class TransformerBlock(nn.Module):
         self.v_proj = nn.Linear(d_model, d_model, bias=False)
         self.out_proj = nn.Linear(d_model, d_model, bias=False)
 
-        self.norm1 = RMSNorm(d_model)
-        self.norm2 = RMSNorm(d_model)
+        self.norm1 = nn.RMSNorm(normalized_shape=d_model)
+        self.norm2 = nn.RMSNorm(normalized_shape=d_model)
 
         self.ffn = SwiGLU(
             in_features=d_model,

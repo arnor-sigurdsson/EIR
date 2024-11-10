@@ -21,16 +21,16 @@
         "response": {
             "result": [
                 {
-                    "english": "I'm very hungry guys."
+                    "english": "I have a lot of noise."
+                },
+                {
+                    "english": "Why does Tom still trust us?"
                 },
                 {
                     "english": "Why is Tom still in Boston?"
                 },
                 {
-                    "english": "Why is Tom still in Boston?"
-                },
-                {
-                    "english": "A cat was very tall cat."
+                    "english": "A cat"
                 }
             ]
         }

@@ -13,7 +13,7 @@ input_type_info:
 
 model_config:
         model_type: sequence-default
-        embedding_dim: 32
+        embedding_dim: 64
         position: embed
         pool: avg
         model_init_config:

@@ -4,6 +4,8 @@ from typing import Callable, Optional
 import torch
 from torch import nn
 
+from eir.models.layers.attention_layers import SwiGLU
+
 
 class Transpose(nn.Module):
     def __init__(self, dim0, dim1):
@@ -67,8 +69,13 @@ class SequenceProjectionLayer(nn.Module):
             # above to get 1 and 2
             layers.extend(
                 [
-                    nn.LayerNorm(normalized_shape=target_embedding_dim),
-                    nn.GELU(),
+                    nn.RMSNorm(normalized_shape=target_embedding_dim),
+                    SwiGLU(
+                        in_features=target_embedding_dim,
+                        hidden_features=target_embedding_dim,
+                        out_features=target_embedding_dim,
+                        bias=False,
+                    ),
                     Transpose(1, 2),
                     linear_layer,
                     Transpose(1, 2),

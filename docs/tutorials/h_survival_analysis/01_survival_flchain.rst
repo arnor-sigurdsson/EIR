@@ -4,7 +4,7 @@
     :format: html
 
 01 – Survival Analysis: Free Light Chain Analysis
-==============================================
+=================================================
 
 In this tutorial, we will explore using `EIR` for survival analysis tasks,
 specifically focusing on predicting survival outcomes based
@@ -17,7 +17,7 @@ levels and mortality in the general population.
     have gone through previous tutorials. Not required, but recommended.
 
 A - Dataset Overview
-------------------
+--------------------
 
 We'll be using the Free Light Chain (FLChain)
 dataset from the Mayo Clinic study, which contains:
@@ -47,7 +47,7 @@ After downloading the data, the folder structure should look like this:
     :language: console
 
 B - Training a Survival Model
----------------------------
+-----------------------------
 
 Let's configure and train a model on the FLChain data. Here are the key configuration files:
 
@@ -69,7 +69,7 @@ To train the model, run the following command:
     :language: console
 
 Results and Model Performance
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Here's the training curve showing the C-index (concordance index) over time:
 
@@ -94,12 +94,12 @@ some survival curves are plotted in the ``results/samples/<iteration>/`` directo
     :align: center
 
 C - Model Deployment and Analysis
--------------------------------
+---------------------------------
 
 Let's deploy our trained model as a web service and analyze its predictions across different patient subgroups.
 
 Starting the Web Service
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 To serve the model, use:
 
@@ -107,7 +107,7 @@ To serve the model, use:
     :language: console
 
 Making Predictions
-^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
 
 Here's how to send requests to the model:
 
@@ -116,7 +116,7 @@ Here's how to send requests to the model:
     :caption: Python request example
 
 Survival Analysis by Age Groups
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 After sending all the samples in the test set to the model,
 we can analyze the survival probabilities across different patient subgroups.
@@ -138,7 +138,7 @@ Here we can see for example, as expected,
 that older patients have lower survival probabilities.
 
 Conclusion
----------
+----------
 
 In this tutorial, we've explored how to:
 

@@ -436,6 +436,7 @@ def process_survival_output_for_testing(
         cur_tabular_info.file_path,
         usecols=["ID", time_column],
         index_col="ID",
+        dtype={"ID": str},
     )
     df_time_test = df_time.loc[df_time.index.isin(ids)]
 

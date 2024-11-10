@@ -24,6 +24,7 @@ from torch_optimizer import get as get_custom_opt
 
 from eir.models.model_training_utils import add_wd_to_model_params
 from eir.setup.setup_utils import get_base_optimizer_names
+from eir.train_utils.optimization_modules.soap import SOAP
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -123,6 +124,7 @@ def get_base_optimizers_dict() -> Dict[str, Type[Optimizer]]:
         "adahessian": AdaHessian,
         "adabelief": partial(AdaBelief, print_change_log=False),
         "adabeliefw": partial(AdaBelief, weight_decouple=True, print_change_log=False),
+        "soap": SOAP,
     }
     assert set(base_optimizers) == get_base_optimizer_names()
     return base_optimizers

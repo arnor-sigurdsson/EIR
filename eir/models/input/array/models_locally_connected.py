@@ -547,7 +547,7 @@ class LCLAttentionBlock(nn.Module):
                 dim_head=self.embedding_dim // self.num_heads,
             )
 
-        self.norm = nn.LayerNorm(self.embedding_dim)
+        self.norm = nn.RMSNorm(self.embedding_dim)
         self.pos_emb = PositionalEmbedding(
             embedding_dim=self.embedding_dim,
             max_length=self.in_features // self.embedding_dim,

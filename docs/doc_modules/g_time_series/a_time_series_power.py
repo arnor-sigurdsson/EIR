@@ -395,7 +395,7 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     We call get data manually to ensure that the data is downloaded as the last
     experiments use some of it for the setup.
     """
-    exp_1 = get_time_series_power_01_transformer(data="sim", target_iteration=10_000)
+    exp_1 = get_time_series_power_01_transformer(data="sim", target_iteration=8000)
     get_data(url=exp_1.data_url, output_path=exp_1.data_output_path)
 
     exp_2 = get_time_series_power_01_transformer(data="real", target_iteration=2000)

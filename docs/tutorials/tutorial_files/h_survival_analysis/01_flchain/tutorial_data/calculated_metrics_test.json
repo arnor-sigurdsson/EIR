@@ -1,1 +1,1 @@
-{"flchain_prediction": {"event": {"flchain_prediction_event_c-index": 0.7730154114568188, "flchain_prediction_event_loss": 1.0641605854034424}}, "average": {"average": {"loss-average": 1.0641605854034424, "perf-average": 0.7730154114568188}}}
+{"flchain_prediction": {"event": {"flchain_prediction_event_c-index": 0.7683628961907532, "flchain_prediction_event_loss": 1.0655641555786133}}, "average": {"average": {"loss-average": 1.0655641555786133, "perf-average": 0.7683628961907532}}}

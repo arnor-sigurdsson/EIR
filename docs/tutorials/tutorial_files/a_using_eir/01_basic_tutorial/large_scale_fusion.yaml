@@ -1,8 +1,0 @@
-model_config:
-  fc_do: 0.1
-  fc_task_dim: 512
-  layers: 
-    - 2
-  rb_do: 0.1
-  stochastic_depth_p: 0.1
-model_type: "default"
