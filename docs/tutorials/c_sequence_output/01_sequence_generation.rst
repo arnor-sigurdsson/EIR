@@ -261,11 +261,6 @@ Here is an example of the command:
 .. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/commands/SEQUENCE_GENERATION_DEPLOY.txt
     :language: console
 
-.. important::
-    Currently neither serving nor predicting works with the "bpe" tokenizer
-    due to a bug / design decision in the library that implements it,
-    see `here <https://github.com/huggingface/tokenizers/issues/566>`__
-    for more information.
 
 Sending Requests
 """"""""""""""""

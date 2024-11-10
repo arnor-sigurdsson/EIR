@@ -4,5 +4,5 @@ eirtrain \
 --fusion_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/imdb/imdb_fusion.yaml \
 --output_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/imdb/imdb_output.yaml \
 --imdb_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/e_pretraining/02_mini_foundation_imdb_from_pretrained \
---imdb_input.pretrained_config.model_path=eir_tutorials/e_pretraining/02_mini_foundation/data/02_mini_foundation/saved_models/02_mini_foundation_model_13500_perf-average=0.2610.pt \
+--imdb_input.pretrained_config.model_path=eir_tutorials/e_pretraining/02_mini_foundation/data/02_mini_foundation/saved_models/02_mini_foundation_model_17000_perf-average=0.2689.pt \
 --imdb_input.pretrained_config.load_module_name=text
