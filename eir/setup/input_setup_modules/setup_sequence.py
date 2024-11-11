@@ -734,13 +734,14 @@ def yield_tokens_from_deeplake_dataset(
 ) -> Generator[Sequence[str], None, None]:
     deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
     deeplake_iter = get_deeplake_input_source_iterable(
-        deeplake_dataset=deeplake_ds, inner_key=inner_key
+        deeplake_dataset=deeplake_ds,
+        inner_key=inner_key,
     )
 
     split_func = get_sequence_split_function(split_on=split_on)
 
     for sample in deeplake_iter:
-        cur_sequence = sample.text()
+        cur_sequence = str(sample)
         cur_line = split_func(cur_sequence)
 
         cur_length = len(cur_line)

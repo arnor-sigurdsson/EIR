@@ -78,8 +78,34 @@ def _create_and_save_test_array_omics(
 
 
 def _set_up_base_test_omics_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    IMPORTANT NOTE ON MEMORY LAYOUT in DeepLake V4:
+    This function ensures proper memory layout for storage in DeepLake. The PyTorch
+    transpose operation creates arrays in Fortran order (column-major) memory layout:
+        - Original data: C_CONTIGUOUS=True, F_CONTIGUOUS=False
+        - After transpose: C_CONTIGUOUS=False, F_CONTIGUOUS=True
+
+    DeepLake assumes C-order (row-major) when storing/loading arrays. If we store
+    a Fortran-ordered array, Deep Lake will read the memory in the wrong order,
+    corrupting the data. Consider this example:
+
+    Fortran-ordered memory of a one-hot array:
+        Memory: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+        Intended shape (4x4):    When Deep Lake reads in C-order:
+        1 0 0 0                  1 1 0 0
+        0 1 0 0      -->         0 0 0 0
+        0 0 1 0                  0 0 0 0
+        0 0 0 1                  0 0 1 1
+
+    To prevent this, we use np.ascontiguousarray() to ensure C-ordered memory
+    layout before yielding the arrays for storage.
+    """
     # create random one hot array
-    base_array = np.eye(4)[np.random.choice(4, n_snps)].T
+    base_array = np.eye(4, dtype=bool)[np.random.choice(4, n_snps)].T
+
+    # ensure C order
+    base_array = np.ascontiguousarray(base_array)
+
     # set up 10 candidates
     step_size = n_snps // 10
     snp_idxs_candidates = np.array(range(50, n_snps, step_size))

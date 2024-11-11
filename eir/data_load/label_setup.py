@@ -24,6 +24,7 @@ from tqdm import tqdm
 from eir.data_load.data_source_modules.csv_ops import ColumnOperation
 from eir.data_load.data_source_modules.deeplake_ops import (
     is_deeplake_dataset,
+    is_deeplake_sample_missing,
     load_deeplake_dataset,
 )
 from eir.setup.schemas import InputConfig
@@ -551,14 +552,18 @@ def build_deeplake_available_id_iterator(
     data_source: Path, inner_key: str
 ) -> Generator[str, None, None]:
     deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
-    for sample in deeplake_ds:
-        inner_key_tensor = sample[inner_key]
-        is_empty = inner_key_tensor.size == 0
-
-        if is_empty:
+    columns = {col.name for col in deeplake_ds.schema.columns}
+    existence_col = f"{inner_key}_exists"
+    for row in deeplake_ds:
+        if is_deeplake_sample_missing(
+            row=row,
+            existence_col=existence_col,
+            columns=columns,
+        ):
             continue
 
-        id_ = sample["ID"].numpy().item()
+        id_ = row["ID"]
+
         yield id_
 
 

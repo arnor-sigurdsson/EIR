@@ -92,7 +92,7 @@ def create_test_image(
     elif target_class == "Europe":
         image_base[12:, 12:] = patch_base
 
-    img = Image.fromarray(image_base, mode="L")
+    img = Image.fromarray(np.stack([image_base] * 3, axis=-1), mode="RGB")
 
     image_sample = ImageTestSample(
         image=img,

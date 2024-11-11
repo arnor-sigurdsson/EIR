@@ -227,7 +227,9 @@ def get_background_loader(experiment: "Experiment") -> torch.utils.data.DataLoad
 def tabular_attribution_analysis_wrapper(
     model: "al_meta_model",
     experiment: Union[
-        "Experiment", "PredictExperiment", "LoadedTrainExperimentMixedWithPredict"
+        "Experiment",
+        "PredictExperiment",
+        "LoadedTrainExperimentMixedWithPredict",
     ],
     output_folder_target_callable: Callable,
     dataset_to_interpret: al_local_datasets,

@@ -51,7 +51,11 @@ def image_load_wrapper(
             input_source=input_source,
             inner_key=deeplake_inner_key,
         )
-        array = np.uint8(image_data * 255).squeeze(axis=-1)  # type: ignore
+        array = np.uint8(image_data * 255)  # type: ignore
+
+        if len(array.shape) == 3 and array.shape[2] == 1:
+            array = array.squeeze(axis=-1)
+
         pil_image = fromarray(obj=array)
     else:
         assert isinstance(data_pointer, Path)

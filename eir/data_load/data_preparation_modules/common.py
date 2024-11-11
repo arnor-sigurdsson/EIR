@@ -14,7 +14,7 @@ def _load_deeplake_sample(
     inner_key: str,
 ) -> np.ndarray:
     """
-    Deeplake warns about indexing directly into a DS, vs. random access. For now we'll
+    Deeplake warns about indexing directly into a DS, vs. random access. For now, we'll
     use this random access pattern here as we have to be able to connect to other
     data sources (which might be outside deeplake).
     """
@@ -23,7 +23,7 @@ def _load_deeplake_sample(
     deeplake_ds_index = data_pointer
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sample_data = deeplake_ds[deeplake_ds_index][inner_key].numpy()
+        sample_data = deeplake_ds[deeplake_ds_index][inner_key]
 
     return sample_data
 
