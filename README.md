@@ -26,7 +26,7 @@
 
 ---
 
-Supervised modelling, sequence generation, image generation and array output on genotype, tabular, sequence, image, array, and binary input data.
+Supervised modelling, sequence generation, image generation, array output and survival analysis on genotype, tabular, sequence, image, array, and binary input data.
 
 **WARNING:** This project is in alpha phase. Expect backwards incompatible changes and API changes between minor versions.
 
