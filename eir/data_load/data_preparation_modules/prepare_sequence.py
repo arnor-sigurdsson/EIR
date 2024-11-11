@@ -32,12 +32,11 @@ def sequence_load_wrapper(
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
         assert isinstance(data_pointer, int)
-        text_as_np_array = _load_deeplake_sample(
+        content = _load_deeplake_sample(
             data_pointer=data_pointer,
             input_source=input_source,
             inner_key=deeplake_inner_key,
         )
-        content = text_as_np_array[0]
     elif input_source.endswith(".csv"):
         assert isinstance(data_pointer, np.ndarray)
         return data_pointer

@@ -33,7 +33,11 @@ def _get_sequence_test_specific_fusion_configs() -> Dict:
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"task_type": "multi", "modalities": ("sequence",), "source": "local"},
+        {
+            "task_type": "multi",
+            "modalities": ("sequence",),
+            "source": "deeplake",
+        },
     ],
     indirect=True,
 )
@@ -148,7 +152,11 @@ def test_sequence_modelling(prep_modelling_test_configs):
 @pytest.mark.parametrize(
     "create_test_data",
     [
-        {"task_type": "multi", "modalities": ("sequence",), "source": "local"},
+        {
+            "task_type": "multi",
+            "modalities": ("sequence",),
+            "source": "local",
+        },
     ],
     indirect=True,
 )

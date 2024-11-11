@@ -223,7 +223,7 @@ def _make_deeplake_test_dataset(
     if "test_image" in shapes:
         ds.add_column(
             "test_image",
-            deeplake.types.Image(dtype="uint8", sample_compression="jpeg"),
+            deeplake.types.Image(dtype="uint8", sample_compression="png"),
         )
         ds.add_column("test_image_exists", deeplake.types.Bool())
 
@@ -289,7 +289,12 @@ def _make_deeplake_test_dataset(
                     samples[sample_id]["test_genotype_exists"] = [True]
                 case "image":
                     data = default_image_loader(str(sample_file))
-                    samples[sample_id]["test_image"] = [np.array(data)]
+                    data_np = np.array(data)
+                    # we add an axis here to make it a 3D image, otherwise
+                    # deeplake will complain as it expects a channel dimension
+                    data_np = data_np[..., np.newaxis]
+
+                    samples[sample_id]["test_image"] = [data_np]
                     samples[sample_id]["test_image_exists"] = [True]
                 case "sequence":
                     data = sample_file.read_text().strip()
