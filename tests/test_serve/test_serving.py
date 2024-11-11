@@ -419,7 +419,7 @@ def _check_prediction(
             if not _validate_array_output(
                 actual_output=actual_output,
                 expected_array=expected_image,
-                data_dimensions=(1, 16, 16),
+                data_dimensions=(3, 16, 16),
                 check_cosine=False,
             ):
                 return False
