@@ -26,7 +26,9 @@ def bytes_load_wrapper(
             data_pointer=data_pointer,
             input_source=input_source,
             inner_key=deeplake_inner_key,
-        ).astype(dtype=dtype)
+        )
+        assert isinstance(bytes_data, np.ndarray)
+        bytes_data = bytes_data.astype(dtype=dtype)
     else:
         assert isinstance(data_pointer, Path)
         bytes_data = np.fromfile(file=data_pointer, dtype=dtype)

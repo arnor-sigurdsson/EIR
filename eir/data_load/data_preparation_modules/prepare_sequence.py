@@ -37,6 +37,7 @@ def sequence_load_wrapper(
             input_source=input_source,
             inner_key=deeplake_inner_key,
         )
+        assert isinstance(content, str)
     elif input_source.endswith(".csv"):
         assert isinstance(data_pointer, np.ndarray)
         return data_pointer

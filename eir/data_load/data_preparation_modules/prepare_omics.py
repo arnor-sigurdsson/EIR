@@ -30,6 +30,8 @@ def omics_load_wrapper(
         assert isinstance(data_pointer, Path)
         genotype_array_raw = np.load(str(data_pointer))
 
+    assert isinstance(genotype_array_raw, np.ndarray)
+
     if subset_indices is not None:
         genotype_array_raw = genotype_array_raw[:, subset_indices]
 

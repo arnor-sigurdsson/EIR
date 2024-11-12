@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional, Union
 
+import numpy as np
 import torch
 from PIL.Image import Image, fromarray
 
@@ -50,6 +51,7 @@ def image_load_wrapper(
             input_source=input_source,
             inner_key=deeplake_inner_key,
         )
+        assert isinstance(array, np.ndarray)
 
         if len(array.shape) == 3 and array.shape[2] == 1:
             array = array.squeeze(axis=-1)

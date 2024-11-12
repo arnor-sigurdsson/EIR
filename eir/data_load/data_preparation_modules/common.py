@@ -12,7 +12,7 @@ def _load_deeplake_sample(
     data_pointer: int,
     input_source: str,
     inner_key: str,
-) -> np.ndarray:
+) -> np.ndarray | str:
     """
     Deeplake warns about indexing directly into a DS, vs. random access. For now, we'll
     use this random access pattern here as we have to be able to connect to other
