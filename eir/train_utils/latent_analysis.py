@@ -9,7 +9,6 @@ from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from torch import nn
-from umap import UMAP
 
 if TYPE_CHECKING:
     from eir.train_utils.evaluation import EvaluationResults
@@ -41,7 +40,6 @@ def latent_analysis_wrapper(
     outputs_parsed = parse_latent_outputs(latent_outputs=latent_outputs.outputs)
     plot_pca(outputs=outputs_parsed, folder=latent_output_folder)
     plot_tsne(outputs=outputs_parsed, folder=latent_output_folder)
-    plot_umap(outputs=outputs_parsed, folder=latent_output_folder)
 
 
 def register_latent_hook(
@@ -138,18 +136,3 @@ def plot_tsne(outputs: np.ndarray, folder: Path) -> None:
     plt.title("t-SNE plot of latent space")
 
     plt.savefig(folder / "tsne.png")
-
-
-def plot_umap(outputs: np.ndarray, folder: Path) -> None:
-    umap = UMAP(n_components=2)
-
-    reduced = umap.fit_transform(X=outputs)
-
-    plt.figure(figsize=(8, 6))
-    plt.scatter(reduced[:, 0], reduced[:, 1], s=2)
-
-    plt.xlabel("UMAP 1")
-    plt.ylabel("UMAP 2")
-    plt.title("UMAP plot of latent space")
-
-    plt.savefig(folder / "umap.png")

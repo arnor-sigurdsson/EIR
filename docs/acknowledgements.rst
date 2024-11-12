@@ -58,8 +58,6 @@ and so on:
 
 - ``einops``  – Alex Rogozhnikov: A new flavour of deep learning operations
 
-- ``umap-learn`` : Uniform Manifold Approximation and Projection
-
 - ``fastapi`` : FastAPI framework, high performance, easy to learn, fast to code, ready for production
 
 - ``uvicorn`` : The lightning-fast ASGI server.

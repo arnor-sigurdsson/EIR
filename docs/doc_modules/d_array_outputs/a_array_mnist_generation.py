@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from PIL import Image
-from umap import UMAP
+from sklearn.manifold import TSNE
 
 from docs.doc_modules.d_array_outputs.utils import get_content_root
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
@@ -155,11 +155,15 @@ def visualize_latents(label_file: str, latents_path: str, output_folder: str) ->
 
     latents_2d = np.array(merged_df["Latent"].tolist())
 
-    umap = UMAP(n_components=2)
-    latents_reduced = umap.fit_transform(latents_2d)
+    tsne = TSNE(
+        n_components=2,
+        perplexity=30,
+        learning_rate=200,
+        random_state=42,
+    )
+    latents_reduced = tsne.fit_transform(latents_2d)
 
     palette = sns.color_palette("tab10", n_colors=merged_df["CLASS"].nunique())
-
     sorted_labels = sorted(merged_df["CLASS"].unique())
 
     plt.figure(figsize=(10, 8))
@@ -167,12 +171,12 @@ def visualize_latents(label_file: str, latents_path: str, output_folder: str) ->
         subset = latents_reduced[merged_df["CLASS"] == label]
         plt.scatter(subset[:, 0], subset[:, 1], c=[color], label=f"{label}")
 
-    plt.title("Latents Visualization")
-    plt.xlabel("UMAP Dimension 1")
-    plt.ylabel("UMAP Dimension 2")
+    plt.title("Latents Visualization with t-SNE")
+    plt.xlabel("t-SNE Dimension 1")
+    plt.ylabel("t-SNE Dimension 2")
     plt.legend(title="Class Label")
 
-    output_path = os.path.join(output_folder, "latents_visualization.png")
+    output_path = os.path.join(output_folder, "latents_visualization_tsne.png")
     plt.savefig(output_path)
     plt.close()
 
