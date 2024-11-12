@@ -199,6 +199,11 @@ def _make_deeplake_test_dataset(
                     shapes["test_genotype"] = data.shape
                 case "image":
                     data = np.array(default_image_loader(str(sample_file)))
+
+                    # we add an axis here to make it a 3D image, otherwise
+                    # deeplake will complain as it expects a channel dimension
+                    data = data[..., np.newaxis]
+
                     shapes["test_image"] = data.shape
                 case "array":
                     data = np.load(str(sample_file))
