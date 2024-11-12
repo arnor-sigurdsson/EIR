@@ -71,14 +71,17 @@ def get_dtype_from_data_source(
     deeplake_inner_key: Optional[str] = None,
 ) -> np.dtype:
     if is_deeplake_dataset(data_source=str(data_source)):
-        assert (
-            deeplake_inner_key is not None
-        ), "Deeplake inner key is required for Deeplake datasets"
+        msg = "Deeplake inner key is required for Deeplake datasets"
+        assert deeplake_inner_key is not None, msg
+
         deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
         deeplake_iter = get_deeplake_input_source_iterable(
-            deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
+            deeplake_dataset=deeplake_ds,
+            inner_key=deeplake_inner_key,
         )
-        data_type = next(deeplake_iter).dtype
+        sample = next(deeplake_iter)
+        assert isinstance(sample, np.ndarray)
+        data_type = sample.dtype
     else:
         iterator = get_file_path_iterator(data_source=data_source)
         path = next(iterator)

@@ -23,6 +23,7 @@ from tqdm import tqdm
 
 from eir.data_load.data_source_modules.deeplake_ops import (
     is_deeplake_dataset,
+    is_deeplake_sample_missing,
     load_deeplake_dataset,
 )
 from eir.data_load.label_setup import (
@@ -958,14 +959,17 @@ def build_deeplake_available_pointer_iterator(
     data_source: Path, inner_key: str
 ) -> Generator[tuple[str, int], None, None]:
     deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
-    for int_pointer, sample in enumerate(deeplake_ds):
-        inner_key_tensor = sample[inner_key]
-        is_empty = inner_key_tensor.size == 0
+    columns = {col.name for col in deeplake_ds.schema.columns}
+    existence_col = f"{inner_key}_exists"
+    for int_pointer, row in enumerate(deeplake_ds):
+        if is_deeplake_sample_missing(
+            row=row,
+            existence_col=existence_col,
+            columns=columns,
+        ):
+            pass
 
-        if is_empty:
-            continue
-
-        id_ = sample["ID"].numpy().item()
+        id_ = row["ID"]
 
         yield id_, int(int_pointer)
 

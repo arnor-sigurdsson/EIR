@@ -46,7 +46,7 @@ and so on:
 
 - ``captum``  – PyTorch Team: Model interpretability for PyTorch
 
-- ``deeplake``  – activeloop.ai: Activeloop Deep Lake
+- ``deeplake``  – activeloop.ai: Data Lake for Multi-Modal AI Search
 
 - ``aioboto3``  – Terry Cain: Async boto3 wrapper
 
@@ -65,8 +65,6 @@ and so on:
 - ``uvicorn`` : The lightning-fast ASGI server.
 
 - ``pydantic`` : Data validation using Python type hints
-
-- ``libdeeplake``  – activeloop.ai: C++ backend for Deep Lake
 
 - ``lifelines``  – Cameron Davidson-Pilon: Survival analysis in Python, including Kaplan Meier, Nelson Aalen and regression
 

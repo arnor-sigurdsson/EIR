@@ -91,6 +91,8 @@ def create_test_image(
         image_base[0:4, 12:] = patch_base
     elif target_class == "Europe":
         image_base[12:, 12:] = patch_base
+    else:
+        raise ValueError(f"Unknown target class '{target_class}'")
 
     img = Image.fromarray(image_base, mode="L")
 

@@ -177,13 +177,88 @@ def _make_deeplake_test_dataset(
     base_output_folder: Path,
     sub_folder_name: Union[None, Literal["train_set", "test_set"]],
 ) -> None:
-    if sub_folder_name is None:
-        suffix = ""
-    else:
-        suffix = f"_{sub_folder_name}"
+    suffix = f"_{sub_folder_name}" if sub_folder_name is not None else ""
+    ds_path = base_output_folder / f"deeplake{suffix}"
 
-    if (base_output_folder / f"deeplake{suffix}").exists():
+    if deeplake.exists(str(ds_path)):
         return
+
+    shapes = {}
+    for f in base_output_folder.iterdir():
+        if not f.is_dir() or "deeplake" in f.name:
+            continue
+
+        file_iterator = f.iterdir()
+        if sub_folder_name is not None:
+            file_iterator = (f / sub_folder_name).iterdir()
+
+        for sample_file in file_iterator:
+            match f.name:
+                case "omics":
+                    data = np.load(str(sample_file))
+                    shapes["test_genotype"] = data.shape
+                case "image":
+                    data = np.array(default_image_loader(str(sample_file)))
+
+                    # we add an axis here to make it a 3D image, otherwise
+                    # deeplake will complain as it expects a channel dimension
+                    data = data[..., np.newaxis]
+
+                    shapes["test_image"] = data.shape
+                case "array":
+                    data = np.load(str(sample_file))
+                    shapes["test_array"] = data.shape
+            if len(shapes) == 3:
+                break
+        if len(shapes) == 3:
+            break
+
+    ds = deeplake.create(str(ds_path))
+
+    ds.add_column("ID", deeplake.types.Text())
+    ds.add_column("test_sequence", deeplake.types.Text())
+
+    if "test_genotype" in shapes:
+        ds.add_column(
+            "test_genotype",
+            deeplake.types.Array(dtype="uint8", shape=shapes["test_genotype"]),
+        )
+        ds.add_column("test_genotype_exists", deeplake.types.Bool())
+
+    if "test_image" in shapes:
+        ds.add_column(
+            "test_image",
+            deeplake.types.Image(dtype="uint8", sample_compression="png"),
+        )
+        ds.add_column("test_image_exists", deeplake.types.Bool())
+
+    if "test_array" in shapes:
+        ds.add_column(
+            "test_array",
+            deeplake.types.Array(dtype="float32", shape=shapes["test_array"]),
+        )
+        ds.add_column("test_array_exists", deeplake.types.Bool())
+
+    ds.commit("Created dataset schema")
+
+    empty_data = {
+        "test_genotype": (
+            np.zeros(shapes["test_genotype"], dtype="bool")
+            if "test_genotype" in shapes
+            else None
+        ),
+        "test_image": (
+            np.zeros(shapes["test_image"], dtype=np.uint8)
+            if "test_image" in shapes
+            else None
+        ),
+        "test_sequence": "",
+        "test_array": (
+            np.zeros(shapes["test_array"], dtype=np.float32)
+            if "test_array" in shapes
+            else None
+        ),
+    }
 
     samples = {}
     for f in base_output_folder.iterdir():
@@ -197,40 +272,53 @@ def _make_deeplake_test_dataset(
         for sample_file in file_iterator:
             sample_id = sample_file.stem
             if sample_id not in samples:
-                samples[sample_id] = {"ID": sample_id}
+                sample = {"ID": [sample_id], "test_sequence": [""]}
+
+                for col_name, zero_data in empty_data.items():
+                    if col_name != "test_sequence":
+                        if zero_data is not None:
+                            sample[col_name] = [zero_data]
+                            sample[f"{col_name}_exists"] = [False]
+
+                samples[sample_id] = sample
 
             match f.name:
                 case "omics":
-                    cur_name = "test_genotype"
-                    sample_data = np.load(str(sample_file))
+                    data = np.load(str(sample_file))
+                    assert (data.sum(0) == 1).all()
+
+                    order = "C" if data.flags["C_CONTIGUOUS"] else "F"
+                    assert order == "C"
+
+                    samples[sample_id]["test_genotype"] = [data]
+                    samples[sample_id]["test_genotype_exists"] = [True]
                 case "image":
-                    cur_name = "test_image"
-                    sample_data = default_image_loader(str(sample_file))
-                    sample_data = np.array(sample_data)
+                    data = default_image_loader(str(sample_file))
+                    data_np = np.array(data)
+                    # we add an axis here to make it a 3D image, otherwise
+                    # deeplake will complain as it expects a channel dimension
+                    data_np = data_np[..., np.newaxis]
+
+                    samples[sample_id]["test_image"] = [data_np]
+                    samples[sample_id]["test_image_exists"] = [True]
                 case "sequence":
-                    cur_name = "test_sequence"
-                    sample_data = sample_file.read_text().strip()
+                    data = sample_file.read_text().strip()
+                    samples[sample_id]["test_sequence"] = [data if data else ""]
                 case "array":
-                    cur_name = "test_array"
-                    sample_data = np.load(str(sample_file))
+                    data = np.load(str(sample_file))
+
+                    order = "C" if data.flags["C_CONTIGUOUS"] else "F"
+                    assert order == "C"
+
+                    samples[sample_id]["test_array"] = [data]
+                    samples[sample_id]["test_array_exists"] = [True]
                 case _:
-                    raise ValueError()
+                    raise ValueError(f"Unknown directory type: {f.name}")
 
-            samples[sample_id][cur_name] = sample_data
+    for sample_id, sample in samples.items():
+        ds.append(sample)
 
-    name = "deeplake"
-    if sub_folder_name is not None:
-        name = f"{name}_{sub_folder_name}"
-    ds = deeplake.empty(base_output_folder / name, overwrite=True)
-
-    ds.create_tensor(name="ID", htype="text")
-    ds.create_tensor(name="test_genotype")
-    ds.create_tensor(name="test_image", htype="image", sample_compression="jpg")
-    ds.create_tensor(name="test_sequence", htype="text")
-    ds.create_tensor(name="test_array")
-    with ds:
-        for sample_id, sample in samples.items():
-            ds.append(sample, append_empty=True)
+    ds.commit("Added all samples")
 
 
 def _delete_random_rows_from_csv(csv_file: Path, n_to_drop: int):

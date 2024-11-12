@@ -40,18 +40,22 @@ def image_load_wrapper(
     deeplake_inner_key: Optional[str] = None,
 ) -> Image:
     """
-    Squeeze there since loading a saved 2D image, e.g. saved as (16, 16),
-    in deeplake will be loaded as (16, 16, 1).
+    Squeeze there since deeplake seems to support only 3D images. Therefore,
+    when saving we generally add a channel dimension, e.g. (16, 16) -> (16, 16, 1).
     """
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
         assert isinstance(data_pointer, int)
-        image_data = _load_deeplake_sample(
+        array = _load_deeplake_sample(
             data_pointer=data_pointer,
             input_source=input_source,
             inner_key=deeplake_inner_key,
         )
-        array = np.uint8(image_data * 255).squeeze(axis=-1)  # type: ignore
+        assert isinstance(array, np.ndarray)
+
+        if len(array.shape) == 3 and array.shape[2] == 1:
+            array = array.squeeze(axis=-1)
+
         pil_image = fromarray(obj=array)
     else:
         assert isinstance(data_pointer, Path)

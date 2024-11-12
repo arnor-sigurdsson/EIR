@@ -177,12 +177,13 @@ def infer_num_image_channels(
         assert deeplake_inner_key is not None
         deeplake_ds = load_deeplake_dataset(data_source=data_source)
         deeplake_iter = get_deeplake_input_source_iterable(
-            deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
+            deeplake_dataset=deeplake_ds,
+            inner_key=deeplake_inner_key,
         )
-        test_image_array = next(deeplake_iter).numpy()
+        test_image_array = next(deeplake_iter)
         data_pointer = (
             f"[deeplake dataset {data_source}, input {deeplake_inner_key}, "
-            f"image ID: {deeplake_ds['ID'][0].text()}]"
+            f"image ID: {deeplake_ds['ID']}]"
         )
     else:
         test_file = next(Path(data_source).iterdir())
@@ -290,10 +291,10 @@ def get_image_normalization_values(
                 deeplake_ds = load_deeplake_dataset(data_source=input_source)
                 assert deeplake_inner_key is not None
                 image_iter = get_deeplake_input_source_iterable(
-                    deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
+                    deeplake_dataset=deeplake_ds,
+                    inner_key=deeplake_inner_key,
                 )
-
-                numpy_iter = (i.numpy() for i in image_iter)
+                numpy_iter = (i for i in image_iter)
 
                 if image_mode:
                     image_iter = (Image.fromarray(i) for i in numpy_iter)

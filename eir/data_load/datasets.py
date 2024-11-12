@@ -515,7 +515,9 @@ class DiskDataset(DatasetBase):
 
         inputs = copy(sample.inputs)
         inputs_prepared = prepare_inputs_disk(
-            inputs=inputs, inputs_objects=self.inputs, test_mode=self.test_mode
+            inputs=inputs,
+            inputs_objects=self.inputs,
+            test_mode=self.test_mode,
         )
 
         inputs_final = impute_missing_modalities_wrapper(

@@ -1,6 +1,5 @@
 import warnings
 from functools import lru_cache
-from pathlib import Path
 from typing import TYPE_CHECKING, Callable, DefaultDict, Generator, Set, Union
 
 warnings.filterwarnings("ignore", message=".*newer version of deeplake.*")
@@ -16,38 +15,44 @@ if TYPE_CHECKING:
 
 @lru_cache()
 def is_deeplake_dataset(data_source: str) -> bool:
-    if Path(data_source, "dataset_meta.json").exists():
+    if deeplake.exists(data_source):
         return True
-
     return False
 
 
 @lru_cache()
-def load_deeplake_dataset(data_source: str) -> deeplake.Dataset:
-    dataset = deeplake.load(
-        path=data_source,
-        read_only=True,
-        verbose=False,
+def load_deeplake_dataset(data_source: str) -> deeplake.ReadOnlyDataset:
+    dataset = deeplake.open_read_only(
+        url=data_source,
+        token=None,
     )
-    if "ID" not in dataset.tensors.keys():
+
+    columns = {col.name for col in dataset.schema.columns}
+    if "ID" not in columns:
         raise ValueError(
-            f"DeepLake dataset at {data_source} does not have an ID tensor. "
+            f"DeepLake dataset at {data_source} does not have an ID column. "
             f"Please add one to the dataset."
         )
     return dataset
 
 
 def get_deeplake_input_source_iterable(
-    deeplake_dataset: deeplake.Dataset, inner_key: str
-) -> Generator[deeplake.Tensor, None, None]:
-    def _is_empty(x: deeplake.Tensor) -> bool:
-        return x.shape[0] == 0
+    deeplake_dataset: deeplake.ReadOnlyDataset, inner_key: str
+) -> Generator[Union[deeplake.Column, deeplake.ColumnView], None, None]:
+    columns = {col.name for col in deeplake_dataset.schema.columns}
 
-    for deeplake_sample in deeplake_dataset[inner_key]:
-        if _is_empty(x=deeplake_sample):
+    existence_col = f"{inner_key}_exists"
+    for row in deeplake_dataset:
+        if is_deeplake_sample_missing(
+            row=row,
+            existence_col=existence_col,
+            columns=columns,
+        ):
             continue
 
-        yield deeplake_sample
+        value = row[inner_key]
+
+        yield value
 
 
 def add_deeplake_data_to_samples(
@@ -58,41 +63,35 @@ def add_deeplake_data_to_samples(
     data_loading_hook: Callable,
     ids_to_keep: Union[None, Set[str]],
 ) -> DefaultDict[str, "Sample"]:
-    """
-    For normal files in a folder, this is holding the paths, which we can think of as
-    unique pointer to the sample data, for this source.
-
-    In the DeepLake case, this is an integer index pointing to the sample.
-    """
     assert deeplake_input_inner_key is not None, "Deeplake input inner key is None"
 
-    def _is_empty(x: deeplake.Tensor) -> bool:
-        return x.shape[0] == 0
-
     deeplake_ds = load_deeplake_dataset(data_source=input_source)
-    if deeplake_input_inner_key not in deeplake_ds.tensors.keys():
+
+    columns = {col.name for col in deeplake_ds.schema.columns}
+    if deeplake_input_inner_key not in columns:
         raise ValueError(
             f"Input key {deeplake_input_inner_key} not found in deeplake dataset "
-            f"{input_source}. Available inputs in deeplake dataset are "
-            f"{deeplake_ds.tensors.keys()}."
+            f"{input_source}. Available columns are: {columns}."
         )
 
-    if ids_to_keep is None:
-        pbar = tqdm(total=len(deeplake_ds), desc=input_name)
-    else:
-        pbar = tqdm(total=len(ids_to_keep), desc=input_name)
+    total = len(ids_to_keep) if ids_to_keep is not None else len(deeplake_ds)
+    pbar = tqdm(total=total, desc=input_name)
 
-    for deeplake_sample in deeplake_ds:
-        cur_input_from_sample = deeplake_sample[deeplake_input_inner_key]
-        if _is_empty(x=cur_input_from_sample):
+    existence_col = f"{deeplake_input_inner_key}_exists"
+    for row in deeplake_ds:
+        if is_deeplake_sample_missing(
+            row=row,
+            existence_col=existence_col,
+            columns=columns,
+        ):
             continue
 
-        sample_id = deeplake_sample["ID"].numpy().item()
+        sample_id = row["ID"]
 
         if ids_to_keep is not None and sample_id not in ids_to_keep:
             continue
 
-        sample_data_pointer = deeplake_sample.index.values[0].value
+        sample_data_pointer = row.row_id
         sample_data = data_loading_hook(sample_data_pointer)
 
         samples = add_id_to_samples(samples=samples, sample_id=sample_id)
@@ -101,3 +100,15 @@ def add_deeplake_data_to_samples(
         pbar.update(1)
 
     return samples
+
+
+def is_deeplake_sample_missing(
+    row: deeplake.RowView,
+    existence_col: str,
+    columns: set[str],
+) -> bool:
+    if existence_col in columns:
+        is_missing = not row[existence_col].item()
+        return is_missing
+
+    return False

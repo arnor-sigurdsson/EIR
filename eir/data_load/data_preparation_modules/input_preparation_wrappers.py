@@ -41,7 +41,9 @@ from eir.setup.schemas import (
 
 
 def prepare_inputs_disk(
-    inputs: Dict[str, Any], inputs_objects: "al_input_objects_as_dict", test_mode: bool
+    inputs: Dict[str, Any],
+    inputs_objects: "al_input_objects_as_dict",
+    test_mode: bool,
 ) -> Dict[str, torch.Tensor]:
     prepared_inputs = {}
 

@@ -26,6 +26,7 @@ def array_load_wrapper(
         assert isinstance(data_pointer, Path)
         array_data = np.load(str(data_pointer))
 
+    assert isinstance(array_data, np.ndarray)
     return array_data
 
 
