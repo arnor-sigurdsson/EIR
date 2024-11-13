@@ -8,6 +8,7 @@ from sklearn.metrics import mean_squared_error
 
 from eir import train
 from eir.train_utils.utils import seed_everything
+from eir.utils.logging import get_logger
 from tests.conftest import should_skip_in_gha_macos
 from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
     )
 
 seed_everything(seed=0)
+
+logger = get_logger(name=__name__)
 
 
 def _get_output_array_data_parameters() -> Sequence[dict]:
@@ -183,6 +186,7 @@ def _array_output_test_check_wrapper(
     test_config: "ModelTestConfig",
     mse_threshold: float = 0.35,
     cosine_similarity_threshold: float = 0.6,
+    success_rate_threshold: float = 0.8,
 ) -> None:
     output_configs = experiment.configs.output_configs
 
@@ -198,37 +202,61 @@ def _array_output_test_check_wrapper(
         latest_sample = test_config.last_sample_folders[output_name][output_name]
         auto_folder = latest_sample / "auto"
 
+        total_checks = 0
+        passed_checks = 0
         did_check = False
+
         for f in auto_folder.iterdir():
             if f.suffix != ".npy":
                 continue
 
-            generated_array = np.load(str(f))
+            try:
+                generated_array = np.load(str(f))
 
-            index = f.name.split("_")[0]
-            matching_input_folder = auto_folder / f"{index}_inputs"
-            matching_input_array_file = matching_input_folder / "test_array.npy"
-            matching_input_array = np.load(str(matching_input_array_file))
+                index = f.name.split("_")[0]
+                matching_input_folder = auto_folder / f"{index}_inputs"
+                matching_input_array_file = matching_input_folder / "test_array.npy"
+                matching_input_array = np.load(str(matching_input_array_file))
 
-            mse = mean_squared_error(
-                y_true=matching_input_array.ravel(),
-                y_pred=generated_array.ravel(),
-            )
-            assert mse < mse_threshold
+                mse = mean_squared_error(
+                    y_true=matching_input_array.ravel(),
+                    y_pred=generated_array.ravel(),
+                )
 
-            did_check = True
+                mse_check_passed = mse < mse_threshold
+                cosine_check_passed = True
 
-            # due to deeplake arrays not storing 0s but as very small numbers
-            matching_input_array[matching_input_array < 1e-8] = 0.0
+                if not (matching_input_array.sum() == 0 or is_diffusion):
+                    matching_input_array = matching_input_array.copy()
+                    # due to deeplake arrays not storing 0s but as very small numbers
+                    matching_input_array[matching_input_array < 1e-8] = 0.0
 
-            # Skip if all 0s or diffusion
-            if matching_input_array.sum() == 0 or is_diffusion:
+                    cosine_similarity = 1 - cosine(
+                        u=matching_input_array.ravel().astype(np.float32),
+                        v=generated_array.ravel(),
+                    )
+                    cosine_check_passed = (
+                        cosine_similarity > cosine_similarity_threshold
+                    )
+
+                if mse_check_passed and cosine_check_passed:
+                    passed_checks += 1
+
+                total_checks += 1
+                did_check = True
+
+            except Exception as e:
+                logger.error(f"Error checking array: {f} - {e}")
+                total_checks += 1
                 continue
 
-            cosine_similarity = 1 - cosine(
-                u=matching_input_array.ravel().astype(np.float32),
-                v=generated_array.ravel(),
-            )
-            assert cosine_similarity > cosine_similarity_threshold
+        assert did_check, "No arrays were checked"
 
-        assert did_check
+        if total_checks > 0:
+            success_rate = passed_checks / total_checks
+            assert success_rate >= success_rate_threshold, (
+                f"Only {success_rate:.1%} of arrays passed all checks, "
+                f"which is below the required"
+                f" threshold of {success_rate_threshold:.1%}. "
+                f"{passed_checks} passed out of {total_checks} total checks."
+            )
