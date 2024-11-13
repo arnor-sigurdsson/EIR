@@ -154,7 +154,7 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
     diff_tolerance: int = 0,
 ) -> Tuple[int, int] | None:
-    best_diff = np.Inf
+    best_diff = np.inf
     best_kernel_width = None
     best_out_feature_sets = None
 
