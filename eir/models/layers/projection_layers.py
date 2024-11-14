@@ -107,7 +107,7 @@ def get_lcl_projection_layer(
     input_dimension: int,
     target_dimension: int,
     layer_type: Literal["lcl_residual", "lcl"] = "lcl_residual",
-    kernel_width_candidates: Sequence[int] = tuple(range(1, 4096 + 1)),
+    kernel_width_candidates: Sequence[int] = tuple(range(1, 16384 + 1)),
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     diff_tolerance: int = 0,
 ) -> LCLResidualBlock | LCL | None:

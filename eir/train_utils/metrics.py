@@ -573,24 +573,37 @@ def calc_survival_c_index(
     *args,
     **kwargs,
 ) -> float:
+    """
+    Note that for CoxPH models we just have the output being a single value quantifying
+    risk predicted by the model for each sample. Whereas for discrete survival models
+    we take the last bin (i.e., last time point) as the overall risk predicted by the
+    model.
+    """
 
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
 
-    time_kbins_transformer = target_transformers[output_name][time_name]
+    target_transformer = target_transformers[output_name][time_name]
+    model_type = "discrete"
+    if isinstance(target_transformer, IdentityTransformer):
+        model_type = "cox"
 
-    hazards_logits = outputs
     events = labels
-    times_binned = times
 
-    times = time_kbins_transformer.inverse_transform(times_binned.reshape(-1, 1))
+    times = target_transformer.inverse_transform(times.reshape(-1, 1))
     times = times.flatten()
 
-    hazards = sigmoid(x=hazards_logits)
+    # # Convert model outputs (risk) to survival scores
+    # higher survival score = longer predicted survival time
+    if model_type == "discrete":
+        hazards = sigmoid(outputs)
+        survival_scores = -hazards[:, -1]
+    else:
+        survival_scores = -outputs
 
     c_index = concordance_index(
         event_times=times,
-        predicted_scores=-hazards[:, -1],
+        predicted_scores=survival_scores,
         event_observed=events,
     )
 
