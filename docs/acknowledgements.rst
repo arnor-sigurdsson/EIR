@@ -88,7 +88,7 @@ and so on:
 
 - ``ipykernel`` : IPython Kernel for Jupyter
 
-- ``coverage``  – Ned Batchelder and 233 others: Code coverage measurement for Python
+- ``coverage``  – Ned Batchelder and 234 others: Code coverage measurement for Python
 
 - ``snakeviz`` : A web-based viewer for Python profiler output
 
