@@ -331,14 +331,24 @@ def get_dataloaders(
     if isinstance(train_dataset, datasets.StreamingDataset):
         shuffle = None
 
+    pin_memory = torch.cuda.is_available()
+    if pin_memory:
+        logger.debug("Enabling memory pinning for CPU -> GPU transfer.")
+
+    persistent_workers = False
+    if num_workers > 0:
+        persistent_workers = True
+        logger.debug("Enabling persistent workers for dataloader.")
+
     train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=batch_size,
         sampler=train_sampler,
         shuffle=shuffle,
         num_workers=train_num_workers,
-        pin_memory=False,
+        pin_memory=pin_memory,
         drop_last=True,
+        persistent_workers=persistent_workers,
     )
 
     valid_dataloader = DataLoader(
