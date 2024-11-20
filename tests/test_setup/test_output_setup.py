@@ -23,7 +23,9 @@ def test_set_up_num_classes(get_transformer_test_data):
         impute_missing=False,
     )
 
-    num_classes = set_up_num_outputs_per_target(target_transformers=test_transformers)
+    num_classes = set_up_num_outputs_per_target(
+        target_transformers=test_transformers, cat_loss="CrossEntropyLoss"
+    )
 
     assert num_classes["Height"] == 1
     assert num_classes["Origin"] == 3
