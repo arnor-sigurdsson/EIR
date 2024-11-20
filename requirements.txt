@@ -68,7 +68,6 @@ pandas==2.2.3 ; python_full_version >= "3.12.0" and python_version < "3.13"
 parso==0.8.4 ; python_full_version >= "3.12.0" and python_version < "3.13"
 pexpect==4.9.0 ; python_full_version >= "3.12.0" and python_version < "3.13" and (sys_platform != "win32" and sys_platform != "emscripten")
 pillow==11.0.0 ; python_full_version >= "3.12.0" and python_version < "3.13"
-polars==1.14.0 ; python_full_version >= "3.12.0" and python_version < "3.13"
 prompt-toolkit==3.0.48 ; python_full_version >= "3.12.0" and python_version < "3.13"
 propcache==0.2.0 ; python_full_version >= "3.12.0" and python_version < "3.13"
 ptyprocess==0.7.0 ; python_full_version >= "3.12.0" and python_version < "3.13" and (sys_platform != "win32" and sys_platform != "emscripten")

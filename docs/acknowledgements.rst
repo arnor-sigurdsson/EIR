@@ -76,8 +76,6 @@ and so on:
 
 - ``websockets`` : An implementation of the WebSocket Protocol (RFC 6455 & 7692)
 
-- ``polars`` : Blazingly fast DataFrame library
-
 - ``memory-profiler``  – Fabian Pedregosa: A module for monitoring memory usage of a python program
 
 - ``pytest``  – Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin, Others (See AUTHORS): pytest: simple powerful testing with Python
