@@ -85,13 +85,23 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
                     output_config=output_object.output_config,
                     column_type="cat",
                 )
+                cat_loss_name = _get_cat_loss_name(
+                    output_config=output_object.output_config
+                )
                 criterion_cat = get_supervised_criterion(
                     column_type_="cat",
-                    loss_name="CrossEntropyLoss",
+                    loss_name=cat_loss_name,
                     cat_label_smoothing_=label_smoothing,
                     reduction="none",
                 )
-                assert isinstance(criterion_cat, nn.CrossEntropyLoss)
+                cat_loss_callable = (
+                    loop_ce_loss
+                    if cat_loss_name == "CrossEntropyLoss"
+                    else vectorized_bce_loss
+                )
+                assert isinstance(
+                    criterion_cat, (nn.CrossEntropyLoss, nn.BCEWithLogitsLoss)
+                )
 
                 loss_func = partial(
                     tabular_output_loss,
@@ -101,6 +111,7 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
                     log_empty_loss_callable=log_empty_once,
                     con_loss_func=criterion_con,
                     cat_loss_func=criterion_cat,
+                    cat_loss_callable=cat_loss_callable,
                 )
 
                 criteria_dict[output_name] = loss_func
@@ -175,7 +186,8 @@ def tabular_output_loss(
     output_name: str,
     log_empty_loss_callable: LogEmptyLossProtocol,
     con_loss_func: Callable,
-    cat_loss_func: nn.CrossEntropyLoss,
+    cat_loss_func: nn.CrossEntropyLoss | nn.BCEWithLogitsLoss,
+    cat_loss_callable: Callable,
 ) -> dict[str, torch.Tensor]:
     con_preds = {k: predictions[k] for k in con_columns}
     cat_preds = {k: predictions[k] for k in cat_columns}
@@ -193,7 +205,7 @@ def tabular_output_loss(
     )
 
     cat_losses = (
-        loop_ce_loss(
+        cat_loss_callable(
             predictions=cat_preds,
             targets=cat_targets,
             loss_func=cat_loss_func,
@@ -230,6 +242,28 @@ def vectorized_con_loss(
     targets_masked[~valid_mask] = 0
 
     losses = loss_func(predictions_masked, targets_masked)
+    target_means = losses.sum(dim=0) / (valid_mask.sum(dim=0) + 1e-8)
+
+    if len(target_means.shape) == 0:
+        target_means = target_means.unsqueeze(0)
+
+    return {name: loss for name, loss in zip(predictions.keys(), target_means)}
+
+
+def vectorized_bce_loss(
+    predictions: dict[str, torch.Tensor],
+    targets: dict[str, torch.Tensor],
+    loss_func: Callable = nn.BCEWithLogitsLoss(reduction="none"),
+) -> dict[str, torch.Tensor]:
+    predictions_stacked = torch.stack(list(predictions.values()), dim=1).squeeze()
+    targets_stacked = torch.stack(list(targets.values()), dim=1).squeeze().float()
+
+    valid_mask = targets_stacked != -1
+
+    targets_masked = targets_stacked.clone()
+    targets_masked[~valid_mask] = 0
+
+    losses = loss_func(predictions_stacked, targets_masked)
     target_means = losses.sum(dim=0) / (valid_mask.sum(dim=0) + 1e-8)
 
     if len(target_means.shape) == 0:
@@ -276,6 +310,7 @@ def build_loss_dict() -> dict[str, list[str]]:
     loss_dict = {
         "cat": [
             "CrossEntropyLoss",
+            "BCEWithLogitsLoss",
         ],
         "con": [
             "MSELoss",
@@ -348,6 +383,14 @@ def _get_label_smoothing(
             return output_type_info.cat_label_smoothing
         case _:
             raise ValueError(f"Unknown column type: {column_type}")
+
+
+def _get_cat_loss_name(
+    output_config: schemas.OutputConfig,
+) -> "al_cat_loss_names":
+    output_type_info = output_config.output_type_info
+    assert isinstance(output_type_info, schemas.TabularOutputTypeConfig)
+    return output_type_info.cat_loss_name
 
 
 class NaNHandling(Enum):
@@ -451,8 +494,18 @@ def _negative_log_likelihood_loss(
     time: torch.Tensor,
     event: torch.Tensor,
 ) -> torch.Tensor:
+    valid_mask = (time != -1) & (event != -1)
+
+    # Early return if no valid samples
+    if not valid_mask.any():
+        return log_hazards.new_zeros((), requires_grad=True)
+
+    masked_log_hazards = log_hazards[valid_mask]
+    masked_time = time[valid_mask]
+    masked_event = event[valid_mask]
+
     # Convert log-hazards to hazards
-    hazards = torch.sigmoid(log_hazards)
+    hazards = torch.sigmoid(masked_log_hazards)
 
     # Calculate log(survival probability) for each interval
     log_surv = torch.log(1 - hazards + 1e-8)
@@ -461,16 +514,16 @@ def _negative_log_likelihood_loss(
     cum_log_surv = torch.cumsum(log_surv, dim=1)
 
     # Select the relevant timepoints
-    idx = torch.arange(log_hazards.shape[0], device=log_hazards.device)
-    relevant_log_surv = cum_log_surv[idx, time]
-    relevant_hazards = hazards[idx, time]
+    idx = torch.arange(masked_log_hazards.shape[0], device=masked_log_hazards.device)
+    relevant_log_surv = cum_log_surv[idx, masked_time]
+    relevant_hazards = hazards[idx, masked_time]
 
     # Calculate log-likelihood
     uncensored_ll = torch.log(relevant_hazards + 1e-8) + relevant_log_surv
     censored_ll = relevant_log_surv
 
     # Combine censored and uncensored log-likelihoods
-    log_likelihood = event * uncensored_ll + (1 - event) * censored_ll
+    log_likelihood = masked_event * uncensored_ll + (1 - masked_event) * censored_ll
 
     # Return negative average log-likelihood
     return -torch.mean(log_likelihood)
@@ -482,27 +535,35 @@ def _cox_ph_loss(
     event: torch.Tensor,
     ties_method: str = "efron",
 ) -> torch.Tensor:
-    if torch.sum(event) == 0:
-        return torch.tensor(0.0, device=risk_scores.device, requires_grad=True)
+    valid_mask = (time != -1) & (event != -1)
 
-    sorted_time, indices = torch.sort(time)
-    sorted_risk_scores = risk_scores[indices]
-    sorted_event = event[indices]
+    # Early returns if no valid samples or no events
+    if not valid_mask.any():
+        return risk_scores.new_zeros((), requires_grad=True)
+
+    masked_risk_scores = risk_scores[valid_mask]
+    masked_time = time[valid_mask]
+    masked_event = event[valid_mask]
+
+    if torch.sum(masked_event) == 0:
+        return risk_scores.new_zeros((), requires_grad=True)
+
+    sorted_time, indices = torch.sort(masked_time)
+    sorted_risk_scores = masked_risk_scores[indices]
+    sorted_event = masked_event[indices]
 
     if ties_method == "breslow":
         log_risk = torch.logcumsumexp(sorted_risk_scores.flip(0), dim=0).flip(0)
         loss = sorted_risk_scores - log_risk
         loss = loss[sorted_event == 1]
-        return -torch.nanmean(loss)
+        return -torch.mean(loss)
 
     elif ties_method == "efron":
         unique_times = torch.unique(sorted_time)
 
-        # Get risk sets and event sets for each unique time
         log_likelihood = torch.tensor(0.0, device=risk_scores.device)
 
         for t in unique_times:
-            # Events at this time
             events_at_t = (sorted_time == t) & (sorted_event == 1)
             if not torch.any(events_at_t):
                 continue
@@ -523,7 +584,7 @@ def _cox_ph_loss(
                     torch.sum(risk_set_scores) - factor * torch.sum(tied_scores_exp)
                 )
 
-        n_events_total = torch.sum(event)
+        n_events_total = torch.sum(masked_event)
         return -log_likelihood / n_events_total
 
     else:

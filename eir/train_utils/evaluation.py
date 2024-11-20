@@ -144,6 +144,12 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
     exp.model.train()
 
 
+def expand_binary_logits(binary_logits: torch.Tensor) -> torch.Tensor:
+    neg_logits = -binary_logits / 2
+    pos_logits = binary_logits / 2
+    return torch.cat([neg_logits, pos_logits], dim=-1)
+
+
 def run_all_eval_hook_analysis(
     hook_outputs: dict[str, LatentHookOutput],
     run_folder: Path,
@@ -514,7 +520,14 @@ def save_tabular_evaluation_results_wrapper(
                     output_name=output_name,
                     iteration=iteration,
                 )
+
                 cur_val_outputs = val_outputs[output_name][column_name]
+
+                if column_type == "cat" and cur_val_outputs.shape[1] == 1:
+                    cur_val_outputs = expand_binary_logits(
+                        binary_logits=cur_val_outputs
+                    )
+
                 cur_val_outputs_np = cur_val_outputs.cpu().numpy()
 
                 cur_val_labels = val_labels[output_name][column_name]
@@ -581,6 +594,7 @@ def save_classification_predictions(
     transformer: LabelEncoder,
     output_folder: Path,
 ) -> None:
+
     validation_predictions_total = val_outputs.argmax(axis=1)
 
     df_predictions = _parse_valid_classification_predictions(

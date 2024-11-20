@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING, Optional, Protocol
 import numpy as np
 
 from eir.data_load.label_setup import al_label_transformers_object
-from eir.interpretation.interpretation_utils import get_target_class_name
+from eir.interpretation.interpretation_utils import (
+    TargetTypeInfo,
+    get_target_class_name,
+)
 
 if TYPE_CHECKING:
     from eir.interpretation.interpretation import SampleAttribution
@@ -33,11 +36,12 @@ def get_array_sum_consumer(
     target_transformer: "al_label_transformers_object",
     input_name: str,
     output_name: str,
-    target_column: str,
-    column_type: str,
+    target_info: TargetTypeInfo,
 ) -> ArrayConsumerCallable:
     results: dict[str, np.ndarray] = {}
     n_samples: dict[str, int] = {}
+
+    target_name = target_info.name
 
     def _consumer(
         attribution: Optional["SampleAttribution"],
@@ -53,10 +57,9 @@ def get_array_sum_consumer(
         sample_target_labels = attribution.sample_info.target_labels
 
         cur_label_name = get_target_class_name(
-            sample_label=sample_target_labels[output_name][target_column],
+            sample_label=sample_target_labels[output_name][target_name],
             target_transformer=target_transformer,
-            column_type=column_type,
-            target_column_name=target_column,
+            target_info=target_info,
         )
 
         sample_acts = attribution.sample_attributions[input_name].squeeze()

@@ -19,7 +19,8 @@ def _get_classification_output_configs(
         "linear",
         "mlp_residual",
         "shared_mlp_residual",
-    ] = "mlp_residual"
+    ] = "mlp_residual",
+    cat_loss_name: str = "CrossEntropyLoss",
 ) -> Sequence[Dict]:
     output_configs = [
         {
@@ -27,6 +28,7 @@ def _get_classification_output_configs(
             "output_type_info": {
                 "target_cat_columns": ["Origin"],
                 "target_con_columns": [],
+                "cat_loss_name": cat_loss_name,
             },
         }
     ]
@@ -91,7 +93,7 @@ def _get_classification_output_configs(
                     }
                 },
                 "output_configs": _get_classification_output_configs(
-                    output_type="linear"
+                    output_type="linear",
                 ),
             },
         },
@@ -165,6 +167,83 @@ def test_classification(prep_modelling_test_configs):
         The indirect parametrization passes the arguments over to the fixtures used
         in _prep_modelling_test_config.
     """
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    output_configs = experiment.configs.output_configs
+
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+
+        check_performance_result_wrapper(
+            outputs=experiment.outputs,
+            run_path=test_config.run_path,
+            max_thresholds=(0.8, 0.8),
+        )
+
+        top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
+        _check_snps_wrapper(
+            test_config=test_config,
+            output_name=output_name,
+            target_name="Origin",
+            top_row_grads_dict=top_row_grads_dict,
+            at_least_n_snps=5,
+            all_attribution_target_classes_must_pass=False,
+        )
+
+
+@pytest.mark.skipif(
+    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
+)
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "binary",
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        # Case 1: MLP, linear output
+        {
+            "injections": {
+                "global_configs": {
+                    "training_control": {
+                        "weighted_sampling_columns": ["all"],
+                    },
+                    "model": {
+                        "n_iter_before_swa": 50,
+                    },
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "linear",
+                            "model_init_config": {"l1": 1e-04},
+                        },
+                    }
+                ],
+                "fusion_configs": {
+                    "model_config": {
+                        "fc_task_dim": 256,
+                        "layers": [2],
+                    }
+                },
+                "output_configs": _get_classification_output_configs(
+                    output_type="linear",
+                    cat_loss_name="BCEWithLogitsLoss",
+                ),
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_bce_classification(prep_modelling_test_configs):
     experiment, test_config = prep_modelling_test_configs
 
     train.train(experiment=experiment)
