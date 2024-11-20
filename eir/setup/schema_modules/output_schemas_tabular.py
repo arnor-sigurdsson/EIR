@@ -37,4 +37,4 @@ class TabularOutputTypeConfig:
     cat_label_smoothing: float = 0.0
     cat_loss_name: al_cat_loss_names = "CrossEntropyLoss"
     con_loss_name: al_con_loss_names = "MSELoss"
-    uncertainty_weighted_mt_loss: bool = True
+    uncertainty_weighted_mt_loss: bool = False

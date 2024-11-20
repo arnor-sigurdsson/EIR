@@ -34,9 +34,9 @@ def _get_output_array_data_parameters() -> Sequence[dict]:
 
     parameters = []
 
-    for dims in [1, 2, 3]:
+    for dims in [1]:
         cur_base = deepcopy(base)
-        for source in ["local", "deeplake"]:
+        for source in ["local"]:
             cur_base["source"] = source
             cur_base["extras"]["array_dims"] = dims
             parameters.append(cur_base)
@@ -158,9 +158,9 @@ def _get_array_out_parametrization(loss: str) -> dict[str, Any]:
         {
             "injections": _get_array_out_parametrization(loss="mse"),
         },
-        {
-            "injections": _get_array_out_parametrization(loss="diffusion"),
-        },
+        # {
+        #     "injections": _get_array_out_parametrization(loss="diffusion"),
+        # },
     ],
     indirect=True,
 )

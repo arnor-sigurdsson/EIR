@@ -14,7 +14,7 @@ from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
-al_num_outputs_per_target = Dict[str, int]
+al_num_outputs_per_target = dict[str, int]
 
 
 @dataclass

@@ -119,8 +119,8 @@ def _create_optimizer_class_getter(
 def get_base_optimizers_dict() -> Dict[str, Type[Optimizer]]:
     base_optimizers = {
         "sgdm": SGD,
-        "adam": Adam,
-        "adamw": AdamW,
+        "adam": partial(Adam, fused=True),
+        "adamw": partial(AdamW, fused=True),
         "adahessian": AdaHessian,
         "adabelief": partial(AdaBelief, print_change_log=False),
         "adabeliefw": partial(AdaBelief, weight_decouple=True, print_change_log=False),

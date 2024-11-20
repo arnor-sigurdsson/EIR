@@ -31,7 +31,8 @@ def array_load_wrapper(
 
 
 def prepare_array_data(
-    array_data: np.ndarray, normalization_stats: Optional[ArrayNormalizationStats]
+    array_data: np.ndarray,
+    normalization_stats: Optional[ArrayNormalizationStats],
 ) -> torch.Tensor:
     """Enforce 3 dimensions for now."""
 
@@ -50,9 +51,39 @@ def prepare_array_data(
                 f"1, 2, or 3 are supported."
             )
 
-    tensor = normalize_array(array=tensor, normalization_stats=normalization_stats)
+    tensor_no_nan = fill_nans_from_stats(
+        array=tensor,
+        normalization_stats=normalization_stats,
+    )
+    tensor_normalized = normalize_array(
+        array=tensor_no_nan,
+        normalization_stats=normalization_stats,
+    )
 
-    return tensor
+    return tensor_normalized
+
+
+def fill_nans_from_stats(
+    array: torch.Tensor,
+    normalization_stats: Optional[ArrayNormalizationStats],
+) -> torch.Tensor:
+    array = array.to(device="cpu")
+    nan_mask = torch.isnan(array)
+    if not nan_mask.any():
+        return array
+
+    if normalization_stats is None:
+        return torch.where(nan_mask, torch.zeros_like(array), array)
+
+    match normalization_stats.type:
+        case "channel":
+            return torch.where(
+                nan_mask, normalization_stats.means.expand_as(array), array
+            )
+        case "element":
+            return torch.where(nan_mask, normalization_stats.means, array)
+        case _:
+            raise ValueError(f"Unknown normalization type: {normalization_stats.type}")
 
 
 def normalize_array(

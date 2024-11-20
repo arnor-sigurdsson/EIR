@@ -16,11 +16,7 @@ import torch
 from timm.data.mixup import rand_bbox
 
 from eir.data_load.data_utils import Batch, get_output_info_generator
-from eir.target_setup.target_label_setup import MissingTargetsInfo
-from eir.train_utils.metrics import (
-    FilteredOutputsAndLabels,
-    filter_missing_outputs_and_labels,
-)
+from eir.train_utils.metrics import filter_missing_outputs_and_labels
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -202,16 +198,24 @@ def hook_mix_loss(
     *args,
     **kwargs,
 ) -> Dict:
-    target_columns_gen = get_output_info_generator(outputs_as_dict=experiment.outputs)
-
     valid_dataset = experiment.valid_dataset
 
-    mixed_losses, filtered_outputs = calc_all_mixed_losses(
-        target_columns_gen=target_columns_gen,
+    model_outputs = state["model_outputs"]
+    mixed_object = state["mixing_info"]
+
+    mixed_losses = calc_all_mixed_losses(
         criteria=experiment.criteria,
         outputs=state["model_outputs"],
         mixed_object=state["mixing_info"],
-        missing_ids_per_output=valid_dataset.missing_ids_per_output,
+    )
+
+    # only used here to update the state with the filtered outputs
+    filtered_outputs = filter_missing_outputs_and_labels(
+        batch_ids=list(mixed_object.ids),
+        model_outputs=model_outputs,
+        target_labels=mixed_object.targets,
+        missing_ids_info=valid_dataset.missing_ids_per_output,
+        with_labels=True,
     )
 
     state_updates = {
@@ -321,12 +325,10 @@ def mixup_targets(
 
 
 def calc_all_mixed_losses(
-    target_columns_gen: Generator[tuple[str, str, str], None, None],
     criteria: "al_criteria_dict",
     outputs: dict[str, dict[str, torch.Tensor]],
     mixed_object: MixingObject,
-    missing_ids_per_output: MissingTargetsInfo,
-) -> tuple[dict[str, dict[str, torch.Tensor]], FilteredOutputsAndLabels]:
+) -> dict[str, dict[str, torch.Tensor]]:
     losses: dict[str, dict[str, torch.Tensor]] = {
         output_name: {} for output_name in outputs.keys()
     }
@@ -334,51 +336,38 @@ def calc_all_mixed_losses(
     model_outputs = outputs
     target_labels = mixed_object.targets
 
-    filtered_outputs = filter_missing_outputs_and_labels(
-        batch_ids=list(mixed_object.ids),
-        model_outputs=model_outputs,
-        target_labels=target_labels,
-        missing_ids_info=missing_ids_per_output,
-        with_labels=True,
-    )
-
     target_labels_permuted = mixed_object.targets_permuted
-    ids_permuted = [mixed_object.ids[i] for i in mixed_object.permuted_indexes]
-    filtered_outputs_permuted = filter_missing_outputs_and_labels(
-        batch_ids=ids_permuted,
-        model_outputs=model_outputs,
-        target_labels=target_labels_permuted,
-        missing_ids_info=missing_ids_per_output,
-        with_labels=True,
-    )
-    filtered_targets_permuted = filtered_outputs_permuted.target_labels
 
-    for output_name, target_type, target_name in target_columns_gen:
+    for output_name in outputs.keys():
         cur_loss = calc_mixed_loss(
-            criterion=criteria[output_name][target_name],
-            outputs=filtered_outputs.model_outputs[output_name][target_name],
-            targets=filtered_outputs.target_labels[output_name][target_name],
-            targets_permuted=filtered_targets_permuted[output_name][target_name],
+            criterion=criteria[output_name],
+            outputs=model_outputs[output_name],
+            targets=target_labels[output_name],
+            targets_permuted=target_labels_permuted[output_name],
             lambda_=mixed_object.lambda_,
         )
-        losses[output_name][target_name] = cur_loss
+        losses[output_name] = cur_loss
 
-    return losses, filtered_outputs
+    return losses
 
 
 def calc_mixed_loss(
     criterion: "al_losses",
-    outputs: torch.Tensor,
-    targets: torch.Tensor,
-    targets_permuted: torch.Tensor,
+    outputs: dict[str, torch.Tensor],
+    targets: dict[str, torch.Tensor],
+    targets_permuted: dict[str, torch.Tensor],
     lambda_: float,
-) -> torch.Tensor:
-    base_loss = lambda_ * criterion(input=outputs, target=targets)
-    permuted_loss = (1.0 - lambda_) * criterion(input=outputs, target=targets_permuted)
+) -> dict[str, torch.Tensor]:
+    base_losses = criterion(predictions=outputs, targets=targets)
+    permuted_losses = criterion(predictions=outputs, targets=targets_permuted)
 
-    total_loss = base_loss + permuted_loss
+    loss_names = list(base_losses.keys())
+    base_tensor = torch.stack([base_losses[name] for name in loss_names])
+    permuted_tensor = torch.stack([permuted_losses[name] for name in loss_names])
 
-    return total_loss
+    total_tensor = lambda_ * base_tensor + (1.0 - lambda_) * permuted_tensor
+
+    return {name: loss for name, loss in zip(loss_names, total_tensor)}
 
 
 @lru_cache(maxsize=128)

@@ -611,9 +611,11 @@ def hook_default_per_target_loss(
             with_labels=True,
         )
 
+        # note here we pass the outputs directly to the loss
+        # function as it handles NaNs itself
         per_target_train_losses = experiment.loss_function(
-            inputs=filtered_outputs.model_outputs,
-            targets=filtered_outputs.target_labels,
+            inputs=model_outputs,
+            targets=target_labels,
         )
 
         state_updates = {

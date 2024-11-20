@@ -7,10 +7,10 @@ import pytest
 import torch
 from hypothesis import given, settings
 from hypothesis.strategies import floats, integers, lists
-from torch import nn
 from torch.nn import functional as F
 
 from eir.data_load import data_augmentation
+from eir.train_utils.criteria import vectorized_con_loss
 from tests.setup_tests.setup_modelling_test_data.setup_omics_test_data import (
     _set_up_base_test_omics_array,
 )
@@ -353,12 +353,6 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
     }
     all_target_columns = target_columns["con"] + target_columns["cat"]
 
-    def _target_columns_gen():
-        for con_column in target_columns["con"]:
-            yield "test_output_tabular", "con", con_column
-        for cat_column in target_columns["cat"]:
-            yield "test_output_tabular", "cat", cat_column
-
     targets = {
         "test_output_tabular": {c: test_inputs["targets"] for c in all_target_columns}
     }
@@ -380,26 +374,15 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
         permuted_indexes=permuted_indexes,
     )
 
-    test_criteria = {
-        "test_output_tabular": {c: nn.MSELoss() for c in all_target_columns}
-    }
+    test_criteria = {"test_output_tabular": vectorized_con_loss}
     outputs = {
         "test_output_tabular": {c: test_inputs["outputs"] for c in all_target_columns}
     }
 
-    missing_ids = data_augmentation.MissingTargetsInfo(
-        missing_ids_per_modality={},
-        missing_ids_within_modality={},
-        precomputed_missing_ids={},
-        linked_targets={},
-    )
-
-    all_losses, _ = data_augmentation.calc_all_mixed_losses(
-        target_columns_gen=_target_columns_gen(),
+    all_losses = data_augmentation.calc_all_mixed_losses(
         criteria=test_criteria,
         outputs=outputs,
         mixed_object=mixed_object,
-        missing_ids_per_output=missing_ids,
     )
     for _, loss in all_losses["test_output_tabular"].items():
         assert loss.item() == expected_output
@@ -410,10 +393,21 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
     _get_mixed_loss_test_cases_for_parametrization(),
 )
 def test_calc_mixed_loss(test_inputs, expected_output):
-    criterion = nn.MSELoss()
+    criterion = vectorized_con_loss
 
-    mixed_loss = data_augmentation.calc_mixed_loss(criterion=criterion, **test_inputs)
-    assert mixed_loss.item() == expected_output
+    outputs_dict = {"test_output_tabular": test_inputs["outputs"]}
+    targets_dict = {"test_output_tabular": test_inputs["targets"]}
+    targets_permuted_dict = {"test_output_tabular": test_inputs["targets_permuted"]}
+    lambda_ = test_inputs["lambda_"]
+
+    mixed_loss = data_augmentation.calc_mixed_loss(
+        criterion=criterion,
+        outputs=outputs_dict,
+        targets=targets_dict,
+        targets_permuted=targets_permuted_dict,
+        lambda_=lambda_,
+    )
+    assert mixed_loss["test_output_tabular"].item() == expected_output
 
 
 def test_make_random_snps_missing_some():

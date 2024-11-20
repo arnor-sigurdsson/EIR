@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -67,6 +67,8 @@ def _create_and_save_test_array(
     base_array, elements_active = _set_up_base_test_array(
         dims=dims,
         class_integer=class_integer,
+        nan_probability=0.05,
+        nan_array_probability=0.1,
     )
 
     np.save(str(sample_output_path), base_array)
@@ -77,7 +79,9 @@ def _create_and_save_test_array(
 def _set_up_base_test_array(
     dims: int,
     class_integer: int,
-) -> Tuple[np.ndarray, np.ndarray]:
+    nan_probability: float = 0.0,
+    nan_array_probability: float = 0.0,
+) -> tuple[np.ndarray, np.ndarray]:
     candidates = np.array(list(range(0, 100, 10)))
 
     lower_bound, upper_bound = 4, 11
@@ -87,13 +91,15 @@ def _set_up_base_test_array(
     elements_active = np.array(sorted(candidates[:num_elements_this_sample]))
 
     base_array = np.zeros(shape=100)
-
     base_array[elements_active] = float(class_integer)
 
     if dims == 2:
         base_array = np.tile(base_array, reps=(4, 1))
-
     elif dims == 3:
         base_array = np.tile(base_array, reps=(2, 4, 1))
+
+    if nan_probability > 0 and np.random.random() < nan_array_probability:
+        mask = np.random.random(base_array.shape) < nan_probability
+        base_array[mask] = np.nan
 
     return base_array, elements_active

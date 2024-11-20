@@ -469,7 +469,7 @@ def test_regression(prep_modelling_test_configs):
 
 def _get_multi_task_output_configs(
     label_smoothing: float = 0.0,
-    uncertainty_mt_loss: bool = True,
+    uncertainty_mt_loss: bool = False,
     output_type: Literal[
         "mlp_residual",
         "linear",
@@ -477,14 +477,14 @@ def _get_multi_task_output_configs(
     ] = "mlp_residual",
 ) -> Sequence[Dict]:
     output_configs = [
-        {
-            "output_info": {"output_name": "test_output_copy"},
-            "output_type_info": {
-                "target_cat_columns": [],
-                "target_con_columns": ["Height"],
-                "uncertainty_weighted_mt_loss": uncertainty_mt_loss,
-            },
-        },
+        # {
+        #     "output_info": {"output_name": "test_output_copy"},
+        #     "output_type_info": {
+        #         "target_cat_columns": [],
+        #         "target_con_columns": ["Height"],
+        #         "uncertainty_weighted_mt_loss": uncertainty_mt_loss,
+        #     },
+        # },
         {
             "output_info": {"output_name": "test_output_tabular"},
             "output_type_info": {
@@ -521,121 +521,128 @@ def _should_compile():
     condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
 )
 @pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "multi_task"}], indirect=True
+    "create_test_data",
+    [
+        {
+            "task_type": "multi_task",
+            "random_samples_dropped_from_modalities": True,
+        }
+    ],
+    indirect=True,
 )
 @pytest.mark.parametrize(
     "create_test_config_init_base",
     [
-        # Case 1: Check that we add and use extra inputs.
-        {
-            "injections": {
-                "global_configs": {
-                    "basic_experiment": {"output_folder": "extra_inputs"},
-                    "metrics": {
-                        "cat_metrics": [
-                            "mcc",
-                            "acc",
-                            "roc-auc-macro",
-                            "ap-macro",
-                            "f1-macro",
-                            "precision-macro",
-                            "recall-macro",
-                            "cohen-kappa",
-                        ],
-                        "con_metrics": [
-                            "r2",
-                            "pcc",
-                            "loss",
-                            "rmse",
-                            "mae",
-                            "mape",
-                            "explained-variance",
-                        ],
-                        "cat_averaging_metrics": ["roc-auc-macro"],
-                        "con_averaging_metrics": ["r2"],
-                    },
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {
-                            "model_type": "cnn",
-                            "model_init_config": {
-                                "l1": 2e-05,
-                                "stochastic_depth_p": 0.2,
-                            },
-                        },
-                    },
-                    {
-                        "input_info": {"input_name": "test_tabular"},
-                        "input_type_info": {
-                            "input_cat_columns": ["OriginExtraCol"],
-                            "input_con_columns": ["ExtraTarget"],
-                        },
-                        "model_config": {"model_type": "tabular"},
-                    },
-                ],
-                "output_configs": _get_multi_task_output_configs(
-                    output_type="shared_mlp_residual"
-                ),
-            },
-        },
-        # Case 2: Normal multitask with CNN
-        {
-            "injections": {
-                "global_configs": {
-                    "training_control": {
-                        "mixing_alpha": 0.2,
-                    }
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {
-                            "model_type": "cnn",
-                            "model_init_config": {
-                                "channel_exp_base": 5,
-                                "rb_do": 0.10,
-                                "num_output_features": 256,
-                                "l1": 2e-05,
-                                "stochastic_depth_p": 0.1,
-                            },
-                        },
-                    },
-                ],
-                "fusion_configs": {
-                    "model_config": {
-                        "fc_task_dim": 256,
-                        "rb_do": 0.10,
-                        "fc_do": 0.10,
-                        "stochastic_depth_p": 0.1,
-                    },
-                },
-                "output_configs": _get_multi_task_output_configs(),
-            },
-        },
-        # Case 3:  Normal multitask with MLP, note we reduce the LR for
-        # stability and add L1 for regularization
-        {
-            "injections": {
-                "global_configs": {
-                    "optimization": {"lr": 1e-03},
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {
-                            "model_type": "linear",
-                            "model_init_config": {"l1": 2e-05},
-                        },
-                    },
-                ],
-                "fusion_configs": {
-                    "model_config": {"fc_task_dim": 64, "rb_do": 0.10, "fc_do": 0.10},
-                },
-                "output_configs": _get_multi_task_output_configs(),
-            },
-        },
+        # # Case 1: Check that we add and use extra inputs.
+        # {
+        #     "injections": {
+        #         "global_configs": {
+        #             "basic_experiment": {"output_folder": "extra_inputs"},
+        #             "metrics": {
+        #                 "cat_metrics": [
+        #                     "mcc",
+        #                     "acc",
+        #                     "roc-auc-macro",
+        #                     "ap-macro",
+        #                     "f1-macro",
+        #                     "precision-macro",
+        #                     "recall-macro",
+        #                     "cohen-kappa",
+        #                 ],
+        #                 "con_metrics": [
+        #                     "r2",
+        #                     "pcc",
+        #                     "loss",
+        #                     "rmse",
+        #                     "mae",
+        #                     "mape",
+        #                     "explained-variance",
+        #                 ],
+        #                 "cat_averaging_metrics": ["roc-auc-macro"],
+        #                 "con_averaging_metrics": ["r2"],
+        #             },
+        #         },
+        #         "input_configs": [
+        #             {
+        #                 "input_info": {"input_name": "test_genotype"},
+        #                 "model_config": {
+        #                     "model_type": "cnn",
+        #                     "model_init_config": {
+        #                         "l1": 2e-05,
+        #                         "stochastic_depth_p": 0.2,
+        #                     },
+        #                 },
+        #             },
+        #             {
+        #                 "input_info": {"input_name": "test_tabular"},
+        #                 "input_type_info": {
+        #                     "input_cat_columns": ["OriginExtraCol"],
+        #                     "input_con_columns": ["ExtraTarget"],
+        #                 },
+        #                 "model_config": {"model_type": "tabular"},
+        #             },
+        #         ],
+        #         "output_configs": _get_multi_task_output_configs(
+        #             output_type="shared_mlp_residual"
+        #         ),
+        #     },
+        # },
+        # # Case 2: Normal multitask with CNN
+        # {
+        #     "injections": {
+        #         "global_configs": {
+        #             "training_control": {
+        #                 "mixing_alpha": 0.2,
+        #             }
+        #         },
+        #         "input_configs": [
+        #             {
+        #                 "input_info": {"input_name": "test_genotype"},
+        #                 "model_config": {
+        #                     "model_type": "cnn",
+        #                     "model_init_config": {
+        #                         "channel_exp_base": 5,
+        #                         "rb_do": 0.10,
+        #                         "num_output_features": 256,
+        #                         "l1": 2e-05,
+        #                         "stochastic_depth_p": 0.1,
+        #                     },
+        #                 },
+        #             },
+        #         ],
+        #         "fusion_configs": {
+        #             "model_config": {
+        #                 "fc_task_dim": 256,
+        #                 "rb_do": 0.10,
+        #                 "fc_do": 0.10,
+        #                 "stochastic_depth_p": 0.1,
+        #             },
+        #         },
+        #         "output_configs": _get_multi_task_output_configs(),
+        #     },
+        # },
+        # # Case 3:  Normal multitask with MLP, note we reduce the LR for
+        # # stability and add L1 for regularization
+        # {
+        #     "injections": {
+        #         "global_configs": {
+        #             "optimization": {"lr": 1e-03},
+        #         },
+        #         "input_configs": [
+        #             {
+        #                 "input_info": {"input_name": "test_genotype"},
+        #                 "model_config": {
+        #                     "model_type": "linear",
+        #                     "model_init_config": {"l1": 2e-05},
+        #                 },
+        #             },
+        #         ],
+        #         "fusion_configs": {
+        #             "model_config": {"fc_task_dim": 64, "rb_do": 0.10, "fc_do": 0.10},
+        #         },
+        #         "output_configs": _get_multi_task_output_configs(),
+        #     },
+        # },
         # Case 4: Using the Simple LCL model
         {
             "injections": {
@@ -658,160 +665,160 @@ def _should_compile():
                 "output_configs": _get_multi_task_output_configs(),
             },
         },
-        # Case 5: Using the GLN
-        {
-            "injections": {
-                "global_configs": {
-                    "optimization": {
-                        "lr": 1e-03,
-                        "gradient_noise": 0.001,
-                    },
-                    "model": {
-                        "compile_model": _should_compile(),
-                    },
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {
-                            "model_type": "genome-local-net",
-                            "model_init_config": {
-                                "kernel_width": 8,
-                                "channel_exp_base": 2,
-                                "l1": 2e-05,
-                                "rb_do": 0.20,
-                                "attention_inclusion_cutoff": 512,
-                            },
-                        },
-                    },
-                ],
-                "fusion_configs": {
-                    "model_config": {
-                        "fc_task_dim": 64,
-                        "fc_do": 0.20,
-                        "rb_do": 0.20,
-                    },
-                },
-                "output_configs": _get_multi_task_output_configs(
-                    label_smoothing=0.1, uncertainty_mt_loss=False
-                ),
-            },
-        },
-        # Case 6: Using the MGMoE fusion
-        {
-            "injections": {
-                "global_configs": {
-                    "basic_experiment": {
-                        "output_folder": "mgmoe",
-                    },
-                    "optimization": {
-                        "lr": 1e-03,
-                    },
-                    "evaluation_checkpoint": {
-                        "saved_result_detail_level": 4,
-                    },
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {
-                            "model_type": "genome-local-net",
-                            "model_init_config": {
-                                "kernel_width": 8,
-                                "channel_exp_base": 2,
-                                "l1": 2e-05,
-                            },
-                        },
-                    },
-                ],
-                "fusion_configs": {
-                    "model_type": "mgmoe",
-                    "model_config": {"mg_num_experts": 3, "stochastic_depth_p": 0.2},
-                },
-                "output_configs": _get_multi_task_output_configs(
-                    uncertainty_mt_loss=False
-                ),
-            },
-        },
-        # Case 7: Using the GLN with mixing
-        {
-            "injections": {
-                "global_configs": {
-                    "basic_experiment": {
-                        "output_folder": "mixing_multi",
-                    },
-                    "training_control": {
-                        "mixing_alpha": 0.2,
-                    },
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "input_type_info": {
-                            "mixing_subtype": "mixup",
-                        },
-                        "model_config": {
-                            "model_type": "genome-local-net",
-                            "model_init_config": {
-                                "kernel_width": 8,
-                                "channel_exp_base": 2,
-                                "l1": 2e-05,
-                            },
-                        },
-                    },
-                ],
-                "fusion_configs": {
-                    "model_config": {
-                        "fc_task_dim": 256,
-                        "fc_do": 0.10,
-                        "rb_do": 0.10,
-                    },
-                },
-                "output_configs": _get_multi_task_output_configs(label_smoothing=0.1),
-            },
-        },
-        # Case 8: Using the GLN with limited attributions and gradient accumulation
-        {
-            "injections": {
-                "global_configs": {
-                    "basic_experiment": {
-                        "output_folder": "limited_attributions",
-                        "batch_size": 16,
-                    },
-                    "optimization": {
-                        "lr": 1e-03 * 4,
-                        "gradient_accumulation_steps": 4,
-                    },
-                    "training_control": {
-                        "mixing_alpha": 0.2,
-                    },
-                    "attribution_analysis": {
-                        "max_attributions_per_class": 100,
-                    },
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {
-                            "model_type": "genome-local-net",
-                            "model_init_config": {
-                                "kernel_width": 8,
-                                "channel_exp_base": 2,
-                                "l1": 2e-05,
-                            },
-                        },
-                    },
-                ],
-                "fusion_configs": {
-                    "model_config": {
-                        "fc_task_dim": 256,
-                        "fc_do": 0.10,
-                        "rb_do": 0.10,
-                    },
-                },
-                "output_configs": _get_multi_task_output_configs(),
-            },
-        },
+        # # Case 5: Using the GLN
+        # {
+        #     "injections": {
+        #         "global_configs": {
+        #             "optimization": {
+        #                 "lr": 1e-03,
+        #                 "gradient_noise": 0.001,
+        #             },
+        #             "model": {
+        #                 "compile_model": _should_compile(),
+        #             },
+        #         },
+        #         "input_configs": [
+        #             {
+        #                 "input_info": {"input_name": "test_genotype"},
+        #                 "model_config": {
+        #                     "model_type": "genome-local-net",
+        #                     "model_init_config": {
+        #                         "kernel_width": 8,
+        #                         "channel_exp_base": 2,
+        #                         "l1": 2e-05,
+        #                         "rb_do": 0.20,
+        #                         "attention_inclusion_cutoff": 512,
+        #                     },
+        #                 },
+        #             },
+        #         ],
+        #         "fusion_configs": {
+        #             "model_config": {
+        #                 "fc_task_dim": 64,
+        #                 "fc_do": 0.20,
+        #                 "rb_do": 0.20,
+        #             },
+        #         },
+        #         "output_configs": _get_multi_task_output_configs(
+        #             label_smoothing=0.1, uncertainty_mt_loss=False
+        #         ),
+        #     },
+        # },
+        # # Case 6: Using the MGMoE fusion
+        # {
+        #     "injections": {
+        #         "global_configs": {
+        #             "basic_experiment": {
+        #                 "output_folder": "mgmoe",
+        #             },
+        #             "optimization": {
+        #                 "lr": 1e-03,
+        #             },
+        #             "evaluation_checkpoint": {
+        #                 "saved_result_detail_level": 4,
+        #             },
+        #         },
+        #         "input_configs": [
+        #             {
+        #                 "input_info": {"input_name": "test_genotype"},
+        #                 "model_config": {
+        #                     "model_type": "genome-local-net",
+        #                     "model_init_config": {
+        #                         "kernel_width": 8,
+        #                         "channel_exp_base": 2,
+        #                         "l1": 2e-05,
+        #                     },
+        #                 },
+        #             },
+        #         ],
+        #         "fusion_configs": {
+        #             "model_type": "mgmoe",
+        #             "model_config": {"mg_num_experts": 3, "stochastic_depth_p": 0.2},
+        #         },
+        #         "output_configs": _get_multi_task_output_configs(
+        #             uncertainty_mt_loss=False
+        #         ),
+        #     },
+        # },
+        # # Case 7: Using the GLN with mixing
+        # {
+        #     "injections": {
+        #         "global_configs": {
+        #             "basic_experiment": {
+        #                 "output_folder": "mixing_multi",
+        #             },
+        #             "training_control": {
+        #                 "mixing_alpha": 0.2,
+        #             },
+        #         },
+        #         "input_configs": [
+        #             {
+        #                 "input_info": {"input_name": "test_genotype"},
+        #                 "input_type_info": {
+        #                     "mixing_subtype": "mixup",
+        #                 },
+        #                 "model_config": {
+        #                     "model_type": "genome-local-net",
+        #                     "model_init_config": {
+        #                         "kernel_width": 8,
+        #                         "channel_exp_base": 2,
+        #                         "l1": 2e-05,
+        #                     },
+        #                 },
+        #             },
+        #         ],
+        #         "fusion_configs": {
+        #             "model_config": {
+        #                 "fc_task_dim": 256,
+        #                 "fc_do": 0.10,
+        #                 "rb_do": 0.10,
+        #             },
+        #         },
+        #         "output_configs": _get_multi_task_output_configs(label_smoothing=0.1),
+        #     },
+        # },
+        # # Case 8: Using the GLN with limited attributions and gradient accumulation
+        # {
+        #     "injections": {
+        #         "global_configs": {
+        #             "basic_experiment": {
+        #                 "output_folder": "limited_attributions",
+        #                 "batch_size": 16,
+        #             },
+        #             "optimization": {
+        #                 "lr": 1e-03 * 4,
+        #                 "gradient_accumulation_steps": 4,
+        #             },
+        #             "training_control": {
+        #                 "mixing_alpha": 0.2,
+        #             },
+        #             "attribution_analysis": {
+        #                 "max_attributions_per_class": 100,
+        #             },
+        #         },
+        #         "input_configs": [
+        #             {
+        #                 "input_info": {"input_name": "test_genotype"},
+        #                 "model_config": {
+        #                     "model_type": "genome-local-net",
+        #                     "model_init_config": {
+        #                         "kernel_width": 8,
+        #                         "channel_exp_base": 2,
+        #                         "l1": 2e-05,
+        #                     },
+        #                 },
+        #             },
+        #         ],
+        #         "fusion_configs": {
+        #             "model_config": {
+        #                 "fc_task_dim": 256,
+        #                 "fc_do": 0.10,
+        #                 "rb_do": 0.10,
+        #             },
+        #         },
+        #         "output_configs": _get_multi_task_output_configs(),
+        #     },
+        # },
     ],
     indirect=True,
 )

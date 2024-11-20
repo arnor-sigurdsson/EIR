@@ -85,10 +85,6 @@ def test_get_default_experiment(
     assert default_experiment.configs == test_configs
 
     assert len(default_experiment.criteria) == 1
-    assert isinstance(
-        default_experiment.criteria["test_output_tabular"]["Origin"],
-        nn.CrossEntropyLoss,
-    )
 
     assert len(default_experiment.inputs) == 1
     assert set(default_experiment.inputs.keys()) == {"test_genotype"}

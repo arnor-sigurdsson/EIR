@@ -1,6 +1,15 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Sequence,
+)
 
 import numpy as np
 import pandas as pd
@@ -284,7 +293,8 @@ def run_split_evaluation(
         output_objects=output_objects
     )
     split_output_generator = get_split_output_generator(
-        output_generator=output_generator, output_objects=output_objects
+        output_generator=output_generator,
+        output_objects=output_objects,
     )
 
     for split_outputs in split_output_generator:
@@ -343,6 +353,8 @@ def run_split_evaluation(
             experiment_metrics=experiment_metrics,
             loss_function=loss_function,
             device=device,
+            val_outputs_for_loss=full_gathered_output_batches_stacked,
+            val_targets_for_loss=full_gathered_label_batches_stacked,
         )
 
     all_metrics = {**computed_metrics_averaged, **full_gathered_metrics}
@@ -434,7 +446,17 @@ def compute_eval_metrics_wrapper(
     experiment_metrics: metrics.al_metric_record_dict,
     loss_function: Callable,
     device: str,
+    val_outputs_for_loss: Optional[dict[str, dict[str, torch.Tensor]]] = None,
+    val_targets_for_loss: Optional["al_training_labels_target"] = None,
 ) -> metrics.al_step_metric_dict:
+    """
+    We have these specific optional values `val_outputs_for_loss` and
+    `val_targets_for_loss` as the loss computations assume we have equally
+    sized batches and they handle the NaNs themselves.
+
+    Later if we add NaN handling directly to metric calculations, we
+    can simplify this again to only accept `val_outputs` and `val_target_labels`.
+    """
     val_target_labels = model_training_utils.parse_tabular_target_labels(
         output_objects=outputs, device=device, labels=val_target_labels
     )
@@ -447,7 +469,10 @@ def compute_eval_metrics_wrapper(
         metric_record_dict=experiment_metrics,
     )
 
-    val_losses = loss_function(inputs=val_outputs, targets=val_target_labels)
+    outputs_for_loss = val_outputs_for_loss or val_outputs
+    targets_for_loss = val_targets_for_loss or val_target_labels
+
+    val_losses = loss_function(inputs=outputs_for_loss, targets=targets_for_loss)
     val_loss_avg = metrics.aggregate_losses(losses_dict=val_losses)
     eval_metrics_dict_w_loss = metrics.add_loss_to_metrics(
         outputs_as_dict=outputs,

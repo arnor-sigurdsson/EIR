@@ -122,14 +122,17 @@ def parse_tabular_target_labels(
 
                 if column_type == ColumnType.CON.value:
                     labels_casted[output_name_][column_name] = cur_labels.to(
-                        dtype=torch.float, device=device
+                        dtype=torch.float,
+                        device=device,
                     )
                 elif column_type == ColumnType.CAT.value:
                     cur_labels = replace_nan_and_cast_to_long(
-                        cur_labels=cur_labels.to(dtype=torch.float), device=device
+                        cur_labels=cur_labels.to(dtype=torch.float),
+                        device=device,
                     )
                     labels_casted[output_name_][column_name] = cur_labels.to(
-                        dtype=torch.long, device=device
+                        dtype=torch.long,
+                        device=device,
                     )
 
     def handle_survival_object(

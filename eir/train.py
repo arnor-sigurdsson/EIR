@@ -1,3 +1,4 @@
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
@@ -7,6 +8,18 @@ import torch.multiprocessing
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 from aislib.misc_utils import ensure_path_exists
+
+original_warn = warnings.warn
+
+
+def custom_warn(*args, **kwargs):
+    if "functional optimizers is deprecated" in str(args[0]):
+        return
+    return original_warn(*args, **kwargs)
+
+
+warnings.warn = custom_warn
+
 from ignite.engine import Engine
 from torch import nn
 from torch.optim.optimizer import Optimizer
@@ -43,12 +56,7 @@ from eir.target_setup.target_label_setup import (
     set_up_all_targets_wrapper,
 )
 from eir.train_utils import distributed, utils
-from eir.train_utils.criteria import (
-    al_criteria_dict,
-    build_survival_links_for_criteria,
-    get_criteria,
-    get_loss_callable,
-)
+from eir.train_utils.criteria import al_criteria_dict, get_criteria, get_loss_callable
 from eir.train_utils.metrics import (
     get_average_history_filepath,
     get_default_supervised_metrics,
@@ -224,10 +232,7 @@ def get_default_experiment(
         outputs_as_dict=outputs_as_dict,
     )
 
-    survival_links = build_survival_links_for_criteria(
-        output_configs=configs.output_configs,
-    )
-    loss_func = get_loss_callable(criteria=criteria, survival_links=survival_links)
+    loss_func = get_loss_callable(criteria=criteria)
 
     extra_modules = None
     if hooks.extra_state is not None:
