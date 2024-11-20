@@ -156,6 +156,10 @@ def parse_tabular_target_labels(
         )
 
         cur_label_event = labels[output_name_][event_column]
+        cur_label_event = replace_nan_and_cast_to_long(
+            cur_labels=cur_label_event.to(dtype=torch.float),
+            device=device,
+        )
         labels_casted[output_name_][event_column] = cur_label_event.to(
             dtype=torch.long, device=device
         )
