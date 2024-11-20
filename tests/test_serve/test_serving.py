@@ -58,16 +58,16 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 },
             },
             "input_configs": [
-                # {
-                #     "input_info": {"input_name": "test_genotype"},
-                #     "model_config": {
-                #         "model_type": "genome-local-net",
-                #         "model_init_config": {"l1": 1e-04},
-                #     },
-                # },
-                # {
-                #     "input_info": {"input_name": "test_sequence"},
-                # },
+                {
+                    "input_info": {"input_name": "test_genotype"},
+                    "model_config": {
+                        "model_type": "genome-local-net",
+                        "model_init_config": {"l1": 1e-04},
+                    },
+                },
+                {
+                    "input_info": {"input_name": "test_sequence"},
+                },
                 {
                     "input_info": {"input_name": "test_array"},
                     "input_type_info": {
@@ -88,29 +88,29 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                         },
                     },
                 },
-                # {
-                #     "input_info": {"input_name": "test_image"},
-                #     "model_config": {
-                #         "model_init_config": {
-                #             "layers": [2],
-                #             "kernel_width": 2,
-                #             "kernel_height": 2,
-                #             "down_stride_width": 2,
-                #             "down_stride_height": 2,
-                #         },
-                #     },
-                # },
-                # {
-                #     "input_info": {"input_name": "test_tabular"},
-                #     "input_type_info": {
-                #         "input_cat_columns": ["OriginExtraCol"],
-                #         "input_con_columns": ["ExtraTarget"],
-                #     },
-                #     "model_config": {
-                #         "model_type": "tabular",
-                #         "model_init_config": {"l1": 1e-04},
-                #     },
-                # },
+                {
+                    "input_info": {"input_name": "test_image"},
+                    "model_config": {
+                        "model_init_config": {
+                            "layers": [2],
+                            "kernel_width": 2,
+                            "kernel_height": 2,
+                            "down_stride_width": 2,
+                            "down_stride_height": 2,
+                        },
+                    },
+                },
+                {
+                    "input_info": {"input_name": "test_tabular"},
+                    "input_type_info": {
+                        "input_cat_columns": ["OriginExtraCol"],
+                        "input_con_columns": ["ExtraTarget"],
+                    },
+                    "model_config": {
+                        "model_type": "tabular",
+                        "model_init_config": {"l1": 1e-04},
+                    },
+                },
             ],
             "fusion_configs": {
                 "model_config": {
@@ -121,23 +121,23 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 },
             },
             "output_configs": [
-                # {
-                #     "output_info": {"output_name": "test_output_copy"},
-                #     "output_type_info": {
-                #         "target_cat_columns": [],
-                #         "target_con_columns": ["Height"],
-                #     },
-                # },
-                # {
-                #     "output_info": {"output_name": "test_output_tabular"},
-                #     "output_type_info": {
-                #         "target_cat_columns": ["Origin"],
-                #         "target_con_columns": ["Height"],
-                #     },
-                # },
-                # {
-                #     "output_info": {"output_name": "test_output_sequence"},
-                # },
+                {
+                    "output_info": {"output_name": "test_output_copy"},
+                    "output_type_info": {
+                        "target_cat_columns": [],
+                        "target_con_columns": ["Height"],
+                    },
+                },
+                {
+                    "output_info": {"output_name": "test_output_tabular"},
+                    "output_type_info": {
+                        "target_cat_columns": ["Origin"],
+                        "target_con_columns": ["Height"],
+                    },
+                },
+                {
+                    "output_info": {"output_name": "test_output_sequence"},
+                },
                 {
                     "output_info": {
                         "output_name": "test_output_array_cnn",
@@ -150,45 +150,45 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                         },
                     },
                 },
-                # {
-                #     "output_info": {
-                #         "output_name": "test_array",
-                #     },
-                #     "output_type_info": {
-                #         "loss": "diffusion",
-                #         "diffusion_time_steps": 50,
-                #     },
-                #     "model_config": {
-                #         "model_type": "cnn",
-                #         "model_init_config": {
-                #             "channel_exp_base": 3,
-                #             "allow_pooling": False,
-                #         },
-                #     },
-                # },
-                # {
-                #     "output_info": {
-                #         "output_name": "test_output_image",
-                #     },
-                #     "output_type_info": {
-                #         "loss": "mse",
-                #         "size": [16, 16],
-                #     },
-                #     "model_config": {
-                #         "model_type": "cnn",
-                #         "model_init_config": {
-                #             "channel_exp_base": 4,
-                #             "allow_pooling": False,
-                #         },
-                #     },
-                # },
-                # {
-                #     "output_info": {"output_name": "test_output_survival"},
-                #     "output_type_info": {
-                #         "event_column": "BinaryOrigin",
-                #         "time_column": "Time",
-                #     },
-                # },
+                {
+                    "output_info": {
+                        "output_name": "test_array",
+                    },
+                    "output_type_info": {
+                        "loss": "diffusion",
+                        "diffusion_time_steps": 50,
+                    },
+                    "model_config": {
+                        "model_type": "cnn",
+                        "model_init_config": {
+                            "channel_exp_base": 3,
+                            "allow_pooling": False,
+                        },
+                    },
+                },
+                {
+                    "output_info": {
+                        "output_name": "test_output_image",
+                    },
+                    "output_type_info": {
+                        "loss": "mse",
+                        "size": [16, 16],
+                    },
+                    "model_config": {
+                        "model_type": "cnn",
+                        "model_init_config": {
+                            "channel_exp_base": 4,
+                            "allow_pooling": False,
+                        },
+                    },
+                },
+                {
+                    "output_info": {"output_name": "test_output_survival"},
+                    "output_type_info": {
+                        "event_column": "BinaryOrigin",
+                        "time_column": "Time",
+                    },
+                },
             ],
         },
     }

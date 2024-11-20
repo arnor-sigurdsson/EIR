@@ -158,9 +158,9 @@ def _get_array_out_parametrization(loss: str) -> dict[str, Any]:
         {
             "injections": _get_array_out_parametrization(loss="mse"),
         },
-        # {
-        #     "injections": _get_array_out_parametrization(loss="diffusion"),
-        # },
+        {
+            "injections": _get_array_out_parametrization(loss="diffusion"),
+        },
     ],
     indirect=True,
 )
