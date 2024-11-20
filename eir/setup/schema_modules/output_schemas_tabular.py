@@ -27,6 +27,12 @@ class TabularOutputTypeConfig:
     :param cat_label_smoothing:
         Label smoothing to apply to categorical targets.
 
+    :param cat_loss_name:
+        Loss function to use for categorical targets.
+
+    :param con_loss_name:
+        Loss function to use for continuous targets.
+
     :param uncertainty_weighted_mt_loss:
         Whether to use uncertainty weighted loss for multitask / multilabel learning.
     """

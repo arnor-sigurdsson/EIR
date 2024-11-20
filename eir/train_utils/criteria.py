@@ -81,9 +81,14 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
                     reduction="none",
                 )
 
+                label_smoothing = _get_label_smoothing(
+                    output_config=output_object.output_config,
+                    column_type="cat",
+                )
                 criterion_cat = get_supervised_criterion(
                     column_type_="cat",
                     loss_name="CrossEntropyLoss",
+                    cat_label_smoothing_=label_smoothing,
                     reduction="none",
                 )
                 assert isinstance(criterion_cat, nn.CrossEntropyLoss)
