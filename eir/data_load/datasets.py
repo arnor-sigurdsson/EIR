@@ -264,7 +264,8 @@ class DatasetBase(Dataset):
         )
 
         filtered_df = filter_df(
-            input_df=input_df, target_labels_df=self.target_labels_df
+            input_df=input_df,
+            target_labels_df=self.target_labels_df,
         )
 
         _log_missing_samples_between_modalities(
@@ -398,57 +399,61 @@ def add_data_to_df(
 
 
 def filter_df(
-    input_df: pl.DataFrame,
-    target_labels_df: Optional[pl.DataFrame] = None,
+    input_df: pl.DataFrame, target_labels_df: Optional[pl.DataFrame] = None
 ) -> pl.DataFrame:
-    num_samples_raw = input_df.height
 
-    input_cols = [col for col in input_df.columns if col != "ID"]
-    if not input_cols:
+    num_samples_raw = input_df.height
+    if len(input_df.columns) <= 1:
         return pl.DataFrame(schema=input_df.schema)
 
-    has_inputs = input_df.select(
-        [
-            pl.col("ID"),
-            pl.any_horizontal(pl.all().exclude("ID").is_not_null()).alias("has_input"),
-        ]
-    )
+    input_valid_mask = _get_valid_mask(df=input_df)
+    has_inputs = input_df.select([pl.col("ID"), input_valid_mask.alias("has_input")])
 
     filtered_df = input_df.join(has_inputs.filter(pl.col("has_input")), on="ID").drop(
         "has_input"
     )
 
-    if target_labels_df is not None:
-        target_cols = [col for col in target_labels_df.columns if col != "ID"]
-        if target_cols:
-            has_targets = target_labels_df.select(
-                [
-                    pl.col("ID"),
-                    pl.any_horizontal(pl.all().exclude("ID").is_not_null()).alias(
-                        "has_target"
-                    ),
-                ]
-            )
-
-            filtered_df = filtered_df.join(
-                has_targets.filter(pl.col("has_target")), on="ID"
-            ).drop("has_target")
-
-    num_samples_filtered = filtered_df.height
-    num_missing = num_samples_raw - num_samples_filtered
-
-    if target_labels_df is not None:
-        logger.info(
-            "Filtered out %d samples that had no inputs or no target labels.",
-            num_missing,
+    if target_labels_df is not None and len(target_labels_df.columns) > 1:
+        target_valid_mask = _get_valid_mask(df=target_labels_df)
+        has_targets = target_labels_df.select(
+            [pl.col("ID"), target_valid_mask.alias("has_target")]
         )
-    else:
-        logger.info(
-            "Filtered out %d samples that had no inputs.",
-            num_missing,
-        )
+        filtered_df = filtered_df.join(
+            has_targets.filter(pl.col("has_target")), on="ID"
+        ).drop("has_target")
+
+    num_missing = num_samples_raw - filtered_df.height
+    logger.info(
+        "Filtered out %d samples that had no %s.",
+        num_missing,
+        "inputs or no target labels" if target_labels_df is not None else "inputs",
+    )
 
     return filtered_df
+
+
+def _get_valid_mask(df: pl.DataFrame) -> pl.Expr:
+    numeric_cols = [
+        col for col in df.columns if col != "ID" and df[col].dtype.is_numeric()
+    ]
+    other_cols = [
+        col for col in df.columns if col != "ID" and not df[col].dtype.is_numeric()
+    ]
+
+    numeric_mask = (
+        pl.any_horizontal(
+            pl.all().exclude("ID", *other_cols).is_not_null()
+            & ~pl.all().exclude("ID", *other_cols).is_nan()
+        )
+        if numeric_cols
+        else pl.lit(True)
+    )
+    other_mask = (
+        pl.any_horizontal(pl.all().exclude("ID", *numeric_cols).is_not_null())
+        if other_cols
+        else pl.lit(True)
+    )
+    return numeric_mask & other_mask
 
 
 def _log_missing_samples_between_modalities(
