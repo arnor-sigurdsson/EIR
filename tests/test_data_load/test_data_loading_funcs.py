@@ -4,12 +4,13 @@ from statistics import mean
 from typing import List
 
 import numpy as np
+import polars as pl
 import pytest
 from hypothesis import given, settings
 from hypothesis.strategies import integers, lists
 
 from eir.data_load import data_loading_funcs
-from eir.data_load.data_utils import Sample
+from eir.data_load.datasets import al_datasets
 from eir.setup.config import get_all_tabular_targets
 from eir.train import get_dataloaders
 
@@ -62,11 +63,11 @@ def test_get_weighted_random_sampler(
 
     patched_train_dataset = patch_dataset_to_be_unbalanced(dataset=train_dataset)
     columns_to_sample = [
-        "test_output_tabular." + i
+        "test_output_tabular__" + i
         for i in targets_object.cat_targets["test_output_tabular"]
     ]
     random_sampler = data_loading_funcs.get_weighted_random_sampler(
-        samples=patched_train_dataset.samples,
+        target_df=patched_train_dataset.target_labels_df,
         columns_to_sample=columns_to_sample,
     )
 
@@ -121,20 +122,24 @@ def _check_if_all_numbers_close(list_of_numbers, abs_tol):
     return are_close.all()
 
 
-def patch_dataset_to_be_unbalanced(dataset):
+def patch_dataset_to_be_unbalanced(dataset: al_datasets) -> al_datasets:
+    """
+    Makes dataset unbalanced by limiting samples with Origin=1 to max_values=100
+    """
     max_values = 100
-    new_samples = []
-    cur_values = 0
-    for sample in dataset.samples:
-        if sample.target_labels["test_output_tabular"]["Origin"] == 1:
-            if cur_values < max_values:
-                new_samples.append(sample)
-                cur_values += 1
 
-        else:
-            new_samples.append(sample)
+    df_targets = dataset.target_labels_df
+    df_inputs = dataset.input_df
+    origin_1_df = df_targets.filter(pl.col("test_output_tabular__Origin") == 1).head(
+        max_values
+    )
+    other_df = df_targets.filter(pl.col("test_output_tabular__Origin") != 1)
 
-    dataset.samples = new_samples
+    dataset.target_labels_df = pl.concat([origin_1_df, other_df])
+    dataset.input_df = df_inputs.filter(
+        pl.col("ID").is_in(dataset.target_labels_df["ID"])
+    )
+
     return dataset
 
 
@@ -168,13 +173,13 @@ def test_gather_column_sampling_weights(test_labels):
     We have the .map here to ensure that all possible values exist at least once.
     """
     test_target_columns = ["Origin", "HairColor"]
-    test_samples = generate_test_samples(
+    test_input_df, test_target_df = generate_test_data(
         test_labels=test_labels,
         target_columns=test_target_columns,
         output_name="test_output_tabular",
     )
     all_target_weights_test_dict = data_loading_funcs._gather_column_sampling_weights(
-        samples=test_samples,
+        target_df=test_target_df,
         columns_to_sample=test_target_columns,
         output_name="test_output_tabular",
     )
@@ -185,21 +190,23 @@ def test_gather_column_sampling_weights(test_labels):
         )
 
 
-def generate_test_samples(
+def generate_test_data(
     test_labels: List[int], target_columns: List[str], output_name: str
-):
-    test_samples = []
-    for idx, label in enumerate(test_labels):
-        cur_label_dict = {
-            output_name: {column_name: label for column_name in target_columns}
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    input_df = pl.DataFrame(
+        {
+            "ID": [str(i) for i in range(len(test_labels))],
+            "omics_test": [f"fake_path_{i}.npy" for i in range(len(test_labels))],
         }
-        cur_inputs = {"omics_test": f"fake_path_{idx}.npy"}
-        cur_test_sample = Sample(
-            sample_id=str(idx), inputs=cur_inputs, target_labels=cur_label_dict
-        )
-        test_samples.append(cur_test_sample)
+    )
 
-    return test_samples
+    target_data = {
+        "ID": [str(i) for i in range(len(test_labels))],
+        **{col: test_labels for col in target_columns},
+    }
+    target_df = pl.DataFrame(target_data)
+
+    return input_df, target_df
 
 
 def _check_label_weights_and_counts(test_labels, label_weight_dict):
@@ -247,7 +254,7 @@ def test_aggregate_column_sampling_weights_auto(test_labels):
     by having different labels generated for different label columns.
     """
     target_columns = ["Origin", "HairColor"]
-    test_samples = generate_test_samples(
+    test_input_df, test_target_df = generate_test_data(
         test_labels=test_labels,
         target_columns=target_columns,
         output_name="test_output_tabular",
@@ -255,7 +262,7 @@ def test_aggregate_column_sampling_weights_auto(test_labels):
 
     gather_func = data_loading_funcs._gather_column_sampling_weights
     test_all_label_weights_and_counts = gather_func(
-        samples=test_samples,
+        target_df=test_target_df,
         columns_to_sample=target_columns,
         output_name="test_output_tabular",
     )

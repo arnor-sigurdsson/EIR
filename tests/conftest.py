@@ -1,6 +1,6 @@
 from typing import Any, Dict, Tuple
 
-import pandas as pd
+import polars as pl
 import pytest
 
 from eir.train_utils.utils import seed_everything
@@ -82,13 +82,11 @@ def parse_test_cl_args(request) -> Dict[str, Any]:
 
 @pytest.fixture()
 def get_transformer_test_data():
-    test_labels_dict = {
-        "1": {"Origin": "Asia", "Height": 150},
-        "2": {"Origin": "Africa", "Height": 190},
-        "3": {"Origin": "Europe", "Height": 170},
-    }
-    test_labels_df = pd.DataFrame(test_labels_dict).T
-
+    test_data = [
+        {"ID": "1", "Origin": "Asia", "Height": 150},
+        {"ID": "2", "Origin": "Africa", "Height": 190},
+        {"ID": "3", "Origin": "Europe", "Height": 170},
+    ]
+    test_labels_df = pl.DataFrame(test_data)
     test_target_columns_dict = {"con": ["Height"], "cat": ["Origin"]}
-
     return test_labels_df, test_target_columns_dict

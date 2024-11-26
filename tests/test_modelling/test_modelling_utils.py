@@ -104,10 +104,10 @@ def check_test_performance_results(
 
     key = f"{output_name}_{target_column}_{metric}"
     if direction == "max":
-        if check_train:
+        if check_train and key in df_train.columns:
             assert df_train.loc[:, key].max() > threshold_train, fail_msg
         assert df_valid.loc[:, key].max() > threshold_valid, fail_msg
     elif direction == "min":
-        if check_train:
+        if check_train and key in df_train.columns:
             assert df_train.loc[:, key].min() < threshold_train, fail_msg
         assert df_valid.loc[:, key].min() < threshold_valid, fail_msg

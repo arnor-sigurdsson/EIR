@@ -77,15 +77,12 @@ def get_train_sampler(
 
 @overload
 def get_train_sampler(
-    columns_to_sample: Sequence[str], train_dataset: "al_local_datasets"
+    columns_to_sample: Sequence[str],
+    train_dataset: "al_local_datasets",
 ) -> Union[WeightedRandomSampler, DistributedSampler]: ...
 
 
 def get_train_sampler(columns_to_sample, train_dataset):
-    """
-    TODO:   Refactor, remove dependency on train_dataset and use instead
-            Iterable[Samples], and outputs directly.
-    """
     in_distributed_run = in_distributed_env()
 
     if columns_to_sample is None:
@@ -109,7 +106,7 @@ def get_train_sampler(columns_to_sample, train_dataset):
     if columns_to_sample == ["all"]:
         is_sample_all_cols = True
     else:
-        parsed_columns_to_sample = set(i.split(".", 1)[1] for i in columns_to_sample)
+        parsed_columns_to_sample = set(i.split("__", 1)[1] for i in columns_to_sample)
         is_sample_column_loaded = parsed_columns_to_sample.issubset(
             set(loaded_target_columns)
         )
@@ -127,12 +124,12 @@ def get_train_sampler(columns_to_sample, train_dataset):
                 continue
 
             cat_columns_with_output_prefix = [
-                output_name + "." + i for i in output_object.target_columns["cat"]
+                output_name + "__" + i for i in output_object.target_columns["cat"]
             ]
             columns_to_sample += cat_columns_with_output_prefix
 
     train_sampler = get_weighted_random_sampler(
-        samples=train_dataset.samples,
+        target_df=train_dataset.target_labels_df,
         columns_to_sample=columns_to_sample,
     )
     return train_sampler
@@ -161,5 +158,5 @@ def _gather_all_loaded_columns(outputs: "al_output_objects_as_dict") -> Sequence
 @dataclass
 class Sample:
     sample_id: str
-    inputs: Dict[str, Any]
+    inputs: dict[str, Any]
     target_labels: "al_sample_label_dict_target"

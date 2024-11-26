@@ -1,7 +1,6 @@
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 import pytest
-import torch.utils
 from torch.utils.data import DataLoader
 
 from eir.data_load import datasets
@@ -19,14 +18,17 @@ def create_test_datasets(
     create_test_data: "TestDataConfig",
     create_test_labels: "MergedTargetLabels",
     create_test_config: config.Configs,
-) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
+) -> tuple[datasets.al_datasets, datasets.al_datasets]:
     configs = create_test_config
     target_labels = create_test_labels
 
+    train_ids = tuple(target_labels.train_labels["ID"])
+    valid_ids = tuple(target_labels.valid_labels["ID"])
+
     inputs = input_setup.set_up_inputs_for_training(
         inputs_configs=configs.input_configs,
-        train_ids=tuple(target_labels.train_labels.keys()),
-        valid_ids=tuple(target_labels.valid_labels.keys()),
+        train_ids=train_ids,
+        valid_ids=valid_ids,
         hooks=None,
     )
 

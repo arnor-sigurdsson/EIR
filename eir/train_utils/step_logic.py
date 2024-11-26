@@ -23,7 +23,6 @@ from torch.optim.optimizer import Optimizer
 
 from eir.data_load.data_augmentation import get_mix_data_hook, hook_mix_loss
 from eir.data_load.data_utils import Batch
-from eir.data_load.label_setup import al_all_column_ops
 from eir.models import model_training_utils
 from eir.models.input.tabular.tabular import get_tabular_inputs
 from eir.predict_modules.predict_tabular_input_setup import (
@@ -88,8 +87,6 @@ class Hooks:
 
     step_func_hooks: "StepFunctionHookStages"
     extra_state: Optional[dict[str, Any]] = None
-    custom_column_label_parsing_ops: al_all_column_ops = None
-    custom_handler_attachers: Union[None, al_handler_attachers] = None
 
 
 def _get_default_step_function_hooks(
@@ -603,6 +600,8 @@ def hook_default_per_target_loss(
         target_labels = batch.target_labels
         ids = batch.ids
 
+        # TODO: Re-enable here passing in filtered values after changing it to be
+        #       only based on fully missing (so not within) modalities
         filtered_outputs = filter_missing_outputs_and_labels(
             batch_ids=ids,
             model_outputs=model_outputs,

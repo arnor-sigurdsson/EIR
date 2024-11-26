@@ -1,9 +1,12 @@
+from dataclasses import dataclass
 from functools import partial, update_wrapper
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional, Type
 
 import numpy as np
+import polars as pl
 import torch
 from PIL.Image import Image
+from polars.datatypes.classes import NumericType
 
 from eir.data_load.data_preparation_modules.prepare_array import (
     array_load_wrapper,
@@ -41,7 +44,7 @@ from eir.setup.schemas import (
 
 
 def prepare_inputs_disk(
-    inputs: Dict[str, Any],
+    inputs: dict[str, Any],
     inputs_objects: "al_input_objects_as_dict",
     test_mode: bool,
 ) -> Dict[str, torch.Tensor]:
@@ -242,9 +245,19 @@ def typed_partial_for_hook(
     return update_wrapper(partial_func, func)
 
 
+@dataclass
+class InputHookOutput:
+    hook_callable: Callable[..., np.ndarray | Image | str]
+    return_dtype: Optional[pl.DataType]
+
+
 def get_input_data_loading_hooks(
     inputs: al_input_objects_as_dict,
-) -> dict[str, Callable[..., np.ndarray | Image]]:
+) -> Optional[dict[str, InputHookOutput]]:
+    """
+    Creates data loading hooks for input objects with appropriate polars dtypes.
+    Note we use object dtypes for images as they are PIL.Image objects.
+    """
     mapping = {}
 
     for input_name, input_object in inputs.items():
@@ -255,44 +268,90 @@ def get_input_data_loading_hooks(
 
         match input_object:
             case ComputedOmicsInputInfo():
-                mapping[input_name] = typed_partial_for_hook(
+                inner_function = typed_partial_for_hook(
                     omics_load_wrapper,
                     **common_kwargs,
                     subset_indices=input_object.subset_indices,
                 )
 
+                # skip the batch dimension here for polars later as loading
+                # the array will return a 2D array
+                arr_shape = input_object.data_dimensions.full_shape()[1:]
+                mapping[input_name] = InputHookOutput(
+                    hook_callable=inner_function,
+                    return_dtype=pl.Array(inner=pl.Boolean, shape=arr_shape),
+                )
+
             case ComputedImageInputInfo():
                 input_type_info = input_object.input_config.input_type_info
                 assert isinstance(input_type_info, ImageInputDataConfig)
-                mapping[input_name] = typed_partial_for_hook(
+
+                inner_function = typed_partial_for_hook(
                     image_load_wrapper,
                     **common_kwargs,
                     image_mode=input_type_info.mode,
                 )
 
+                mapping[input_name] = InputHookOutput(
+                    hook_callable=inner_function,
+                    return_dtype=pl.Object(),
+                )
+
             case ComputedSequenceInputInfo():
                 input_type_info = input_object.input_config.input_type_info
                 assert isinstance(input_type_info, SequenceInputDataConfig)
-                mapping[input_name] = typed_partial_for_hook(
+
+                inner_function = typed_partial_for_hook(
                     sequence_load_wrapper,
                     **common_kwargs,
                     split_on=input_type_info.split_on,
                     encode_func=input_object.encode_func,
                 )
 
+                max_length = input_object.computed_max_length
+                mapping[input_name] = InputHookOutput(
+                    hook_callable=inner_function,
+                    return_dtype=pl.Array(inner=pl.Int64, shape=(max_length,)),
+                )
+
             case ComputedBytesInputInfo():
                 input_type_info = input_object.input_config.input_type_info
                 assert isinstance(input_type_info, ByteInputDataConfig)
-                mapping[input_name] = typed_partial_for_hook(
+
+                inner_function = typed_partial_for_hook(
                     bytes_load_wrapper,
                     **common_kwargs,
                     dtype=input_type_info.byte_encoding,
                 )
 
+                pl_dtype = _get_polars_dtype_for_bytes(input_type_info.byte_encoding)
+                max_length = input_object.computed_max_length
+                mapping[input_name] = InputHookOutput(
+                    hook_callable=inner_function,
+                    return_dtype=pl.Array(inner=pl_dtype, shape=(max_length,)),
+                )
+
             case ComputedArrayInputInfo():
-                mapping[input_name] = typed_partial_for_hook(
+                inner_function = typed_partial_for_hook(
                     array_load_wrapper,
                     **common_kwargs,
                 )
 
+                loaded_shape = input_object.data_dimensions.original_shape
+                mapping[input_name] = InputHookOutput(
+                    hook_callable=inner_function,
+                    return_dtype=pl.Array(inner=pl.Float64, shape=loaded_shape),
+                )
+
     return mapping
+
+
+def _get_polars_dtype_for_bytes(
+    byte_encoding: str,
+) -> Type[NumericType] | Type[pl.Object]:
+    encoding_dtype_map = {
+        "uint8": pl.UInt8,
+        "int8": pl.Int8,
+        "float32": pl.Float32,
+    }
+    return encoding_dtype_map.get(byte_encoding, pl.Object)

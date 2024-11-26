@@ -624,14 +624,6 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             handler_config=handler_config,
         )
 
-    if exp.hooks.custom_handler_attachers is not None:
-        custom_handlers = _get_custom_handlers(handler_config=handler_config)
-        trainer = _attach_custom_handlers(
-            trainer=trainer,
-            handler_config=handler_config,
-            custom_handlers=custom_handlers,
-        )
-
     return trainer
 
 
@@ -901,21 +893,3 @@ def _plot_progress_handler(engine: Engine, handler_config: HandlerConfig) -> Non
         title_extra="Multi Task Average",
         plot_skip_steps=gc.vl.plot_skip_steps,
     )
-
-
-def _get_custom_handlers(handler_config: "HandlerConfig"):
-    custom_handlers = handler_config.experiment.hooks.custom_handler_attachers
-
-    return custom_handlers
-
-
-def _attach_custom_handlers(
-    trainer: Engine, handler_config: "HandlerConfig", custom_handlers
-):
-    if not custom_handlers:
-        return trainer
-
-    for custom_handler_attacher in custom_handlers:
-        trainer = custom_handler_attacher(trainer, handler_config)
-
-    return trainer

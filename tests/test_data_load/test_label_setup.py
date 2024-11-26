@@ -1,14 +1,12 @@
 from pathlib import Path
-from unittest.mock import patch
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import pytest
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from eir import train
 from eir.data_load import label_setup
-from eir.data_load.data_source_modules.csv_ops import ColumnOperation
 from eir.data_load.label_setup import merge_target_columns
 from eir.setup.config import Configs
 from eir.target_setup.target_label_setup import (
@@ -17,70 +15,6 @@ from eir.target_setup.target_label_setup import (
     get_tabular_target_file_infos,
     set_up_all_target_labels_wrapper,
 )
-
-
-@pytest.fixture()
-def create_test_column_ops():
-    def test_column_op_1(df, column_name, replace_dict):
-        df = df.replace({column_name: replace_dict})
-        return df
-
-    def test_column_op_2(df, column_name, multiplier):
-        df[column_name] = df[column_name] * multiplier
-        return df
-
-    def test_column_op_3(df, column_name, replace_with_col):
-        df[column_name] = df[replace_with_col]
-        return df
-
-    replace_dict_args = {"replace_dict": {"Europe": "Iceland"}}
-    multiplier_dict_arg = {"multiplier": 2}
-    replace_column_dict_arg = {"replace_with_col": "ExtraCol3"}
-
-    test_column_ops = {
-        "Origin": [
-            ColumnOperation(function=test_column_op_1, function_args=replace_dict_args),
-            ColumnOperation(
-                function=test_column_op_2, function_args=multiplier_dict_arg
-            ),
-        ],
-        "OriginExtraColumnsAll": [
-            ColumnOperation(
-                function=test_column_op_1,
-                function_args=replace_dict_args,
-                extra_columns_deps=("ExtraCol1", "ExtraCol2"),
-            ),
-            ColumnOperation(
-                function=test_column_op_3,
-                function_args=replace_column_dict_arg,
-                extra_columns_deps=("ExtraCol3",),
-            ),
-        ],
-        "OriginExtraColumnsPartial1": [
-            ColumnOperation(
-                function=test_column_op_1,
-                function_args=replace_dict_args,
-                extra_columns_deps=("ExtraCol1", "ExtraCol2"),
-            )
-        ],
-        "OriginExtraColumnsPartial2": [
-            ColumnOperation(
-                function=test_column_op_3,
-                function_args=replace_column_dict_arg,
-                extra_columns_deps=("ExtraCol3",),
-            )
-        ],
-        "ExtraTarget": [
-            ColumnOperation(
-                function=test_column_op_1,
-                function_args=replace_dict_args,
-                extra_columns_deps=(),
-                only_apply_if_target=True,
-            )
-        ],
-    }
-
-    return test_column_ops
 
 
 @pytest.mark.parametrize(
@@ -153,7 +87,9 @@ def create_test_column_ops():
     indirect=True,
 )
 def test_set_up_train_and_valid_tabular_data(
-    parse_test_cl_args, create_test_data, create_test_config
+    parse_test_cl_args,
+    create_test_data,
+    create_test_config,
 ):
     test_configs = create_test_config
     gc = test_configs.global_config
@@ -171,22 +107,21 @@ def test_set_up_train_and_valid_tabular_data(
 
     target_labels = set_up_all_target_labels_wrapper(
         output_configs=test_configs.output_configs,
-        custom_label_ops=None,
         train_ids=train_ids,
         valid_ids=valid_ids,
     )
 
-    train_labels_dict = target_labels.train_labels
-    valid_labels_dict = target_labels.valid_labels
+    train_labels_df = target_labels.train_labels
+    valid_labels_df = target_labels.valid_labels
 
-    assert len(train_labels_dict) + len(valid_labels_dict) == n_classes * dc.n_per_class
-    assert len(train_labels_dict) > len(valid_labels_dict)
+    assert len(train_labels_df) + len(valid_labels_df) == n_classes * dc.n_per_class
+    assert len(train_labels_df) > len(valid_labels_df)
 
-    train_ids_set = set(train_labels_dict.keys())
-    valid_ids_set = set(valid_labels_dict.keys())
+    train_ids_set = set(train_labels_df["ID"])
+    valid_ids_set = set(valid_labels_df["ID"])
 
-    assert len(train_ids_set) == len(train_labels_dict)
-    assert len(valid_ids_set) == len(valid_labels_dict)
+    assert len(train_ids_set) == len(train_labels_df)
+    assert len(valid_ids_set) == len(valid_labels_df)
 
     assert valid_ids_set.isdisjoint(train_ids_set)
 
@@ -214,7 +149,7 @@ def test_fit_scaler_transformer_on_target_column(get_transformer_test_data):
     transformer = label_setup._get_transformer(column_type="con")
 
     height_transformer = label_setup._fit_transformer_on_label_column(
-        column_series=df_test_labels["Height"],
+        column_series=df_test_labels["Height"].to_numpy(),
         transformer=transformer,
         impute_missing=False,
     )
@@ -230,7 +165,7 @@ def test_fit_label_encoder_transformer_on_target_column(get_transformer_test_dat
     transformer = label_setup._get_transformer(column_type="cat")
 
     origin_transformer = label_setup._fit_transformer_on_label_column(
-        column_series=df_test_labels["Origin"],
+        column_series=df_test_labels["Origin"].to_numpy(),
         transformer=transformer,
         impute_missing=False,
     )
@@ -281,10 +216,12 @@ def test_transform_all_labels_in_sample_targets_only(
         impute_missing=False,
     )
 
-    transformed_sample_labels = transformed_df.loc[test_input_key].to_dict()
+    transformed_sample_labels = transformed_df.filter(pl.col("ID") == test_input_key)
 
-    assert transformed_sample_labels["Origin"] == expected["Origin_as_int"]
-    assert int(transformed_sample_labels["Height"]) == expected["Scaled_height_int"]
+    assert transformed_sample_labels["Origin"].item() == expected["Origin_as_int"]
+    assert (
+        int(transformed_sample_labels["Height"].item()) == expected["Scaled_height_int"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -300,10 +237,16 @@ def test_transform_all_labels_in_sample_with_extra_con(
 ):
     df_test_labels, test_target_columns_dict = get_transformer_test_data
 
-    df_test_labels["Extra_Con"] = np.nan
-    df_test_labels.loc["1", "Extra_Con"] = 130
-    df_test_labels.loc["2", "Extra_Con"] = 170
-    df_test_labels.loc["3", "Extra_Con"] = 150
+    df_test_labels = df_test_labels.with_columns(
+        pl.when(pl.col("ID") == "1")
+        .then(130)
+        .when(pl.col("ID") == "2")
+        .then(170)
+        .when(pl.col("ID") == "3")
+        .then(150)
+        .otherwise(None)
+        .alias("Extra_Con")
+    )
 
     test_target_columns_dict["con"].append("Extra_Con")
     label_transformers = label_setup._get_fit_label_transformers(
@@ -319,7 +262,10 @@ def test_transform_all_labels_in_sample_with_extra_con(
         impute_missing=False,
     )
 
-    transformed_sample_labels = df_test_labels_transformed.loc[test_input_key].to_dict()
+    dtlt = df_test_labels_transformed
+    transformed_sample_labels = dtlt.filter(pl.col("ID") == test_input_key).row(
+        index=0, named=True
+    )
 
     assert int(transformed_sample_labels["Extra_Con"]) == expected["Extra_con_int"]
 
@@ -418,7 +364,7 @@ def test_label_df_parse_wrapper(
     # since we're only testing binary case here
     n_total = dc.n_per_class * 2
 
-    assert df_labels.shape == (n_total, 1)
+    assert df_labels.shape == (n_total, 2)
     assert set(df_labels[test_target_column].unique()) == {"Asia", "Europe"}
 
 
@@ -426,14 +372,15 @@ def test_ensure_categorical_columns_are_str(get_test_nan_df):
     df_test = get_test_nan_df
     df_converted = label_setup.ensure_categorical_columns_and_format(df=df_test)
 
-    column_dtypes = df_converted.dtypes.to_dict()
+    column_dtypes = {col: df_converted[col].dtype for col in df_converted.columns}
 
     for column, dtype in column_dtypes.items():
-        assert isinstance(dtype, object) or dtype == float
+        assert isinstance(dtype, object) or dtype == pl.Float64
 
-        if isinstance(dtype, object) and dtype != float:
+        if isinstance(dtype, object) and dtype != pl.Float64:
             categories = df_converted[column].unique()
-            assert all(isinstance(i, str) for i in categories)
+            for i in categories:
+                assert isinstance(i, str) or i is None, f"Column: {column}, Value: {i}"
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
@@ -506,14 +453,14 @@ def test_get_array_path_iterator_fail(create_test_data):
         ({"target_cat_columns": ["Origin"]}, ["Origin"]),
         (
             {"target_cat_columns": ["Origin", "OriginExtraColumnsAll"]},
-            ["Origin", "OriginExtraColumnsAll", "ExtraCol1", "ExtraCol2", "ExtraCol3"],
+            ["Origin", "OriginExtraColumnsAll"],
         ),
         (
             {
                 "target_cat_columns": ["Origin"],
                 "input_con_columns": ["OriginExtraColumnsPartial1"],
             },
-            ["Origin", "OriginExtraColumnsPartial1", "ExtraCol1", "ExtraCol2"],
+            ["Origin", "OriginExtraColumnsPartial1"],
         ),
         (
             {
@@ -527,15 +474,13 @@ def test_get_array_path_iterator_fail(create_test_data):
                 "OriginExtraColumnsAll",
                 "OriginExtraColumnsPartial1",
                 "OriginExtraColumnsPartial2",
-                "ExtraCol1",
-                "ExtraCol2",
-                "ExtraCol3",
             ],
         ),
     ],
 )
 def test_get_all_label_columns_and_dtypes(
-    test_input_args, expected, create_test_column_ops
+    test_input_args,
+    expected,
 ):
     cat_columns = []
     con_columns = []
@@ -548,41 +493,13 @@ def test_get_all_label_columns_and_dtypes(
     columns, dtypes = label_setup._get_all_label_columns_and_dtypes(
         cat_columns=cat_columns,
         con_columns=con_columns,
-        column_ops=create_test_column_ops,
     )
 
     assert set(columns) == set(expected)
     for column in cat_columns:
         assert isinstance(dtypes[column], object)
     for column in con_columns:
-        assert dtypes[column] == float
-
-
-@pytest.mark.parametrize(
-    "test_input,expected",
-    [
-        (["Origin"], {}),
-        (
-            ["OriginExtraColumnsAll"],
-            {k: None for k in ["ExtraCol1", "ExtraCol2", "ExtraCol3"]},
-        ),
-        (
-            ["OriginExtraColumnsPartial1", "Origin"],
-            {k: None for k in ["ExtraCol1", "ExtraCol2"]},
-        ),
-        (
-            ["OriginExtraColumnsPartial1", "OriginExtraColumnsPartial2"],
-            {k: None for k in ["ExtraCol1", "ExtraCol2", "ExtraCol3"]},
-        ),
-    ],
-)
-def test_get_extra_columns(test_input, expected, create_test_column_ops):
-    test_column_ops = create_test_column_ops
-
-    test_output = label_setup._get_extra_columns(
-        label_columns=test_input, all_column_ops=test_column_ops
-    )
-    assert test_output == expected
+        assert dtypes[column] == pl.Float64
 
 
 @pytest.mark.parametrize(
@@ -596,12 +513,21 @@ def test_load_label_df_one_target_no_extra_col(parse_test_cl_args, create_test_d
 
     label_columns = ["Origin"]
     df_label = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
+        label_fpath=label_fpath,
+        columns=label_columns,
     )
 
-    assert df_label.shape[0] == c.n_per_class * n_classes
-    assert df_label.index.name == "ID"
-    assert [i for i in df_label.Origin.value_counts()] == [c.n_per_class] * n_classes
+    assert df_label.height == c.n_per_class * n_classes
+    assert df_label.get_column("ID") is not None
+
+    value_counts = (
+        df_label.get_column("Origin")
+        .value_counts()
+        .sort(by="count", descending=True)
+        .get_column("count")
+        .to_list()
+    )
+    assert value_counts == [c.n_per_class] * n_classes
 
 
 @pytest.mark.parametrize(
@@ -615,10 +541,11 @@ def test_load_label_df_one_target_one_extra_col(parse_test_cl_args, create_test_
     label_columns = ["Origin", "OriginExtraCol"]
 
     df_label_extra = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
+        label_fpath=label_fpath,
+        columns=label_columns,
     )
 
-    assert df_label_extra.shape[1] == 2
+    assert df_label_extra.width == 3
 
     # OriginExtraCol is same as Origin by definition
     assert (df_label_extra["OriginExtraCol"] == df_label_extra["Origin"]).all()
@@ -636,28 +563,9 @@ def test_load_label_df_missing_col_fail(parse_test_cl_args, create_test_data):
 
     with pytest.raises(ValueError):
         label_setup._load_label_df(
-            label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
+            label_fpath=label_fpath,
+            columns=label_columns,
         )
-
-
-@pytest.mark.parametrize(
-    "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
-)
-def test_load_label_df_missing_col_pass(
-    parse_test_cl_args, create_test_data, test_column_operations
-):
-    c = create_test_data
-
-    label_fpath = c.scoped_tmp_path / "labels.csv"
-
-    label_columns = ["Origin", "NonExistentColumn"]
-
-    df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath,
-        columns=label_columns,
-        custom_label_ops=test_column_operations,
-    )
-    assert df_labels.shape[1] == 1
 
 
 @pytest.mark.parametrize(
@@ -670,47 +578,36 @@ def test_load_label_extra_target_extra_col(parse_test_cl_args, create_test_data)
 
     label_columns = ["Origin", "OriginExtraCol", "Height", "ExtraTarget"]
     df_label_multi_target = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
+        label_fpath=label_fpath,
+        columns=label_columns,
     )
 
-    assert df_label_multi_target.shape[1] == 4
+    assert df_label_multi_target.width == 5
 
-    # Check that they're all the same, as defined
-    part_1 = df_label_multi_target["Origin"]
-    part_2 = df_label_multi_target["OriginExtraCol"]
-
+    part_1 = df_label_multi_target.get_column("Origin")
+    part_2 = df_label_multi_target.get_column("OriginExtraCol")
     assert (part_1 == part_2).all()
 
-    part_3 = df_label_multi_target["Height"]
-    part_4 = df_label_multi_target["ExtraTarget"]
-    assert ((part_3 - 50).astype(int) == part_4.astype(int)).all()
-
-
-@pytest.fixture
-def test_column_operations():
-    def _dummy_func(df, column_name):
-        return df
-
-    test_column_ops = (ColumnOperation(function=_dummy_func, function_args={}),)
-
-    return test_column_ops
+    part_3 = df_label_multi_target.get_column("Height")
+    part_4 = df_label_multi_target.get_column("ExtraTarget")
+    assert (part_3 - 50).cast(pl.Int64).equals(part_4.cast(pl.Int64))
 
 
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_get_currently_available_columns_pass(
-    parse_test_cl_args, create_test_data, test_column_operations
+    parse_test_cl_args,
+    create_test_data,
 ):
     c = create_test_data
 
     label_fpath = c.scoped_tmp_path / "labels.csv"
-    label_columns = ["Origin", "NotExisting1", "NotExisting2"]
+    label_columns = ["Origin"]
 
     available_columns = label_setup._get_currently_available_columns(
         label_fpath=label_fpath,
         requested_columns=label_columns,
-        custom_label_ops=test_column_operations,
     )
 
     assert available_columns == ["Origin"]
@@ -729,7 +626,6 @@ def test_get_currently_available_columns_fail(parse_test_cl_args, create_test_da
         label_setup._get_currently_available_columns(
             label_fpath=label_fpath,
             requested_columns=label_columns,
-            custom_label_ops=None,
         )
 
 
@@ -740,215 +636,27 @@ def test_filter_ids_from_label_df(create_test_data):
 
     label_columns = ["Origin"]
     df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
+        label_fpath=label_fpath,
+        columns=label_columns,
     )
 
     df_no_filter = label_setup._filter_ids_from_label_df(df_labels=df_labels)
-    assert (df_no_filter == df_labels).all().item()
+    assert df_no_filter.equals(df_labels)
 
     ids_to_keep = ("0_Asia", "1_Asia", "998_Europe")
     df_filtered = label_setup._filter_ids_from_label_df(
         df_labels=df_labels, ids_to_keep=ids_to_keep
     )
-    assert len(df_filtered) == 3
-    assert tuple(df_filtered.index.values) == ids_to_keep
-    assert tuple(df_filtered["Origin"].values) == ("Asia", "Asia", "Europe")
 
+    assert df_filtered.height == 3
 
-@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
-def test_apply_column_operations_to_df_applied_1(
-    create_test_data, create_test_column_ops
-):
-    """
-    Here we run column operations for 'Origin'. Hence we expect to apply:
+    assert tuple(df_filtered.get_column("ID").to_list()) == ids_to_keep
 
-        - test_column_op_1: Replace "Europe with Iceland"
-        - test_column_op_2: Multiply the values by 2.
-
-    As these are the column operations associated with "Origin" in
-    create_test_column_ops.
-    """
-    c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
-
-    test_column_ops = create_test_column_ops
-
-    label_columns = ["Origin"]
-    df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
+    assert tuple(df_filtered.get_column("Origin").to_list()) == (
+        "Asia",
+        "Asia",
+        "Europe",
     )
-    df_labels_parsed = label_setup._apply_column_operations_to_df(
-        df=df_labels, operations_dict=test_column_ops, label_columns=label_columns
-    )
-
-    assert set(df_labels_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
-
-
-@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
-def test_apply_column_operations_to_df_applied_2(
-    create_test_data, create_test_column_ops
-):
-    """
-    Here we run column operations for 'OriginExtraColumnsAll'. Hence we expect to apply:
-
-        - test_column_op_1: Replace "Europe with Iceland"
-        - test_column_op_3: Replace value of of 'OriginExtraColumnsAll' with the values
-          in ExtraCol3.
-    """
-
-    c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
-
-    test_column_ops = create_test_column_ops
-
-    label_columns = ["Origin"]
-    df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
-    )
-
-    extra_cols = ("ExtraCol3",)
-    for col in extra_cols:
-        df_labels[col] = "Iceland"
-
-    df_labels = df_labels.rename(columns={"Origin": "OriginExtraColumnsAll"})
-
-    new_label_columns = ["OriginExtraColumnsAll"]
-    df_labels_parsed = label_setup._apply_column_operations_to_df(
-        df=df_labels, operations_dict=test_column_ops, label_columns=new_label_columns
-    )
-
-    assert df_labels_parsed["OriginExtraColumnsAll"].unique().item() == "Iceland"
-
-
-@patch("eir.data_load.label_setup.logger.debug", autospec=True)
-@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
-def test_parse_label_df_not_applied(
-    m_logger, create_test_data, create_test_column_ops, test_column_operations
-):
-    """
-    Here we run column operations for 'Origin'. Hence we expect to apply:
-
-        - test_column_op_1: Replace "Europe with Iceland"
-        - test_column_op_2: Multiply the values by 2.
-
-    As these are the column operations associated with "Origin" in
-    create_test_column_ops.
-
-    Additionally, we manually add two columns to the label df. For these, we don't
-    expect them to change as no column operations should be performed on them.
-    Firstly because one op should only run if it's a target, secondly because it's
-    a random extra column.
-
-    So in the logging, we expect only 'Applying func' to be called twice, for the
-    'Origin' column.
-    """
-
-    def _check_mocked_logger_call_count():
-        calls = []
-        for call in m_logger.call_args_list:
-            cur_call_first_arg = call[0][0]
-            if cur_call_first_arg.startswith("Applying"):
-                calls.append(cur_call_first_arg)
-
-        assert len(calls) == 2
-
-    c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
-
-    test_column_ops = create_test_column_ops
-
-    label_columns = ["Origin"]
-    df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath,
-        columns=label_columns,
-        custom_label_ops=test_column_operations,
-    )
-    df_labels["OnlyApplyIfTarget"] = 1
-    df_labels["SomeRandomCol"] = 1
-
-    df_labels_parsed = label_setup._apply_column_operations_to_df(
-        df=df_labels, operations_dict=test_column_ops, label_columns=label_columns
-    )
-
-    assert set(df_labels_parsed.Origin.unique()) == {"Iceland" * 2, "Asia" * 2}
-    _check_mocked_logger_call_count()
-    assert df_labels_parsed["OnlyApplyIfTarget"].unique().item() == 1
-    assert df_labels_parsed["SomeRandomCol"].unique().item() == 1
-
-
-@pytest.fixture()
-def create_test_always_applied_column_ops():
-    def test_column_op_1(df, column_name, replace_dict):
-        df = df.replace(replace_dict)
-        return df
-
-    def test_column_op_2(df, column_name, multiplier):
-        df = df * multiplier
-        return df
-
-    def test_column_op_3(df, column_name, replace_column_mapping):
-        df = df.rename(replace_column_mapping, axis="columns")
-        return df
-
-    replace_dict_args = {"replace_dict": {"Europe": "Iceland", "Iceland": "Martinaise"}}
-    multiplier_dict_arg = {"multiplier": 2}
-    replace_column_dict_arg = {
-        "replace_column_mapping": {"ExtraCol": "ExtraColRenamed"}
-    }
-
-    test_column_ops = {
-        "base": [
-            ColumnOperation(function=test_column_op_1, function_args=replace_dict_args),
-            ColumnOperation(
-                function=test_column_op_2, function_args=multiplier_dict_arg
-            ),
-        ],
-        "post": [
-            ColumnOperation(
-                function=test_column_op_3,
-                function_args=replace_column_dict_arg,
-                extra_columns_deps=("ExtraCol",),
-            ),
-        ],
-    }
-
-    return test_column_ops
-
-
-@pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
-def test_apply_column_operations_to_df_always_applied(
-    create_test_data, create_test_always_applied_column_ops
-):
-    """
-    Here we run column operations that should always apply with column 'Origin'. Hence
-    we expect to apply:
-
-        - test_column_op_1: Replace "Europe with Iceland"
-        - test_column_op_2: Multiply the values by 2.
-        - test_column_op_3: Replace "ExtraCol" name with "ExtraColRenamed"
-    """
-
-    c = create_test_data
-    label_fpath = c.scoped_tmp_path / "labels.csv"
-
-    test_column_ops = create_test_always_applied_column_ops
-
-    label_columns = ["Origin"]
-    df_labels = label_setup._load_label_df(
-        label_fpath=label_fpath, columns=label_columns, custom_label_ops=None
-    )
-
-    extra_cols = ("ExtraCol",)
-    for col in extra_cols:
-        df_labels[col] = "Iceland"
-
-    df_labels_parsed = label_setup._apply_column_operations_to_df(
-        df=df_labels, operations_dict=test_column_ops, label_columns=label_columns
-    )
-
-    assert set(df_labels_parsed["Origin"].unique()) == {"Iceland" * 2, "Asia" * 2}
-    assert set(df_labels_parsed["ExtraColRenamed"].unique()) == {"Martinaise" * 2}
-    assert "ExtraCol" not in df_labels_parsed.columns
 
 
 @pytest.mark.parametrize(
@@ -963,8 +671,7 @@ def test_check_parsed_label_df_pass(parse_test_cl_args, create_test_data):
     df_labels = label_setup._load_label_df(
         label_fpath=label_fpath,
         columns=label_columns,
-        custom_label_ops=None,
-        dtypes={"Origin": "category", "ExtraTarget": "category"},
+        dtypes={"Origin": pl.Categorical, "ExtraTarget": pl.Categorical},
     )
 
     df_labels_checked = label_setup._check_parsed_label_df(
@@ -978,22 +685,24 @@ def test_check_parsed_label_df_pass(parse_test_cl_args, create_test_data):
     "create_test_data", [{"task_type": "binary"}, {"task_type": "multi"}], indirect=True
 )
 def test_check_parsed_label_df_fail(
-    parse_test_cl_args, create_test_data, test_column_operations
+    parse_test_cl_args,
+    create_test_data,
 ):
     c = create_test_data
     label_fpath = c.scoped_tmp_path / "labels.csv"
 
-    label_columns = ["Origin", "ExtraTarget", "NotExisting"]
+    label_columns = ["Origin"]
+    fail_label_columns = ["Origin", "ExtraTarget", "NotExisting"]
 
     df_labels = label_setup._load_label_df(
         label_fpath=label_fpath,
         columns=label_columns,
-        custom_label_ops=test_column_operations,
     )
 
     with pytest.raises(ValueError):
         label_setup._check_parsed_label_df(
-            df_labels=df_labels, supplied_label_columns=label_columns
+            df_labels=df_labels,
+            supplied_label_columns=fail_label_columns,
         )
 
 
@@ -1034,33 +743,35 @@ def test_split_df_by_ids(create_test_data, create_test_config):
         ids_to_keep=None,
     )
 
-    ids = tuple(df_labels.index)
+    ids = tuple(df_labels.get_column("ID").to_list())
 
     for valid_fraction in (0.1, 0.5, 0.7):
         ids_train, ids_valid = label_setup.split_ids(ids=ids, valid_size=valid_fraction)
         df_train, df_valid = label_setup._split_df_by_ids(
-            df=df_labels, train_ids=ids_train, valid_ids=ids_valid
+            df=df_labels,
+            train_ids=list(ids_train),
+            valid_ids=list(ids_valid),
         )
 
-        assert set(df_train.index) == set(ids_train)
-        assert set(df_valid.index) == set(ids_valid)
+        assert set(df_train.get_column("ID").to_list()) == set(ids_train)
+        assert set(df_valid.get_column("ID").to_list()) == set(ids_valid)
 
-        expected_no_train = df_labels.shape[0] * (1 - valid_fraction)
-        expected_no_valid = df_labels.shape[0] * valid_fraction
+        expected_no_train = df_labels.height * (1 - valid_fraction)
+        expected_no_valid = df_labels.height * valid_fraction
 
-        assert len(ids_train) == int(expected_no_train) == len(df_train)
-        assert len(ids_valid) == int(expected_no_valid) == len(df_valid)
+        assert len(ids_train) == int(expected_no_train) == df_train.height
+        assert len(ids_valid) == int(expected_no_valid) == df_valid.height
 
 
 def test_validate_df_pass():
-    df = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]}, index=["a", "b", "c"])
+    df = pl.DataFrame({"ID": ["a", "b", "c"], "A": [1, 2, 3], "B": [4, 5, 6]})
 
     label_setup._validate_df(df=df)
 
 
 def test_validate_df_fail():
-    df = pd.DataFrame(
-        {"A": [1, 2, 3, 4], "B": [5, 6, 7, 8]}, index=["a", "b", "b", "c"]
+    df = pl.DataFrame(
+        {"ID": ["a", "b", "b", "c"], "A": [1, 2, 3, 4], "B": [5, 6, 7, 8]}
     )
 
     with pytest.raises(ValueError) as excinfo:
@@ -1068,9 +779,12 @@ def test_validate_df_fail():
 
     assert "b" in str(excinfo.value)
 
-    df = pd.DataFrame(
-        {"A": [1, 2, 3, 4, 5, 6], "B": [7, 8, 9, 10, 11, 12]},
-        index=["a", "b", "b", "c", "c", "c"],
+    df = pl.DataFrame(
+        {
+            "ID": ["a", "b", "b", "c", "c", "c"],
+            "A": [1, 2, 3, 4, 5, 6],
+            "B": [7, 8, 9, 10, 11, 12],
+        }
     )
 
     with pytest.raises(ValueError) as excinfo:
@@ -1117,18 +831,16 @@ def test_split_ids(create_test_data, create_test_config):
         ids_to_keep=None,
     )
 
-    ids = tuple(df_labels.index)
+    ids = tuple(df_labels.get_column("ID").to_list())
 
-    # Automatic splitting
     for valid_fraction in (0.1, 0.5, 0.7):
         ids_train, ids_valid = label_setup.split_ids(ids=ids, valid_size=valid_fraction)
-        expected_train = df_labels.shape[0] * (1 - valid_fraction)
-        expected_valid = df_labels.shape[0] * valid_fraction
+        expected_train = df_labels.height * (1 - valid_fraction)
+        expected_valid = df_labels.height * valid_fraction
 
         assert len(ids_train) == int(expected_train)
         assert len(ids_valid) == int(expected_valid)
 
-    # Manual splitting
     manual_ids = ids[:10]
 
     ids_train, ids_valid = label_setup.split_ids(
@@ -1155,21 +867,23 @@ def get_test_nan_df():
         ],
         columns=list("ABCD"),
     """
-    df = pd.DataFrame(
+    return pl.DataFrame(
         {
-            "A": pd.Series([np.nan, 3, np.nan, np.nan], dtype="object"),
-            "B": pd.Series([2, 4, np.nan, 3], dtype="object"),
-            "C": pd.Series([np.nan, np.nan, np.nan, np.nan], dtype="float"),
-            "D": pd.Series([0.0, 1.0, 5.0, 4.0], dtype="float"),
-        },
-    )
-    return df
+            "ID": ["0", "1", "2", "3"],
+            "A": [None, "3", None, None],
+            "B": ["2", "4", None, "3"],
+            "C": [None, None, None, None],
+            "D": [0.0, 1.0, 5.0, 4.0],
+        }
+    ).with_columns([pl.col("C").cast(pl.Float64), pl.col("D").cast(pl.Float64)])
 
 
 @pytest.fixture
 def get_test_nan_tabular_file_info():
     label_info = label_setup.TabularFileInfo(
-        file_path=Path("fake_file"), cat_columns=["A", "B"], con_columns=["C", "D"]
+        file_path=Path("fake_file"),
+        cat_columns=["A", "B"],
+        con_columns=["C", "D"],
     )
 
     return label_info
@@ -1179,20 +893,19 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_
     """
     NOTE:   Here we have the situation where we have NA in valid, but not in train. This
             means that we have to make sure we have manually added the 'NA' to train.
-
-    NOTE:   We have to manually convert A and B back to object, as pandas will convert
-            them to int64 when we fillna.
     """
-
     test_df = get_test_nan_df
     label_info = get_test_nan_tabular_file_info
 
-    train_df = test_df.copy()
-    valid_df = test_df.copy()
+    train_df = test_df.clone()
+    valid_df = test_df.clone()
 
-    train_df = train_df.fillna(5)
-    train_df["A"] = train_df["A"].astype(object)
-    train_df["B"] = train_df["B"].astype(object)
+    train_df = train_df.with_columns(
+        [
+            pl.col("A").fill_null(5).cast(pl.String),
+            pl.col("B").fill_null(5).cast(pl.String),
+        ]
+    )
 
     train_df = label_setup.ensure_categorical_columns_and_format(df=train_df)
     valid_df = label_setup.ensure_categorical_columns_and_format(df=valid_df)
@@ -1209,33 +922,31 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_
     assert set(label_transformers["B"].classes_) == {"2", "3", "4", "5", "nan"}
 
     a_t = label_transformers["A"]
-    assert set(train_df_filled["A"].unique()) == {0, 1}
-    assert set(a_t.inverse_transform(train_df_filled["A"].unique())) == {"5", "3"}
+    assert set(train_df_filled.get_column("A").unique().to_list()) == {0, 1}
+    assert set(
+        a_t.inverse_transform(train_df_filled.get_column("A").unique().to_list())
+    ) == {"5", "3"}
 
-    assert set(valid_df_filled["A"].unique()) == {0, 2}
-    assert set(a_t.inverse_transform(valid_df_filled["A"].unique())) == {"nan", "3"}
+    assert set(valid_df_filled.get_column("A").unique().to_list()) == {0, 2}
+    assert set(
+        a_t.inverse_transform(valid_df_filled.get_column("A").unique().to_list())
+    ) == {"nan", "3"}
 
     b_t = label_transformers["B"]
-    assert set(train_df_filled["B"].unique()) == {0, 1, 2, 3}
-    assert set(b_t.inverse_transform(train_df_filled["B"].unique())) == {
-        "2",
-        "3",
-        "4",
-        "5",
-    }
+    assert set(train_df_filled.get_column("B").unique().to_list()) == {0, 1, 2, 3}
+    assert set(
+        b_t.inverse_transform(train_df_filled.get_column("B").unique().to_list())
+    ) == {"2", "3", "4", "5"}
 
-    assert set(valid_df_filled["B"].unique()) == {0, 1, 2, 4}
-    assert set(b_t.inverse_transform(valid_df_filled["B"].unique())) == {
-        "2",
-        "3",
-        "4",
-        "nan",
-    }
+    assert set(valid_df_filled.get_column("B").unique().to_list()) == {0, 1, 2, 4}
+    assert set(
+        b_t.inverse_transform(valid_df_filled.get_column("B").unique().to_list())
+    ) == {"2", "3", "4", "nan"}
 
-    assert (train_df_filled["C"] == 0.0).all()
-    assert (valid_df_filled["C"] == 0.0).all()
+    assert (train_df_filled.get_column("C") == 0.0).all()
+    assert (valid_df_filled.get_column("C") == 0.0).all()
 
-    assert (train_df_filled["D"] == valid_df_filled["D"]).all()
+    assert train_df_filled.get_column("D").equals(valid_df_filled.get_column("D"))
 
 
 def test_handle_missing_label_values_in_df(
@@ -1252,20 +963,26 @@ def test_handle_missing_label_values_in_df(
         impute_missing=True,
     )
 
-    assert set(test_df_filled["A"].unique()) == {"nan", 3}
-    assert set(test_df_filled["B"].unique()) == {"nan", 2, 3, 4}
-    assert (test_df_filled["C"] == 3.0).all()
-    assert (test_df_filled["D"] == test_df["D"]).all()
+    assert set(test_df_filled.get_column("A").unique().to_list()) == {"nan", "3"}
+    assert set(test_df_filled.get_column("B").unique().to_list()) == {
+        "nan",
+        "2",
+        "3",
+        "4",
+    }
+
+    assert (test_df_filled.get_column("C") == 3.0).all()
+    assert test_df_filled.get_column("D").equals(test_df.get_column("D"))
 
 
 @pytest.mark.parametrize("impute_missing", [False, True])
 def test_fill_categorical_nans(
-    impute_missing: bool, get_test_nan_df: pd.DataFrame
+    impute_missing: bool, get_test_nan_df: pl.DataFrame
 ) -> None:
     """
-    Only when we impute missing do we call df.fillna('nan'), this is the case for
+    Only when we impute missing do we call fill_null('nan'), this is the case for
     inputs where we e.g. actually want to encode them in the tabular input. For
-    targets, we keep them as np.nan as they are never actually used.
+    targets, we keep them as None as they are never actually used.
     """
     test_df = get_test_nan_df
     test_df_filled = label_setup._fill_categorical_nans(
@@ -1275,30 +992,53 @@ def test_fill_categorical_nans(
     )
 
     if impute_missing:
-        assert set(test_df_filled["A"].unique()) == {"nan", 3}
-        assert set(test_df_filled["B"].unique()) == {"nan", 2, 3, 4}
+        assert set(test_df_filled.get_column("A").unique().to_list()) == {"nan", "3"}
+        assert set(test_df_filled.get_column("B").unique().to_list()) == {
+            "nan",
+            "2",
+            "3",
+            "4",
+        }
     else:
-        assert set(test_df_filled["A"].unique()) == {np.nan, 3}
-        assert set(test_df_filled["B"].unique()) == {np.nan, 2, 3, 4}
+        assert set(
+            x
+            for x in test_df_filled.get_column("A").unique().to_list()
+            if x is not None
+        ) == {"3"}
+        assert set(
+            x
+            for x in test_df_filled.get_column("B").unique().to_list()
+            if x is not None
+        ) == {"2", "3", "4"}
 
-    assert test_df_filled["C"].isna().values.all()
-    assert test_df_filled["D"].notna().values.all()
+    assert test_df_filled.get_column("C").is_null().all()
+    assert test_df_filled.get_column("D").is_null().sum() == 0
 
 
 def test_get_con_manual_vals_dict(get_test_nan_df):
-    test_df = get_test_nan_df.astype(float)
+    test_df = get_test_nan_df.with_columns(
+        [pl.col(["A", "B", "C", "D"]).cast(pl.Float64)]
+    )
 
     means_dict = label_setup._get_con_manual_vals_dict(
-        df=test_df, con_columns=["A", "B", "C", "D"]
+        df=test_df,
+        con_columns=[
+            "A",
+            "B",
+            "C",
+            "D",
+        ],
     )
     assert means_dict["A"] == 3.0
     assert means_dict["B"] == 3.0
-    assert np.isnan(means_dict["C"])
+    assert means_dict["C"] == 0.0  # all are nan
     assert means_dict["D"] == 2.5
 
 
 def test_fill_continuous_nans(get_test_nan_df):
-    test_df = get_test_nan_df.astype(float)
+    test_df = get_test_nan_df.with_columns(
+        [pl.col(["A", "B", "C", "D"]).cast(pl.Float64)]
+    )
 
     manual_values = {"A": 1.0, "B": 2.0, "C": 3.0}
     test_df_filled = label_setup._fill_continuous_nans(
@@ -1308,10 +1048,10 @@ def test_fill_continuous_nans(get_test_nan_df):
         impute_missing=True,
     )
 
-    assert test_df_filled["A"].loc[0] == 1.0
-    assert test_df_filled["A"].loc[1] == 3.0
-    assert test_df_filled["B"].loc[2] == 2.0
-    assert (test_df_filled["C"] == 3.0).all()
+    assert test_df_filled.filter(pl.col("ID") == "0").get_column("A")[0] == 1.0
+    assert test_df_filled.filter(pl.col("ID") == "1").get_column("A")[0] == 3.0
+    assert test_df_filled.filter(pl.col("ID") == "2").get_column("B")[0] == 2.0
+    assert (test_df_filled.get_column("C") == 3.0).all()
 
 
 @pytest.mark.parametrize(

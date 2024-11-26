@@ -1,20 +1,15 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Sequence, Set
+from typing import Any, Dict, Sequence, Set, Type
 
-import numpy as np
-import pandas as pd
-import torch
+import polars as pl
 from sklearn.preprocessing import KBinsDiscretizer, StandardScaler
 
 from eir.data_load import label_setup
 from eir.data_load.data_source_modules.deeplake_ops import is_deeplake_dataset
 from eir.data_load.label_setup import (
     TabularFileInfo,
-    al_all_column_ops,
-    al_label_dict,
     al_label_transformers,
-    al_target_label_dict,
     transform_label_df,
 )
 from eir.experiment_io.label_transformer_io import load_transformers
@@ -31,15 +26,14 @@ from eir.setup.schemas import (
 from eir.target_setup.target_label_setup import (
     MissingTargetsInfo,
     compute_missing_ids_per_tabular_output,
-    convert_dtypes,
     gather_data_pointers_from_data_source,
-    gather_torch_nan_missing_ids,
+    gather_torch_null_missing_ids,
     get_all_output_and_target_names,
     get_missing_targets_info,
     get_tabular_target_file_infos,
     synchronize_missing_survival_values,
     transform_durations_with_nans,
-    update_labels_dict,
+    update_labels_df,
 )
 from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.utils.logging import get_logger
@@ -49,30 +43,29 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 @dataclass
 class PredictTargetLabels:
-    predict_labels: pd.DataFrame
+    predict_labels: pl.DataFrame
     label_transformers: Dict[str, al_label_transformers]
 
     @property
-    def all_labels(self):
+    def all_labels(self) -> pl.DataFrame:
         return self.predict_labels
 
 
 @dataclass
 class MergedPredictTargetLabels:
-    label_dict: al_target_label_dict
+    predict_labels: pl.DataFrame
     label_transformers: dict[str, dict[str, al_label_transformers]]
     missing_ids_per_output: MissingTargetsInfo
 
     @property
-    def all_labels(self):
-        return self.label_dict
+    def all_labels(self) -> pl.DataFrame:
+        return self.predict_labels
 
 
 def get_tabular_target_labels_for_predict(
     output_folder: str,
     tabular_info: TabularFileInfo,
     output_name: str,
-    custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
 ) -> PredictTargetLabels:
     all_columns = list(tabular_info.cat_columns) + list(tabular_info.con_columns)
@@ -85,7 +78,6 @@ def get_tabular_target_labels_for_predict(
     df_labels_test = _load_labels_for_predict(
         tabular_info=tabular_info,
         ids_to_keep=ids,
-        custom_label_ops=custom_column_label_parsing_ops,
     )
 
     label_transformers = load_transformers(
@@ -93,7 +85,7 @@ def get_tabular_target_labels_for_predict(
         transformers_to_load={output_name: all_columns},
     )
 
-    labels_dict = parse_labels_for_predict(
+    labels_df = parse_labels_for_predict(
         con_columns=con_columns,
         cat_columns=cat_columns,
         df_labels_test=df_labels_test,
@@ -101,7 +93,7 @@ def get_tabular_target_labels_for_predict(
     )
 
     labels = PredictTargetLabels(
-        predict_labels=labels_dict,
+        predict_labels=labels_df,
         label_transformers=label_transformers,
     )
 
@@ -111,15 +103,13 @@ def get_tabular_target_labels_for_predict(
 def _load_labels_for_predict(
     tabular_info: TabularFileInfo,
     ids_to_keep: Sequence[str],
-    custom_label_ops: al_all_column_ops = None,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     parse_wrapper = label_setup.get_label_parsing_wrapper(
         label_parsing_chunk_size=tabular_info.parsing_chunk_size
     )
     df_labels_test = parse_wrapper(
         label_file_tabular_info=tabular_info,
         ids_to_keep=ids_to_keep,
-        custom_label_ops=custom_label_ops,
     )
 
     return df_labels_test
@@ -128,9 +118,10 @@ def _load_labels_for_predict(
 def parse_labels_for_predict(
     con_columns: Sequence[str],
     cat_columns: Sequence[str],
-    df_labels_test: pd.DataFrame,
+    df_labels_test: pl.DataFrame,
     label_transformers: al_label_transformers,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
+
     all_con_transformers = _extract_target_con_transformers(
         label_transformers=label_transformers,
         con_columns=con_columns,
@@ -155,7 +146,8 @@ def parse_labels_for_predict(
         impute_missing=False,
     )
 
-    assert len(label_transformers) > 0
+    assert len(label_transformers) > 0, "No label transformers found"
+
     df_labels_test = transform_label_df(
         df_labels=df_labels_test,
         label_transformers=label_transformers,
@@ -189,7 +181,6 @@ def _extract_target_con_transformers(
 
 def get_target_labels_for_testing(
     configs_overloaded_for_predict: Configs,
-    custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
 ) -> MergedPredictTargetLabels:
     pc = configs_overloaded_for_predict
@@ -198,10 +189,9 @@ def get_target_labels_for_testing(
     all_ids: set[str] = set(ids)
     per_modality_missing_ids: dict[str, set[str]] = {}
     within_modality_missing_ids: dict[str, dict[str, set[str]]] = {}
-    tabular_label_transformers: dict[str, Any] = {}
-    dtypes: dict[str, dict[str, Any]] = {}
+    label_transformers: dict[str, Any] = {}
 
-    test_labels_dict: dict[str, dict[str, dict[str, Any]]] = {}
+    test_labels_df = pl.DataFrame(schema={"ID": pl.Utf8})
 
     tabular_target_files_info = get_tabular_target_file_infos(
         output_configs=pc.output_configs
@@ -215,53 +205,46 @@ def get_target_labels_for_testing(
 
         match output_type_info:
             case TabularOutputTypeConfig():
-                process_tabular_output_for_testing(
+                test_labels_df = process_tabular_output_for_testing(
                     output_name=output_name,
                     tabular_target_files_info=tabular_target_files_info,
                     output_folder=pc.global_config.basic_experiment.output_folder,
-                    custom_column_label_parsing_ops=custom_column_label_parsing_ops,
                     ids=ids,
                     all_ids=all_ids,
-                    tabular_label_transformers=tabular_label_transformers,
+                    label_transformers=label_transformers,
                     per_modality_missing_ids=per_modality_missing_ids,
                     within_modality_missing_ids=within_modality_missing_ids,
-                    test_labels_dict=test_labels_dict,
-                    dtypes=dtypes,
+                    test_labels_df=test_labels_df,
                 )
-
             case SequenceOutputTypeConfig():
-                process_sequence_output_for_testing(
+                test_labels_df = process_sequence_output_for_testing(
                     output_name=output_name,
                     ids=ids,
                     per_modality_missing_ids=per_modality_missing_ids,
-                    test_labels_dict=test_labels_dict,
-                    dtypes=dtypes,
+                    test_labels_df=test_labels_df,
                 )
 
             case ArrayOutputTypeConfig() | ImageOutputTypeConfig():
-                process_array_or_image_output_for_testing(
+                test_labels_df = process_array_or_image_output_for_testing(
                     output_name=output_name,
                     ids=ids,
                     output_config=output_config,
                     output_source=output_source,
                     per_modality_missing_ids=per_modality_missing_ids,
-                    test_labels_dict=test_labels_dict,
-                    dtypes=dtypes,
+                    test_labels_df=test_labels_df,
                 )
 
             case SurvivalOutputTypeConfig():
-                process_survival_output_for_testing(
+                test_labels_df = process_survival_output_for_testing(
                     output_name=output_name,
                     tabular_target_files_info=tabular_target_files_info,
                     output_folder=pc.global_config.basic_experiment.output_folder,
-                    custom_column_label_parsing_ops=custom_column_label_parsing_ops,
                     ids=ids,
                     all_ids=all_ids,
-                    tabular_label_transformers=tabular_label_transformers,
+                    label_transformers=label_transformers,
+                    test_labels_df=test_labels_df,
                     per_modality_missing_ids=per_modality_missing_ids,
                     within_modality_missing_ids=within_modality_missing_ids,
-                    test_labels_dict=test_labels_dict,
-                    dtypes=dtypes,
                 )
             case _:
                 raise NotImplementedError(
@@ -277,8 +260,8 @@ def get_target_labels_for_testing(
     )
 
     test_labels_object = MergedPredictTargetLabels(
-        label_dict=test_labels_dict,
-        label_transformers=tabular_label_transformers,
+        predict_labels=test_labels_df,
+        label_transformers=label_transformers,
         missing_ids_per_output=missing_target_info,
     )
 
@@ -287,29 +270,26 @@ def get_target_labels_for_testing(
 
 def process_tabular_output_for_testing(
     output_name: str,
-    tabular_target_files_info: Dict[str, Any],
+    tabular_target_files_info: dict[str, Any],
     output_folder: str,
-    custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
     all_ids: Set[str],
-    tabular_label_transformers: Dict[str, Any],
-    per_modality_missing_ids: Dict[str, Set[str]],
-    within_modality_missing_ids: Dict[str, Dict[str, Set[str]]],
-    test_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
-    dtypes: Dict[str, Dict[str, Any]],
-):
+    label_transformers: dict[str, Any],
+    per_modality_missing_ids: dict[str, set[str]],
+    within_modality_missing_ids: dict[str, dict[str, Set[str]]],
+    test_labels_df: pl.DataFrame,
+) -> pl.DataFrame:
     cur_tabular_info = tabular_target_files_info[output_name]
     cur_labels = get_tabular_target_labels_for_predict(
         output_folder=output_folder,
         tabular_info=cur_tabular_info,
         output_name=output_name,
-        custom_column_label_parsing_ops=custom_column_label_parsing_ops,
         ids=ids,
     )
-    tabular_label_transformers[output_name] = cur_labels.label_transformers
+    label_transformers[output_name] = cur_labels.label_transformers
 
     all_labels = cur_labels.all_labels
-    cur_ids = set(all_labels.index)
+    cur_ids = set(all_labels.get_column("ID").to_list())
     missing_ids = all_ids.difference(cur_ids)
     per_modality_missing_ids[output_name] = missing_ids
 
@@ -320,43 +300,40 @@ def process_tabular_output_for_testing(
     )
     within_modality_missing_ids.update(missing_ids_per_target_column)
 
-    update_labels_dict(
-        labels_dict=test_labels_dict,
-        labels_df=cur_labels.predict_labels,
+    test_labels_df = update_labels_df(
+        master_df=test_labels_df,
+        new_labels=cur_labels.predict_labels,
         output_name=output_name,
     )
 
-    if output_name not in dtypes:
-        dtypes[output_name] = cur_labels.predict_labels.dtypes.to_dict()
+    return test_labels_df
 
 
 def process_sequence_output_for_testing(
     output_name: str,
     ids: Sequence[str],
     per_modality_missing_ids: Dict[str, Set[str]],
-    test_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
-    dtypes: Dict[str, Dict[str, Any]],
-):
+    test_labels_df: pl.DataFrame,
+) -> pl.DataFrame:
     cur_labels = set_up_delayed_predict_target_labels(
         ids=ids,
         output_name=output_name,
     )
 
-    cur_missing_ids = gather_torch_nan_missing_ids(
+    cur_missing_ids = gather_torch_null_missing_ids(
         labels=cur_labels.all_labels,
         output_name=output_name,
     )
 
     per_modality_missing_ids[output_name] = cur_missing_ids
 
-    update_labels_dict(
-        labels_dict=test_labels_dict,
-        labels_df=cur_labels.predict_labels,
+    test_labels_df = update_labels_df(
+        master_df=test_labels_df,
+        new_labels=cur_labels.predict_labels,
         output_name=output_name,
     )
 
-    if output_name not in dtypes:
-        dtypes[output_name] = cur_labels.predict_labels.dtypes.to_dict()
+    return test_labels_df
 
 
 def process_array_or_image_output_for_testing(
@@ -365,51 +342,50 @@ def process_array_or_image_output_for_testing(
     output_config: Any,
     output_source: str,
     per_modality_missing_ids: Dict[str, Set[str]],
-    test_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
-    dtypes: Dict[str, Dict[str, Any]],
-):
+    test_labels_df: pl.DataFrame,
+) -> pl.DataFrame:
     cur_labels = _set_up_predict_file_target_labels(
         ids=ids,
         output_config=output_config,
     )
 
-    cur_missing_ids = gather_torch_nan_missing_ids(
+    cur_missing_ids = gather_torch_null_missing_ids(
         labels=cur_labels.all_labels,
         output_name=output_name,
     )
     per_modality_missing_ids[output_name] = cur_missing_ids
 
     is_deeplake = is_deeplake_dataset(data_source=output_source)
+    col_name = f"{output_name}__{output_name}"
+
+    polars_dtype: Type[pl.Int64] | Type[pl.Utf8]
     if is_deeplake:
-        dtypes[output_name] = {output_name: np.dtype("int64")}
+        polars_dtype = pl.Int64
     else:
-        dtypes[output_name] = {output_name: np.dtype("O")}
+        polars_dtype = pl.Utf8
 
-    dtypes = convert_dtypes(dtypes=dtypes)
-
-    update_labels_dict(
-        labels_dict=test_labels_dict,
-        labels_df=cur_labels.predict_labels,
+    test_labels_df = update_labels_df(
+        master_df=test_labels_df,
+        new_labels=cur_labels.predict_labels,
         output_name=output_name,
-        dtypes=dtypes,
-    )
+    ).with_columns([pl.col(col_name).cast(polars_dtype)])
+
+    return test_labels_df
 
 
 def process_survival_output_for_testing(
     output_name: str,
     tabular_target_files_info: Dict[str, Any],
     output_folder: str,
-    custom_column_label_parsing_ops: al_all_column_ops,
     ids: Sequence[str],
     all_ids: Set[str],
-    tabular_label_transformers: Dict[str, Any],
+    label_transformers: Dict[str, Any],
     per_modality_missing_ids: Dict[str, Set[str]],
     within_modality_missing_ids: Dict[str, Dict[str, Set[str]]],
-    test_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
-    dtypes: Dict[str, Dict[str, Any]],
-) -> None:
+    test_labels_df: pl.DataFrame,
+) -> pl.DataFrame:
     """
-    Process survival output data for testing phase.
+    Process survival output data for testing phase using Polars.
 
     Note: Unlike training, we only transform the time values and don't process
     event indicators, as they're not needed for prediction.
@@ -420,7 +396,6 @@ def process_survival_output_for_testing(
         output_folder=output_folder,
         tabular_info=cur_tabular_info,
         output_name=output_name,
-        custom_column_label_parsing_ops=custom_column_label_parsing_ops,
         ids=ids,
     )
 
@@ -432,13 +407,12 @@ def process_survival_output_for_testing(
     time_column = cur_tabular_info.con_columns[0]
     event_column = cur_tabular_info.cat_columns[0]
 
-    df_time = pd.read_csv(
+    df_time = pl.read_csv(
         cur_tabular_info.file_path,
-        usecols=["ID", time_column],
-        index_col="ID",
-        dtype={"ID": str},
-    )
-    df_time_test = df_time.loc[df_time.index.isin(ids)]
+        columns=["ID", time_column],
+    ).with_columns([pl.col("ID").cast(pl.Utf8), pl.col(time_column).cast(pl.Float64)])
+
+    df_time_test = df_time.filter(pl.col("ID").is_in(ids))
 
     df_time_test, cur_labels.predict_labels = synchronize_missing_survival_values(
         df_time=df_time_test,
@@ -448,16 +422,21 @@ def process_survival_output_for_testing(
     )
 
     dur_transformer = cur_labels.label_transformers[output_name][time_column]
-    cur_labels.predict_labels[time_column] = transform_durations_with_nans(
-        df=df_time_test,
-        time_column=time_column,
-        transformer=dur_transformer,
+
+    cur_labels.predict_labels = cur_labels.predict_labels.with_columns(
+        [
+            transform_durations_with_nans(
+                df=df_time_test,
+                time_column=time_column,
+                transformer=dur_transformer,
+            ).alias(time_column)
+        ]
     )
 
-    tabular_label_transformers[output_name] = cur_labels.label_transformers
+    label_transformers[output_name] = cur_labels.label_transformers
 
     all_labels = cur_labels.all_labels
-    cur_ids = set(all_labels.index)
+    cur_ids = set(all_labels.get_column("ID").to_list())
     missing_ids = all_ids.difference(cur_ids)
     per_modality_missing_ids[output_name] = missing_ids
 
@@ -468,14 +447,13 @@ def process_survival_output_for_testing(
     )
     within_modality_missing_ids.update(missing_ids_per_target_column)
 
-    update_labels_dict(
-        labels_dict=test_labels_dict,
-        labels_df=cur_labels.predict_labels,
+    test_labels_df = update_labels_df(
+        master_df=test_labels_df,
+        new_labels=cur_labels.predict_labels,
         output_name=output_name,
     )
 
-    if output_name not in dtypes:
-        dtypes[output_name] = cur_labels.predict_labels.dtypes.to_dict()
+    return test_labels_df
 
 
 def _set_up_predict_file_target_labels(
@@ -492,13 +470,16 @@ def _set_up_predict_file_target_labels(
         output_inner_key=output_inner_key,
     )
 
-    ids_set = set(ids)
-    labels: al_label_dict = {
-        id_: {output_name: id_to_data_pointer_mapping[id_]} for id_ in ids_set
-    }
+    values = [id_to_data_pointer_mapping.get(id_, None) for id_ in ids]
 
-    df_labels = pd.DataFrame.from_dict(labels, orient="index")
-    df_labels["Output Name"] = output_name
+    df_labels = pl.DataFrame(
+        {
+            "ID": list(ids),
+            f"{output_name}": values,
+        }
+    )
+
+    df_labels = df_labels.with_columns([pl.col(f"{output_name}").cast(pl.Utf8)])
 
     return PredictTargetLabels(
         predict_labels=df_labels,
@@ -510,11 +491,12 @@ def set_up_delayed_predict_target_labels(
     ids: Sequence[str],
     output_name: str,
 ) -> PredictTargetLabels:
-    ids_set = set(ids)
-    labels: al_label_dict = {id_: {output_name: torch.nan} for id_ in ids_set}
-
-    df_labels = pd.DataFrame.from_dict(labels, orient="index")
-    df_labels["Output Name"] = output_name
+    df_labels = pl.DataFrame(
+        {
+            "ID": list(ids),
+            f"{output_name}": [float("nan")] * len(ids),
+        }
+    )
 
     return PredictTargetLabels(
         predict_labels=df_labels,

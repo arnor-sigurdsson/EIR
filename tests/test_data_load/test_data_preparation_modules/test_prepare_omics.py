@@ -1,5 +1,4 @@
 from copy import deepcopy
-from pathlib import Path
 from typing import Sequence, Union
 from unittest.mock import patch
 
@@ -86,7 +85,7 @@ def test_load_omics_array_from_disk(subset_indices: Union[None, Sequence[int]]):
     ):
         loaded = prepare_omics.omics_load_wrapper(
             input_source="fake",
-            data_pointer=Path("fake"),
+            data_pointer="fake",
             subset_indices=subset_indices,
         )
 

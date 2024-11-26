@@ -39,15 +39,17 @@ def test_get_train_sampler(create_test_data, create_test_datasets, create_test_c
     gc = test_config.global_config
 
     train_dataset, *_ = create_test_datasets
-    gc.weighted_sampling_columns = ["test_output_tabular.Origin"]
+    gc.weighted_sampling_columns = ["test_output_tabular__Origin"]
 
     test_sampler = get_train_sampler(
-        columns_to_sample=gc.weighted_sampling_columns, train_dataset=train_dataset
+        columns_to_sample=gc.weighted_sampling_columns,
+        train_dataset=train_dataset,
     )
     assert isinstance(test_sampler, WeightedRandomSampler)
 
     gc.weighted_sampling_columns = None
     test_sampler = get_train_sampler(
-        columns_to_sample=gc.weighted_sampling_columns, train_dataset=train_dataset
+        columns_to_sample=gc.weighted_sampling_columns,
+        train_dataset=train_dataset,
     )
     assert test_sampler is None

@@ -528,13 +528,26 @@ def save_tabular_evaluation_results_wrapper(
                         binary_logits=cur_val_outputs
                     )
 
+                cur_val_ids = val_ids[output_name][column_name]
                 cur_val_outputs_np = cur_val_outputs.cpu().numpy()
 
                 cur_val_labels = val_labels[output_name][column_name]
                 cur_val_labels_np = cur_val_labels.cpu().numpy()
-                target_transformers = output_object.target_transformers
 
-                cur_val_ids = val_ids[output_name][column_name]
+                nan_labels_mask = np.isnan(cur_val_labels_np)
+                if column_type == "cat":
+                    nan_labels_mask = np.logical_or(
+                        nan_labels_mask, cur_val_labels_np == -1
+                    )
+
+                cur_val_ids_np = np.array(cur_val_ids)
+                cur_val_ids_np = cur_val_ids_np[~nan_labels_mask]
+                cur_val_ids = cur_val_ids_np.tolist()
+
+                cur_val_outputs_np = cur_val_outputs_np[~nan_labels_mask]
+                cur_val_labels_np = cur_val_labels_np[~nan_labels_mask]
+
+                target_transformers = output_object.target_transformers
 
                 plot_config = PerformancePlotConfig(
                     val_outputs=cur_val_outputs_np,

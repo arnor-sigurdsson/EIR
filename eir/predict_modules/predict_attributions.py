@@ -182,13 +182,8 @@ def _get_predict_background_loader(
         input_configs=configs.input_configs
     )
 
-    custom_ops = None
-    if loaded_hooks is not None:
-        custom_ops = loaded_hooks.custom_column_label_parsing_ops
-
     target_labels = get_target_labels_for_testing(
         configs_overloaded_for_predict=configs,
-        custom_column_label_parsing_ops=custom_ops,
         ids=background_ids_pool,
     )
 
@@ -207,7 +202,7 @@ def _get_predict_background_loader(
     background_dataset = set_up_default_dataset(
         configs=configs,
         outputs_as_dict=outputs_as_dict,
-        target_labels_dict=target_labels.label_dict,
+        target_labels_df=target_labels.predict_labels,
         inputs_as_dict=background_inputs_as_dict,
         missing_ids_per_output=target_labels.missing_ids_per_output,
     )
@@ -243,7 +238,7 @@ def _get_background_ids_sample(
     ids_inputs: Sequence[str],
     num_attribution_background_samples: int,
 ) -> list[str]:
-    ids_target_set = set(target_labels.label_dict.keys())
+    ids_target_set = set(target_labels.predict_labels["ID"])
     ids_inputs_set = set(ids_inputs)
 
     ids_common: list[str] = list(ids_target_set.intersection(ids_inputs_set))

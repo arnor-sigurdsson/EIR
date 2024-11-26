@@ -134,7 +134,7 @@ class MetricRecord:
     name: str
     function: MetricFunctionProtocol | SurvivalMetricFunctionProtocol
     output_type: str = "supervised"
-    only_val: bool = False
+    only_val: bool = True
     minimize_goal: bool = False
 
 
@@ -175,6 +175,13 @@ def calculate_batch_metrics(
 
             cur_labels = labels[output_name][target_name]
             cur_labels_np = cur_labels.cpu().to(dtype=torch.float32).numpy()
+
+            nan_labels_mask = np.isnan(cur_labels_np)
+            if output_target_type == "cat":
+                nan_labels_mask = np.logical_or(nan_labels_mask, cur_labels_np == -1)
+
+            cur_outputs_np = cur_outputs_np[~nan_labels_mask]
+            cur_labels_np = cur_labels_np[~nan_labels_mask]
 
             for metric_record in cur_metric_records:
 
@@ -218,6 +225,14 @@ def calculate_batch_metrics(
             cur_time_name = cur_oti.time_column
             cur_times = labels[output_name][cur_time_name]
             cur_times_np = cur_times.cpu().to(dtype=torch.float32).numpy()
+
+            nan_labels_mask = cur_labels_np == -1
+            cur_times_nan = np.isnan(cur_times_np)
+            nan_labels_mask = np.logical_or(nan_labels_mask, cur_times_nan)
+
+            cur_outputs_np = cur_outputs_np[~nan_labels_mask]
+            cur_labels_np = cur_labels_np[~nan_labels_mask]
+            cur_times_np = cur_times_np[~nan_labels_mask]
 
             for metric_record in cur_metric_records:
 
@@ -1019,12 +1034,10 @@ def get_available_supervised_metrics() -> (
         "roc-auc-macro": MetricRecord(
             name="roc-auc-macro",
             function=calc_roc_auc_ovo,
-            only_val=True,
         ),
         "ap-macro": MetricRecord(
             name="ap-macro",
             function=calc_average_precision,
-            only_val=True,
         ),
         "f1-macro": MetricRecord(
             name="f1-macro",
@@ -1053,12 +1066,10 @@ def get_available_supervised_metrics() -> (
         "r2": MetricRecord(
             name="r2",
             function=calc_r2,
-            only_val=True,
         ),
         "pcc": MetricRecord(
             name="pcc",
             function=calc_pcc,
-            only_val=True,
         ),
         "mae": MetricRecord(
             name="mae",
@@ -1073,7 +1084,6 @@ def get_available_supervised_metrics() -> (
         "explained-variance": MetricRecord(
             name="explained-variance",
             function=calc_explained_variance,
-            only_val=True,
         ),
     }
 
@@ -1090,7 +1100,6 @@ def get_available_survival_metrics(
                 calc_survival_c_index, target_transformers=target_transformers
             ),
             output_type="survival",
-            only_val=True,
             minimize_goal=False,
         ),
     )

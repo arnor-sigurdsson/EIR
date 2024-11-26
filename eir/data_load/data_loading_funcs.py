@@ -1,24 +1,15 @@
 from collections import Counter
 from statistics import mean
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-    Generator,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
+import polars as pl
 import torch
 from torch.utils.data import WeightedRandomSampler
 
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.data_load.data_utils import Sample
     from eir.data_load.datasets import DatasetBase  # noqa: F401
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -27,44 +18,25 @@ al_sample_weight_and_counts = Dict[str, torch.Tensor | list[int]]
 
 
 def get_weighted_random_sampler(
-    samples: Iterable["Sample"],
+    target_df: pl.DataFrame,
     columns_to_sample: List[str],
 ) -> WeightedRandomSampler:
     """
-    Labels spec:
-
-    {
-        {
-        ID1:
-            {
-                output_name:
-                {
-                    Label Column: Target Value,
-                    Extra Column 1: Extra Column 1 Value
-                    Extra Column 2: Extra Column 2 Value}
-                }
-            },
-        },
-        ID2: {...}
-    }
-
-    The list comprehension is going over all the label dicts associated with the IDs,
-    then just parsing the label (converting to int in the case of classification).
+    Takes a polars DataFrame with an ID column and target columns.
+    Returns a WeightedRandomSampler based on the specified columns.
     """
-
     parsed_weighted_sample_columns = _build_weighted_sample_dict_from_config_sequence(
         config_list=columns_to_sample
     )
 
     all_column_weights = {}
-    samples_list = list(samples)
 
     logger.debug("Setting up weighted sampling statistics.")
 
     for output_name, weighted_columns_list in parsed_weighted_sample_columns.items():
         logger.debug(f"Setting up weighted sampling for output '{output_name}'.")
         cur_column_weights = _gather_column_sampling_weights(
-            samples=samples_list,
+            target_df=target_df,
             output_name=output_name,
             columns_to_sample=weighted_columns_list,
         )
@@ -80,11 +52,12 @@ def get_weighted_random_sampler(
         columns_to_sample,
         num_sample_per_epoch,
     )
-    sampler = WeightedRandomSampler(
-        weights=samples_weighted, num_samples=num_sample_per_epoch, replacement=True
-    )
 
-    return sampler
+    return WeightedRandomSampler(
+        weights=samples_weighted,
+        num_samples=num_sample_per_epoch,
+        replacement=True,
+    )
 
 
 def _build_weighted_sample_dict_from_config_sequence(
@@ -96,7 +69,8 @@ def _build_weighted_sample_dict_from_config_sequence(
         if weighted_sample_config_string == "all":
             return {"all": ["all"]}
 
-        output_name, sample_column = weighted_sample_config_string.split(".", 1)
+        output_name, _ = weighted_sample_config_string.split("__", 1)
+        sample_column = weighted_sample_config_string
         if output_name not in weighted_sample_dict:
             weighted_sample_dict[output_name] = [sample_column]
         else:
@@ -106,7 +80,7 @@ def _build_weighted_sample_dict_from_config_sequence(
 
 
 def _gather_column_sampling_weights(
-    samples: Iterable["Sample"],
+    target_df: pl.DataFrame,
     output_name: str,
     columns_to_sample: Iterable[str],
 ) -> Dict[str, al_sample_weight_and_counts]:
@@ -114,18 +88,14 @@ def _gather_column_sampling_weights(
 
     for column in columns_to_sample:
         try:
-            cur_label_iterable = (
-                (
-                    i.target_labels[output_name][column]
-                    if output_name in i.target_labels
-                    and column in i.target_labels[output_name]
-                    else np.nan
-                )
-                for i in samples
+            if column == "all":
+                continue
+
+            cur_label_series = target_df.get_column(column)
+            cur_label_iterable_int = (
+                int(i) if not np.isnan(i) else np.nan for i in cur_label_series
             )
-            cur_label_iterable_int: Generator[int | float, None, None] = (
-                int(i) if not np.isnan(i) else np.nan for i in cur_label_iterable
-            )
+
             cur_weight_dict = _get_column_label_weights_and_counts(
                 label_iterable=cur_label_iterable_int,
                 column_name=column,

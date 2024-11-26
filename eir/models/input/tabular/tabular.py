@@ -235,7 +235,6 @@ def lookup_embeddings(
     """
     This produces a batch of embeddings, with dimensions N x embed_dim.
     """
-
     cur_embedding_module: nn.Embedding = getattr(model, "embed_" + embedding_col)
     cur_embedding = cur_embedding_module(labels)
 

@@ -27,8 +27,8 @@ def prepare_example_test_batch(
 ) -> Batch:
     inputs_as_dict = set_up_inputs_for_training(
         inputs_configs=configs.input_configs,
-        train_ids=tuple(labels.train_labels.keys()),
-        valid_ids=tuple(labels.valid_labels.keys()),
+        train_ids=tuple(labels.train_labels["ID"]),
+        valid_ids=tuple(labels.valid_labels["ID"]),
         hooks=None,
     )
 

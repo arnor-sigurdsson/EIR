@@ -50,15 +50,24 @@ def save_survival_evaluation_results_wrapper(
         ids = val_ids[output_name][event_name]
         model_outputs = val_outputs[output_name][event_name].cpu()
         events = val_labels[output_name][event_name].cpu().numpy().astype(int)
+        times = val_labels[output_name][time_name].cpu().numpy()
+
+        nan_labels_mask = events == -1
+        cur_times_nan = np.isnan(times)
+        nan_labels_mask = np.logical_or(nan_labels_mask, cur_times_nan)
+
+        model_outputs = model_outputs[~nan_labels_mask]
+        events = events[~nan_labels_mask]
+        times = times[~nan_labels_mask]
+        ids = np.array(ids)[~nan_labels_mask].tolist()
 
         if model_type == "discrete":
             transformers = output_object.target_transformers
             time_kbins_transformer = transformers[time_name]
             time_bins = time_kbins_transformer.bin_edges_[0]
-            times_binned = val_labels[output_name][time_name].cpu().numpy()
-            times = time_kbins_transformer.inverse_transform(
-                times_binned.reshape(-1, 1)
-            ).flatten()
+            times_binned = times
+            it_func = time_kbins_transformer.inverse_transform
+            times = it_func(times_binned.reshape(-1, 1)).flatten()
 
             hazards = torch.sigmoid(model_outputs).numpy()
             survival_probs = np.cumprod(1 - hazards, 1)
@@ -92,7 +101,6 @@ def save_survival_evaluation_results_wrapper(
             )
 
         else:
-            times = val_labels[output_name][time_name].cpu().numpy()
             risk_scores = model_outputs.numpy()
 
             unique_times, baseline_hazard = estimate_baseline_hazard(

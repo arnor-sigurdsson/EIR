@@ -12,16 +12,16 @@ from typing import (
     Protocol,
     Sequence,
     Tuple,
+    Type,
     Union,
 )
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 from tqdm import tqdm
 
-from eir.data_load.data_source_modules.csv_ops import ColumnOperation
 from eir.data_load.data_source_modules.deeplake_ops import (
     is_deeplake_dataset,
     is_deeplake_sample_missing,
@@ -35,31 +35,32 @@ from eir.utils.logging import get_logger
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type Aliases
-al_all_column_ops = Optional[dict[str, tuple[ColumnOperation, ...]]]
-al_train_val_dfs = tuple[pd.DataFrame, pd.DataFrame]
+al_train_val_dfs = tuple[pl.DataFrame, pl.DataFrame]
 
 # e.g. 'Asia' or '5' for categorical or 1.511 for continuous
 al_label_values_raw = float | int | Path
 al_sample_labels_raw = dict[str, al_label_values_raw]
 al_label_dict = dict[str, al_sample_labels_raw]
-al_target_label_dict = dict[str, al_label_dict]  # account for output name
+al_target_labels = pl.DataFrame
 al_target_columns = dict[Literal["con", "cat"], list[str]]
 al_label_transformers_object = Union[
-    StandardScaler, LabelEncoder, KBinsDiscretizer, IdentityTransformer
+    StandardScaler,
+    LabelEncoder,
+    KBinsDiscretizer,
+    IdentityTransformer,
 ]
 al_label_transformers = dict[str, al_label_transformers_object]
-al_pd_dtypes = np.ndarray | pd.CategoricalDtype
 
 
 @dataclass
 class Labels:
-    train_labels: pd.DataFrame
-    valid_labels: pd.DataFrame
+    train_labels: pl.DataFrame
+    valid_labels: pl.DataFrame
     label_transformers: al_label_transformers
 
     @property
-    def all_labels(self) -> pd.DataFrame:
-        return pd.concat([self.train_labels, self.valid_labels])
+    def all_labels(self) -> pl.DataFrame:
+        return pl.concat([self.train_labels, self.valid_labels])
 
 
 @dataclass
@@ -72,7 +73,6 @@ class TabularFileInfo:
 
 def set_up_train_and_valid_tabular_data(
     tabular_file_info: TabularFileInfo,
-    custom_label_ops: al_all_column_ops,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     impute_missing: bool = False,
@@ -82,7 +82,6 @@ def set_up_train_and_valid_tabular_data(
     Splits and does split based processing (e.g. scaling validation set with training
     set for regression) on the labels.
     """
-
     if len(tabular_file_info.con_columns) + len(tabular_file_info.cat_columns) < 1:
         raise ValueError(f"No label columns specified in {tabular_file_info}.")
 
@@ -93,7 +92,6 @@ def set_up_train_and_valid_tabular_data(
     df_labels = parse_wrapper(
         label_file_tabular_info=tabular_file_info,
         ids_to_keep=ids_to_keep,
-        custom_label_ops=custom_label_ops,
     )
     _validate_df(df=df_labels)
 
@@ -130,9 +128,34 @@ def set_up_train_and_valid_tabular_data(
     return labels_data_object
 
 
+def convert_none_to_nan(df: pl.DataFrame) -> pl.DataFrame:
+    expr = []
+    for col_name, dtype in df.schema.items():
+        if col_name == "ID":
+            expr.append(pl.col("ID"))
+            continue
+
+        if dtype.is_numeric():
+            expr.append(
+                pl.when(pl.col(col_name).is_null())
+                .then(pl.lit(float("nan")))
+                .otherwise(pl.col(col_name))
+                .alias(col_name)
+            )
+        else:
+            expr.append(
+                pl.when(pl.col(col_name).is_null())
+                .then(pl.lit("nan"))
+                .otherwise(pl.col(col_name))
+                .alias(col_name)
+            )
+
+    return df.with_columns(expr)
+
+
 def _get_fit_label_transformers(
-    df_labels_train: pd.DataFrame,
-    df_labels_full: pd.DataFrame,
+    df_labels_train: pl.DataFrame,
+    df_labels_full: pl.DataFrame,
     label_columns: al_target_columns,
     impute_missing: bool,
 ) -> al_label_transformers:
@@ -150,11 +173,11 @@ def _get_fit_label_transformers(
 
         for label_column in label_columns_for_cur_type:
             if column_type == "con":
-                cur_series = df_labels_train[label_column]
+                cur_series = df_labels_train.get_column(name=label_column).to_numpy()
             elif column_type == "cat":
-                cur_series = df_labels_full[label_column]
+                cur_series = df_labels_full.get_column(name=label_column).to_numpy()
             else:
-                raise ValueError()
+                raise ValueError(f"Unknown column type: {column_type}")
 
             cur_transformer = _get_transformer(column_type=column_type)
             cur_target_transformer_fit = _fit_transformer_on_label_column(
@@ -177,30 +200,18 @@ def _get_transformer(column_type):
 
 
 def _fit_transformer_on_label_column(
-    column_series: pd.Series,
+    column_series: np.ndarray,
     transformer: al_label_transformers_object,
     impute_missing: bool,
 ) -> al_label_transformers_object:
-    """
-    TODO:   Possibly use the categorical codes here directly in the fit call. Then we
-            don't do another pass over all values, and we ensure that the encoder
-            encounters 'NA'.
-
-    If we have a label file, and a column only consists of integers, and we are reading
-    it as a categorical columns. Then, the values of that categorical column are
-    going to be INT. This is still a categorical column, the key element is, how
-    do we change the values of a categorical column?
-    """
-
-    if isinstance(column_series.dtype, object) and column_series.dtype != float:
-        values_array: np.ndarray = np.asarray(column_series.values)
-        series_values = np.unique(values_array)
+    if np.issubdtype(column_series.dtype, np.object_) and column_series.dtype != float:
+        series_values = np.unique(column_series)
         if not impute_missing:
             series_values = series_values[series_values != "nan"]
         else:
             series_values = np.append(series_values, "nan")
     else:
-        series_values = column_series.values
+        series_values = column_series
         series_values = series_values[~np.isnan(series_values)]
 
     series_values_streamlined = streamline_values_for_transformers(
@@ -209,7 +220,6 @@ def _fit_transformer_on_label_column(
     )
 
     transformer.fit(series_values_streamlined)
-
     return transformer
 
 
@@ -228,18 +238,14 @@ def streamline_values_for_transformers(
 
 
 def transform_label_df(
-    df_labels: pd.DataFrame,
+    df_labels: pl.DataFrame,
     label_transformers: al_label_transformers,
     impute_missing: bool,
-) -> pd.DataFrame:
-    """
-    If impute missing, we transform the values as they are, as we assume the
-    encoder has been fit on the missing values as well.
-    """
-    df_labels_copy = df_labels.copy()
+) -> pl.DataFrame:
+    expr = []
 
     for column_name, transformer_instance in label_transformers.items():
-        series_values = np.asarray(df_labels_copy[column_name].values)
+        series_values = df_labels.get_column(column_name).to_numpy()
         transform_func = transformer_instance.transform
 
         if impute_missing:
@@ -247,34 +253,38 @@ def transform_label_df(
                 transformer=transformer_instance,
                 values=series_values,
             )
-            df_labels_copy[column_name] = transform_func(series_values_streamlined)
+            transformed = transform_func(series_values_streamlined)
+            expr.append(pl.lit(transformed.squeeze()).alias(column_name))
         else:
             match transformer_instance:
                 case StandardScaler():
-                    non_nan_mask = df_labels_copy[column_name].notna()
+                    non_nan_mask = ~df_labels.get_column(column_name).is_null()
                 case LabelEncoder():
-                    non_nan_mask = df_labels_copy[column_name] != "nan"
+                    non_nan_mask = df_labels.get_column(column_name) != "nan"
                 case KBinsDiscretizer() | IdentityTransformer():
-                    non_nan_mask = df_labels_copy[column_name].notna()
+                    non_nan_mask = ~df_labels.get_column(column_name).is_null()
                 case _:
-                    raise ValueError()
+                    raise ValueError(
+                        f"Unknown transformer type: {type(transformer_instance)}"
+                    )
 
-            non_nan_values = df_labels_copy.loc[non_nan_mask, column_name].values
-            non_nan_values_arr = np.asarray(non_nan_values)
-
+            non_nan_values = series_values[non_nan_mask.to_numpy()]
             series_values_streamlined = streamline_values_for_transformers(
                 transformer=transformer_instance,
-                values=non_nan_values_arr,
+                values=non_nan_values,
             )
 
             transformed_values = transform_func(series_values_streamlined).squeeze()
-            df_labels_copy.loc[non_nan_mask, column_name] = transformed_values
 
-            match transformer_instance:
-                case LabelEncoder():
-                    df_labels_copy.loc[~non_nan_mask, column_name] = np.nan
+            result = np.full(len(series_values), np.nan)
+            result[non_nan_mask.to_numpy()] = transformed_values
 
-    return df_labels_copy
+            if isinstance(transformer_instance, LabelEncoder):
+                result[~non_nan_mask.to_numpy()] = np.nan
+
+            expr.append(pl.lit(result).alias(column_name))
+
+    return df_labels.with_columns(expr)
 
 
 class LabelDFParseWrapperProtocol(Protocol):
@@ -282,8 +292,7 @@ class LabelDFParseWrapperProtocol(Protocol):
         self,
         label_file_tabular_info: TabularFileInfo,
         ids_to_keep: Union[None, Sequence[str]],
-        custom_label_ops: al_all_column_ops = None,
-    ) -> pd.DataFrame: ...
+    ) -> pl.DataFrame: ...
 
 
 def get_label_parsing_wrapper(
@@ -294,13 +303,17 @@ def get_label_parsing_wrapper(
     return chunked_label_df_parse_wrapper
 
 
-def _validate_df(df: pd.DataFrame) -> None:
-    if df.index.duplicated().any():
-        duplicated_indices = df.index[df.index.duplicated()].tolist()[:10]
-        duplicated_indices_str = ", ".join(duplicated_indices)
+def _validate_df(df: pl.DataFrame) -> None:
+    duplicate_counts = (
+        df.group_by("ID").agg(pl.count().alias("count")).filter(pl.col("count") > 1)
+    )
+
+    if duplicate_counts.height > 0:
+        duplicated_ids = duplicate_counts.select("ID").limit(10).to_series().to_list()
+        duplicated_indices_str = ", ".join(map(str, duplicated_ids))
         raise ValueError(
             f"Found duplicated indices in the dataframe. "
-            f"Random examples:  {duplicated_indices_str}. "
+            f"Random examples: {duplicated_indices_str}. "
             f"Please make sure that the indices in the ID column are unique."
         )
 
@@ -308,53 +321,37 @@ def _validate_df(df: pd.DataFrame) -> None:
 def label_df_parse_wrapper(
     label_file_tabular_info: TabularFileInfo,
     ids_to_keep: Union[None, Sequence[str]],
-    custom_label_ops: al_all_column_ops = None,
-) -> pd.DataFrame:
-    """
-    Note: Here the genomic arrays are the dominant factor
-    in determining whether we drop or not.
-
-    If we start doing multimodal data, we no longer can say that the genomic test set
-    is the test set, unless we are careful about syncing all data sources (e.g. images,
-    other omics, etc.).
-    """
-
-    column_ops = {}
-    if custom_label_ops is not None:
-        column_ops = custom_label_ops
+) -> pl.DataFrame:
 
     all_label_columns, dtypes = _get_all_label_columns_and_dtypes(
         cat_columns=label_file_tabular_info.cat_columns,
         con_columns=label_file_tabular_info.con_columns,
-        column_ops=column_ops,
     )
 
     df_labels = _load_label_df(
         label_fpath=label_file_tabular_info.file_path,
         columns=all_label_columns,
-        custom_label_ops=column_ops,
         dtypes=dtypes,
     )
 
     df_labels_filtered = _filter_ids_from_label_df(
-        df_labels=df_labels, ids_to_keep=ids_to_keep
-    )
-
-    df_labels_column_op_parsed = _apply_column_operations_to_df(
-        df=df_labels_filtered,
-        operations_dict=column_ops,
-        label_columns=all_label_columns,
+        df_labels=df_labels,
+        ids_to_keep=ids_to_keep,
     )
 
     supplied_columns = get_passed_in_columns(tabular_info=label_file_tabular_info)
     df_column_filtered = _drop_not_needed_label_columns(
-        df=df_labels_column_op_parsed, needed_label_columns=supplied_columns
+        df=df_labels_filtered,
+        needed_label_columns=supplied_columns,
     )
 
     df_cat_str = ensure_categorical_columns_and_format(df=df_column_filtered)
 
+    df_no_none = convert_none_to_nan(df=df_cat_str)
+
     df_final = _check_parsed_label_df(
-        df_labels=df_cat_str, supplied_label_columns=supplied_columns
+        df_labels=df_no_none,
+        supplied_label_columns=supplied_columns,
     )
 
     return df_final
@@ -363,141 +360,85 @@ def label_df_parse_wrapper(
 def chunked_label_df_parse_wrapper(
     label_file_tabular_info: TabularFileInfo,
     ids_to_keep: Union[None, Sequence[str]],
-    custom_label_ops: al_all_column_ops = None,
-) -> pd.DataFrame:
-    """
-    Note that we have to recast the dtypes to preserve the categorical dtypes
-    after concatenation, otherwise they will be cast to object (i.e. str).
-    See: https://github.com/pandas-dev/pandas/issues/25412
-
-    We can be a bit risky in the cast (i.e. only casting columns that are in the DF,
-    even if they are specified in the dtypes), because _check_parsed_label_df will
-    raise an error if there is any mismatch.
-
-    If this starts to lead to memory issues, we can try using pandas union_categoricals.
-
-    Note that we continue in the case that we have empty dfs after filtering for IDs.
-    This is to avoid errors when applying column operations to empty dfs, as that case
-    might not be considered in the column operation functions. The case for supporting
-    that in column operations might be some manual creation of a df assuming that it
-    can be empty, but I think its a very rare use case, so not supported for now.
-    """
-
-    column_ops = {}
-    if custom_label_ops is not None:
-        column_ops = custom_label_ops
+) -> pl.DataFrame:
 
     label_columns, dtypes = _get_all_label_columns_and_dtypes(
         cat_columns=label_file_tabular_info.cat_columns,
         con_columns=label_file_tabular_info.con_columns,
-        column_ops=column_ops,
     )
 
     assert isinstance(label_file_tabular_info.parsing_chunk_size, int)
-    chunk_generator = _get_label_df_chunk_generator(
-        chunk_size=label_file_tabular_info.parsing_chunk_size,
-        label_fpath=label_file_tabular_info.file_path,
-        columns=label_columns,
-        custom_label_ops=column_ops,
-        dtypes=dtypes,
+
+    stream = pl.read_csv_batched(
+        source=label_file_tabular_info.file_path,
+        schema_overrides=dtypes,
+        has_header=True,
+        batch_size=label_file_tabular_info.parsing_chunk_size,
     )
 
-    processed_chunks: list[pd.DataFrame] = []
     supplied_columns = get_passed_in_columns(tabular_info=label_file_tabular_info)
 
-    for chunk in chunk_generator:
-        assert isinstance(chunk, pd.DataFrame)
+    def process_chunk(chunk: pl.DataFrame) -> Optional[pl.DataFrame]:
+        if chunk.height == 0:
+            return None
+
         df_labels_filtered = _filter_ids_from_label_df(
-            df_labels=chunk, ids_to_keep=ids_to_keep
+            df_labels=chunk,
+            ids_to_keep=ids_to_keep,
         )
 
-        if len(df_labels_filtered) == 0:
-            continue
+        if df_labels_filtered.height == 0:
+            return None
 
-        df_labels_parsed = _apply_column_operations_to_df(
+        if df_labels_filtered.height == 0:
+            return None
+
+        return _drop_not_needed_label_columns(
             df=df_labels_filtered,
-            operations_dict=column_ops,
-            label_columns=label_columns,
+            needed_label_columns=supplied_columns,
         )
 
-        if len(df_labels_parsed) == 0:
-            continue
+    processed_chunks: list[pl.DataFrame] = []
 
-        df_column_filtered = _drop_not_needed_label_columns(
-            df=df_labels_parsed, needed_label_columns=supplied_columns
-        )
+    while True:
+        next_batches = stream.next_batches(1)
 
-        processed_chunks.append(df_column_filtered)
+        if not next_batches:
+            break
 
-    df_concat = pd.concat(processed_chunks)
+        for chunk in next_batches:
+            processed_chunk = process_chunk(chunk)
+            if processed_chunk is not None:
+                processed_chunks.append(processed_chunk)
 
-    # TODO: Remove cast after pandas fixes issue, see docstring
-    dtype_cast = {k: v for k, v in dtypes.items() if k in df_concat.columns}
-    df_concat = df_concat.astype(dtype=dtype_cast)
+    if not processed_chunks:
+        return pl.DataFrame(schema=dtypes)
+
+    df_concat = pl.concat(processed_chunks)
 
     df_cat_str = ensure_categorical_columns_and_format(df=df_concat)
 
     df_final = _check_parsed_label_df(
-        df_labels=df_cat_str, supplied_label_columns=supplied_columns
+        df_labels=df_cat_str,
+        supplied_label_columns=supplied_columns,
     )
 
     return df_final
 
 
-def _get_label_df_chunk_generator(
-    chunk_size: int,
-    label_fpath: Path,
-    columns: Sequence[str],
-    custom_label_ops: al_all_column_ops,
-    dtypes: Optional[Dict[str, Any]] = None,
-) -> Generator[pd.DataFrame, None, None]:
-    """
-    We accept only loading the available columns at this point because the passed
-    in columns might be forward referenced, meaning that they might be created
-    by the custom library.
-    """
-    assert isinstance(chunk_size, int)
+def ensure_categorical_columns_and_format(df: pl.DataFrame) -> pl.DataFrame:
+    expr = []
+    for column in df.columns:
+        if column == "ID":
+            continue
 
-    dtypes = _ensure_id_str_dtype(dtypes=dtypes)
+        col_dtype = df.schema[column]
+        if col_dtype in [pl.Object, pl.Categorical, pl.Utf8]:
+            expr.append(pl.col(column).cast(pl.Categorical).alias(column))
+        else:
+            expr.append(pl.col(column))
 
-    logger.debug("Reading in labelfile: %s in chunks of %d.", label_fpath, chunk_size)
-
-    columns_with_id_col = ["ID"] + list(columns)
-    available_columns = _get_currently_available_columns(
-        label_fpath=label_fpath,
-        requested_columns=columns_with_id_col,
-        custom_label_ops=custom_label_ops,
-    )
-
-    chunks_processed = 0
-    for chunk in pd.read_csv(
-        label_fpath,
-        usecols=available_columns,
-        dtype=dtypes,
-        low_memory=False,
-        chunksize=chunk_size,
-    ):
-        logger.debug(
-            "Processsed %d rows so far in %d chunks.",
-            chunk_size * chunks_processed,
-            chunks_processed,
-        )
-        chunks_processed += 1
-
-        chunk = chunk.set_index("ID")
-        yield chunk
-
-
-def ensure_categorical_columns_and_format(df: pd.DataFrame) -> pd.DataFrame:
-    df_copy = df.copy()
-    for column in df_copy.columns:
-        if df_copy[column].dtype == object:
-            df_copy[column] = df_copy[column].astype(str)
-
-        if isinstance(df_copy[column].dtype, pd.CategoricalDtype):
-            df_copy[column] = df_copy[column].astype(str)
-
-    return df_copy
+    return df.with_columns(expr)
 
 
 def gather_all_ids_from_all_inputs(
@@ -569,9 +510,8 @@ def build_deeplake_available_id_iterator(
 
 @lru_cache()
 def gather_ids_from_tabular_file(file_path: Path) -> Tuple[str, ...]:
-    df = pd.read_csv(file_path, usecols=["ID"])
-    all_ids = tuple(df["ID"].astype(str))
-
+    df = pl.read_csv(file_path, columns=["ID"])
+    all_ids = tuple(df.select(pl.col("ID").cast(pl.Utf8)).to_series().to_list())
     return all_ids
 
 
@@ -606,18 +546,13 @@ def get_file_path_iterator(
 def _get_all_label_columns_and_dtypes(
     cat_columns: Sequence[str],
     con_columns: Sequence[str],
-    column_ops: al_all_column_ops,
-) -> Tuple[Sequence[str], Dict[str, Any]]:
+) -> Tuple[Sequence[str], dict[str, Type[pl.Categorical] | Type[pl.Float64]]]:
     supplied_label_columns = _get_column_dtypes(
-        cat_columns=cat_columns, con_columns=con_columns
+        cat_columns=cat_columns,
+        con_columns=con_columns,
     )
 
-    label_columns = list(supplied_label_columns.keys())
-    extra_label_parsing_cols = _get_extra_columns(
-        label_columns=label_columns, all_column_ops=column_ops
-    )
-
-    all_cols_and_dtypes = {**supplied_label_columns, **extra_label_parsing_cols}
+    all_cols_and_dtypes = {**supplied_label_columns}
     all_cols = tuple(all_cols_and_dtypes.keys())
     supplied_dtypes = {k: v for k, v in all_cols_and_dtypes.items() if v is not None}
 
@@ -626,67 +561,22 @@ def _get_all_label_columns_and_dtypes(
 
 def _get_column_dtypes(
     cat_columns: Sequence[str], con_columns: Sequence[str]
-) -> Dict[str, Any]:
-    dtypes = {}
+) -> dict[str, Type[pl.Categorical] | Type[pl.Float64]]:
+    dtypes: dict[str, Type[pl.Categorical] | Type[pl.Float64]] = {}
 
     for cat_column in cat_columns:
-        dtypes[cat_column] = object
+        dtypes[cat_column] = pl.Categorical
     for con_column in con_columns:
-        dtypes[con_column] = float
+        dtypes[con_column] = pl.Float64
 
     return dtypes
-
-
-def _get_extra_columns(
-    label_columns: List[str], all_column_ops: al_all_column_ops
-) -> Dict[str, Any]:
-    """
-    We use this to grab extra columns needed for the current run, as specified in the
-    COLUMN_OPS, where the keys are the label columns. That is, "for running with these
-    specific label columns, what other columns do we need to grab", as specified
-    by the extra_columns_deps attribute of each column operation.
-    """
-
-    extra_columns = {}
-
-    assert all_column_ops is not None
-    for column_name in label_columns + ["base", "post"]:
-        if column_name in all_column_ops:
-            cur_column_operations_sequence = all_column_ops[column_name]
-
-            for cur_column_operation_object in cur_column_operations_sequence:
-                cur_extra_columns = cur_column_operation_object.extra_columns_deps
-                cur_column_dtypes = cur_column_operation_object.column_dtypes
-
-                if cur_column_dtypes is None:
-                    cur_column_dtypes = {}
-
-                if cur_extra_columns is None:
-                    continue
-
-                for cur_extra_column in cur_extra_columns:
-                    cur_dtype = cur_column_dtypes.get(cur_extra_column, None)
-                    extra_columns[cur_extra_column] = cur_dtype
-
-    return extra_columns
 
 
 def _load_label_df(
     label_fpath: Path,
     columns: Sequence[str],
-    custom_label_ops: al_all_column_ops,
-    dtypes: Union[Dict[str, Any], None] = None,
-) -> pd.DataFrame:
-    """
-    We accept only loading the available columns at this point because the passed
-    in columns might be forward referenced, meaning that they might be created
-    by the custom library.
-
-    We do the casting there to object as otherwise pandas will automatically
-    cast to e.g. int-CategoricalDtype, but we want to keep categorical columns as
-    an object / str dtype for compatibility with other parts of the codebase.
-    """
-
+    dtypes: Optional[dict[str, type[pl.Categorical] | type[pl.Float64]]] = None,
+) -> pl.DataFrame:
     dtypes = _ensure_id_str_dtype(dtypes=dtypes)
 
     logger.debug("Reading in labelfile: %s. ID is read as str dtype.", label_fpath)
@@ -695,45 +585,52 @@ def _load_label_df(
     available_columns = _get_currently_available_columns(
         label_fpath=label_fpath,
         requested_columns=columns_with_id_col,
-        custom_label_ops=custom_label_ops,
     )
 
-    df_labels = pd.read_csv(
-        filepath_or_buffer=label_fpath,
-        usecols=available_columns,
-        dtype=dtypes,
-        engine="pyarrow",
+    df_labels = pl.read_csv(
+        label_fpath,
+        columns=available_columns,
+        schema_overrides=dtypes,
     )
-    # pyarrow fills missing values with None,
-    # which is not compatible with the rest of
-    # the codebase
-    df_labels = df_labels.map(lambda x: np.nan if x is None else x)
 
-    for column, dtype in dtypes.items():
-        if dtype == "category" and column in df_labels.columns:
-            df_labels[column] = df_labels[column].astype(str)
+    map_expressions = [
+        get_map_expr(
+            col=col,
+            df_schema=df_labels.schema,
+        )
+        for col in df_labels.columns
+    ]
 
-    for column, dtype in dtypes.items():
-        if column in df_labels.columns:
-            if dtype == "category":
-                df_labels[column] = pd.Categorical(df_labels[column])
-            else:
-                df_labels[column] = df_labels[column].astype(dtype)
+    df_labels = df_labels.with_columns(map_expressions)
 
-    df_labels = df_labels.set_index("ID")
+    df_labels = df_labels.select([pl.col("ID").cast(pl.Utf8), pl.all().exclude("ID")])
+
     pre_check_label_df(df=df_labels, name=str(label_fpath))
 
     return df_labels
 
 
-def pre_check_label_df(df: pd.DataFrame, name: str) -> None:
+def get_map_expr(col: str, df_schema: dict[str, pl.DataType]) -> pl.Expr:
+    dtype = df_schema[col]
+    if isinstance(dtype, pl.Categorical):
+        return (
+            pl.col(col)
+            .map_elements(lambda x: None if x == "nan" else x, return_dtype=pl.Utf8)
+            .cast(pl.Categorical)
+        )
+    return pl.col(col).map_elements(
+        lambda x: None if x == "nan" else x, return_dtype=dtype
+    )
+
+
+def pre_check_label_df(df: pl.DataFrame, name: str) -> None:
     for column in df.columns:
-        if df[column].isnull().all():
+        if df.get_column(column).is_null().all():
             raise ValueError(
                 f"All values are NULL in column '{column}' from {name}. "
                 f"This can either be due to all values in the column actually "
-                f"being NULL, or an unfavorable split happened during train/validation"
-                f" splitting, causing all values in the training split for the column "
+                f"being NULL, or an unfavorable split happened during train/validation "
+                f"splitting, causing all values in the training split for the column "
                 f"to be NULL. For now this will raise an error, but might be handled "
                 f"in the future."
                 f" In any case, please remove '{column}' as an input/target for now.",
@@ -741,17 +638,19 @@ def pre_check_label_df(df: pd.DataFrame, name: str) -> None:
 
 
 def check_train_valid_df_sync(
-    df_train: pd.DataFrame, df_valid: pd.DataFrame, cat_columns: Sequence[str]
+    df_train: pl.DataFrame, df_valid: pl.DataFrame, cat_columns: Sequence[str]
 ) -> None:
     for col in cat_columns:
-        train_values = set(df_train[col].unique())
-        valid_values = set(df_valid[col].unique())
+        train_values = set(df_train.get_column(col).unique().to_list())
+        valid_values = set(df_valid.get_column(col).unique().to_list())
 
         mismatched_values = valid_values - train_values
 
         if mismatched_values:
-            total_mismatch_count = sum(df_valid[col].isin(mismatched_values))
-            total_count = len(df_valid) + len(df_train)
+            total_mismatch_count = df_valid.filter(
+                pl.col(col).is_in(list(mismatched_values))
+            ).height
+            total_count = df_valid.height + df_train.height
             percentage = (total_mismatch_count / total_count) * 100
 
             error_message = (
@@ -784,11 +683,11 @@ def check_train_valid_df_sync(
             logger.warning(error_message)
 
 
-def _ensure_id_str_dtype(dtypes: Union[Dict[str, Any], None]) -> Dict[str, Any]:
+def _ensure_id_str_dtype(dtypes: Union[dict[str, Any], None]) -> dict[str, Any]:
     if dtypes is None:
-        dtypes = {"ID": str}
+        dtypes = {"ID": pl.Utf8}
     elif "ID" not in dtypes.keys():
-        dtypes["ID"] = str
+        dtypes["ID"] = pl.Utf8
 
     return dtypes
 
@@ -796,30 +695,14 @@ def _ensure_id_str_dtype(dtypes: Union[Dict[str, Any], None]) -> Dict[str, Any]:
 def _get_currently_available_columns(
     label_fpath: Path,
     requested_columns: List[str],
-    custom_label_ops: al_all_column_ops,
 ) -> List[str]:
-    """
-    If custom label operations are specified, the requested columns could be forward
-    references. Hence, we should not raise an error if there is a possibility of them
-    being created at runtime.
-
-    However, if no custom operations are specified, we should fail here if columns
-    are not found.
-    """
-
-    label_file_columns_set = set(
-        pd.read_csv(label_fpath, dtype={"ID": str}, nrows=0).columns
-    )
+    label_file_columns_set = set(pl.read_csv(label_fpath, n_rows=0).columns)
 
     requested_columns_set = set(requested_columns)
 
-    if custom_label_ops is None:
-        missing_columns = requested_columns_set - label_file_columns_set
-        if missing_columns:
-            raise ValueError(
-                f"No custom library specified and could not find columns "
-                f"{missing_columns} in {label_fpath}."
-            )
+    missing_columns = requested_columns_set - label_file_columns_set
+    if missing_columns:
+        raise ValueError(f"Could not find columns {missing_columns} in {label_fpath}.")
 
     available_columns = requested_columns_set.intersection(label_file_columns_set)
 
@@ -827,17 +710,16 @@ def _get_currently_available_columns(
 
 
 def _filter_ids_from_label_df(
-    df_labels: pd.DataFrame, ids_to_keep: Union[None, Sequence[str]] = None
-) -> pd.DataFrame:
+    df_labels: pl.DataFrame, ids_to_keep: Union[None, Sequence[str]] = None
+) -> pl.DataFrame:
     if not ids_to_keep:
         return df_labels
 
-    no_labels = df_labels.shape[0]
+    no_labels = df_labels.height
 
-    mask = df_labels.index.isin(ids_to_keep)
-    df_filtered = df_labels.loc[mask, :].copy()
+    df_filtered = df_labels.filter(pl.col("ID").is_in(ids_to_keep))
 
-    no_dropped = no_labels - df_filtered.shape[0]
+    no_dropped = no_labels - df_filtered.height
 
     logger.debug(
         "Removed %d file IDs from label file based on IDs present in data folder.",
@@ -847,148 +729,13 @@ def _filter_ids_from_label_df(
     return df_filtered
 
 
-def _apply_column_operations_to_df(
-    df: pd.DataFrame, operations_dict: al_all_column_ops, label_columns: Sequence[str]
-) -> pd.DataFrame:
-    """
-    We want to be able to dynamically apply various operations to different columns
-    in the label file (e.g. different operations for creating obesity labels or parsing
-    country of origin).
-
-    We consider applying a column operation if:
-
-        1. The column is in the df, hence loaded explicitly or as an extra column.
-        2. It is not in the df, but in label columns. Hence expected to be created
-           by the column op.
-
-    If a column operation is supposed to only be applied if its column is a label
-    column, make sure it's not applied in other cases (e.g. if the column is a
-    embedding / continuous input to another target).
-
-    Why this 'base'? In the custom column operations, we might have operations that
-    should always be called. They have the key 'base' in the column_ops dictionary.
-    Same logic for 'post', we might have operations that should only be applied
-    after all other stand-alone operations have been applied.
-
-    Note that we have the return condition there for empty dataframes currently. This
-    is because currently we do not enforce on the applied operations that they should
-    always work with empty dataframes, and in e.g. cases where we are applying row-based
-    filtering operations on chunks, it can happens that an empty chunk ensues. In that
-    case, we will pass an empty df to operation functions that expect an actual df,
-    which in many cases will cause them to raise an error. To avoid this, we immediately
-    return the empty df if encountered.
-
-    :param df: Dataframe to perform processing on.
-    :param operations_dict: A dictionary of column names, where each value is a list
-    of tuples, where each tuple is a callable as the first element and the callable's
-    arguments as the second element.
-    :param label_columns:
-    :return: Parsed dataframe.
-    """
-
-    if operations_dict is None:
-        return df
-
-    for operation_name, operation_sequences in operations_dict.items():
-        if len(df) == 0:
-            return df
-
-        if _should_apply_op_sequence(
-            operation_name=operation_name,
-            columns_in_df=list(df.columns),
-            label_columns=label_columns,
-        ):
-            df = _apply_operation_sequence(
-                df=df,
-                operation_sequence=operation_sequences,
-                operation_name=operation_name,
-                label_columns=label_columns,
-            )
-
-    if len(df) == 0:
-        return df
-
-    if "post" in operations_dict.keys():
-        post_operations = operations_dict["post"]
-
-        df = _apply_operation_sequence(
-            df=df,
-            operation_sequence=post_operations,
-            operation_name="post",
-            label_columns=label_columns,
-        )
-
-    return df
-
-
-def _should_apply_op_sequence(
-    operation_name: str, columns_in_df: list[str], label_columns: Sequence[str]
-) -> bool:
-    column_in_df = operation_name in columns_in_df
-    column_expected_to_be_made = (
-        operation_name in label_columns and operation_name not in columns_in_df
-    )
-    is_candidate = (
-        column_in_df or column_expected_to_be_made or operation_name in ["base"]
-    )
-    return is_candidate
-
-
-def _apply_operation_sequence(
-    df: pd.DataFrame,
-    operation_sequence: Sequence[ColumnOperation],
-    operation_name: str,
-    label_columns: Sequence[str],
-) -> pd.DataFrame:
-    for operation in operation_sequence:
-        if _should_apply_single_op(
-            column_operation=operation,
-            operation_name=operation_name,
-            label_columns=label_columns,
-        ):
-            df = apply_column_op(
-                df=df,
-                operation=operation,
-                operation_name=operation_name,
-            )
-
-    return df
-
-
-def _should_apply_single_op(
-    column_operation: ColumnOperation, operation_name: str, label_columns: Sequence[str]
-) -> bool:
-    only_apply_if_target = column_operation.only_apply_if_target
-    not_a_label_col = operation_name not in label_columns
-    do_skip = only_apply_if_target and not_a_label_col
-
-    do_call = not do_skip or operation_name in ["base", "post"]
-    return do_call
-
-
-def apply_column_op(
-    df: pd.DataFrame,
-    operation: ColumnOperation,
-    operation_name: str,
-) -> pd.DataFrame:
-    func, args_dict = operation.function, operation.function_args
-    logger.debug(
-        "Applying func %s with args %s to column %s in pre-processing.",
-        func,
-        reprlib.repr(args_dict),
-        operation_name,
-    )
-    logger.debug("Shape before: %s", df.shape)
-    df = func(df=df, column_name=operation_name, **args_dict)
-    logger.debug("Shape after: %s", df.shape)
-
-    return df
-
-
 def _check_parsed_label_df(
-    df_labels: pd.DataFrame,
+    df_labels: pl.DataFrame,
     supplied_label_columns: Sequence[str],
-) -> pd.DataFrame:
+) -> pl.DataFrame:
+    """
+    Validate DataFrame structure and types using Polars.
+    """
     missing_columns = set(supplied_label_columns) - set(df_labels.columns)
     if missing_columns:
         raise ValueError(
@@ -998,16 +745,32 @@ def _check_parsed_label_df(
             f"found in the raw label file."
         )
 
-    assert df_labels.index.dtype == object
+    id_dtype = df_labels.schema["ID"]
+    assert id_dtype == pl.Utf8, f"ID column must be string type, got {id_dtype}"
 
-    column_dtypes = df_labels.dtypes.to_dict()
+    for column in df_labels.columns:
+        dtype = df_labels.schema[column]
 
-    for column, dtype in column_dtypes.items():
-        assert isinstance(dtype, object) or dtype == float, (column, dtype)
+        if column == "ID":
+            assert dtype == pl.Utf8, f"ID column must be string type, got {dtype}"
+            continue
 
-        if isinstance(dtype, object) and dtype != float:
-            categories = np.unique(df_labels[column].values)
-            assert all(isinstance(i, str) for i in categories), categories
+        assert dtype in [
+            pl.Float64,
+            pl.Categorical,
+        ], f"Column {column} has invalid type {dtype}"
+
+        if dtype == pl.Categorical:
+            non_null_vals = (
+                df_labels.filter(pl.col(column).is_not_null())
+                .get_column(column)
+                .unique()
+            )
+
+            if len(non_null_vals) > 0:
+                assert all(
+                    isinstance(val, str) for val in non_null_vals
+                ), f"Non-string values found in string column {column}"
 
     return df_labels
 
@@ -1022,24 +785,25 @@ def get_passed_in_columns(tabular_info: TabularFileInfo) -> Sequence[str]:
 
 
 def _drop_not_needed_label_columns(
-    df: pd.DataFrame, needed_label_columns: Sequence[str]
-) -> pd.DataFrame:
-    to_drop = [i for i in df.columns if i not in needed_label_columns]
-
-    if to_drop:
-        df = df.drop(to_drop, axis=1)
-
-    return df
+    df: pl.DataFrame, needed_label_columns: Sequence[str]
+) -> pl.DataFrame:
+    needed_columns = ["ID"] + [col for col in needed_label_columns]
+    return df.select(needed_columns)
 
 
 def _split_df_by_ids(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     train_ids: list[str],
     valid_ids: list[str],
 ) -> al_train_val_dfs:
-    df_labels_train = df.loc[df.index.intersection(train_ids)]
-    df_labels_valid = df.loc[df.index.intersection(valid_ids)]
-    assert len(df_labels_train) + len(df_labels_valid) == len(df)
+    df_labels_train = df.filter(pl.col("ID").is_in(train_ids))
+    df_labels_valid = df.filter(pl.col("ID").is_in(valid_ids))
+
+    msg = (
+        "Total number of rows in train and validation "
+        "sets doesn't match original DataFrame"
+    )
+    assert df_labels_train.height + df_labels_valid.height == df.height, msg
 
     return df_labels_train, df_labels_valid
 
@@ -1096,21 +860,13 @@ def _split_ids_manual(
 
 def _process_train_and_label_dfs(
     tabular_info: TabularFileInfo,
-    df_labels_train: pd.DataFrame,
-    df_labels_valid: pd.DataFrame,
+    df_labels_train: pl.DataFrame,
+    df_labels_valid: pl.DataFrame,
     impute_missing: bool,
-) -> Tuple[pd.DataFrame, pd.DataFrame, al_label_transformers]:
-    """
-    NOTE: Possibly, we will run into problem here in the future in the scenario that
-    we have NA in the df_valid, but not in df_train. Then, we will have to add call
-    to a helper function (e.g. _match_df_category_columns). Another even more
-    problematic scenario is if we only have NA in the test set (because here we have
-    knowledge of both train / valid, so we can match them, but we cannot assume we
-    have access to the test set at the time of training).
-    """
-
+) -> Tuple[pl.DataFrame, pl.DataFrame, al_label_transformers]:
     train_con_means = _get_con_manual_vals_dict(
-        df=df_labels_train, con_columns=tabular_info.con_columns
+        df=df_labels_train,
+        con_columns=tabular_info.con_columns,
     )
 
     df_labels_train_no_nan = handle_missing_label_values_in_df(
@@ -1131,7 +887,7 @@ def _process_train_and_label_dfs(
         impute_missing=impute_missing,
     )
 
-    df_labels_full = pd.concat([df_labels_train_no_nan, df_labels_valid_no_nan])
+    df_labels_full = pl.concat([df_labels_train_no_nan, df_labels_valid_no_nan])
 
     label_columns: al_target_columns = {
         "con": list(tabular_info.con_columns),
@@ -1160,20 +916,31 @@ def _process_train_and_label_dfs(
 
 
 def _get_con_manual_vals_dict(
-    df: pd.DataFrame, con_columns: Sequence[str]
-) -> Dict[str, float]:
-    con_means_dict = {column: df[column].mean() for column in con_columns}
+    df: pl.DataFrame,
+    con_columns: Sequence[str],
+) -> dict[str, float]:
+    con_means_dict: dict[str, float] = {}
+
+    for column in con_columns:
+        column_mean = (
+            df.get_column(column).drop_nans().drop_nulls().cast(pl.Float64).mean()
+        )
+        if isinstance(column_mean, (int, float)):
+            con_means_dict[column] = float(column_mean)
+        else:
+            con_means_dict[column] = 0.0
+
     return con_means_dict
 
 
 def handle_missing_label_values_in_df(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     cat_label_columns: Sequence[str],
     con_label_columns: Sequence[str],
     impute_missing: bool,
-    con_manual_values: Union[Dict[str, float], None] = None,
+    con_manual_values: Optional[dict[str, float]] = None,
     name: str = "df",
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     df_filled_cat = _fill_categorical_nans(
         df=df,
         column_names=cat_label_columns,
@@ -1196,61 +963,79 @@ def handle_missing_label_values_in_df(
 
 
 def _fill_categorical_nans(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     column_names: Sequence[str],
     impute_missing: bool,
     name: str = "df",
-) -> pd.DataFrame:
-    """
-    Note when dealing with categories, we have to make sure it exists in the parent
-    category mapping before adding it as a value to the column.
-    """
-
+) -> pl.DataFrame:
     missing_stats = _get_missing_stats_string(df=df, columns_to_check=column_names)
 
-    for column in column_names:
-        if impute_missing:
-            logger.debug(
-                "Replacing NaNs in categorical columns %s (counts: %s) "
-                "in %s with 'NA'.",
-                column_names,
-                missing_stats,
-                name,
-            )
-            df[column] = df[column].fillna("nan")
+    if not impute_missing:
+        return df
 
-    return df
+    logger.debug(
+        "Replacing NaNs in categorical columns %s (counts: %s) " "in %s with 'NA'.",
+        column_names,
+        missing_stats,
+        name,
+    )
+
+    expr = [
+        pl.when(pl.col(col).is_null())
+        .then(pl.lit("nan"))
+        .otherwise(pl.col(col))
+        .alias(col)
+        for col in column_names
+    ]
+
+    other_cols = [col for col in df.columns if col not in column_names]
+    expr.extend([pl.col(col) for col in other_cols])
+
+    return df.with_columns(expr)
 
 
 def _fill_continuous_nans(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     column_names: Sequence[str],
     con_means_dict: Dict[str, float],
     impute_missing: bool,
     name: str = "df",
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     missing_stats = _get_missing_stats_string(df=df, columns_to_check=column_names)
 
-    if impute_missing:
-        logger.debug(
-            "Replacing NaNs in continuous columns %s (counts: %s) in %s with %s",
-            column_names,
-            missing_stats,
-            name,
-            con_means_dict,
-        )
+    if not impute_missing:
+        return df
 
-        df[column_names] = df[column_names].fillna(con_means_dict)
-    return df
+    logger.debug(
+        "Replacing NaNs in continuous columns %s (counts: %s) in %s with %s",
+        column_names,
+        missing_stats,
+        name,
+        con_means_dict,
+    )
+
+    cols_to_fill = con_means_dict.keys()
+
+    expr = [
+        pl.when(pl.col(col).is_null() | pl.col(col).is_nan())
+        .then(pl.lit(con_means_dict[col]))
+        .otherwise(pl.col(col))
+        .alias(col)
+        for col in cols_to_fill
+    ]
+
+    other_cols = [col for col in df.columns if col not in column_names]
+    expr.extend([pl.col(col) for col in other_cols])
+
+    return df.with_columns(expr)
 
 
 def _get_missing_stats_string(
-    df: pd.DataFrame, columns_to_check: Sequence[str]
+    df: pl.DataFrame, columns_to_check: Sequence[str]
 ) -> Dict[str, int]:
-    missing_count_dict = {}
-    for col in columns_to_check:
-        missing_count_dict[col] = int(df[col].isna().sum())
-
+    missing_count_dict = {
+        col: int(df.get_column(col).is_null().sum()) for col in columns_to_check
+    }
     return missing_count_dict
 
 

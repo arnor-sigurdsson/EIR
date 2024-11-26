@@ -1,4 +1,3 @@
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
@@ -8,18 +7,6 @@ import torch.multiprocessing
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 from aislib.misc_utils import ensure_path_exists
-
-original_warn = warnings.warn
-
-
-def custom_warn(*args, **kwargs):
-    if "functional optimizers is deprecated" in str(args[0]):
-        return
-    return original_warn(*args, **kwargs)
-
-
-warnings.warn = custom_warn
-
 from ignite.engine import Engine
 from torch import nn
 from torch.optim.optimizer import Optimizer

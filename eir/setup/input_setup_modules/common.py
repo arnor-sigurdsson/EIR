@@ -18,6 +18,7 @@ class DataDimensions:
     height: int
     width: int
     extra_dims: tuple[int, ...] = tuple()
+    original_shape: Optional[Tuple[int, ...]] = None
 
     def num_elements(self) -> int:
         base = self.channels * self.height * self.width
@@ -63,6 +64,7 @@ def get_data_dimension_from_data_source(
         height=height,
         width=width,
         extra_dims=extra_dims,
+        original_shape=tuple(shape),
     )
 
 

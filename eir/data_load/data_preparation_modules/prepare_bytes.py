@@ -30,7 +30,7 @@ def bytes_load_wrapper(
         assert isinstance(bytes_data, np.ndarray)
         bytes_data = bytes_data.astype(dtype=dtype)
     else:
-        assert isinstance(data_pointer, Path)
+        assert isinstance(data_pointer, (str, Path))
         bytes_data = np.fromfile(file=data_pointer, dtype=dtype)
 
     return bytes_data

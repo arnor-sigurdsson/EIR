@@ -81,10 +81,13 @@ def prep_modelling_test_configs(
 
     train_dataset, valid_dataset = create_test_datasets
 
+    train_ids = tuple(target_labels.train_labels["ID"])
+    valid_ids = tuple(target_labels.valid_labels["ID"])
+
     inputs_as_dict = input_setup.set_up_inputs_for_training(
         inputs_configs=c.input_configs,
-        train_ids=tuple(target_labels.train_labels.keys()),
-        valid_ids=tuple(target_labels.valid_labels.keys()),
+        train_ids=train_ids,
+        valid_ids=valid_ids,
         hooks=None,
     )
 

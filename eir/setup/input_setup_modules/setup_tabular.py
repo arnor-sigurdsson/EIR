@@ -31,7 +31,8 @@ def set_up_tabular_input_for_training(
     input_config: schemas.InputConfig,
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
-    hooks: Union["Hooks", None],
+    *args,
+    **kwargs,
 ) -> ComputedTabularInputInfo:
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.TabularInputDataConfig)
@@ -41,10 +42,8 @@ def set_up_tabular_input_for_training(
         tabular_data_type_config=input_type_info,
     )
 
-    custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
     tabular_labels = set_up_train_and_valid_tabular_data(
         tabular_file_info=tabular_file_info,
-        custom_label_ops=custom_ops,
         train_ids=train_ids,
         valid_ids=valid_ids,
         impute_missing=True,

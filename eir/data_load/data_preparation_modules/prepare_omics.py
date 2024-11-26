@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 import torch
@@ -13,7 +13,7 @@ from eir.data_load.data_source_modules import deeplake_ops
 
 
 def omics_load_wrapper(
-    data_pointer: Union[Path, int],
+    data_pointer: Path | str | int,
     input_source: str,
     subset_indices: Optional[np.ndarray],
     deeplake_inner_key: Optional[str] = None,
@@ -27,7 +27,7 @@ def omics_load_wrapper(
             inner_key=deeplake_inner_key,
         )
     else:
-        assert isinstance(data_pointer, Path)
+        assert isinstance(data_pointer, (str, Path))
         genotype_array_raw = np.load(str(data_pointer))
 
     assert isinstance(genotype_array_raw, np.ndarray)

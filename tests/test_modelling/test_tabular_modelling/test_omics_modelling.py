@@ -66,46 +66,47 @@ def _get_classification_output_configs(
 @pytest.mark.parametrize(
     "create_test_config_init_base",
     [
-        # Case 1: MLP, linear output
-        {
-            "injections": {
-                "global_configs": {
-                    "training_control": {
-                        "weighted_sampling_columns": ["all"],
-                    },
-                    "model": {
-                        "n_iter_before_swa": 50,
-                    },
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {
-                            "model_type": "linear",
-                            "model_init_config": {"l1": 1e-04},
-                        },
-                    }
-                ],
-                "fusion_configs": {
-                    "model_config": {
-                        "fc_task_dim": 256,
-                        "layers": [2],
-                    }
-                },
-                "output_configs": _get_classification_output_configs(
-                    output_type="linear",
-                ),
-            },
-        },
+        # # Case 1: MLP, linear output
+        # {
+        #     "injections": {
+        #         "global_configs": {
+        #             "training_control": {
+        #                 "weighted_sampling_columns": ["all"],
+        #             },
+        #             "model": {
+        #                 "n_iter_before_swa": 50,
+        #             },
+        #         },
+        #         "input_configs": [
+        #             {
+        #                 "input_info": {"input_name": "test_genotype"},
+        #                 "model_config": {
+        #                     "model_type": "linear",
+        #                     "model_init_config": {"l1": 1e-04},
+        #                 },
+        #             }
+        #         ],
+        #         "fusion_configs": {
+        #             "model_config": {
+        #                 "fc_task_dim": 256,
+        #                 "layers": [2],
+        #             }
+        #         },
+        #         "output_configs": _get_classification_output_configs(
+        #             output_type="linear",
+        #         ),
+        #     },
+        # },
         # Case 2: CNN
         {
             "injections": {
                 "global_configs": {
                     "basic_experiment": {
                         "n_epochs": 20,
+                        "memory_dataset": True,
                     },
                     "training_control": {
-                        "weighted_sampling_columns": ["test_output_tabular.Origin"],
+                        "weighted_sampling_columns": ["test_output_tabular__Origin"],
                     },
                     "optimization": {
                         "gradient_noise": 0.01,

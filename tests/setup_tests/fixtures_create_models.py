@@ -16,10 +16,13 @@ def create_test_model(
     gc = create_test_config.global_config
     target_labels = create_test_labels
 
+    train_ids = tuple(create_test_labels.train_labels["ID"])
+    valid_ids = tuple(create_test_labels.valid_labels["ID"])
+
     inputs_as_dict = input_setup.set_up_inputs_for_training(
         inputs_configs=create_test_config.input_configs,
-        train_ids=tuple(create_test_labels.train_labels.keys()),
-        valid_ids=tuple(create_test_labels.valid_labels.keys()),
+        train_ids=train_ids,
+        valid_ids=valid_ids,
         hooks=None,
     )
 
