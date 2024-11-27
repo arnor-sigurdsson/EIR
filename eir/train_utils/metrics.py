@@ -41,8 +41,11 @@ from sklearn.preprocessing import KBinsDiscretizer, StandardScaler, label_binari
 from torch.linalg import vector_norm
 
 from eir.data_load.data_utils import get_output_info_generator
-from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
-from eir.setup.schemas import OutputConfig, SurvivalOutputTypeConfig
+from eir.setup.schemas import (
+    OutputConfig,
+    SurvivalOutputTypeConfig,
+    TabularOutputTypeConfig,
+)
 from eir.target_setup.target_label_setup import MissingTargetsInfo
 from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.utils.logging import get_logger
@@ -62,7 +65,7 @@ if TYPE_CHECKING:
 
 # aliases
 # output_name -> target_name -> metric name: value
-al_step_metric_dict = Dict[str, Dict[str, Dict[str, float]]]
+al_step_metric_dict = dict[str, dict[str, dict[str, float]]]
 
 logger = get_logger(name=__name__)
 
@@ -278,7 +281,7 @@ def add_loss_to_metrics(
     metric_dict_copy = copy(metric_dict)
 
     for output_name, column_type, column_name in target_columns_gen:
-        cur_metric_dict = metric_dict_copy.get(output_name, {}).get(column_name, {})
+        cur_metric_dict = metric_dict_copy[output_name][column_name]
         cur_key = f"{output_name}_{column_name}_loss"
         cur_metric_dict[cur_key] = losses[output_name][column_name].item()
 
@@ -1114,12 +1117,13 @@ def get_available_survival_metrics(
     return survival_metrics
 
 
-def get_default_supervised_metrics(
+def get_default_metrics(
     target_transformers: dict[str, "al_label_transformers"],
     cat_metrics: al_cat_metric_choices,
     con_metrics: al_con_metric_choices,
     cat_averaging_metrics: Optional[al_cat_metric_choices],
     con_averaging_metrics: Optional[al_con_metric_choices],
+    output_configs: Sequence[OutputConfig],
 ) -> "al_metric_record_dict":
     available_cat_metrics, available_con_metrics = get_available_supervised_metrics()
 
@@ -1158,7 +1162,7 @@ def get_default_supervised_metrics(
         cat_metric_records=cat_metric_records,
         con_metric_records=con_metric_records,
         surv_metric_records=surv_metric_records,
-        label_transformers=target_transformers,
+        output_configs=output_configs,
     )
 
     default_metrics: al_metric_record_dict = {
@@ -1181,8 +1185,19 @@ def _build_general_metric_info(
     cat_metric_records: tuple[MetricRecord, ...],
     con_metric_records: tuple[MetricRecord, ...],
     surv_metric_records: tuple[MetricRecord, ...],
-    label_transformers: dict[str, "al_label_transformers"],
+    output_configs: Sequence[OutputConfig],
 ) -> GeneralMetricInfo:
+    """
+    This function and the created object is used in in the training loop to:
+
+        1. Determine if all metrics are validation-only metrics. If that is the case
+        the metric calculation for training batches is completely skipped.
+        2. If (1) is True, we create a base structure for the metric calculation
+        which is used in other parts of the code (e.g. for running average metrics).
+        The structure is bootstrapped here, even though it is never filled with metrics
+        as the general output_name -> target name nested dict structure is e.g.
+        used when adding losses to the state dict in the training loop.
+    """
     all_cat_are_val = all(metric.only_val for metric in cat_metric_records)
     all_con_are_val = all(metric.only_val for metric in con_metric_records)
     all_surv_are_val = all(metric.only_val for metric in surv_metric_records)
@@ -1195,11 +1210,21 @@ def _build_general_metric_info(
         )
 
     base_structure: dict[str, Any] = {}
-    for output_name, inner_target_transformers in label_transformers.items():
-        if output_name not in base_structure:
-            base_structure[output_name] = {}
-        for inner_target_name in inner_target_transformers.keys():
-            base_structure[output_name][inner_target_name] = {}
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+        base_structure[output_name] = {}
+
+        oti = output_config.output_type_info
+        match oti:
+            case TabularOutputTypeConfig():
+                targets = list(oti.target_cat_columns) + list(oti.target_con_columns)
+            case SurvivalOutputTypeConfig():
+                targets = [oti.event_column]
+            case _:
+                targets = [output_name]
+
+        for target in targets:
+            base_structure[output_name][target] = {}
 
     return GeneralMetricInfo(
         all_are_val_only=all_are_val_only,

@@ -70,12 +70,13 @@ def prep_modelling_test_configs(
 
     model = create_test_model
 
-    test_metrics = metrics.get_default_supervised_metrics(
+    test_metrics = metrics.get_default_metrics(
         target_transformers=target_labels.label_transformers,
         cat_metrics=gc.met.cat_metrics,
         con_metrics=gc.met.con_metrics,
         cat_averaging_metrics=gc.met.cat_averaging_metrics,
         con_averaging_metrics=gc.met.con_averaging_metrics,
+        output_configs=c.output_configs,
     )
     test_metrics = _patch_metrics(metrics_=test_metrics)
     test_metrics["general_metric_info"].all_are_val_only = False

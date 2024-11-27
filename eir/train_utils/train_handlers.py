@@ -489,10 +489,10 @@ def _attach_running_average_metrics(
             column_name_key: str,
             metric_name_key: str,
         ) -> float:
-            value = metric_dict_from_step[output_name_key][column_name_key][
-                metric_name_key
-            ]
-            return value
+            output_dict = metric_dict_from_step[output_name_key]
+            inner_dict = output_dict[column_name_key]
+            metric_value = inner_dict[metric_name_key]
+            return metric_value
 
         partial_func = partial(
             output_transform,
