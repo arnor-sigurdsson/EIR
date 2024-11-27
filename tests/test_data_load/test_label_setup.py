@@ -148,7 +148,7 @@ def test_fit_scaler_transformer_on_target_column(get_transformer_test_data):
     transformer = label_setup._get_transformer(column_type="con")
 
     height_transformer = label_setup._fit_transformer_on_label_column(
-        column_series=df_test_labels["Height"].to_numpy(),
+        column_series=df_test_labels["Height"],
         transformer=transformer,
         impute_missing=False,
     )
@@ -164,7 +164,7 @@ def test_fit_label_encoder_transformer_on_target_column(get_transformer_test_dat
     transformer = label_setup._get_transformer(column_type="cat")
 
     origin_transformer = label_setup._fit_transformer_on_label_column(
-        column_series=df_test_labels["Origin"].to_numpy(),
+        column_series=df_test_labels["Origin"],
         transformer=transformer,
         impute_missing=False,
     )
@@ -917,8 +917,8 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_
         impute_missing=True,
     )
 
-    assert set(label_transformers["A"].classes_) == {"5", "3", "nan"}
-    assert set(label_transformers["B"].classes_) == {"2", "3", "4", "5", "nan"}
+    assert set(label_transformers["A"].classes_) == {"5", "3", "__NULL__"}
+    assert set(label_transformers["B"].classes_) == {"2", "3", "4", "5", "__NULL__"}
 
     a_t = label_transformers["A"]
     assert set(train_df_filled.get_column("A").unique().to_list()) == {0, 1}
@@ -929,7 +929,7 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_
     assert set(valid_df_filled.get_column("A").unique().to_list()) == {0, 2}
     assert set(
         a_t.inverse_transform(valid_df_filled.get_column("A").unique().to_list())
-    ) == {"nan", "3"}
+    ) == {"__NULL__", "3"}
 
     b_t = label_transformers["B"]
     assert set(train_df_filled.get_column("B").unique().to_list()) == {0, 1, 2, 3}
@@ -940,7 +940,7 @@ def test_process_train_and_label_dfs(get_test_nan_df, get_test_nan_tabular_file_
     assert set(valid_df_filled.get_column("B").unique().to_list()) == {0, 1, 2, 4}
     assert set(
         b_t.inverse_transform(valid_df_filled.get_column("B").unique().to_list())
-    ) == {"2", "3", "4", "nan"}
+    ) == {"2", "3", "4", "__NULL__"}
 
     assert (train_df_filled.get_column("C") == 0.0).all()
     assert (valid_df_filled.get_column("C") == 0.0).all()
@@ -962,9 +962,9 @@ def test_handle_missing_label_values_in_df(
         impute_missing=True,
     )
 
-    assert set(test_df_filled.get_column("A").unique().to_list()) == {"nan", "3"}
+    assert set(test_df_filled.get_column("A").unique().to_list()) == {"__NULL__", "3"}
     assert set(test_df_filled.get_column("B").unique().to_list()) == {
-        "nan",
+        "__NULL__",
         "2",
         "3",
         "4",
@@ -991,9 +991,12 @@ def test_fill_categorical_nans(
     )
 
     if impute_missing:
-        assert set(test_df_filled.get_column("A").unique().to_list()) == {"nan", "3"}
+        assert set(test_df_filled.get_column("A").unique().to_list()) == {
+            "__NULL__",
+            "3",
+        }
         assert set(test_df_filled.get_column("B").unique().to_list()) == {
-            "nan",
+            "__NULL__",
             "2",
             "3",
             "4",
