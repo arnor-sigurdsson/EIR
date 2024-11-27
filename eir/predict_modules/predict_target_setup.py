@@ -494,8 +494,9 @@ def set_up_delayed_predict_target_labels(
     df_labels = pl.DataFrame(
         {
             "ID": list(ids),
-            f"{output_name}": [float("nan")] * len(ids),
-        }
+            f"{output_name}": ["DELAYED"] * len(ids),
+        },
+        schema_overrides={f"{output_name}": pl.Categorical},
     )
 
     return PredictTargetLabels(

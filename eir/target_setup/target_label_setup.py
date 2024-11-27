@@ -806,15 +806,17 @@ def set_up_delayed_target_labels(
     df_train = pl.DataFrame(
         {
             "ID": list(train_ids),
-            f"{output_name}": [float("nan")] * len(train_ids),
-        }
+            f"{output_name}": ["DELAYED"] * len(train_ids),
+        },
+        schema_overrides={f"{output_name}": pl.Categorical},
     )
 
     df_valid = pl.DataFrame(
         {
             "ID": list(valid_ids),
-            f"{output_name}": [float("nan")] * len(valid_ids),
-        }
+            f"{output_name}": ["DELAYED"] * len(valid_ids),
+        },
+        schema_overrides={f"{output_name}": pl.Categorical},
     )
 
     return Labels(

@@ -269,7 +269,8 @@ class DatasetBase(Dataset):
         )
 
         _log_missing_samples_between_modalities(
-            df=filtered_df, input_keys=self.inputs.keys()
+            df=filtered_df,
+            input_keys=self.inputs.keys(),
         )
 
         if self.target_labels_df is not None and not self.target_labels_df.is_empty():
@@ -399,7 +400,8 @@ def add_data_to_df(
 
 
 def filter_df(
-    input_df: pl.DataFrame, target_labels_df: Optional[pl.DataFrame] = None
+    input_df: pl.DataFrame,
+    target_labels_df: Optional[pl.DataFrame] = None,
 ) -> pl.DataFrame:
 
     num_samples_raw = input_df.height
