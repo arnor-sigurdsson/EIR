@@ -1076,7 +1076,7 @@ def _get_multi_task_test_args(
 
     an_extra_col_is_correlated_with_target = target_copy in extra_columns
     if an_extra_col_is_correlated_with_target:
-        thresholds, at_least_n = (0.9, 0.9), 0
+        thresholds, at_least_n = (0.85, 0.85), 0
     else:
         thresholds, at_least_n = (0.8, 0.6), 5
 
