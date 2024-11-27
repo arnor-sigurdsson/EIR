@@ -18,6 +18,8 @@ from typing import (
 
 import numpy as np
 import polars as pl
+
+pl.enable_string_cache()
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 from tqdm import tqdm
@@ -128,31 +130,6 @@ def set_up_train_and_valid_tabular_data(
     return labels_data_object
 
 
-def convert_none_to_nan(df: pl.DataFrame) -> pl.DataFrame:
-    expr = []
-    for col_name, dtype in df.schema.items():
-        if col_name == "ID":
-            expr.append(pl.col("ID"))
-            continue
-
-        if dtype.is_numeric():
-            expr.append(
-                pl.when(pl.col(col_name).is_null())
-                .then(pl.lit(float("nan")))
-                .otherwise(pl.col(col_name))
-                .alias(col_name)
-            )
-        else:
-            expr.append(
-                pl.when(pl.col(col_name).is_null())
-                .then(pl.lit("nan"))
-                .otherwise(pl.col(col_name))
-                .alias(col_name)
-            )
-
-    return df.with_columns(expr)
-
-
 def _get_fit_label_transformers(
     df_labels_train: pl.DataFrame,
     df_labels_full: pl.DataFrame,
@@ -173,15 +150,15 @@ def _get_fit_label_transformers(
 
         for label_column in label_columns_for_cur_type:
             if column_type == "con":
-                cur_series = df_labels_train.get_column(name=label_column).to_numpy()
+                cur_values = df_labels_train.get_column(name=label_column)
             elif column_type == "cat":
-                cur_series = df_labels_full.get_column(name=label_column).to_numpy()
+                cur_values = df_labels_full.get_column(name=label_column)
             else:
                 raise ValueError(f"Unknown column type: {column_type}")
 
             cur_transformer = _get_transformer(column_type=column_type)
             cur_target_transformer_fit = _fit_transformer_on_label_column(
-                column_series=cur_series,
+                column_series=cur_values,
                 transformer=cur_transformer,
                 impute_missing=impute_missing,
             )
@@ -200,19 +177,17 @@ def _get_transformer(column_type):
 
 
 def _fit_transformer_on_label_column(
-    column_series: np.ndarray,
+    column_series: pl.Series,
     transformer: al_label_transformers_object,
     impute_missing: bool,
 ) -> al_label_transformers_object:
-    if np.issubdtype(column_series.dtype, np.object_) and column_series.dtype != float:
-        series_values = np.unique(column_series)
-        if not impute_missing:
-            series_values = series_values[series_values != "nan"]
-        else:
-            series_values = np.append(series_values, "nan")
+    if column_series.dtype == pl.Categorical or column_series.dtype == pl.Utf8:
+        unique_values = column_series.unique().drop_nulls()
+        series_values = unique_values.to_numpy()
+        if impute_missing:
+            series_values = np.append(series_values, "__NULL__")
     else:
-        series_values = column_series
-        series_values = series_values[~np.isnan(series_values)]
+        series_values = column_series.drop_nulls().to_numpy()
 
     series_values_streamlined = streamline_values_for_transformers(
         transformer=transformer,
@@ -260,7 +235,7 @@ def transform_label_df(
                 case StandardScaler():
                     non_nan_mask = ~df_labels.get_column(column_name).is_null()
                 case LabelEncoder():
-                    non_nan_mask = df_labels.get_column(column_name) != "nan"
+                    non_nan_mask = ~df_labels.get_column(column_name).is_null()
                 case KBinsDiscretizer() | IdentityTransformer():
                     non_nan_mask = ~df_labels.get_column(column_name).is_null()
                 case _:
@@ -284,7 +259,8 @@ def transform_label_df(
 
             expr.append(pl.lit(result).alias(column_name))
 
-    return df_labels.with_columns(expr)
+    df_final = df_labels.with_columns(expr)
+    return df_final
 
 
 class LabelDFParseWrapperProtocol(Protocol):
@@ -347,10 +323,10 @@ def label_df_parse_wrapper(
 
     df_cat_str = ensure_categorical_columns_and_format(df=df_column_filtered)
 
-    df_no_none = convert_none_to_nan(df=df_cat_str)
+    # df_no_none = convert_none_to_nan(df=df_cat_str)
 
     df_final = _check_parsed_label_df(
-        df_labels=df_no_none,
+        df_labels=df_cat_str,
         supplied_label_columns=supplied_columns,
     )
 
@@ -593,34 +569,11 @@ def _load_label_df(
         schema_overrides=dtypes,
     )
 
-    map_expressions = [
-        get_map_expr(
-            col=col,
-            df_schema=df_labels.schema,
-        )
-        for col in df_labels.columns
-    ]
-
-    df_labels = df_labels.with_columns(map_expressions)
-
     df_labels = df_labels.select([pl.col("ID").cast(pl.Utf8), pl.all().exclude("ID")])
 
     pre_check_label_df(df=df_labels, name=str(label_fpath))
 
     return df_labels
-
-
-def get_map_expr(col: str, df_schema: dict[str, pl.DataType]) -> pl.Expr:
-    dtype = df_schema[col]
-    if isinstance(dtype, pl.Categorical):
-        return (
-            pl.col(col)
-            .map_elements(lambda x: None if x == "nan" else x, return_dtype=pl.Utf8)
-            .cast(pl.Categorical)
-        )
-    return pl.col(col).map_elements(
-        lambda x: None if x == "nan" else x, return_dtype=dtype
-    )
 
 
 def pre_check_label_df(df: pl.DataFrame, name: str) -> None:
@@ -982,7 +935,7 @@ def _fill_categorical_nans(
 
     expr = [
         pl.when(pl.col(col).is_null())
-        .then(pl.lit("nan"))
+        .then(pl.lit("__NULL__"))
         .otherwise(pl.col(col))
         .alias(col)
         for col in column_names
