@@ -765,8 +765,8 @@ def _should_compile():
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 2e-05,
-                                "rb_do": 0.20,
+                                "l1": 1e-06,
+                                "rb_do": 0.10,
                                 "attention_inclusion_cutoff": 512,
                             },
                         },
@@ -775,12 +775,13 @@ def _should_compile():
                 "fusion_configs": {
                     "model_config": {
                         "fc_task_dim": 64,
-                        "fc_do": 0.20,
-                        "rb_do": 0.20,
+                        "fc_do": 0.10,
+                        "rb_do": 0.10,
                     },
                 },
                 "output_configs": _get_multi_task_output_configs(
-                    label_smoothing=0.1, uncertainty_mt_loss=False
+                    label_smoothing=0.1,
+                    uncertainty_mt_loss=False,
                 ),
             },
         },
