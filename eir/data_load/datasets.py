@@ -462,13 +462,23 @@ def _log_missing_samples_between_modalities(
     df: pl.DataFrame,
     input_keys: Iterable[str],
 ) -> None:
+    """
+    We have the `if col == key or col.startswith(f"{key}__"):` condition there
+    as for e.g. genotype inputs, the column name is just the key itself, but for
+    tabular inputs, we have the key as a prefix to the column name, e.g.
+    "tabular_input__column1".
+    """
     missing_counts = {k: 0 for k in input_keys}
     missing_ids: dict[str, list[str]] = {k: [] for k in input_keys}
     any_missing = False
     no_samples = df.height
 
     for key in input_keys:
-        key_cols = [col for col in df.columns if col == key]
+        key_cols = []
+        for col in df.columns:
+            if col == key or col.startswith(f"{key}__"):
+                key_cols.append(col)
+
         if not key_cols:
             missing_counts[key] = no_samples
             missing_ids[key] = df.get_column("ID").to_list()
@@ -641,11 +651,16 @@ class DiskDataset(DatasetBase):
         self.target_labels_df = sample_dfs[1]
         self.check_samples()
 
+        self.column_map_inputs = _build_column_map(columns=self.input_df.columns)
+        self.column_map_targets = _build_column_map(
+            columns=self.target_labels_df.columns
+        )
+
     def __getitem__(self, index: int) -> al_getitem_return:
         input_row = self.input_df.row(index, named=True)
         sample_id = input_row["ID"]
 
-        inputs = process_row_values(row=input_row, columns=self.input_df.columns)
+        inputs = process_row_values(row=input_row, column_map=self.column_map_inputs)
 
         inputs_prepared = prepare_inputs_disk(
             inputs=inputs,
@@ -662,7 +677,8 @@ class DiskDataset(DatasetBase):
         if not self.target_labels_df.is_empty():
             target_row = self.target_labels_df.row(index, named=True)
             target_labels = process_row_values(
-                row=target_row, columns=self.target_labels_df.columns
+                row=target_row,
+                column_map=self.column_map_targets,
             )
 
             targets_prepared = prepare_outputs_disk(
@@ -700,11 +716,16 @@ class MemoryDataset(DatasetBase):
         self.target_labels_df = sample_dfs[1]
         self.check_samples()
 
+        self.column_map_inputs = _build_column_map(columns=self.input_df.columns)
+        self.column_map_targets = _build_column_map(
+            columns=self.target_labels_df.columns
+        )
+
     def __getitem__(self, index: int) -> al_getitem_return:
         input_row = self.input_df.row(index, named=True)
         sample_id = input_row["ID"]
 
-        inputs = process_row_values(row=input_row, columns=self.input_df.columns)
+        inputs = process_row_values(row=input_row, column_map=self.column_map_inputs)
 
         inputs_prepared = prepare_inputs_memory(
             inputs=inputs,
@@ -721,7 +742,8 @@ class MemoryDataset(DatasetBase):
         if not self.target_labels_df.is_empty():
             target_row = self.target_labels_df.row(index, named=True)
             target_labels = process_row_values(
-                row=target_row, columns=self.target_labels_df.columns
+                row=target_row,
+                column_map=self.column_map_targets,
             )
 
             targets_prepared = prepare_outputs_memory(
@@ -741,6 +763,19 @@ class MemoryDataset(DatasetBase):
         return self.input_df.height
 
 
+def _build_column_map(columns: list[str]) -> dict[str, tuple[str, str | None]]:
+    column_map: dict[str, Any] = {}
+    for col in columns:
+        if col == "ID":
+            continue
+        if "__" in col:
+            main_key, sub_key = col.split("__", 1)
+            column_map[col] = (main_key, sub_key)
+        else:
+            column_map[col] = (col, None)
+    return column_map
+
+
 def convert_value(value: Any) -> Any:
     """
     Note that this is only needed as when we store arrays in the Array() polars
@@ -752,23 +787,19 @@ def convert_value(value: Any) -> Any:
 
 def process_row_values(
     row: dict,
-    columns: list[str],
-    exclude_id: bool = True,
+    column_map: dict[str, tuple[str, str | None]],
 ) -> dict[str, Any]:
     result: dict[str, Any] = {}
 
-    for col in columns:
-        if exclude_id and col == "ID":
-            continue
-
+    for col, (main_key, sub_key) in column_map.items():
         value = row[col]
         if value is None:
             continue
 
-        if "__" in col:
-            main_key, sub_key = col.split("__", 1)
-            result.setdefault(main_key, {})[sub_key] = convert_value(value=value)
+        value = convert_value(value=value)
+        if sub_key:
+            result.setdefault(main_key, {})[sub_key] = value
         else:
-            result[col] = convert_value(value=value)
+            result[main_key] = value
 
     return result
