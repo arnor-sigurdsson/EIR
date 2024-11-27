@@ -6,6 +6,7 @@ from pathlib import Path
 from statistics import mean
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Dict,
     Generator,
@@ -99,7 +100,8 @@ class AverageMetricFunctionProtocol(Protocol):
 
 al_averaging_functions_dict = Dict[str, AverageMetricFunctionProtocol]
 al_metric_record_dict = Dict[
-    str, Tuple["MetricRecord", ...] | "al_averaging_functions_dict"
+    str,
+    Tuple["MetricRecord", ...] | "al_averaging_functions_dict" | "GeneralMetricInfo",
 ]
 
 al_cat_metric_choices = Sequence[
@@ -146,6 +148,11 @@ def calculate_batch_metrics(
     metric_record_dict: al_metric_record_dict,
 ) -> al_step_metric_dict:
     assert mode in ["val", "train"]
+
+    general_info = metric_record_dict["general_metric_info"]
+    assert isinstance(general_info, GeneralMetricInfo)
+    if mode == "train" and general_info.all_are_val_only:
+        return general_info.base_metric_structure
 
     target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
 
@@ -271,7 +278,7 @@ def add_loss_to_metrics(
     metric_dict_copy = copy(metric_dict)
 
     for output_name, column_type, column_name in target_columns_gen:
-        cur_metric_dict = metric_dict_copy[output_name][column_name]
+        cur_metric_dict = metric_dict_copy.get(output_name, {}).get(column_name, {})
         cur_key = f"{output_name}_{column_name}_loss"
         cur_metric_dict[cur_key] = losses[output_name][column_name].item()
 
@@ -1147,13 +1154,57 @@ def get_default_supervised_metrics(
         target_transformers=target_transformers
     )
 
+    general_metric_info = _build_general_metric_info(
+        cat_metric_records=cat_metric_records,
+        con_metric_records=con_metric_records,
+        surv_metric_records=surv_metric_records,
+        label_transformers=target_transformers,
+    )
+
     default_metrics: al_metric_record_dict = {
         "cat": cat_metric_records,
         "con": con_metric_records,
         "survival": surv_metric_records,
         "averaging_functions": averaging_functions,
+        "general_metric_info": general_metric_info,
     }
     return default_metrics
+
+
+@dataclass
+class GeneralMetricInfo:
+    all_are_val_only: bool
+    base_metric_structure: dict[str, dict[str, dict]]
+
+
+def _build_general_metric_info(
+    cat_metric_records: tuple[MetricRecord, ...],
+    con_metric_records: tuple[MetricRecord, ...],
+    surv_metric_records: tuple[MetricRecord, ...],
+    label_transformers: dict[str, "al_label_transformers"],
+) -> GeneralMetricInfo:
+    all_cat_are_val = all(metric.only_val for metric in cat_metric_records)
+    all_con_are_val = all(metric.only_val for metric in con_metric_records)
+    all_surv_are_val = all(metric.only_val for metric in surv_metric_records)
+    all_are_val_only = all([all_cat_are_val, all_con_are_val, all_surv_are_val])
+
+    if all_are_val_only:
+        logger.debug(
+            "All metrics are validation-only metrics, will skip all metric "
+            "calculation for training batches."
+        )
+
+    base_structure: dict[str, Any] = {}
+    for output_name, inner_target_transformers in label_transformers.items():
+        if output_name not in base_structure:
+            base_structure[output_name] = {}
+        for inner_target_name in inner_target_transformers.keys():
+            base_structure[output_name][inner_target_name] = {}
+
+    return GeneralMetricInfo(
+        all_are_val_only=all_are_val_only,
+        base_metric_structure=base_structure,
+    )
 
 
 def parse_averaging_metrics(

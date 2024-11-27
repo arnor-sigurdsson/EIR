@@ -78,6 +78,7 @@ def prep_modelling_test_configs(
         con_averaging_metrics=gc.met.con_averaging_metrics,
     )
     test_metrics = _patch_metrics(metrics_=test_metrics)
+    test_metrics["general_metric_info"].all_are_val_only = False
 
     train_dataset, valid_dataset = create_test_datasets
 

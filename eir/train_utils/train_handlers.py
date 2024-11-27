@@ -468,7 +468,8 @@ class MyRunningAverage(RunningAverage):
 
 
 def _attach_running_average_metrics(
-    engine: Engine, monitoring_metrics: List[Tuple[str, str, str]]
+    engine: Engine,
+    monitoring_metrics: List[Tuple[str, str, str]],
 ) -> None:
     """
     For each metric, we create an output_transform function that grabs the
