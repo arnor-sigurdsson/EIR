@@ -792,7 +792,7 @@ def _should_compile():
                         "output_folder": "mgmoe",
                     },
                     "optimization": {
-                        "lr": 1e-03,
+                        "lr": 3e-04,
                     },
                     "evaluation_checkpoint": {
                         "saved_result_detail_level": 4,
@@ -806,14 +806,14 @@ def _should_compile():
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 2e-05,
+                                "l1": 1e-06,
                             },
                         },
                     },
                 ],
                 "fusion_configs": {
                     "model_type": "mgmoe",
-                    "model_config": {"mg_num_experts": 3, "stochastic_depth_p": 0.2},
+                    "model_config": {"mg_num_experts": 4, "stochastic_depth_p": 0.1},
                 },
                 "output_configs": _get_multi_task_output_configs(
                     uncertainty_mt_loss=False
