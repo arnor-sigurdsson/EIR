@@ -727,19 +727,12 @@ def get_sample_attribution_producer(
     missing_for_modality = missing_ids_per_output.missing_ids_per_modality
     cur_missing_ids = missing_for_modality[output_name]
 
-    missing_within_modality: dict[str, Any] = (
-        missing_ids_per_output.missing_ids_within_modality
-    )
-    cur_missing_ids_within = missing_within_modality[output_name].get(
-        target_column_name, {}
-    )
-
     for batch, raw_inputs in data_producer:
         sample_target_labels = batch.target_labels
         cur_target_label = sample_target_labels[output_name][target_column_name]
 
         cur_id = batch.ids[0]
-        if cur_id in cur_missing_ids or cur_id in cur_missing_ids_within:
+        if cur_id in cur_missing_ids:
             continue
 
         sample_all_modalities_attributions = act_func(

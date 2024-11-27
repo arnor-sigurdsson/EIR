@@ -365,15 +365,38 @@ def run_split_evaluation(
 
     all_metrics = {**computed_metrics_averaged, **full_gathered_metrics}
 
+    ids_per_output = _build_ids_per_output(filtered_values=filtered_values)
+
     evaluation_results = EvaluationResults(
         metrics_with_averages=all_metrics,
         gathered_outputs=filtered_values.model_outputs,
         gathered_labels=filtered_values.target_labels,
-        ids_per_output=filtered_values.ids,
+        ids_per_output=ids_per_output,
         all_ids=full_gathered_ids_total,
     )
 
     return evaluation_results
+
+
+def _build_ids_per_output(
+    filtered_values: metrics.FilteredOutputsAndLabels,
+) -> dict[str, dict[str, list[str]]]:
+    fv = filtered_values
+    ids_per_output = fv.ids
+    if ids_per_output is None:
+        assert fv.common_ids is not None
+        ids_per_output = {}
+        for output_name, inner_dict in fv.model_outputs.items():
+            if output_name not in ids_per_output:
+                ids_per_output[output_name] = {}
+
+            for inner_target_name in inner_dict.keys():
+                ids_per_output[output_name][inner_target_name] = fv.common_ids
+    else:
+        assert fv.common_ids is None
+        return ids_per_output
+
+    return ids_per_output
 
 
 def average_nested_dict_values(data: list[dict[str, Any]], weights: list[int]) -> dict:

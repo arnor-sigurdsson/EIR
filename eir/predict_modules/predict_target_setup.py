@@ -25,10 +25,8 @@ from eir.setup.schemas import (
 )
 from eir.target_setup.target_label_setup import (
     MissingTargetsInfo,
-    compute_missing_ids_per_tabular_output,
     gather_data_pointers_from_data_source,
     gather_torch_null_missing_ids,
-    get_all_output_and_target_names,
     get_missing_targets_info,
     get_tabular_target_file_infos,
     synchronize_missing_survival_values,
@@ -188,7 +186,6 @@ def get_target_labels_for_testing(
 
     all_ids: set[str] = set(ids)
     per_modality_missing_ids: dict[str, set[str]] = {}
-    within_modality_missing_ids: dict[str, dict[str, set[str]]] = {}
     label_transformers: dict[str, Any] = {}
 
     test_labels_df = pl.DataFrame(schema={"ID": pl.Utf8})
@@ -213,7 +210,6 @@ def get_target_labels_for_testing(
                     all_ids=all_ids,
                     label_transformers=label_transformers,
                     per_modality_missing_ids=per_modality_missing_ids,
-                    within_modality_missing_ids=within_modality_missing_ids,
                     test_labels_df=test_labels_df,
                 )
             case SequenceOutputTypeConfig():
@@ -244,19 +240,14 @@ def get_target_labels_for_testing(
                     label_transformers=label_transformers,
                     test_labels_df=test_labels_df,
                     per_modality_missing_ids=per_modality_missing_ids,
-                    within_modality_missing_ids=within_modality_missing_ids,
                 )
             case _:
                 raise NotImplementedError(
                     f"Output type {output_type_info} not implemented"
                 )
 
-    outputs_and_targets = get_all_output_and_target_names(output_configs=output_configs)
     missing_target_info = get_missing_targets_info(
         missing_ids_per_modality=per_modality_missing_ids,
-        missing_ids_within_modality=within_modality_missing_ids,
-        output_and_target_names=outputs_and_targets,
-        output_configs=output_configs,
     )
 
     test_labels_object = MergedPredictTargetLabels(
@@ -276,7 +267,6 @@ def process_tabular_output_for_testing(
     all_ids: Set[str],
     label_transformers: dict[str, Any],
     per_modality_missing_ids: dict[str, set[str]],
-    within_modality_missing_ids: dict[str, dict[str, Set[str]]],
     test_labels_df: pl.DataFrame,
 ) -> pl.DataFrame:
     cur_tabular_info = tabular_target_files_info[output_name]
@@ -292,13 +282,6 @@ def process_tabular_output_for_testing(
     cur_ids = set(all_labels.get_column("ID").to_list())
     missing_ids = all_ids.difference(cur_ids)
     per_modality_missing_ids[output_name] = missing_ids
-
-    missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
-        all_labels_df=all_labels,
-        tabular_info=cur_tabular_info,
-        output_name=output_name,
-    )
-    within_modality_missing_ids.update(missing_ids_per_target_column)
 
     test_labels_df = update_labels_df(
         master_df=test_labels_df,
@@ -381,7 +364,6 @@ def process_survival_output_for_testing(
     all_ids: Set[str],
     label_transformers: Dict[str, Any],
     per_modality_missing_ids: Dict[str, Set[str]],
-    within_modality_missing_ids: Dict[str, Dict[str, Set[str]]],
     test_labels_df: pl.DataFrame,
 ) -> pl.DataFrame:
     """
@@ -439,13 +421,6 @@ def process_survival_output_for_testing(
     cur_ids = set(all_labels.get_column("ID").to_list())
     missing_ids = all_ids.difference(cur_ids)
     per_modality_missing_ids[output_name] = missing_ids
-
-    missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
-        all_labels_df=all_labels,
-        tabular_info=cur_tabular_info,
-        output_name=output_name,
-    )
-    within_modality_missing_ids.update(missing_ids_per_target_column)
 
     test_labels_df = update_labels_df(
         master_df=test_labels_df,

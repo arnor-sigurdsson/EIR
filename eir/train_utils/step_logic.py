@@ -600,8 +600,6 @@ def hook_default_per_target_loss(
         target_labels = batch.target_labels
         ids = batch.ids
 
-        # TODO: Re-enable here passing in filtered values after changing it to be
-        #       only based on fully missing (so not within) modalities
         filtered_outputs = filter_missing_outputs_and_labels(
             batch_ids=ids,
             model_outputs=model_outputs,
@@ -610,11 +608,9 @@ def hook_default_per_target_loss(
             with_labels=True,
         )
 
-        # note here we pass the outputs directly to the loss
-        # function as it handles NaNs itself
         per_target_train_losses = experiment.loss_function(
-            inputs=model_outputs,
-            targets=target_labels,
+            inputs=filtered_outputs.model_outputs,
+            targets=filtered_outputs.target_labels,
         )
 
         state_updates = {

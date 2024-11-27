@@ -51,10 +51,7 @@ from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.schemas import OutputConfig
-from eir.target_setup.target_label_setup import (
-    build_linked_survival_targets_for_missing_ids,
-    gather_all_ids_from_output_configs,
-)
+from eir.target_setup.target_label_setup import gather_all_ids_from_output_configs
 from eir.train import check_dataset_and_batch_size_compatibility
 from eir.train_utils.evaluation import (
     deregister_pre_evaluation_hooks,
@@ -339,14 +336,9 @@ def get_default_predict_experiment(
             input_configs=configs_overloaded_for_predict.input_configs
         )
         target_labels = None
-        linked_survival_targets = build_linked_survival_targets_for_missing_ids(
-            output_configs=configs_overloaded_for_predict.output_configs,
-        )
         missing_ids_per_output = MissingTargetsInfo(
             missing_ids_per_modality={},
-            missing_ids_within_modality={},
-            precomputed_missing_ids={},
-            linked_targets=linked_survival_targets,
+            all_have_same_set=False,
         )
 
     test_inputs = set_up_inputs_for_predict(

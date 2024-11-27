@@ -1304,100 +1304,77 @@ def get_performance_averaging_functions(
 
 @dataclass
 class FilteredOutputsAndLabels:
-    model_outputs: Dict[str, Dict[str, torch.Tensor]]
-    target_labels: Dict[str, Dict[str, torch.Tensor]]
-    ids: Dict[str, Dict[str, List[str]]]
+    model_outputs: dict[str, dict[str, torch.Tensor]]
+    target_labels: dict[str, dict[str, torch.Tensor]]
+    ids: Optional[dict[str, dict[str, list[str]]]]
+    common_ids: Optional[list[str]]
 
 
 def filter_missing_outputs_and_labels(
-    batch_ids: List[str],
+    batch_ids: list[str],
     model_outputs: dict[str, dict[str, torch.Tensor]],
     target_labels: dict[str, dict[str, torch.Tensor]],
     missing_ids_info: MissingTargetsInfo,
     with_labels: bool = True,
 ) -> FilteredOutputsAndLabels:
+
+    if missing_ids_info.all_have_same_set:
+        return FilteredOutputsAndLabels(
+            model_outputs=model_outputs,
+            target_labels=target_labels,
+            ids=None,
+            common_ids=batch_ids,
+        )
+
     filtered_outputs = {}
     filtered_labels = {}
     filtered_ids: dict[str, dict[str, list[str]]] = {}
 
-    precomputed = missing_ids_info.precomputed_missing_ids
+    missing_per_modality = missing_ids_info.missing_ids_per_modality
 
     for output_name, output_inner_dict in model_outputs.items():
-        filtered_inner_dict = {}
-        filtered_inner_labels = {}
-        filtered_inner_ids = {}
-
-        output_missing_info = precomputed.get(output_name, {})
-        if not output_missing_info:
+        cur_output_missing = missing_per_modality.get(output_name, set())
+        if not cur_output_missing:
             filtered_outputs[output_name] = output_inner_dict
-            if with_labels:
-                filtered_labels[output_name] = target_labels[output_name]
-            else:
-                filtered_labels[output_name] = {
-                    inner_key: torch.tensor([]) for inner_key in output_inner_dict
-                }
-            filtered_ids[output_name] = {
-                inner_key: batch_ids for inner_key in output_inner_dict
-            }
+            filtered_labels[output_name] = (
+                target_labels[output_name]
+                if with_labels
+                else {k: torch.tensor([]) for k in output_inner_dict}
+            )
+            filtered_ids[output_name] = {k: batch_ids for k in output_inner_dict}
             continue
 
-        for inner_key, modality_output_tensor in output_inner_dict.items():
-            cur_missing_ids = output_missing_info.get(inner_key, set())
+        missing_ids = missing_ids_info.missing_ids_per_modality[output_name]
+        valid_indices = [i for i, id_ in enumerate(batch_ids) if id_ not in missing_ids]
 
-            if not cur_missing_ids:
-                filtered_inner_dict[inner_key] = modality_output_tensor
-                if with_labels:
-                    filtered_inner_labels[inner_key] = target_labels[output_name][
-                        inner_key
-                    ]
-                else:
-                    filtered_inner_labels[inner_key] = torch.tensor([])
-                filtered_inner_ids[inner_key] = batch_ids
-                continue
+        device = next(iter(output_inner_dict.values())).device
+        valid_indices_tensor = torch.tensor(
+            valid_indices,
+            device=device,
+            dtype=torch.long,
+        )
 
-            valid_indices = [
-                i for i, id_ in enumerate(batch_ids) if id_ not in cur_missing_ids
-            ]
-            valid_indices_tensor = torch.tensor(
-                valid_indices,
-                device=modality_output_tensor.device,
-                dtype=torch.long,
-            )
+        filtered_outputs[output_name] = {
+            k: v.index_select(0, valid_indices_tensor)
+            for k, v in output_inner_dict.items()
+        }
 
-            output_tensor = modality_output_tensor.index_select(
-                dim=0, index=valid_indices_tensor
-            )
-            filtered_inner_dict[inner_key] = output_tensor
-
-            if with_labels:
-                cur_output_targets = target_labels[output_name]
-                cur_targets = cur_output_targets[inner_key].index_select(
-                    dim=0, index=valid_indices_tensor
-                )
-                filtered_inner_labels[inner_key] = cur_targets
-
-                if output_name in missing_ids_info.linked_targets:
-                    cur_link = missing_ids_info.linked_targets[output_name]
-                    if inner_key == cur_link.target_name:
-                        linked_target = cur_link.linked_target_name
-                        assert linked_target in cur_output_targets
-                        linked_targets = cur_output_targets[linked_target].index_select(
-                            dim=0, index=valid_indices_tensor
-                        )
-                        filtered_inner_labels[linked_target] = linked_targets
-
-            else:
-                filtered_inner_labels[inner_key] = torch.tensor([])
-
-            ids = [batch_ids[i] for i in valid_indices]
-            filtered_inner_ids[inner_key] = ids
-
-        filtered_outputs[output_name] = filtered_inner_dict
-        filtered_labels[output_name] = filtered_inner_labels
-        filtered_ids[output_name] = filtered_inner_ids
+        if with_labels:
+            filtered_labels[output_name] = {
+                k: v.index_select(0, valid_indices_tensor)
+                for k, v in target_labels[output_name].items()
+            }
+        else:
+            filtered_labels[output_name] = {
+                k: torch.tensor([]) for k in output_inner_dict
+            }
+        filtered_ids[output_name] = {
+            k: [batch_ids[i] for i in valid_indices] for k in output_inner_dict
+        }
 
     return FilteredOutputsAndLabels(
         model_outputs=filtered_outputs,
         target_labels=filtered_labels,
         ids=filtered_ids,
+        common_ids=None,
     )

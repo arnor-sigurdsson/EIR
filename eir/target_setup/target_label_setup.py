@@ -89,34 +89,35 @@ class LinkedTargets:
 
 @dataclass
 class MissingTargetsInfo:
+    """
+    In the case for example when we only have 1 tabular output with multiple
+    targets coming from the same .csv and we have an input where we have different
+    set of overall IDs (i.e., rows in the .csv) compared to the targets, we
+    do not need the specific filtering of IDs later per step as all samples
+    w/o inputs or targets have been filtered out in the dataset creation. We
+    can track this using the all_have_same_set, which allows us to skip
+    checking for the missing IDs completely before loss/metric calculation.
+    """
+
     missing_ids_per_modality: dict[str, set[str]]
-    missing_ids_within_modality: dict[str, dict[str, set[str]]]
-    precomputed_missing_ids: dict[str, dict[str, set[str]]]
-    linked_targets: dict[str, LinkedTargets]
+    all_have_same_set: bool
 
 
 def get_missing_targets_info(
     missing_ids_per_modality: dict[str, set[str]],
-    missing_ids_within_modality: dict[str, dict[str, set[str]]],
-    output_and_target_names: dict[str, list[str]],
-    output_configs: Sequence[schemas.OutputConfig],
 ) -> MissingTargetsInfo:
+    if not missing_ids_per_modality:
+        return MissingTargetsInfo(
+            missing_ids_per_modality=missing_ids_per_modality,
+            all_have_same_set=True,
+        )
 
-    precomputed_missing_ids = _precompute_missing_ids(
-        missing_ids_per_modality=missing_ids_per_modality,
-        missing_ids_within_modality=missing_ids_within_modality,
-        output_and_target_names=output_and_target_names,
-    )
-
-    linked_survival_targets = build_linked_survival_targets_for_missing_ids(
-        output_configs=output_configs
-    )
+    sets = list(missing_ids_per_modality.values())
+    all_same = len(sets) > 1 and all(s == sets[0] for s in sets[1:])
 
     return MissingTargetsInfo(
         missing_ids_per_modality=missing_ids_per_modality,
-        missing_ids_within_modality=missing_ids_within_modality,
-        precomputed_missing_ids=precomputed_missing_ids,
-        linked_targets=linked_survival_targets,
+        all_have_same_set=all_same,
     )
 
 
@@ -138,36 +139,6 @@ def build_linked_survival_targets_for_missing_ids(
             )
 
     return linked_survival_targets
-
-
-def _precompute_missing_ids(
-    missing_ids_per_modality: dict[str, set[str]],
-    missing_ids_within_modality: dict[str, dict[str, set[str]]],
-    output_and_target_names: dict[str, list[str]],
-) -> dict[str, dict[str, set[str]]]:
-    """
-    One could potentially optimize this space-wise by tracking modality-inner_key
-    combinations that lead to the same set of missing IDs, then having them point
-    to the same object (set of missing IDs) in memory.
-    """
-
-    precomputed_missing_ids: dict[str, dict[str, set[str]]] = {}
-
-    for modality, target_names in output_and_target_names.items():
-        if modality not in precomputed_missing_ids:
-            precomputed_missing_ids[modality] = {}
-
-        ids_this_modality = missing_ids_per_modality.get(modality, set())
-        missing_ids_within = missing_ids_within_modality.get(modality, {})
-
-        for target_name in target_names:
-            cur_missing_within = missing_ids_within.get(target_name, set())
-            combined_ids = ids_this_modality.union(cur_missing_within)
-
-            if combined_ids:
-                precomputed_missing_ids[modality][target_name] = combined_ids
-
-    return precomputed_missing_ids
 
 
 def get_all_output_and_target_names(
@@ -205,8 +176,6 @@ def log_missing_targets_info(
     )
 
     total_ids_count = len(all_ids)
-    missing_within = missing_targets_info.missing_ids_within_modality
-    max_columns_to_log = 5
 
     for modality, missing_ids in missing_targets_info.missing_ids_per_modality.items():
         missing_count = len(missing_ids)
@@ -226,48 +195,6 @@ def log_missing_targets_info(
             f"Complete: {complete_count}/{total_ids_count} "
             f"({fraction_complete:.2f}% complete)\n"
         )
-
-        if modality in missing_within:
-            columns_logged = 0
-            for target_column, ids in missing_within[modality].items():
-                missing_within_count = len(ids)
-
-                if missing_within_count == 0:
-                    logger.info(
-                        f"  - No missing target IDs in modality '{modality}', "
-                        f"Column: '{target_column}'."
-                    )
-                    columns_logged += 1
-                    if columns_logged >= max_columns_to_log:
-                        break
-                    continue
-
-                if columns_logged >= max_columns_to_log:
-                    additional_columns = (
-                        len(missing_within[modality]) - max_columns_to_log
-                    )
-                    logger.info(
-                        f"  - There are {additional_columns} "
-                        f"more columns with missing IDs in modality '{modality}' "
-                        f"not displayed."
-                    )
-                    break
-
-                complete_within_count = total_ids_count - missing_within_count
-                fraction_complete_within = (
-                    complete_within_count / total_ids_count
-                ) * 100
-
-                formatted_ids = repr_formatter.repr(ids)
-                logger.info(
-                    f"  - Missing target IDs within modality '{modality}', "
-                    f"Column: '{target_column}'\n"
-                    f"      - Missing IDs: {formatted_ids}\n"
-                    f"      - Stats: Missing: {missing_within_count}, "
-                    f"Complete: {complete_within_count}/{total_ids_count} "
-                    f"({fraction_complete_within:.2f}% complete)\n"
-                )
-                columns_logged += 1
 
 
 @dataclass
@@ -313,7 +240,6 @@ def set_up_all_target_labels_wrapper(
 ) -> MergedTargetLabels:
     all_ids: set[str] = set(train_ids).union(set(valid_ids))
     per_modality_missing_ids: dict[str, set[str]] = {}
-    within_modality_missing_ids: dict[str, dict[str, set[str]]] = {}
     label_transformers: dict[str, Any] = {}
 
     train_labels_df = pl.DataFrame(schema={"ID": pl.Utf8})
@@ -339,7 +265,6 @@ def set_up_all_target_labels_wrapper(
                     all_ids=all_ids,
                     label_transformers=label_transformers,
                     per_modality_missing_ids=per_modality_missing_ids,
-                    within_modality_missing_ids=within_modality_missing_ids,
                     train_labels_df=train_labels_df,
                     valid_labels_df=valid_labels_df,
                 )
@@ -377,21 +302,14 @@ def set_up_all_target_labels_wrapper(
                     all_ids=all_ids,
                     label_transformers=label_transformers,
                     per_modality_missing_ids=per_modality_missing_ids,
-                    within_modality_missing_ids=within_modality_missing_ids,
                     train_labels_df=train_labels_df,
                     valid_labels_df=valid_labels_df,
                 )
             case _:
                 raise ValueError(f"Unknown output type: '{output_type}'.")
 
-    output_and_target_names = get_all_output_and_target_names(
-        output_configs=output_configs
-    )
     missing_target_info = get_missing_targets_info(
         missing_ids_per_modality=per_modality_missing_ids,
-        missing_ids_within_modality=within_modality_missing_ids,
-        output_and_target_names=output_and_target_names,
-        output_configs=output_configs,
     )
     log_missing_targets_info(missing_targets_info=missing_target_info, all_ids=all_ids)
 
@@ -411,7 +329,6 @@ def process_tabular_output(
     all_ids: set[str],
     label_transformers: Dict[str, Any],
     per_modality_missing_ids: Dict[str, set[str]],
-    within_modality_missing_ids: Dict[str, Dict[str, set[str]]],
     train_labels_df: pl.DataFrame,
     valid_labels_df: pl.DataFrame,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -427,15 +344,6 @@ def process_tabular_output(
     cur_ids = set(all_labels.get_column("ID").to_list())
     missing_ids = all_ids.difference(cur_ids)
     per_modality_missing_ids[output_name] = missing_ids
-
-    logger.debug("Estimating missing IDs for tabular output %s.", output_name)
-    missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
-        all_labels_df=all_labels,
-        tabular_info=tabular_info,
-        output_name=output_name,
-    )
-
-    within_modality_missing_ids.update(missing_ids_per_target_column)
 
     train_labels_df = update_labels_df(
         master_df=train_labels_df,
@@ -549,7 +457,6 @@ def process_survival_output(
     all_ids: set[str],
     label_transformers: Dict[str, Any],
     per_modality_missing_ids: Dict[str, set[str]],
-    within_modality_missing_ids: Dict[str, Dict[str, set[str]]],
     train_labels_df: pl.DataFrame,
     valid_labels_df: pl.DataFrame,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -624,15 +531,6 @@ def process_survival_output(
     cur_ids = set(all_labels.get_column("ID").to_list())
     missing_ids = all_ids.difference(cur_ids)
     per_modality_missing_ids[output_name] = missing_ids
-
-    logger.debug("Estimating missing IDs for survival output %s.", output_name)
-    missing_ids_per_target_column = compute_missing_ids_per_tabular_output(
-        all_labels_df=all_labels,
-        tabular_info=tabular_info,
-        output_name=output_name,
-    )
-
-    within_modality_missing_ids.update(missing_ids_per_target_column)
 
     train_labels_df = update_labels_df(
         master_df=train_labels_df,
@@ -773,29 +671,6 @@ def discretize_durations(
             ).alias(time_column)
         ]
     )
-
-
-def compute_missing_ids_per_tabular_output(
-    all_labels_df: pl.DataFrame,
-    tabular_info: TabularFileInfo,
-    output_name: str = "output",
-) -> dict[str, dict[str, set[str]]]:
-    missing_per_target_column: dict[str, dict[str, set[str]]] = {output_name: {}}
-    # TODO: Remove this function once missing IDs within modality has been deprecated
-    #       fully
-    return missing_per_target_column
-
-    all_columns = list(tabular_info.con_columns) + list(tabular_info.cat_columns)
-
-    for target_column in all_columns:
-        missing_ids = (
-            all_labels_df.filter(pl.col(target_column).is_null())
-            .get_column("ID")
-            .to_list()
-        )
-        missing_per_target_column[output_name][target_column] = set(missing_ids)
-
-    return missing_per_target_column
 
 
 def set_up_delayed_target_labels(

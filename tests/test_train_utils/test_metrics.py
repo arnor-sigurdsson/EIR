@@ -556,15 +556,8 @@ def setup_data():
     }
 
     missing_per_modality = {"output1": set()}
-    missing_within_modality = {"output1": {"inner1": set(), "inner2": set()}}
-    output_and_target_names = {
-        "output1": ["inner1", "inner2"],
-    }
     missing_ids_info = get_missing_targets_info(
         missing_ids_per_modality=missing_per_modality,
-        missing_ids_within_modality=missing_within_modality,
-        output_and_target_names=output_and_target_names,
-        output_configs=[],
     )
     return batch_ids, model_outputs, target_labels, missing_ids_info
 
@@ -599,9 +592,6 @@ def test_all_ids_missing(setup_data):
     batch_ids, model_outputs, target_labels, _ = setup_data
     missing_ids_info = get_missing_targets_info(
         missing_ids_per_modality={"output1": set(batch_ids)},
-        missing_ids_within_modality={},
-        output_and_target_names={"output1": ["inner1", "inner2"]},
-        output_configs=[],
     )
 
     result = metrics.filter_missing_outputs_and_labels(
