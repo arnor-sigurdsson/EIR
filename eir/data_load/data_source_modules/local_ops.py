@@ -1,13 +1,10 @@
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Any,
     Callable,
     Generator,
-    Iterable,
     Iterator,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Union,
@@ -26,54 +23,6 @@ if TYPE_CHECKING:
     pass
 
 logger = get_logger(name=__name__)
-
-
-def get_file_sample_id_iterator(
-    data_source: str, ids_to_keep: Union[None, Sequence[str]]
-) -> Generator[Tuple[Any, str], None, None]:
-    def _id_from_filename(file: Path) -> str:
-        return file.stem
-
-    def _filter_ids_callable(item: Path, sample_id: str) -> bool:
-        assert ids_to_keep is not None
-        if sample_id in ids_to_keep:
-            return True
-        return False
-
-    base_file_iterator = get_file_path_iterator(
-        data_source=Path(data_source), validate=False
-    )
-
-    sample_id_and_file_iterator = _get_sample_id_data_iterator(
-        base_iterator=base_file_iterator, id_callable=_id_from_filename
-    )
-
-    if ids_to_keep:
-        final_iterator = _get_filter_iterator(
-            base_iterator=sample_id_and_file_iterator,
-            filter_callable=_filter_ids_callable,
-        )
-    else:
-        final_iterator = sample_id_and_file_iterator
-
-    yield from final_iterator
-
-
-def _get_sample_id_data_iterator(
-    base_iterator: Iterable[Path], id_callable: Callable[[Path], str]
-) -> Generator[Tuple[Path, str], None, None]:
-    for item in base_iterator:
-        sample_id = id_callable(item)
-        yield item, sample_id
-
-
-def _get_filter_iterator(
-    base_iterator: Iterable[Tuple[Path, str]],
-    filter_callable: Callable[[Path, str], bool],
-) -> Generator[Any, None, None]:
-    for item in base_iterator:
-        if filter_callable(*item):
-            yield item
 
 
 def get_file_sample_id_iterator_basic(

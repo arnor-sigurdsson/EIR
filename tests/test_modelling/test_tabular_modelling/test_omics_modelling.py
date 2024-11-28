@@ -787,7 +787,7 @@ def _should_compile():
                 },
                 "output_configs": _get_multi_task_output_configs(
                     label_smoothing=0.1,
-                    uncertainty_mt_loss=False,
+                    uncertainty_mt_loss=True,
                 ),
             },
         },

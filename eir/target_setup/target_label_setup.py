@@ -36,8 +36,6 @@ from eir.data_load.label_setup import (
 )
 from eir.experiment_io.label_transformer_io import save_transformer_set
 from eir.setup import schemas
-from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
-from eir.setup.schema_modules.output_schemas_sequence import SequenceOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.target_setup.target_setup_utils import IdentityTransformer
@@ -119,49 +117,6 @@ def get_missing_targets_info(
         missing_ids_per_modality=missing_ids_per_modality,
         all_have_same_set=all_same,
     )
-
-
-def build_linked_survival_targets_for_missing_ids(
-    output_configs: Sequence[schemas.OutputConfig],
-) -> dict[str, LinkedTargets]:
-    linked_survival_targets: dict[str, LinkedTargets] = {}
-    for output_config in output_configs:
-        output_name = output_config.output_info.output_name
-        output_type = output_config.output_info.output_type
-        if output_type == "survival":
-            output_type_info = output_config.output_type_info
-            assert isinstance(output_type_info, SurvivalOutputTypeConfig)
-            event_column = output_type_info.event_column
-            time_column = output_type_info.time_column
-            linked_survival_targets[output_name] = LinkedTargets(
-                target_name=event_column,
-                linked_target_name=time_column,
-            )
-
-    return linked_survival_targets
-
-
-def get_all_output_and_target_names(
-    output_configs: Sequence[schemas.OutputConfig],
-) -> dict[str, list[str]]:
-    output_and_target_names = {}
-
-    for output_config in output_configs:
-        output_name = output_config.output_info.output_name
-        match output_config.output_type_info:
-            case TabularOutputTypeConfig(
-                target_con_columns=con_columns, target_cat_columns=cat_columns
-            ):
-                all_columns = list(con_columns) + list(cat_columns)
-                output_and_target_names[output_name] = all_columns
-            case ArrayOutputTypeConfig() | SequenceOutputTypeConfig():
-                output_and_target_names[output_name] = [output_name]
-            case SurvivalOutputTypeConfig(
-                event_column=event_column, time_column=time_column
-            ):
-                output_and_target_names[output_name] = [event_column, time_column]
-
-    return output_and_target_names
 
 
 def log_missing_targets_info(
@@ -634,45 +589,6 @@ def transform_durations_with_nans(
     return pl.Series(result)
 
 
-def discretize_durations(
-    df_time_train: pl.DataFrame,
-    df_time_valid: pl.DataFrame,
-    cur_labels: Labels,
-    time_column: str,
-    n_bins: int,
-) -> None:
-    train_values = df_time_train.get_column(time_column).to_numpy()
-    train_nan_mask = np.isnan(train_values)
-
-    dur = (
-        train_values[~train_nan_mask].reshape(-1, 1)
-        if train_nan_mask.any()
-        else train_values.reshape(-1, 1)
-    )
-
-    dur_transformer = fit_duration_transformer(durations=dur, n_bins=n_bins)
-
-    cur_labels.train_labels = cur_labels.train_labels.with_columns(
-        [
-            transform_durations_with_nans(
-                df=df_time_train,
-                time_column=time_column,
-                transformer=dur_transformer,
-            ).alias(time_column)
-        ]
-    )
-
-    cur_labels.valid_labels = cur_labels.valid_labels.with_columns(
-        [
-            transform_durations_with_nans(
-                df=df_time_valid,
-                time_column=time_column,
-                transformer=dur_transformer,
-            ).alias(time_column)
-        ]
-    )
-
-
 def set_up_delayed_target_labels(
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
@@ -771,24 +687,6 @@ def gather_torch_null_missing_ids(labels: pl.DataFrame, output_name: str) -> set
     )
 
     return set(str(id_) for id_ in missing_ids)
-
-
-def convert_dtypes(dtypes: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    dtype_mapping = {
-        "int64": int,
-    }
-
-    converted_dtypes = {}
-    for output_name, inner_target_name in dtypes.items():
-        converted_columns = {}
-        for column_name, dtype in inner_target_name.items():
-            dtype_name = dtype.name
-            if dtype_name in dtype_mapping:
-                primitive_type = dtype_mapping[dtype_name]
-                converted_columns[column_name] = primitive_type
-        converted_dtypes[output_name] = converted_columns
-
-    return converted_dtypes
 
 
 def gather_data_pointers_from_data_source(

@@ -1,6 +1,6 @@
 from enum import Enum
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Literal, Sequence, Type, Union
+from typing import TYPE_CHECKING, Callable, Literal, Type, Union
 
 import torch
 from torch import nn
@@ -272,15 +272,6 @@ def vectorized_bce_loss(
     return {name: loss for name, loss in zip(predictions.keys(), target_means)}
 
 
-def compute_masked_loss(
-    losses: torch.Tensor,
-    mask: torch.Tensor,
-    eps: float = 1e-8,
-) -> torch.Tensor:
-    masked_loss = losses.masked_fill(~mask, 0)
-    return masked_loss.sum() / (mask.sum() + eps)
-
-
 def loop_ce_loss(
     predictions: dict[str, torch.Tensor],
     targets: dict[str, torch.Tensor],
@@ -441,28 +432,6 @@ def get_loss_callable(
         criteria=criteria,
     )
     return single_task_loss_func
-
-
-def build_survival_links_for_criteria(
-    output_configs: Sequence[schemas.OutputConfig],
-) -> dict[str, dict[str, str]]:
-
-    survival_links = {}
-    for output_config in output_configs:
-        output_type_info = output_config.output_type_info
-        if not isinstance(output_type_info, schemas.SurvivalOutputTypeConfig):
-            continue
-
-        output_name = output_config.output_info.output_name
-        event_column = output_type_info.event_column
-        duration_column = output_type_info.time_column
-
-        survival_links[output_name] = {
-            "duration": duration_column,
-            "event": event_column,
-        }
-
-    return survival_links
 
 
 def _sequence_cat_loss(
