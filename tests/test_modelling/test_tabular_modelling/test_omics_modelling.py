@@ -7,7 +7,7 @@ import pytest
 
 from eir import train
 from eir.setup.config import Configs
-from tests.conftest import get_system_info, should_skip_in_gha_macos
+from tests.conftest import get_system_info
 from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 
 if TYPE_CHECKING:
@@ -46,9 +46,6 @@ def _get_classification_output_configs(
     return output_configs
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -197,9 +194,6 @@ def test_classification(prep_modelling_test_configs):
         )
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -223,7 +217,7 @@ def test_classification(prep_modelling_test_configs):
                         "weighted_sampling_columns": ["all"],
                     },
                     "model": {
-                        "n_iter_before_swa": 50,
+                        "n_iter_before_swa": 300,
                     },
                 },
                 "input_configs": [
@@ -231,7 +225,7 @@ def test_classification(prep_modelling_test_configs):
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "linear",
-                            "model_init_config": {"l1": 1e-04},
+                            "model_init_config": {"l1": 1e-06},
                         },
                     }
                 ],
@@ -277,9 +271,6 @@ def test_bce_classification(prep_modelling_test_configs):
         )
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -443,9 +434,6 @@ def _get_regression_output_configs() -> Sequence[Dict]:
     return output_configs
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "regression"}], indirect=True
 )
@@ -603,9 +591,6 @@ def _should_compile():
     return True
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -981,9 +966,6 @@ def test_multi_task(
             )
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data",
     [
