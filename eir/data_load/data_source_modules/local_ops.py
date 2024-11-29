@@ -59,19 +59,34 @@ def add_sequence_data_from_csv_to_df(
 
     split_func = get_sequence_split_function(split_on=split_on)
     csv_sequence_iterator = get_csv_id_sequence_iterator(
-        data_source=input_source, ids_to_keep=ids_to_keep
+        data_source=input_source,
+        ids_to_keep=ids_to_keep,
     )
 
-    sequence_data = []
+    ids = []
+    sequences = []
+
     for sample_id, sequence in tqdm(csv_sequence_iterator, desc=input_name):
         sequence_split = split_func(sequence)
-        sequence_encoded = np.array(encode_func(sequence_split))
-        sequence_data.append({"ID": sample_id, f"{input_name}": sequence_encoded})
+        sequence_encoded = encode_func(sequence_split)
 
-    if not sequence_data:
+        if isinstance(sequence_encoded, np.ndarray):
+            sequence_encoded = sequence_encoded.tolist()
+
+        ids.append(sample_id)
+        sequences.append(sequence_encoded)
+
+    if not ids:
         return input_df
 
-    sequence_df = pl.DataFrame(sequence_data)
+    sequence_df = pl.DataFrame(
+        {
+            "ID": pl.Series(name="ID", values=ids, dtype=pl.Utf8),
+            input_name: pl.Series(
+                name=input_name, values=sequences, dtype=pl.List(pl.Int64)
+            ),
+        }
+    )
 
     if input_df.height == 0:
         return sequence_df
