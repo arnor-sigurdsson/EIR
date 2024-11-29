@@ -308,10 +308,9 @@ def get_input_data_loading_hooks(
                     encode_func=input_object.encode_func,
                 )
 
-                max_length = input_object.computed_max_length
                 mapping[input_name] = InputHookOutput(
                     hook_callable=inner_function,
-                    return_dtype=pl.Array(inner=pl.Int64, shape=(max_length,)),
+                    return_dtype=pl.List(pl.Int64),
                 )
 
             case ComputedBytesInputInfo():

@@ -600,6 +600,7 @@ def _add_file_data_to_df(
     column_arrays: dict[str, Any] = {}
     hook_callable = data_loading_hook.hook_callable
     hook_dtype = data_loading_hook.return_dtype
+    is_list_dype = isinstance(hook_dtype, pl.List)
 
     for sample_id, file in tqdm(file_data_iterator, desc=input_name):
         sample_data = hook_callable(file)
@@ -620,6 +621,10 @@ def _add_file_data_to_df(
         else:
             if input_name not in column_arrays:
                 column_arrays[input_name] = []
+
+            if is_list_dype and isinstance(sample_data, np.ndarray):
+                sample_data = sample_data.tolist()
+
             column_arrays[input_name].append(sample_data)
             ids.append(sample_id)
 
