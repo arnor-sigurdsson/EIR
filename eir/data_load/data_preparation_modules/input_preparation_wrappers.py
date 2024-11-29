@@ -6,6 +6,7 @@ import numpy as np
 import polars as pl
 import torch
 from PIL.Image import Image
+from polars.datatypes import DataTypeClass
 from polars.datatypes.classes import NumericType
 
 from eir.data_load.data_preparation_modules.prepare_array import (
@@ -336,10 +337,12 @@ def get_input_data_loading_hooks(
                     **common_kwargs,
                 )
 
+                polars_dtype = numpy_dtype_to_polars_dtype(np_dtype=input_object.dtype)
                 loaded_shape = input_object.data_dimensions.original_shape
+
                 mapping[input_name] = InputHookOutput(
                     hook_callable=inner_function,
-                    return_dtype=pl.Array(inner=pl.Float64, shape=loaded_shape),
+                    return_dtype=pl.Array(inner=polars_dtype, shape=loaded_shape),
                 )
 
     return mapping
@@ -354,3 +357,27 @@ def _get_polars_dtype_for_bytes(
         "float32": pl.Float32,
     }
     return encoding_dtype_map.get(byte_encoding, pl.Object)
+
+
+def numpy_dtype_to_polars_dtype(np_dtype: np.dtype) -> DataTypeClass:
+
+    dtype_str = str(np_dtype)
+
+    dtype_map = {
+        "float64": pl.Float64,
+        "float32": pl.Float32,
+        "int64": pl.Int64,
+        "int32": pl.Int32,
+        "int16": pl.Int16,
+        "int8": pl.Int8,
+        "uint64": pl.UInt64,
+        "uint32": pl.UInt32,
+        "uint16": pl.UInt16,
+        "uint8": pl.UInt8,
+        "bool": pl.Boolean,
+        "object": pl.Object,
+        "string": pl.String,
+        "datetime64[ns]": pl.Datetime,
+    }
+
+    return dtype_map.get(dtype_str, pl.Float64)
