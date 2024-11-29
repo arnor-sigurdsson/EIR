@@ -72,6 +72,8 @@ def predict_survival_wrapper_with_labels(
         )
 
         events_np = general_torch_to_numpy(tensor=filtered.events)
+        events_np = events_np.astype(int)
+
         times_np = general_torch_to_numpy(tensor=filtered.times)
         ids = filtered.ids
 

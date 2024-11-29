@@ -64,6 +64,7 @@ def save_survival_evaluation_results_wrapper(
         )
 
         events = general_torch_to_numpy(tensor=filtered.events)
+        events = events.astype(int)
         times = general_torch_to_numpy(tensor=filtered.times)
         ids = filtered.ids
 

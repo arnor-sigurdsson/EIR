@@ -192,6 +192,8 @@ def calculate_batch_metrics(
 
             cur_outputs_np = general_torch_to_numpy(tensor=filtered.model_outputs)
             cur_labels_np = general_torch_to_numpy(tensor=filtered.target_labels)
+            if output_target_type == "cat":
+                cur_labels_np = cur_labels_np.astype(int)
 
             for metric_record in cur_metric_records:
 
@@ -241,6 +243,7 @@ def calculate_batch_metrics(
 
             cur_outputs_np = general_torch_to_numpy(tensor=filtered.model_outputs)
             cur_labels_np = general_torch_to_numpy(tensor=filtered.events)
+            cur_labels_np = cur_labels_np.astype(int)
             cur_times_np = general_torch_to_numpy(tensor=filtered.times)
 
             for metric_record in cur_metric_records:

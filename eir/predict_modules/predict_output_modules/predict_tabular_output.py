@@ -66,7 +66,11 @@ def predict_tabular_wrapper_with_labels(
         )
 
         predictions_np = general_torch_to_numpy(tensor=filtered.model_outputs)
+
         target_labels_np = general_torch_to_numpy(tensor=filtered.target_labels)
+        if target_head_name == "cat":
+            target_labels_np = target_labels_np.astype(int)
+
         cur_ids = filtered.ids
 
         df_merged_predictions = _merge_ids_predictions_and_labels(
