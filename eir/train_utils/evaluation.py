@@ -574,10 +574,12 @@ def save_tabular_evaluation_results_wrapper(
 
                 to_npy = metrics.general_torch_to_numpy
                 cur_val_outputs_np = to_npy(tensor=filtered.model_outputs)
-                cur_val_labels_np = to_npy(tensor=filtered.target_labels)
 
+                cur_val_labels_np = to_npy(tensor=filtered.target_labels)
                 if column_type == "cat":
                     cur_val_labels_np = cur_val_labels_np.astype(int)
+
+                cur_val_ids = filtered.ids
 
                 target_transformers = output_object.target_transformers
 
