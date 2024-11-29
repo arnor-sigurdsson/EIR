@@ -594,6 +594,11 @@ def hook_default_per_target_loss(
     *args,
     **kwargs,
 ) -> dict[str, Any]:
+    """
+    Note that we do not filter within modality missing sample data here
+    after `filter_missing_outputs_and_labels` as that is handled in
+    the respective (tabular and survival output) loss functions.
+    """
     context_manager = get_maybe_amp_context_manager_from_state(state=state)
     with context_manager:
         model_outputs = state["model_outputs"]

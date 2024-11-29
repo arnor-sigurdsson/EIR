@@ -1,9 +1,12 @@
+import multiprocessing
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
 
 import torch
 import torch.multiprocessing
+
+multiprocessing.set_start_method("spawn", force=True)
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 from aislib.misc_utils import ensure_path_exists

@@ -181,17 +181,17 @@ def calculate_batch_metrics(
             cur_metric_records: al_record = cur_records
 
             cur_outputs = outputs[output_name][target_name]
-            cur_outputs_np = cur_outputs.detach().cpu().to(dtype=torch.float32).numpy()
+            cur_target_labels = labels[output_name][target_name]
 
-            cur_labels = labels[output_name][target_name]
-            cur_labels_np = cur_labels.cpu().to(dtype=torch.float32).numpy()
+            filtered = filter_tabular_missing_targets(
+                outputs=cur_outputs,
+                target_labels=cur_target_labels,
+                ids=[],
+                target_type=output_target_type,
+            )
 
-            nan_labels_mask = np.isnan(cur_labels_np)
-            if output_target_type == "cat":
-                nan_labels_mask = np.logical_or(nan_labels_mask, cur_labels_np == -1)
-
-            cur_outputs_np = cur_outputs_np[~nan_labels_mask]
-            cur_labels_np = cur_labels_np[~nan_labels_mask]
+            cur_outputs_np = general_torch_to_numpy(tensor=filtered.model_outputs)
+            cur_labels_np = general_torch_to_numpy(tensor=filtered.target_labels)
 
             for metric_record in cur_metric_records:
 
@@ -224,25 +224,24 @@ def calculate_batch_metrics(
             cur_metric_records = cur_records
 
             cur_outputs = outputs[output_name][target_name]
-            cur_outputs_np = cur_outputs.detach().cpu().to(dtype=torch.float32).numpy()
-
-            cur_labels = labels[output_name][target_name]
-            cur_labels_np = cur_labels.cpu().to(dtype=torch.float32).numpy()
+            cur_events = labels[output_name][target_name]
 
             cur_oti = cur_output_object.output_config.output_type_info
             assert isinstance(cur_oti, SurvivalOutputTypeConfig)
 
             cur_time_name = cur_oti.time_column
             cur_times = labels[output_name][cur_time_name]
-            cur_times_np = cur_times.cpu().to(dtype=torch.float32).numpy()
 
-            nan_labels_mask = cur_labels_np == -1
-            cur_times_nan = np.isnan(cur_times_np)
-            nan_labels_mask = np.logical_or(nan_labels_mask, cur_times_nan)
+            filtered = filter_survival_missing_targets(
+                model_outputs=cur_outputs,
+                events=cur_events,
+                times=cur_times,
+                cur_ids=[],
+            )
 
-            cur_outputs_np = cur_outputs_np[~nan_labels_mask]
-            cur_labels_np = cur_labels_np[~nan_labels_mask]
-            cur_times_np = cur_times_np[~nan_labels_mask]
+            cur_outputs_np = general_torch_to_numpy(tensor=filtered.model_outputs)
+            cur_labels_np = general_torch_to_numpy(tensor=filtered.events)
+            cur_times_np = general_torch_to_numpy(tensor=filtered.times)
 
             for metric_record in cur_metric_records:
 
@@ -1454,3 +1453,72 @@ def filter_missing_outputs_and_labels(
         ids=filtered_ids,
         common_ids=None,
     )
+
+
+@dataclass
+class FilteredTabularTargets:
+    model_outputs: torch.Tensor
+    target_labels: torch.Tensor
+    ids: list[str]
+
+
+def filter_tabular_missing_targets(
+    outputs: torch.Tensor,
+    target_labels: torch.Tensor,
+    ids: list[str],
+    target_type: str,
+) -> FilteredTabularTargets:
+    nan_labels_mask = torch.isnan(target_labels)
+    if target_type == "cat":
+        nan_labels_mask = torch.logical_or(nan_labels_mask, target_labels == -1)
+
+    if ids:
+        cur_ids_np = np.array(ids)
+        ids = cur_ids_np[~nan_labels_mask].tolist()
+
+    predictions = outputs[~nan_labels_mask]
+    target_labels = target_labels[~nan_labels_mask]
+
+    return FilteredTabularTargets(
+        model_outputs=predictions,
+        target_labels=target_labels,
+        ids=ids,
+    )
+
+
+@dataclass
+class FilteredSurvivalTargets:
+    model_outputs: torch.Tensor
+    events: torch.Tensor
+    times: torch.Tensor
+    ids: list[str]
+
+
+def filter_survival_missing_targets(
+    model_outputs: torch.Tensor,
+    events: torch.Tensor,
+    times: torch.Tensor,
+    cur_ids: list[str],
+) -> FilteredSurvivalTargets:
+    nan_labels_mask = events == -1
+    cur_times_nan = torch.isnan(times)
+    nan_labels_mask = torch.logical_or(nan_labels_mask, cur_times_nan)
+
+    predictions = model_outputs[~nan_labels_mask]
+    events = events[~nan_labels_mask]
+    times = times[~nan_labels_mask]
+
+    if cur_ids:
+        cur_ids = np.array(cur_ids)[~nan_labels_mask].tolist()
+
+    return FilteredSurvivalTargets(
+        model_outputs=predictions,
+        events=events,
+        times=times,
+        ids=cur_ids,
+    )
+
+
+def general_torch_to_numpy(tensor: torch.Tensor) -> np.ndarray:
+    array = tensor.cpu().to(dtype=torch.float32).detach().numpy()
+    return array

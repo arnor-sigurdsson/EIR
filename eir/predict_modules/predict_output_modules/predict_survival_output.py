@@ -17,6 +17,10 @@ from eir.train_utils.evaluation_modules.evaluation_output_survival import (
     plot_discrete_individual_survival_curves,
     plot_discrete_survival_curves,
 )
+from eir.train_utils.metrics import (
+    filter_survival_missing_targets,
+    general_torch_to_numpy,
+)
 
 if TYPE_CHECKING:
     from eir.predict import PredictExperiment
@@ -46,20 +50,30 @@ def predict_survival_wrapper_with_labels(
         output_folder.mkdir(parents=True, exist_ok=True)
 
         ids = all_ids[output_name][event_name]
-        model_outputs = all_predictions[output_name][event_name].cpu()
+        model_outputs = all_predictions[output_name][event_name]
 
-        times = events = None
-        if predict_cl_args.evaluate:
-            events = all_labels[output_name][event_name].cpu().numpy()
-            if model_type == "discrete":
-                times_binned = all_labels[output_name][time_name].cpu().numpy()
-                transformers = output_object.target_transformers
-                time_kbins_transformer = transformers[time_name]
-                times = time_kbins_transformer.inverse_transform(
-                    times_binned.reshape(-1, 1)
-                ).flatten()
-            else:
-                times = all_labels[output_name][time_name].cpu().numpy()
+        if model_type == "discrete":
+            times_binned = all_labels[output_name][time_name].cpu().numpy()
+            transformers = output_object.target_transformers
+            time_kbins_transformer = transformers[time_name]
+            it_func = time_kbins_transformer.inverse_transform
+            times = it_func(times_binned.reshape(-1, 1)).flatten()
+            times = torch.tensor(times)
+        else:
+            times = all_labels[output_name][time_name]
+
+        events = all_labels[output_name][event_name]
+
+        filtered = filter_survival_missing_targets(
+            model_outputs=model_outputs,
+            events=events,
+            times=times,
+            cur_ids=ids,
+        )
+
+        events_np = general_torch_to_numpy(tensor=filtered.events)
+        times_np = general_torch_to_numpy(tensor=filtered.times)
+        ids = filtered.ids
 
         if model_type == "discrete":
             transformers = output_object.target_transformers
@@ -72,24 +86,23 @@ def predict_survival_wrapper_with_labels(
 
             base_data = {"ID": ids, "Predicted_Risk": hazards[:, -1]}
 
-            if predict_cl_args.evaluate:
-                event_transformer = transformers[event_name]
-                events_untransformed = event_transformer.inverse_transform(events)
-                base_data.update(
-                    {
-                        time_name: times,
-                        event_name: events,
-                        f"{event_name} Untransformed": events_untransformed,
-                    }
-                )
+            event_transformer = transformers[event_name]
+            events_untransformed = event_transformer.inverse_transform(events_np)
+            base_data.update(
+                {
+                    time_name: times_np,
+                    event_name: events_np,
+                    f"{event_name} Untransformed": events_untransformed,
+                }
+            )
 
-                plot_discrete_survival_curves(
-                    times=times,
-                    events=events,
-                    predicted_probs=survival_probs,
-                    time_bins=time_bins_except_last,
-                    output_folder=output_folder,
-                )
+            plot_discrete_survival_curves(
+                times=times_np,
+                events=events_np,
+                predicted_probs=survival_probs,
+                time_bins=time_bins_except_last,
+                output_folder=output_folder,
+            )
 
             surv_prob_cols = {
                 f"Surv_Prob_t{i}": survival_probs[:, i]
@@ -126,26 +139,22 @@ def predict_survival_wrapper_with_labels(
             )
 
             base_data = {"ID": ids, "Risk_Score": risk_scores.squeeze()}
+            base_data.update(
+                {
+                    time_name: times_np,
+                    event_name: events_np,
+                }
+            )
 
-            if predict_cl_args.evaluate:
-                base_data.update(
-                    {
-                        time_name: times,
-                        event_name: events,
-                    }
-                )
-
-                assert times is not None
-                assert events is not None
-                plot_cox_survival_curves(
-                    times=times,
-                    events=events,
-                    risk_scores=risk_scores,
-                    unique_times=unique_times,
-                    baseline_survival=baseline_survival,
-                    time_points=time_points,
-                    output_folder=output_folder,
-                )
+            plot_cox_survival_curves(
+                times=times_np,
+                events=events_np,
+                risk_scores=risk_scores,
+                unique_times=unique_times,
+                baseline_survival=baseline_survival,
+                time_points=time_points,
+                output_folder=output_folder,
+            )
 
             surv_prob_cols = {
                 f"Surv_Prob_t{i}": survival_probs[:, i]

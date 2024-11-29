@@ -12,7 +12,11 @@ from eir.setup.output_setup_modules.survival_output_setup import (
     ComputedSurvivalOutputInfo,
 )
 from eir.train_utils import utils
-from eir.train_utils.metrics import al_step_metric_dict
+from eir.train_utils.metrics import (
+    al_step_metric_dict,
+    filter_survival_missing_targets,
+    general_torch_to_numpy,
+)
 
 if TYPE_CHECKING:
     from eir.train import Experiment
@@ -48,18 +52,20 @@ def save_survival_evaluation_results_wrapper(
         )
 
         ids = val_ids[output_name][event_name]
-        model_outputs = val_outputs[output_name][event_name].cpu()
-        events = val_labels[output_name][event_name].cpu().numpy().astype(int)
-        times = val_labels[output_name][time_name].cpu().numpy()
+        model_outputs = val_outputs[output_name][event_name]
+        events = val_labels[output_name][event_name]
+        times = val_labels[output_name][time_name]
 
-        nan_labels_mask = events == -1
-        cur_times_nan = np.isnan(times)
-        nan_labels_mask = np.logical_or(nan_labels_mask, cur_times_nan)
+        filtered = filter_survival_missing_targets(
+            model_outputs=model_outputs,
+            events=events,
+            times=times,
+            cur_ids=ids,
+        )
 
-        model_outputs = model_outputs[~nan_labels_mask]
-        events = events[~nan_labels_mask]
-        times = times[~nan_labels_mask]
-        ids = np.array(ids)[~nan_labels_mask].tolist()
+        events = general_torch_to_numpy(tensor=filtered.events)
+        times = general_torch_to_numpy(tensor=filtered.times)
+        ids = filtered.ids
 
         if model_type == "discrete":
             transformers = output_object.target_transformers

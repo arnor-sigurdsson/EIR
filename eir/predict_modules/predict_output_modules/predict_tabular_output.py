@@ -14,6 +14,10 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.train_utils.evaluation import PerformancePlotConfig
+from eir.train_utils.metrics import (
+    filter_tabular_missing_targets,
+    general_torch_to_numpy,
+)
 from eir.visualization import visualization_funcs as vf
 
 if TYPE_CHECKING:
@@ -35,16 +39,14 @@ def predict_tabular_wrapper_with_labels(
         if target_head_name not in ("cat", "con"):
             continue
 
-        target_predictions = all_predictions[output_name][target_column_name]
-        predictions = _parse_predictions(target_predictions=target_predictions)
-
         cur_output_object = predict_config.outputs[output_name]
         assert isinstance(cur_output_object, ComputedTabularOutputInfo)
 
         target_transformers = cur_output_object.target_transformers
         cur_target_transformer = target_transformers[target_column_name]
         classes = _get_target_class_names(
-            transformer=cur_target_transformer, target_column=target_column_name
+            transformer=cur_target_transformer,
+            target_column=target_column_name,
         )
 
         output_folder = Path(
@@ -52,16 +54,25 @@ def predict_tabular_wrapper_with_labels(
         )
         ensure_path_exists(path=output_folder, is_folder=True)
 
-        target_labels = None
-        if all_labels:
-            target_labels = all_labels[output_name][target_column_name].cpu().numpy()
-
+        predictions = all_predictions[output_name][target_column_name]
+        target_labels = all_labels[output_name][target_column_name]
         cur_ids = all_ids[output_name][target_column_name]
+
+        filtered = filter_tabular_missing_targets(
+            outputs=predictions,
+            target_labels=target_labels,
+            ids=cur_ids,
+            target_type=target_head_name,
+        )
+
+        predictions_np = general_torch_to_numpy(tensor=filtered.model_outputs)
+        target_labels_np = general_torch_to_numpy(tensor=filtered.target_labels)
+        cur_ids = filtered.ids
 
         df_merged_predictions = _merge_ids_predictions_and_labels(
             ids=cur_ids,
-            predictions=predictions,
-            labels=target_labels,
+            predictions=predictions_np,
+            labels=target_labels_np,
             prediction_classes=classes,
         )
 
@@ -78,21 +89,20 @@ def predict_tabular_wrapper_with_labels(
             output_folder=output_folder,
         )
 
-        if predict_cl_args.evaluate:
-            cur_labels = all_labels[output_name][target_column_name].cpu().numpy()
+        assert target_labels is not None
 
-            plot_config = PerformancePlotConfig(
-                val_outputs=predictions,
-                val_labels=cur_labels,
-                val_ids=cur_ids,
-                iteration=0,
-                column_name=target_column_name,
-                column_type=target_head_name,
-                target_transformer=cur_target_transformer,
-                output_folder=output_folder,
-            )
+        plot_config = PerformancePlotConfig(
+            val_outputs=predictions_np,
+            val_labels=target_labels_np,
+            val_ids=cur_ids,
+            iteration=0,
+            column_name=target_column_name,
+            column_type=target_head_name,
+            target_transformer=cur_target_transformer,
+            output_folder=output_folder,
+        )
 
-            vf.gen_eval_graphs(plot_config=plot_config)
+        vf.gen_eval_graphs(plot_config=plot_config)
 
 
 def _merge_ids_predictions_and_labels(
