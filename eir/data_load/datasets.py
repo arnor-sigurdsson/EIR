@@ -179,6 +179,24 @@ def _check_valid_and_train_datasets(
         )
 
 
+def _identity(input_: Any) -> Any:
+    return input_
+
+
+def _get_default_output_hook() -> HookOutput:
+    return HookOutput(
+        hook_callable=_identity,
+        return_dtype=None,
+    )
+
+
+def _get_default_input_hook() -> InputHookOutput:
+    return InputHookOutput(
+        hook_callable=_identity,
+        return_dtype=None,
+    )
+
+
 class DatasetBase(Dataset):
     def __init__(
         self,
@@ -221,19 +239,11 @@ class DatasetBase(Dataset):
         train/val and test folders.
         """
 
-        def _identity(sample_data: Any) -> Any:
-            return sample_data
-
         mode_str = "evaluation/test" if self.test_mode else "train"
         logger.debug("Setting up dataset in %s mode.", mode_str)
 
         if not output_data_loading_hooks:
-            output_data_loading_hooks = defaultdict(
-                lambda: HookOutput(
-                    hook_callable=_identity,
-                    return_dtype=None,
-                )
-            )
+            output_data_loading_hooks = defaultdict(_get_default_output_hook)
 
         if not self.target_labels_df.is_empty():
             self.target_labels_df = _target_labels_hook_load_wrapper(
@@ -242,12 +252,7 @@ class DatasetBase(Dataset):
             )
 
         if not input_data_loading_hooks:
-            input_data_loading_hooks = defaultdict(
-                lambda: InputHookOutput(
-                    hook_callable=_identity,
-                    return_dtype=None,
-                )
-            )
+            input_data_loading_hooks = defaultdict(_get_default_input_hook)
 
         ids_to_keep = initialize_ids_to_keep(
             target_labels_df=self.target_labels_df,
