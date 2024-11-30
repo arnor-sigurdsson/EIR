@@ -324,7 +324,9 @@ def get_input_data_loading_hooks(
                     dtype=input_type_info.byte_encoding,
                 )
 
-                pl_dtype = _get_polars_dtype_for_bytes(input_type_info.byte_encoding)
+                pl_dtype = _get_polars_dtype_for_bytes(
+                    byte_encoding=input_type_info.byte_encoding
+                )
                 max_length = input_object.computed_max_length
                 mapping[input_name] = InputHookOutput(
                     hook_callable=inner_function,

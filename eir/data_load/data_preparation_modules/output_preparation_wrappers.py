@@ -9,6 +9,7 @@ import torch
 from PIL.Image import Image
 
 from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
+    numpy_dtype_to_polars_dtype,
     typed_partial_for_hook,
 )
 from eir.data_load.data_preparation_modules.prepare_array import (
@@ -151,11 +152,12 @@ def get_output_data_loading_hooks(
                     function=inner_function,
                 )
 
-                arr_shape = output_object.data_dimensions.full_shape()
+                arr_shape = output_object.data_dimensions.original_shape
+                polars_dtype = numpy_dtype_to_polars_dtype(np_dtype=output_object.dtype)
 
                 mapping[output_name] = HookOutput(
                     hook_callable=final_callable,
-                    return_dtype=pl.Array(inner=pl.Float64, shape=arr_shape),
+                    return_dtype=pl.Array(inner=polars_dtype, shape=arr_shape),
                 )
 
             case ComputedImageOutputInfo():
