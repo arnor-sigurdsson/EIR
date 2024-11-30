@@ -195,6 +195,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
                         "output_folder": "test_run_predict",
                         "n_epochs": 8,
                         "batch_size": 64,
+                        "dataloader_workers": 2,
                     },
                     "model": {
                         "n_iter_before_swa": 200,
