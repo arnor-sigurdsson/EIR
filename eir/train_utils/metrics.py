@@ -1477,7 +1477,8 @@ def filter_tabular_missing_targets(
 
     if ids:
         cur_ids_np = np.array(ids)
-        ids = cur_ids_np[~nan_labels_mask].tolist()
+        nan_labels_mask_np = nan_labels_mask.cpu().numpy()
+        ids = cur_ids_np[~nan_labels_mask_np].tolist()
 
     predictions = outputs[~nan_labels_mask]
     target_labels = target_labels[~nan_labels_mask]
@@ -1512,7 +1513,8 @@ def filter_survival_missing_targets(
     times = times[~nan_labels_mask]
 
     if cur_ids:
-        cur_ids = np.array(cur_ids)[~nan_labels_mask].tolist()
+        nan_labels_mask_np = nan_labels_mask.cpu().numpy()
+        cur_ids = np.array(cur_ids)[~nan_labels_mask_np].tolist()
 
     return FilteredSurvivalTargets(
         model_outputs=predictions,
