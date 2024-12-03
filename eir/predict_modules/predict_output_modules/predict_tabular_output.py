@@ -13,6 +13,7 @@ from eir.data_load.label_setup import al_label_transformers_object
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
+from eir.setup.schemas import TabularOutputTypeConfig
 from eir.train_utils.evaluation import PerformancePlotConfig
 from eir.train_utils.metrics import (
     filter_tabular_missing_targets,
@@ -73,11 +74,16 @@ def predict_tabular_wrapper_with_labels(
 
         cur_ids = filtered.ids
 
+        cur_out_config = cur_output_object.output_config
+        cur_output_type_info = cur_out_config.output_type_info
+        assert isinstance(cur_output_type_info, TabularOutputTypeConfig)
+        cat_loss_name = cur_output_type_info.cat_loss_name
         df_merged_predictions = _merge_ids_predictions_and_labels(
             ids=cur_ids,
             predictions=predictions_np,
             labels=target_labels_np,
             prediction_classes=classes,
+            cat_loss_name=cat_loss_name,
         )
 
         df_predictions = _add_inverse_transformed_columns_to_predictions(
@@ -113,6 +119,7 @@ def _merge_ids_predictions_and_labels(
     ids: Sequence[str],
     predictions: np.ndarray,
     labels: Optional[np.ndarray],
+    cat_loss_name: str,
     prediction_classes: Union[Sequence[str], None] = None,
     label_column_name: str = "True Label",
 ) -> pd.DataFrame:
@@ -126,6 +133,11 @@ def _merge_ids_predictions_and_labels(
 
     if prediction_classes is None:
         prediction_classes = [f"Score Class {i}" for i in range(predictions.shape[1])]
+
+    if cat_loss_name == "BCEWithLogitsLoss":
+        assert predictions.shape[1] == 1, predictions.shape
+        assert len(prediction_classes) == 2, len(prediction_classes)
+        prediction_classes = prediction_classes[1]
 
     df[prediction_classes] = predictions
 
@@ -165,10 +177,15 @@ def predict_tabular_wrapper_no_labels(
 
         cur_ids = all_ids[output_name][target_column_name]
 
+        cur_out_config = cur_output_object.output_config
+        cur_output_type_info = cur_out_config.output_type_info
+        assert isinstance(cur_output_type_info, TabularOutputTypeConfig)
+        cat_loss_name = cur_output_type_info.cat_loss_name
         df_predictions = _merge_ids_and_predictions(
             ids=cur_ids,
             predictions=predictions,
             prediction_classes=classes,
+            cat_loss_name=cat_loss_name,
         )
 
         df_predictions = _add_inverse_transformed_columns_to_predictions(
@@ -188,6 +205,7 @@ def predict_tabular_wrapper_no_labels(
 def _merge_ids_and_predictions(
     ids: Sequence[str],
     predictions: np.ndarray,
+    cat_loss_name: str,
     prediction_classes: Optional[Sequence[str]] = None,
 ) -> pd.DataFrame:
     df = pd.DataFrame()
@@ -197,6 +215,11 @@ def _merge_ids_and_predictions(
 
     if prediction_classes is None:
         prediction_classes = [f"Score Class {i}" for i in range(predictions.shape[1])]
+
+    if cat_loss_name == "BCEWithLogitsLoss":
+        assert predictions.shape[1] == 1, predictions.shape
+        assert len(prediction_classes) == 2, len(prediction_classes)
+        prediction_classes = prediction_classes[1]
 
     df[prediction_classes] = predictions
 
