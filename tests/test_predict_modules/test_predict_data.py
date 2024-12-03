@@ -103,8 +103,8 @@ def test_set_up_test_labels(
     con_column = target_tabular_info.con_columns[0]
     cat_column = target_tabular_info.cat_columns[0]
 
-    assert df_labels[f"test_output_tabular__{con_column}"].dtype == pl.Float64
-    assert df_labels[f"test_output_tabular__{cat_column}"].dtype == pl.Float64
+    assert df_labels[f"test_output_tabular__{con_column}"].dtype == pl.Float32
+    assert df_labels[f"test_output_tabular__{cat_column}"].dtype == pl.Float32
 
     df_raw_data = pl.read_csv(source=target_tabular_info.file_path)
     con_transformer = transformers["test_output_tabular"][con_column]
@@ -129,7 +129,7 @@ def set_random_con_targets_to_missing(
         .with_columns(
             pl.col("test_output_tabular__Height").map_elements(
                 lambda x, idx=pl.col("index"): np.nan if idx in random_indices else x,
-                return_dtype=pl.Float64,
+                return_dtype=pl.Float32,
             )
         )
         .drop("index"),
