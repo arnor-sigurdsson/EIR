@@ -251,7 +251,7 @@ def transform_label_df(
 
             transformed_values = transform_func(series_values_streamlined).squeeze()
 
-            result = np.full(len(series_values), np.nan)
+            result = np.full(len(series_values), np.nan, dtype=np.float32)
             result[non_nan_mask.to_numpy()] = transformed_values
 
             if isinstance(transformer_instance, LabelEncoder):
@@ -322,8 +322,6 @@ def label_df_parse_wrapper(
     )
 
     df_cat_str = ensure_categorical_columns_and_format(df=df_column_filtered)
-
-    # df_no_none = convert_none_to_nan(df=df_cat_str)
 
     df_final = _check_parsed_label_df(
         df_labels=df_cat_str,
