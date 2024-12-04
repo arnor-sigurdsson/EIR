@@ -71,7 +71,8 @@ def prepare_sequence_data(
     input_type_info = sio.input_config.input_type_info
     assert isinstance(input_type_info, SequenceInputDataConfig)
 
-    cur_tokens_as_tensor = torch.LongTensor(cur_file_content_tokenized).detach().clone()
+    cur_arr = cur_file_content_tokenized.copy()
+    cur_tokens_as_tensor = torch.LongTensor(cur_arr).detach().clone()
 
     sampling_strategy = input_type_info.sampling_strategy_if_longer
     if test_mode:
