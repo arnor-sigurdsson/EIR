@@ -38,7 +38,7 @@ def bytes_load_wrapper(
 
 def prepare_bytes_data(
     bytes_input_object: "ComputedBytesInputInfo",
-    bytes_data: np.ndarray,
+    bytes_data: np.ndarray | torch.Tensor,
     test_mode: bool,
 ) -> torch.Tensor:
     """
@@ -53,7 +53,9 @@ def prepare_bytes_data(
     if test_mode:
         sampling_strategy = "from_start"
 
-    bytes_data_copy = bytes_data.copy()
+    bytes_data_copy = bytes_data
+    if isinstance(bytes_data, np.ndarray):
+        bytes_data_copy = bytes_data.copy()
     bytes_tensor = torch.LongTensor(bytes_data_copy).detach().clone()
 
     padding_value = bio.vocab.get("<pad>", 0)
