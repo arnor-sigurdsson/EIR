@@ -53,7 +53,8 @@ def prepare_bytes_data(
     if test_mode:
         sampling_strategy = "from_start"
 
-    bytes_tensor = torch.LongTensor(bytes_data).detach().clone()
+    bytes_data_copy = bytes_data.copy()
+    bytes_tensor = torch.LongTensor(bytes_data_copy).detach().clone()
 
     padding_value = bio.vocab.get("<pad>", 0)
     cur_bytes_padded = process_tensor_to_length(
