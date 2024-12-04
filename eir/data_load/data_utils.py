@@ -129,7 +129,7 @@ def get_train_sampler(columns_to_sample, train_dataset):
             columns_to_sample += cat_columns_with_output_prefix
 
     train_sampler = get_weighted_random_sampler(
-        target_df=train_dataset.target_labels_df,
+        target_storage=train_dataset.target_labels_storage,
         columns_to_sample=columns_to_sample,
     )
     return train_sampler

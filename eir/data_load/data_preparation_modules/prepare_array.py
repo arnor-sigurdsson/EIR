@@ -23,7 +23,7 @@ def array_load_wrapper(
             inner_key=deeplake_inner_key,
         )
     else:
-        assert isinstance(data_pointer, (str, Path))
+        assert isinstance(data_pointer, (str, Path)), data_pointer
         array_data = np.load(str(data_pointer))
 
     assert isinstance(array_data, np.ndarray)

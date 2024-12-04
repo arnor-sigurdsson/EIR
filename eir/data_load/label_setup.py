@@ -661,7 +661,8 @@ def _get_currently_available_columns(
 
 
 def _filter_ids_from_label_df(
-    df_labels: pl.DataFrame, ids_to_keep: Union[None, Sequence[str]] = None
+    df_labels: pl.DataFrame,
+    ids_to_keep: Union[None, Sequence[str]] = None,
 ) -> pl.DataFrame:
     if not ids_to_keep:
         return df_labels
@@ -925,7 +926,8 @@ def _fill_categorical_nans(
         return df
 
     logger.debug(
-        "Replacing NaNs in categorical columns %s (counts: %s) " "in %s with 'NA'.",
+        "Replacing NaNs in categorical columns %s (counts: %s) "
+        "in %s with '__NULL__'.",
         column_names,
         missing_stats,
         name,

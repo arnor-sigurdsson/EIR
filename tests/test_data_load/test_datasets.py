@@ -123,8 +123,8 @@ def test_set_up_datasets(
         == test_data_config.n_per_class * n_classes
     )
 
-    valid_ids = tuple(valid_dataset.input_df["ID"])
-    train_ids = tuple(train_dataset.input_df["ID"])
+    valid_ids = tuple(valid_dataset.input_storage.get_ids())
+    train_ids = tuple(train_dataset.input_storage.get_ids())
 
     assert set(valid_ids).isdisjoint(set(train_ids))
     assert len([i for i in valid_ids if i.startswith("SampleIgnore")]) == 0
@@ -293,16 +293,20 @@ def test_set_up_datasets_fails(
             outputs_as_dict=outputs_as_dict,
         )
         if dataset_fail_config.get("corrupt_ids", None):
-            train_dataset.input_df[0, "ID"] = None
-            valid_dataset.input_df[0, "ID"] = None
+            assert train_dataset.input_storage.string_columns[0].name == "ID"
+            assert valid_dataset.input_storage.string_columns[0].name == "ID"
+            train_dataset.input_storage.string_data[0, 0] = np.nan
+            valid_dataset.input_storage.string_data[0, 0] = np.nan
             with pytest.raises(ValueError):
                 train_dataset.check_samples()
             with pytest.raises(ValueError):
                 valid_dataset.check_samples()
 
         if dataset_fail_config.get("corrupt_inputs", None):
-            train_dataset.input_df[0, "test_genotype"] = None
-            valid_dataset.input_df[0, "test_genotype"] = None
+            assert train_dataset.input_storage.path_columns[0].name == "test_genotype"
+            assert valid_dataset.input_storage.path_columns[0].name == "test_genotype"
+            train_dataset.input_storage.path_data[0, 0] = np.nan
+            valid_dataset.input_storage.path_data[0, 0] = np.nan
             with pytest.raises(ValueError):
                 train_dataset.check_samples()
             with pytest.raises(ValueError):
@@ -575,5 +579,5 @@ def check_dataset(
     test_genotype = test_inputs["test_genotype"]
     assert (test_genotype.sum(1) == 1).all()
 
-    assert test_id == dataset.target_labels_df[0]["ID"].item()
-    assert test_id == dataset.input_df[0]["ID"].item()
+    assert test_id == dataset.target_labels_storage.get_row(0)["ID"]
+    assert test_id == dataset.input_storage.get_row(0)["ID"]

@@ -3,14 +3,13 @@ from statistics import mean
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
-import polars as pl
 import torch
 from torch.utils.data import WeightedRandomSampler
 
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.data_load.datasets import DatasetBase  # noqa: F401
+    from eir.data_load.datasets import DatasetBase, HybridStorage  # noqa: F401
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -18,25 +17,24 @@ al_sample_weight_and_counts = Dict[str, torch.Tensor | list[int]]
 
 
 def get_weighted_random_sampler(
-    target_df: pl.DataFrame,
+    target_storage: "HybridStorage",
     columns_to_sample: List[str],
 ) -> WeightedRandomSampler:
     """
-    Takes a polars DataFrame with an ID column and target columns.
-    Returns a WeightedRandomSampler based on the specified columns.
+    Takes a HybridStorage with target data and returns a WeightedRandomSampler
+    based on the specified columns.
     """
     parsed_weighted_sample_columns = _build_weighted_sample_dict_from_config_sequence(
         config_list=columns_to_sample
     )
 
     all_column_weights = {}
-
     logger.debug("Setting up weighted sampling statistics.")
 
     for output_name, weighted_columns_list in parsed_weighted_sample_columns.items():
         logger.debug(f"Setting up weighted sampling for output '{output_name}'.")
         cur_column_weights = _gather_column_sampling_weights(
-            target_df=target_df,
+            target_storage=target_storage,
             output_name=output_name,
             columns_to_sample=weighted_columns_list,
         )
@@ -80,7 +78,7 @@ def _build_weighted_sample_dict_from_config_sequence(
 
 
 def _gather_column_sampling_weights(
-    target_df: pl.DataFrame,
+    target_storage: "HybridStorage",
     output_name: str,
     columns_to_sample: Iterable[str],
 ) -> Dict[str, al_sample_weight_and_counts]:
@@ -91,9 +89,19 @@ def _gather_column_sampling_weights(
             if column == "all":
                 continue
 
-            cur_label_series = target_df.get_column(column)
+            if any(col.name == column for col in target_storage.numeric_columns):
+                col_idx = next(
+                    i
+                    for i, col in enumerate(target_storage.numeric_columns)
+                    if col.name == column
+                )
+                assert target_storage.numeric_data is not None
+                cur_label_data = target_storage.numeric_data[col_idx].numpy()
+            else:
+                raise KeyError(f"Column {column} not found in numeric data")
+
             cur_label_iterable_int = (
-                int(i) if not np.isnan(i) else np.nan for i in cur_label_series
+                int(i) if not np.isnan(i) else np.nan for i in cur_label_data
             )
 
             cur_weight_dict = _get_column_label_weights_and_counts(
@@ -169,7 +177,6 @@ def _aggregate_column_sampling_weights(
     As for the samples per epoch, we take the average of the class counts per target,
     then sum those up.
     """
-
     all_weights = torch.stack(
         [
             torch.Tensor(i["samples_weighted"])
