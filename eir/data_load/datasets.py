@@ -302,9 +302,10 @@ class DatasetBase(Dataset):
 
         input_df = input_df.sort("ID")
 
-        input_ids = input_df.get_column("ID").to_list()
-        target_ids = target_labels_df.get_column("ID").to_list()
-        assert input_ids == target_ids
+        if self.target_labels_df is not None and not self.target_labels_df.is_empty():
+            input_ids = input_df.get_column("ID").to_list()
+            target_ids = target_labels_df.get_column("ID").to_list()
+            assert input_ids == target_ids
 
         return input_df, target_labels_df
 
@@ -315,10 +316,11 @@ class DatasetBase(Dataset):
         raise NotImplementedError()
 
     def check_samples(self) -> None:
-        self.input_storage.validate_storage()
+        mode = "Test/Validation" if self.test_mode else "Train"
+        self.input_storage.validate_storage(f"{mode} input storage")
 
         if len(self.target_labels_storage) > 0:
-            self.target_labels_storage.validate_storage()
+            self.target_labels_storage.validate_storage(f"{mode} target storage")
             check_two_storages(
                 input_storage=self.input_storage,
                 target_storage=self.target_labels_storage,

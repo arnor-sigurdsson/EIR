@@ -266,7 +266,7 @@ class HybridStorage:
                     f"associated with them, but got empty inputs for ID: {sample_id}"
                 )
 
-    def validate_storage(self) -> None:
+    def validate_storage(self, name: str = "") -> None:
         self.check_data()
 
         memory_bytes = (
@@ -293,7 +293,10 @@ class HybridStorage:
         memory_unit = "MB" if memory_mb < 1024 else "GB"
         memory_value = memory_mb if memory_mb < 1024 else memory_mb / 1024
 
-        logger.info(f"Storage is using {memory_value:.4f}{memory_unit} of memory. ")
+        logger.info(
+            f"{name} is using {memory_value:.4f}{memory_unit} of memory "
+            f"holding {self._num_rows} samples."
+        )
 
     def get_row(self, idx: int) -> dict[str, Any]:
         result: dict[str, Any] = {}
