@@ -283,7 +283,7 @@ class HybridStorage:
 
         if self.fixed_array_data is not None:
             fixed_array_mask = torch.all(
-                torch.isnan(self.fixed_array_data) | (self.fixed_array_data == 0),
+                torch.isnan(self.fixed_array_data),
                 dim=(0, -1),
             ).numpy()
             masks.append(fixed_array_mask)
@@ -299,7 +299,7 @@ class HybridStorage:
             masks.append(var_array_mask)
 
         if self.path_data is not None:
-            path_mask = np.all(np.array([not bool(x) for x in self.path_data]), axis=0)
+            path_mask = np.all(check_empty_str_arr(data=self.path_data), axis=0)
             masks.append(path_mask)
 
         if self.object_data:
@@ -381,6 +381,11 @@ class HybridStorage:
                 result[col_info.name] = self.object_data[col_info.name][idx]
 
         return result
+
+
+def check_empty_str_arr(data: np.ndarray) -> bool:
+    str_arr = data.astype(str)
+    return (str_arr == "") | (str_arr == "nan")
 
 
 def _recursive_find_primitive_dtype(dtype: pl.DataType) -> Type[pl.DataType]:
@@ -529,15 +534,18 @@ def get_fixed_array_memory(data: Optional[torch.Tensor]) -> int:
 
 
 def get_array_memory(
-    string_data: Optional[np.ndarray],
-    path_data: Optional[np.ndarray],
+    data: Optional[np.ndarray],
 ) -> int:
     memory_usage = 0
-    if string_data is not None:
-        memory_usage += string_data.nbytes
-    if path_data is not None:
-        memory_usage += path_data.nbytes
+    if data is not None:
+        memory_usage += data.nbytes
     return memory_usage
+
+
+def get_path_memory(data: Optional[np.ndarray]) -> int:
+    if data is None:
+        return 0
+    return data.nbytes
 
 
 def get_var_array_memory(data: Optional[list[np.ndarray]]) -> int:
@@ -569,10 +577,11 @@ def get_total_memory(
 ) -> int:
     return sum(
         [
-            get_numeric_memory(numeric_data),
-            get_fixed_array_memory(fixed_array_data),
-            get_array_memory(string_data, path_data),
-            get_var_array_memory(var_array_data),
-            get_object_memory(object_data),
+            get_numeric_memory(data=numeric_data),
+            get_fixed_array_memory(data=fixed_array_data),
+            get_array_memory(data=string_data),
+            get_path_memory(data=path_data),
+            get_var_array_memory(data=var_array_data),
+            get_object_memory(data=object_data),
         ]
     )
