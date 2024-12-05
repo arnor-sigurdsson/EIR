@@ -232,6 +232,12 @@ class HybridStorage:
         return f"HybridStorage(rows={self._num_rows}, " + ", ".join(type_counts) + ")"
 
     def check_data(self) -> None:
+        """
+        Checks for:
+            1. Non-empty storage
+            2. Valid ID column
+            3. At least one non-null value per row
+        """
         if self._num_rows == 0:
             raise ValueError(
                 "Expected to have at least one sample, but got empty storage. "
@@ -245,8 +251,10 @@ class HybridStorage:
             raise ValueError("Could not find required 'ID' column in string columns")
 
         assert self.string_data is not None
-        id_data = self.string_data[self.string_columns.index(id_col_info)]
-        null_id_mask = np.char.str_len(id_data) == 0
+        id_idx = self.string_columns.index(id_col_info)
+        id_data = self.string_data[id_idx]
+
+        null_id_mask = np.array([not id_ for id_ in id_data])
         if null_id_mask.any():
             null_indices = np.where(null_id_mask)[0]
             raise ValueError(
@@ -255,48 +263,86 @@ class HybridStorage:
                 f"{null_indices.tolist()}"
             )
 
-        for idx in range(self._num_rows):
-            row = self.get_row(idx)
-            non_id_values = [v for k, v in row.items() if k != "ID"]
+        masks = []
 
-            if all(is_null_value(v) for v in non_id_values):
-                sample_id = row["ID"]
+        if self.numeric_data is not None:
+            numeric_mask = torch.isnan(self.numeric_data).all(dim=0).numpy()
+            masks.append(numeric_mask)
+
+        if self.string_data is not None:
+            string_indices = [i for i in range(len(self.string_columns)) if i != id_idx]
+            if string_indices:
+                string_mask = np.all(
+                    [
+                        np.array([not bool(x) for x in self.string_data[i]])
+                        for i in string_indices
+                    ],
+                    axis=0,
+                )
+                masks.append(string_mask)
+
+        if self.fixed_array_data is not None:
+            fixed_array_mask = torch.all(
+                torch.isnan(self.fixed_array_data) | (self.fixed_array_data == 0),
+                dim=(0, -1),
+            ).numpy()
+            masks.append(fixed_array_mask)
+
+        if self.var_array_data:
+            var_array_mask = np.all(
+                [
+                    np.array([len(x) == 0 for x in col_data])
+                    for col_data in self.var_array_data
+                ],
+                axis=0,
+            )
+            masks.append(var_array_mask)
+
+        if self.path_data is not None:
+            path_mask = np.all(np.array([not bool(x) for x in self.path_data]), axis=0)
+            masks.append(path_mask)
+
+        if self.object_data:
+            object_mask = np.all(
+                [
+                    np.array([x is None for x in col_data])
+                    for col_data in self.object_data.values()
+                ],
+                axis=0,
+            )
+            masks.append(object_mask)
+
+        if masks:
+            all_null_mask = np.all(masks, axis=0)
+            null_rows = np.where(all_null_mask)[0]
+
+            if len(null_rows) > 0:
+                bad_id = id_data[null_rows[0]]
                 raise ValueError(
                     f"Expected all observations to have at least one input value "
-                    f"associated with them, but got empty inputs for ID: {sample_id}"
+                    f"associated with them, but got empty inputs for ID: {bad_id}"
                 )
 
-    def validate_storage(self, name: str = "") -> None:
+    def validate_storage(self, name: str = "") -> int:
         self.check_data()
 
-        memory_bytes = (
-            (
-                self.numeric_data.element_size() * self.numeric_data.nelement()
-                if self.numeric_data is not None
-                else 0
-            )
-            + (self.string_data.nbytes if self.string_data is not None else 0)
-            + (self.path_data.nbytes if self.path_data is not None else 0)
-            + (
-                self.fixed_array_data.element_size() * self.fixed_array_data.nelement()
-                if self.fixed_array_data is not None
-                else 0
-            )
+        memory_bytes = get_total_memory(
+            numeric_data=self.numeric_data,
+            string_data=self.string_data,
+            path_data=self.path_data,
+            fixed_array_data=self.fixed_array_data,
+            var_array_data=self.var_array_data,
+            object_data=self.object_data,
         )
 
-        if self.var_array_data is not None:
-            memory_bytes += sum(arr.nbytes for arr in self.var_array_data)
-        if self.object_data is not None:
-            memory_bytes += sum(sys.getsizeof(obj) for obj in self.object_data)
-
-        memory_mb = memory_bytes / (1024**2)
-        memory_unit = "MB" if memory_mb < 1024 else "GB"
-        memory_value = memory_mb if memory_mb < 1024 else memory_mb / 1024
+        memory_value, memory_unit = format_memory_size(bytes_size=memory_bytes)
 
         logger.info(
             f"{name} is using {memory_value:.4f}{memory_unit} of memory "
             f"holding {self._num_rows} samples."
         )
+
+        return memory_bytes
 
     def get_row(self, idx: int) -> dict[str, Any]:
         result: dict[str, Any] = {}
@@ -468,3 +514,65 @@ def polars_dtype_to_str_dtype(polars_dtype: Type[pl.DataType]) -> str:
     }
 
     return dtype_map[polars_dtype]
+
+
+def get_numeric_memory(data: Optional[torch.Tensor]) -> int:
+    if data is None:
+        return 0
+    return data.element_size() * data.nelement()
+
+
+def get_fixed_array_memory(data: Optional[torch.Tensor]) -> int:
+    if data is None:
+        return 0
+    return data.element_size() * data.nelement()
+
+
+def get_array_memory(
+    string_data: Optional[np.ndarray],
+    path_data: Optional[np.ndarray],
+) -> int:
+    memory_usage = 0
+    if string_data is not None:
+        memory_usage += string_data.nbytes
+    if path_data is not None:
+        memory_usage += path_data.nbytes
+    return memory_usage
+
+
+def get_var_array_memory(data: Optional[list[np.ndarray]]) -> int:
+    if data is None:
+        return 0
+    return sum(arr.nbytes for arr in data)
+
+
+def get_object_memory(data: Optional[dict[str, list[object]]]) -> int:
+    if data is None:
+        return 0
+    return sum(sum(sys.getsizeof(obj) for obj in values) for values in data.values())
+
+
+def format_memory_size(bytes_size: int) -> tuple[float, str]:
+    mb_size = bytes_size / (1024**2)
+    if mb_size < 1024:
+        return mb_size, "MB"
+    return mb_size / 1024, "GB"
+
+
+def get_total_memory(
+    numeric_data: Optional[torch.Tensor] = None,
+    string_data: Optional[np.ndarray] = None,
+    path_data: Optional[np.ndarray] = None,
+    fixed_array_data: Optional[torch.Tensor] = None,
+    var_array_data: Optional[list[np.ndarray]] = None,
+    object_data: Optional[dict[str, list[object]]] = None,
+) -> int:
+    return sum(
+        [
+            get_numeric_memory(numeric_data),
+            get_fixed_array_memory(fixed_array_data),
+            get_array_memory(string_data, path_data),
+            get_var_array_memory(var_array_data),
+            get_object_memory(object_data),
+        ]
+    )
