@@ -1,10 +1,12 @@
 import warnings
 from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generator, Set, Union
 
 warnings.filterwarnings("ignore", message=".*newer version of deeplake.*")
 
 import deeplake
+import numpy as np
 import polars as pl
 from tqdm import tqdm
 
@@ -82,6 +84,7 @@ def add_deeplake_data_to_df(
     column_arrays: dict[str, Any] = {}
     hook_callable = data_loading_hook.hook_callable
     hook_dtype = data_loading_hook.return_dtype
+    is_list_dype = isinstance(hook_dtype, pl.List)
 
     with tqdm(total=total, desc=input_name) as pbar:
         for row in deeplake_ds:
@@ -100,6 +103,9 @@ def add_deeplake_data_to_df(
             sample_data_pointer = row.row_id
             sample_data = hook_callable(sample_data_pointer)
 
+            if isinstance(sample_data, Path):
+                sample_data = str(sample_data)
+
             if isinstance(sample_data, dict):
                 for key in sample_data.keys():
                     col_name = f"{input_name}__{key}"
@@ -113,6 +119,10 @@ def add_deeplake_data_to_df(
             else:
                 if input_name not in column_arrays:
                     column_arrays[input_name] = []
+
+                if is_list_dype and isinstance(sample_data, np.ndarray):
+                    sample_data = sample_data.tolist()
+
                 column_arrays[input_name].append(sample_data)
                 ids.append(sample_id)
 

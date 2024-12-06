@@ -36,7 +36,7 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                     "input_info": {"input_name": "test_genotype"},
                     "model_config": {
                         "model_type": "genome-local-net",
-                        "model_init_config": {"l1": 1e-04},
+                        "model_init_config": {"l1": 1e-06},
                     },
                 },
                 {

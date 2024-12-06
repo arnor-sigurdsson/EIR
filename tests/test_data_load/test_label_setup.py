@@ -374,9 +374,9 @@ def test_ensure_categorical_columns_are_str(get_test_nan_df):
     column_dtypes = {col: df_converted[col].dtype for col in df_converted.columns}
 
     for column, dtype in column_dtypes.items():
-        assert isinstance(dtype, object) or dtype == pl.Float64
+        assert isinstance(dtype, object) or dtype == pl.Float32
 
-        if isinstance(dtype, object) and dtype != pl.Float64:
+        if isinstance(dtype, object) and dtype != pl.Float32:
             categories = df_converted[column].unique()
             for i in categories:
                 assert isinstance(i, str) or i is None, f"Column: {column}, Value: {i}"
@@ -498,7 +498,7 @@ def test_get_all_label_columns_and_dtypes(
     for column in cat_columns:
         assert isinstance(dtypes[column], object)
     for column in con_columns:
-        assert dtypes[column] == pl.Float64
+        assert dtypes[column] == pl.Float32
 
 
 @pytest.mark.parametrize(
@@ -874,7 +874,7 @@ def get_test_nan_df():
             "C": [None, None, None, None],
             "D": [0.0, 1.0, 5.0, 4.0],
         }
-    ).with_columns([pl.col("C").cast(pl.Float64), pl.col("D").cast(pl.Float64)])
+    ).with_columns([pl.col("C").cast(pl.Float32), pl.col("D").cast(pl.Float32)])
 
 
 @pytest.fixture
@@ -1019,7 +1019,7 @@ def test_fill_categorical_nans(
 
 def test_get_con_manual_vals_dict(get_test_nan_df):
     test_df = get_test_nan_df.with_columns(
-        [pl.col(["A", "B", "C", "D"]).cast(pl.Float64)]
+        [pl.col(["A", "B", "C", "D"]).cast(pl.Float32)]
     )
 
     means_dict = label_setup._get_con_manual_vals_dict(
@@ -1039,7 +1039,7 @@ def test_get_con_manual_vals_dict(get_test_nan_df):
 
 def test_fill_continuous_nans(get_test_nan_df):
     test_df = get_test_nan_df.with_columns(
-        [pl.col(["A", "B", "C", "D"]).cast(pl.Float64)]
+        [pl.col(["A", "B", "C", "D"]).cast(pl.Float32)]
     )
 
     manual_values = {"A": 1.0, "B": 2.0, "C": 3.0}

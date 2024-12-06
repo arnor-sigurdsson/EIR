@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/c_sequence_output/01_sequence_generation/saved_models/01_sequence_generation_model_9500_perf-average=-0.3092.pt
+--model-path eir_tutorials/tutorial_runs/c_sequence_output/01_sequence_generation/saved_models/01_sequence_generation_model_9500_perf-average=-0.3079.pt

@@ -382,4 +382,4 @@ def numpy_dtype_to_polars_dtype(np_dtype: np.dtype) -> DataTypeClass:
         "datetime64[ns]": pl.Datetime,
     }
 
-    return dtype_map.get(dtype_str, pl.Float64)
+    return dtype_map.get(dtype_str, pl.Float32)

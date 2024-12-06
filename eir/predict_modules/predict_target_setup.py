@@ -392,7 +392,7 @@ def process_survival_output_for_testing(
     df_time = pl.read_csv(
         cur_tabular_info.file_path,
         columns=["ID", time_column],
-    ).with_columns([pl.col("ID").cast(pl.Utf8), pl.col(time_column).cast(pl.Float64)])
+    ).with_columns([pl.col("ID").cast(pl.Utf8), pl.col(time_column).cast(pl.Float32)])
 
     df_time_test = df_time.filter(pl.col("ID").is_in(ids))
 

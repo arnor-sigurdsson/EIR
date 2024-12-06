@@ -6,11 +6,12 @@ from typing import List
 import numpy as np
 import polars as pl
 import pytest
+import torch
 from hypothesis import given, settings
 from hypothesis.strategies import integers, lists
 
 from eir.data_load import data_loading_funcs
-from eir.data_load.datasets import al_datasets
+from eir.data_load.datasets import HybridStorage, al_datasets
 from eir.setup.config import get_all_tabular_targets
 from eir.train import get_dataloaders
 
@@ -55,7 +56,9 @@ from eir.train import get_dataloaders
     indirect=True,
 )
 def test_get_weighted_random_sampler(
-    create_test_config, create_test_data, create_test_datasets
+    create_test_config,
+    create_test_data,
+    create_test_datasets,
 ):
     test_config = create_test_config
     targets_object = get_all_tabular_targets(output_configs=test_config.output_configs)
@@ -67,7 +70,7 @@ def test_get_weighted_random_sampler(
         for i in targets_object.cat_targets["test_output_tabular"]
     ]
     random_sampler = data_loading_funcs.get_weighted_random_sampler(
-        target_df=patched_train_dataset.target_labels_df,
+        target_storage=patched_train_dataset.target_labels_storage,
         columns_to_sample=columns_to_sample,
     )
 
@@ -122,23 +125,74 @@ def _check_if_all_numbers_close(list_of_numbers, abs_tol):
     return are_close.all()
 
 
-def patch_dataset_to_be_unbalanced(dataset: al_datasets) -> al_datasets:
-    """
-    Makes dataset unbalanced by limiting samples with Origin=1 to max_values=100
-    """
+def patch_dataset_to_be_unbalanced(
+    dataset: al_datasets,
+) -> al_datasets:
+    """Makes dataset unbalanced by limiting samples with Origin=1 to max_values=100"""
     max_values = 100
 
-    df_targets = dataset.target_labels_df
-    df_inputs = dataset.input_df
-    origin_1_df = df_targets.filter(pl.col("test_output_tabular__Origin") == 1).head(
-        max_values
+    origin_col_idx = next(
+        i
+        for i, col in enumerate(dataset.target_labels_storage.numeric_columns)
+        if col.name == "test_output_tabular__Origin"
     )
-    other_df = df_targets.filter(pl.col("test_output_tabular__Origin") != 1)
+    origin_data = dataset.target_labels_storage.numeric_data[origin_col_idx]
 
-    dataset.target_labels_df = pl.concat([origin_1_df, other_df])
-    dataset.input_df = df_inputs.filter(
-        pl.col("ID").is_in(dataset.target_labels_df["ID"])
+    origin_1_mask = (origin_data == 1).cumsum(0) <= max_values
+    keep_indices = torch.where(origin_1_mask | (origin_data != 1))[0]
+
+    new_target_storage = HybridStorage()
+    new_target_storage.numeric_columns = (
+        dataset.target_labels_storage.numeric_columns.copy()
     )
+    new_target_storage.string_columns = (
+        dataset.target_labels_storage.string_columns.copy()
+    )
+    new_target_storage.numeric_data = dataset.target_labels_storage.numeric_data[
+        :, keep_indices
+    ]
+    new_target_storage.string_data = dataset.target_labels_storage.string_data[
+        :, keep_indices.numpy()
+    ]
+    new_target_storage._num_rows = len(keep_indices)
+
+    id_col_idx = next(
+        i
+        for i, col in enumerate(dataset.target_labels_storage.string_columns)
+        if col.name == "ID"
+    )
+    keep_ids = dataset.target_labels_storage.string_data[id_col_idx][
+        keep_indices.numpy()
+    ]
+
+    input_id_col_idx = next(
+        i
+        for i, col in enumerate(dataset.input_storage.string_columns)
+        if col.name == "ID"
+    )
+    input_ids = dataset.input_storage.string_data[input_id_col_idx]
+    input_mask = np.isin(input_ids, keep_ids)
+    input_indices = torch.from_numpy(np.where(input_mask)[0])
+
+    new_input_storage = HybridStorage()
+    new_input_storage.numeric_columns = dataset.input_storage.numeric_columns.copy()
+    new_input_storage.string_columns = dataset.input_storage.string_columns.copy()
+    new_input_storage.numeric_data = dataset.input_storage.numeric_data[
+        :, input_indices
+    ]
+    new_input_storage.string_data = dataset.input_storage.string_data[
+        :, input_indices.numpy()
+    ]
+
+    new_input_storage.path_data = dataset.input_storage.path_data[
+        :, input_indices.numpy()
+    ]
+    new_input_storage.path_columns = dataset.input_storage.path_columns.copy()
+
+    new_input_storage._num_rows = len(input_indices)
+
+    dataset.input_storage = new_input_storage
+    dataset.target_labels_storage = new_target_storage
 
     return dataset
 
@@ -173,13 +227,13 @@ def test_gather_column_sampling_weights(test_labels):
     We have the .map here to ensure that all possible values exist at least once.
     """
     test_target_columns = ["Origin", "HairColor"]
-    test_input_df, test_target_df = generate_test_data(
+    test_input_storage, test_target_storage = generate_test_data(
         test_labels=test_labels,
         target_columns=test_target_columns,
         output_name="test_output_tabular",
     )
     all_target_weights_test_dict = data_loading_funcs._gather_column_sampling_weights(
-        target_df=test_target_df,
+        target_storage=test_target_storage,
         columns_to_sample=test_target_columns,
         output_name="test_output_tabular",
     )
@@ -192,7 +246,7 @@ def test_gather_column_sampling_weights(test_labels):
 
 def generate_test_data(
     test_labels: List[int], target_columns: List[str], output_name: str
-) -> tuple[pl.DataFrame, pl.DataFrame]:
+) -> tuple[HybridStorage, HybridStorage]:
     input_df = pl.DataFrame(
         {
             "ID": [str(i) for i in range(len(test_labels))],
@@ -206,7 +260,13 @@ def generate_test_data(
     }
     target_df = pl.DataFrame(target_data)
 
-    return input_df, target_df
+    input_storage = HybridStorage()
+    input_storage.from_polars(input_df)
+
+    target_storage = HybridStorage()
+    target_storage.from_polars(target_df)
+
+    return input_storage, target_storage
 
 
 def _check_label_weights_and_counts(test_labels, label_weight_dict):
@@ -254,7 +314,7 @@ def test_aggregate_column_sampling_weights_auto(test_labels):
     by having different labels generated for different label columns.
     """
     target_columns = ["Origin", "HairColor"]
-    test_input_df, test_target_df = generate_test_data(
+    test_input_storage, test_target_storage = generate_test_data(
         test_labels=test_labels,
         target_columns=target_columns,
         output_name="test_output_tabular",
@@ -262,7 +322,7 @@ def test_aggregate_column_sampling_weights_auto(test_labels):
 
     gather_func = data_loading_funcs._gather_column_sampling_weights
     test_all_label_weights_and_counts = gather_func(
-        target_df=test_target_df,
+        target_storage=test_target_storage,
         columns_to_sample=target_columns,
         output_name="test_output_tabular",
     )

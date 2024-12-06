@@ -14,7 +14,7 @@ pytest_plugins = [
     "tests.setup_tests.fixtures_create_experiment",
 ]
 
-seed_everything()
+seed_everything(seed=0)
 
 
 def pytest_addoption(parser):

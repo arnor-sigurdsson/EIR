@@ -5,6 +5,7 @@ from pathlib import Path
 from random import sample
 from typing import TYPE_CHECKING, Literal, Sequence, Union
 
+import polars as pl
 from aislib.misc_utils import ensure_path_exists
 from torch import nn
 from torch.utils.data import DataLoader
@@ -170,12 +171,19 @@ def _get_predict_background_loader(
     configs: Configs,
     outputs_as_dict: al_output_objects_as_dict,
     loaded_hooks: Union["Hooks", None],
-):
+) -> DataLoader:
     """
-    TODO: Add option to choose whether to reuse train data as background,
-          to use the data passed to the predict.py module, or possibly just
-          an option to serialize the explainer from a training run and reuse
-          that if passed as an option here.
+    Note we have the target filtering there to ensure that the final
+    dataset size matches that of sampled IDs. If not, there is a filtering step
+    applied to the tabular inputs that come from set_up_inputs_from_predict,
+    where the input hook `setup_tabular_input_for_testing` is called and filters
+    on the IDs.
+
+    As part of the basic processing of the tabular inputs, missing values have
+    already been imputed. But, as setup_tabular_input_for_testing applies filtering,
+    whereas other input loading funcs might not, we end up with the case where
+    the joining of the tabular inputs and other modalities (done in the
+    dataset setup) results in multiple NaNs for the tabular inputs,
     """
 
     background_ids_pool = label_setup.gather_all_ids_from_all_inputs(
@@ -199,13 +207,19 @@ def _get_predict_background_loader(
         hooks=loaded_hooks,
         output_folder=configs.gc.be.output_folder,
     )
+
+    df_target = target_labels.predict_labels
+    df_target_filtered = df_target.filter(pl.col("ID").is_in(background_ids_sampled))
+
     background_dataset = set_up_default_dataset(
         configs=configs,
         outputs_as_dict=outputs_as_dict,
-        target_labels_df=target_labels.predict_labels,
+        target_labels_df=df_target_filtered,
         inputs_as_dict=background_inputs_as_dict,
         missing_ids_per_output=target_labels.missing_ids_per_output,
     )
+
+    assert len(background_dataset) <= num_attribution_background_samples
 
     check_dataset_and_batch_size_compatibility(
         dataset=background_dataset,

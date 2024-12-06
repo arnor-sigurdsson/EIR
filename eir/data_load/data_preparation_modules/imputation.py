@@ -190,6 +190,7 @@ def _build_tabular_fill_value(
 
     con_columns = input_type_info.input_con_columns
     for con_column in con_columns:
+        # already assumes mean normalized values, so fill with 0.0
         fill_value[con_column] = 0.0
 
     return fill_value

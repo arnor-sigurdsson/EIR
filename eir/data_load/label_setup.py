@@ -251,7 +251,7 @@ def transform_label_df(
 
             transformed_values = transform_func(series_values_streamlined).squeeze()
 
-            result = np.full(len(series_values), np.nan)
+            result = np.full(len(series_values), np.nan, dtype=np.float32)
             result[non_nan_mask.to_numpy()] = transformed_values
 
             if isinstance(transformer_instance, LabelEncoder):
@@ -322,8 +322,6 @@ def label_df_parse_wrapper(
     )
 
     df_cat_str = ensure_categorical_columns_and_format(df=df_column_filtered)
-
-    # df_no_none = convert_none_to_nan(df=df_cat_str)
 
     df_final = _check_parsed_label_df(
         df_labels=df_cat_str,
@@ -522,7 +520,7 @@ def get_file_path_iterator(
 def _get_all_label_columns_and_dtypes(
     cat_columns: Sequence[str],
     con_columns: Sequence[str],
-) -> Tuple[Sequence[str], dict[str, Type[pl.Categorical] | Type[pl.Float64]]]:
+) -> Tuple[Sequence[str], dict[str, Type[pl.Categorical] | Type[pl.Float32]]]:
     supplied_label_columns = _get_column_dtypes(
         cat_columns=cat_columns,
         con_columns=con_columns,
@@ -537,13 +535,13 @@ def _get_all_label_columns_and_dtypes(
 
 def _get_column_dtypes(
     cat_columns: Sequence[str], con_columns: Sequence[str]
-) -> dict[str, Type[pl.Categorical] | Type[pl.Float64]]:
-    dtypes: dict[str, Type[pl.Categorical] | Type[pl.Float64]] = {}
+) -> dict[str, Type[pl.Categorical] | Type[pl.Float32]]:
+    dtypes: dict[str, Type[pl.Categorical] | Type[pl.Float32]] = {}
 
     for cat_column in cat_columns:
         dtypes[cat_column] = pl.Categorical
     for con_column in con_columns:
-        dtypes[con_column] = pl.Float64
+        dtypes[con_column] = pl.Float32
 
     return dtypes
 
@@ -551,7 +549,7 @@ def _get_column_dtypes(
 def _load_label_df(
     label_fpath: Path,
     columns: Sequence[str],
-    dtypes: Optional[dict[str, type[pl.Categorical] | type[pl.Float64]]] = None,
+    dtypes: Optional[dict[str, type[pl.Categorical] | type[pl.Float32]]] = None,
 ) -> pl.DataFrame:
     dtypes = _ensure_id_str_dtype(dtypes=dtypes)
 
@@ -663,7 +661,8 @@ def _get_currently_available_columns(
 
 
 def _filter_ids_from_label_df(
-    df_labels: pl.DataFrame, ids_to_keep: Union[None, Sequence[str]] = None
+    df_labels: pl.DataFrame,
+    ids_to_keep: Union[None, Sequence[str]] = None,
 ) -> pl.DataFrame:
     if not ids_to_keep:
         return df_labels
@@ -709,7 +708,7 @@ def _check_parsed_label_df(
             continue
 
         assert dtype in [
-            pl.Float64,
+            pl.Float32,
             pl.Categorical,
         ], f"Column {column} has invalid type {dtype}"
 
@@ -876,7 +875,7 @@ def _get_con_manual_vals_dict(
 
     for column in con_columns:
         column_mean = (
-            df.get_column(column).drop_nans().drop_nulls().cast(pl.Float64).mean()
+            df.get_column(column).drop_nans().drop_nulls().cast(pl.Float32).mean()
         )
         if isinstance(column_mean, (int, float)):
             con_means_dict[column] = float(column_mean)
@@ -927,7 +926,8 @@ def _fill_categorical_nans(
         return df
 
     logger.debug(
-        "Replacing NaNs in categorical columns %s (counts: %s) " "in %s with 'NA'.",
+        "Replacing NaNs in categorical columns %s (counts: %s) "
+        "in %s with '__NULL__'.",
         column_names,
         missing_stats,
         name,

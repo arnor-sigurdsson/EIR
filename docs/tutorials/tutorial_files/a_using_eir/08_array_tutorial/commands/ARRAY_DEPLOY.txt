@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_08_run_transformer-3d/saved_models/tutorial_08_run_transformer-3d_model_400_perf-average=0.8936.pt
+--model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_08_run_transformer-3d/saved_models/tutorial_08_run_transformer-3d_model_400_perf-average=0.8934.pt

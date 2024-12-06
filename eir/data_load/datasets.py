@@ -1,5 +1,6 @@
 import reprlib
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -46,6 +47,11 @@ from eir.data_load.data_source_modules.local_ops import (
 )
 from eir.data_load.data_streaming.streaming_dataset import StreamingDataset
 from eir.data_load.label_setup import al_target_labels
+from eir.data_load.storage_engine import (
+    HybridStorage,
+    check_two_storages,
+    is_null_value,
+)
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
@@ -53,7 +59,7 @@ from eir.setup import config
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
-from eir.setup.schemas import SequenceInputDataConfig
+from eir.setup.schemas import InputConfig, OutputConfig, SequenceInputDataConfig
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -127,7 +133,8 @@ def set_up_datasets_from_configs(
         assert isinstance(train_dataset, (MemoryDataset, DiskDataset))
         assert isinstance(valid_dataset, (MemoryDataset, DiskDataset))
         _check_valid_and_train_datasets(
-            train_dataset=train_dataset, valid_dataset=valid_dataset
+            train_dataset=train_dataset,
+            valid_dataset=valid_dataset,
         )
 
     assert isinstance(valid_dataset, (MemoryDataset, DiskDataset))
@@ -157,19 +164,20 @@ def construct_default_dataset_kwargs_from_cl_args(
 
 
 def _check_valid_and_train_datasets(
-    train_dataset: al_local_datasets, valid_dataset: al_local_datasets
+    train_dataset: al_local_datasets,
+    valid_dataset: al_local_datasets,
 ) -> None:
-    if train_dataset.input_df.height < valid_dataset.input_df.height:
+    if len(train_dataset.input_storage) < len(valid_dataset.input_storage):
         logger.warning(
             "Size of training dataset (size: %d) is smaller than validation dataset ("
             "size: %d). Generally it is the opposite, but if this is intended please "
             "ignore this message.",
-            train_dataset.input_df.height,
-            valid_dataset.input_df.height,
+            len(train_dataset.input_storage),
+            len(valid_dataset.input_storage),
         )
 
-    train_ids = set(train_dataset.input_df.get_column("ID").to_list())
-    valid_ids = set(valid_dataset.input_df.get_column("ID").to_list())
+    train_ids = set(train_dataset.input_storage.get_ids())
+    valid_ids = set(valid_dataset.input_storage.get_ids())
 
     if not train_ids.isdisjoint(valid_ids):
         overlapping_ids = train_ids.intersection(valid_ids)
@@ -220,12 +228,15 @@ class DatasetBase(Dataset):
             target_labels_df = pl.DataFrame()
         self.target_labels_df = target_labels_df
 
+        self.input_storage = HybridStorage()
+        self.target_labels_storage = HybridStorage()
+
         self.missing_ids_per_output = missing_ids_per_output
         self.ids_to_keep = set(ids_to_keep) if ids_to_keep else None
 
     def init_label_attributes(self):
         if not self.outputs:
-            raise ValueError("Please specify label column name.")
+            raise ValueError("Please specify outputs.")
 
     def set_up_dfs(
         self,
@@ -246,16 +257,18 @@ class DatasetBase(Dataset):
             output_data_loading_hooks = defaultdict(_get_default_output_hook)
 
         if not self.target_labels_df.is_empty():
-            self.target_labels_df = _target_labels_hook_load_wrapper(
+            target_labels_df = _target_labels_hook_load_wrapper(
                 target_labels_df=self.target_labels_df,
                 output_data_loading_hooks=output_data_loading_hooks,
             )
+        else:
+            target_labels_df = self.target_labels_df
 
         if not input_data_loading_hooks:
             input_data_loading_hooks = defaultdict(_get_default_input_hook)
 
         ids_to_keep = initialize_ids_to_keep(
-            target_labels_df=self.target_labels_df,
+            target_labels_df=target_labels_df,
             ids_to_keep=self.ids_to_keep,
         )
 
@@ -268,26 +281,33 @@ class DatasetBase(Dataset):
             data_loading_hooks=input_data_loading_hooks,
         )
 
-        filtered_df = filter_df(
+        input_df = filter_df(
             input_df=input_df,
-            target_labels_df=self.target_labels_df,
+            target_labels_df=target_labels_df,
         )
 
+        if len(input_df) == 0:
+            raise ValueError("No samples found after filtering.")
+
         _log_missing_samples_between_modalities(
-            df=filtered_df,
+            df=input_df,
             input_keys=self.inputs.keys(),
         )
 
         if self.target_labels_df is not None and not self.target_labels_df.is_empty():
-            target_labels_df = self.target_labels_df.filter(
-                pl.col("ID").is_in(filtered_df.get_column("ID").to_list())
+            target_labels_df = target_labels_df.filter(
+                pl.col("ID").is_in(input_df.get_column("ID").to_list())
             )
-            self.target_labels_df = target_labels_df
-            self.target_labels_df = self.target_labels_df.sort("ID")
+            target_labels_df = target_labels_df.sort("ID")
 
-        filtered_df = filtered_df.sort("ID")
+        input_df = input_df.sort("ID")
 
-        return filtered_df, self.target_labels_df
+        if self.target_labels_df is not None and not self.target_labels_df.is_empty():
+            input_ids = input_df.get_column("ID").to_list()
+            target_ids = target_labels_df.get_column("ID").to_list()
+            assert input_ids == target_ids
+
+        return input_df, target_labels_df
 
     def __len__(self):
         raise NotImplementedError()
@@ -296,48 +316,49 @@ class DatasetBase(Dataset):
         raise NotImplementedError()
 
     def check_samples(self) -> None:
-        if self.input_df.height == 0:
-            raise ValueError(
-                "Expected to have at least one sample, but got empty DataFrame. "
-                "Possibly there is a mismatch between input IDs and target IDs."
+        mode = "Test/Validation" if self.test_mode else "Train"
+        self.input_storage.validate_storage(f"{mode} input storage")
+
+        if len(self.target_labels_storage) > 0:
+            self.target_labels_storage.validate_storage(f"{mode} target storage")
+            check_two_storages(
+                input_storage=self.input_storage,
+                target_storage=self.target_labels_storage,
             )
 
-        if self.input_df.get_column("ID").is_null().any():
-            missing_ids = (
-                self.input_df.filter(pl.col("ID").is_null()).select("ID").row(0)
-            )
-            raise ValueError(
-                f"Expected all observations to have a sample ID associated "
-                f"with them, but got rows with null IDs at indices: {missing_ids}"
-            )
 
-        input_cols = [col for col in self.input_df.columns if col != "ID"]
-        if input_cols:
-            empty_inputs = self.input_df.with_columns(
-                [pl.all_horizontal(pl.col(input_cols).is_null()).alias("all_null")]
-            ).filter(pl.col("all_null"))
+@dataclass()
+class DataSourceTypeInfo:
+    name: str
+    type: str
 
-            if empty_inputs.height > 0:
-                empty_ids = empty_inputs.get_column("ID").to_list()
-                raise ValueError(
-                    f"Expected all observations to have at least one input value "
-                    f"associated with them, but got empty inputs for IDs: {empty_ids}"
-                )
 
-        if not self.target_labels_df.is_empty():
-            target_cols = [col for col in self.target_labels_df.columns if col != "ID"]
-            if target_cols:
-                empty_targets = self.target_labels_df.with_columns(
-                    [pl.all_horizontal(pl.col(target_cols).is_null()).alias("all_null")]
-                ).filter(pl.col("all_null"))
+def extract_input_names_and_types(
+    input_configs: Sequence[InputConfig],
+) -> Sequence[DataSourceTypeInfo]:
+    input_names_and_types = []
+    for input_config in input_configs:
+        input_name = input_config.input_info.input_name
+        input_type = input_config.input_info.input_type
+        input_names_and_types.append(
+            DataSourceTypeInfo(name=input_name, type=input_type)
+        )
 
-                if empty_targets.height > 0:
-                    empty_ids = empty_targets.get_column("ID").to_list()
-                    raise ValueError(
-                        f"Expected all observations to have at least one target label "
-                        f"associated with them, but got empty targets for "
-                        f"IDs: {empty_ids}"
-                    )
+    return input_names_and_types
+
+
+def extract_output_names_and_types(
+    output_configs: Sequence[OutputConfig],
+) -> Sequence[DataSourceTypeInfo]:
+    output_names_and_types = []
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+        output_type = output_config.output_info.output_type
+        output_names_and_types.append(
+            DataSourceTypeInfo(name=output_name, type=output_type)
+        )
+
+    return output_names_and_types
 
 
 def initialize_ids_to_keep(
@@ -534,6 +555,11 @@ def _target_labels_hook_load_wrapper(
     target_labels_df: pl.DataFrame,
     output_data_loading_hooks: Mapping[str, HookOutput],
 ) -> pl.DataFrame:
+    """
+    We have this slightly roundabout way of using a None placeholder as polars
+    raises an error if we try to convert a list that is a mix of None and other
+    types (e.g. arrays) to a polars Series directly.
+    """
     for column in target_labels_df.columns:
         if "__" not in column or column == "ID":
             continue
@@ -543,18 +569,44 @@ def _target_labels_hook_load_wrapper(
             continue
 
         hook = output_data_loading_hooks[output_name]
-        processed_values = [
-            hook.hook_callable({inner_name: x})[inner_name]
-            for x in target_labels_df.get_column(column)
-        ]
+        processed_values = []
+        none_indices = []
 
+        return_dtype = hook.return_dtype
+        none_placeholder: Any
+        if isinstance(return_dtype, pl.List):
+            none_placeholder = []
+        elif return_dtype is not None and return_dtype.is_numeric():
+            none_placeholder = np.nan
+        elif isinstance(return_dtype, pl.Array):
+            none_placeholder = np.full(return_dtype.shape, np.nan)
+        else:
+            none_placeholder = None
+
+        for i, x in enumerate(target_labels_df.get_column(name=column)):
+            if x is None:
+                none_indices.append(i)
+                processed_values.append(none_placeholder)
+                continue
+
+            hook_input = {inner_name: x}
+            hook_output = hook.hook_callable(hook_input)
+            parsed_value = hook_output[inner_name]
+            processed_values.append(parsed_value)
+
+        series = pl.Series(
+            name=column,
+            values=processed_values,
+            dtype=hook.return_dtype,
+        )
+
+        # replace placeholders with None / null
         target_labels_df = target_labels_df.with_columns(
             [
-                pl.Series(
-                    name=column,
-                    values=processed_values,
-                    dtype=hook.return_dtype,
-                )
+                pl.when(pl.arange(0, len(target_labels_df)).is_in(none_indices))
+                .then(pl.lit(None))
+                .otherwise(pl.lit(series))
+                .alias(column)
             ]
         )
 
@@ -657,17 +709,19 @@ class DiskDataset(DatasetBase):
             self.init_label_attributes()
 
         sample_dfs: tuple[pl.DataFrame, pl.DataFrame] = self.set_up_dfs()
-        self.input_df = sample_dfs[0]
-        self.target_labels_df = sample_dfs[1]
+        input_df = sample_dfs[0]
+        target_labels_df = sample_dfs[1]
+
+        self.input_storage.from_polars(df=input_df)
+        self.target_labels_storage.from_polars(df=target_labels_df)
+
         self.check_samples()
 
-        self.column_map_inputs = _build_column_map(columns=self.input_df.columns)
-        self.column_map_targets = _build_column_map(
-            columns=self.target_labels_df.columns
-        )
+        self.column_map_inputs = _build_column_map(columns=input_df.columns)
+        self.column_map_targets = _build_column_map(columns=target_labels_df.columns)
 
     def __getitem__(self, index: int) -> al_getitem_return:
-        input_row = self.input_df.row(index, named=True)
+        input_row = self.input_storage.get_row(idx=index)
         sample_id = input_row["ID"]
 
         inputs = process_row_values(row=input_row, column_map=self.column_map_inputs)
@@ -684,8 +738,8 @@ class DiskDataset(DatasetBase):
         )
 
         targets_final = {}
-        if not self.target_labels_df.is_empty():
-            target_row = self.target_labels_df.row(index, named=True)
+        if len(self.target_labels_storage) > 0:
+            target_row = self.target_labels_storage.get_row(idx=index)
             target_labels = process_row_values(
                 row=target_row,
                 column_map=self.column_map_targets,
@@ -705,7 +759,7 @@ class DiskDataset(DatasetBase):
         return inputs_final, targets_final, sample_id
 
     def __len__(self):
-        return self.input_df.height
+        return len(self.input_storage)
 
 
 class MemoryDataset(DatasetBase):
@@ -722,17 +776,19 @@ class MemoryDataset(DatasetBase):
             input_data_loading_hooks=input_data_loading_hooks,
             output_data_loading_hooks=output_data_loading_hooks,
         )
-        self.input_df = sample_dfs[0]
-        self.target_labels_df = sample_dfs[1]
+        input_df = sample_dfs[0]
+        target_labels_df = sample_dfs[1]
+
+        self.input_storage.from_polars(df=input_df)
+        self.target_labels_storage.from_polars(df=target_labels_df)
+
         self.check_samples()
 
-        self.column_map_inputs = _build_column_map(columns=self.input_df.columns)
-        self.column_map_targets = _build_column_map(
-            columns=self.target_labels_df.columns
-        )
+        self.column_map_inputs = _build_column_map(columns=input_df.columns)
+        self.column_map_targets = _build_column_map(columns=target_labels_df.columns)
 
     def __getitem__(self, index: int) -> al_getitem_return:
-        input_row = self.input_df.row(index, named=True)
+        input_row = self.input_storage.get_row(idx=index)
         sample_id = input_row["ID"]
 
         inputs = process_row_values(row=input_row, column_map=self.column_map_inputs)
@@ -749,8 +805,8 @@ class MemoryDataset(DatasetBase):
         )
 
         targets_final = {}
-        if not self.target_labels_df.is_empty():
-            target_row = self.target_labels_df.row(index, named=True)
+        if len(self.target_labels_storage) > 0:
+            target_row = self.target_labels_storage.get_row(idx=index)
             target_labels = process_row_values(
                 row=target_row,
                 column_map=self.column_map_targets,
@@ -770,7 +826,7 @@ class MemoryDataset(DatasetBase):
         return inputs_final, targets_final, sample_id
 
     def __len__(self):
-        return self.input_df.height
+        return len(self.input_storage)
 
 
 def _build_column_map(columns: list[str]) -> dict[str, tuple[str, str | None]]:
@@ -803,7 +859,7 @@ def process_row_values(
 
     for col, (main_key, sub_key) in column_map.items():
         value = row[col]
-        if value is None:
+        if is_null_value(value=value):
             continue
 
         value = convert_value(value=value)

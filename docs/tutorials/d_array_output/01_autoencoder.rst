@@ -82,7 +82,7 @@ Since we had that latent space sampling configuration in the global config,
 the latents are saved and a couple of visualizations are generated, here is one
 with the t-SNE visualization of the latents at iteration 9000:
 
-.. image:: ../tutorial_files/d_array_output/01_array_mnist_generation/figures/0_autoencoder/latents_visualization.png
+.. image:: ../tutorial_files/d_array_output/01_array_mnist_generation/figures/0_autoencoder/latents_visualization_tsne.png
     :width: 100%
     :align: center
 
@@ -161,7 +161,7 @@ I got the following results:
 
 Here is a visualization of the latent space:
 
-.. image:: ../tutorial_files/d_array_output/01_array_mnist_generation/figures/1_autoencoder_augmented/latents_visualization.png
+.. image:: ../tutorial_files/d_array_output/01_array_mnist_generation/figures/1_autoencoder_augmented/latents_visualization_tsne.png
     :width: 100%
     :align: center
 

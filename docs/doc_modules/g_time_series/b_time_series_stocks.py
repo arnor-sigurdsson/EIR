@@ -605,8 +605,8 @@ def generate_example_requests_arrays(
     for idx in random_rows:
         sample = deeplake_ds[int(idx)]
 
-        cur_id = sample["ID"].numpy().item()
-        cur_arr = sample["input_array"].numpy().astype(np.float32)
+        cur_id = sample["ID"]
+        cur_arr = sample["input_array"].astype(np.float32)
         cur_arr_base64 = encode_array_to_base64(array_np=cur_arr)
 
         for cur_repeat in range(repeat):
