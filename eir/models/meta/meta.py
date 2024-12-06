@@ -29,7 +29,8 @@ class MetaModel(nn.Module):
         self.tensor_broker = tensor_broker
 
     def forward(
-        self, inputs: dict[str, torch.Tensor]
+        self,
+        inputs: dict[str, torch.Tensor],
     ) -> dict[str, dict[str, torch.Tensor]]:
 
         output_modules_out = run_meta_forward(

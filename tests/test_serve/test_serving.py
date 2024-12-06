@@ -1,4 +1,8 @@
+import asyncio
 import random
+import time
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from math import isclose
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence, Tuple
@@ -7,14 +11,18 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
+import uvicorn
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from PIL import Image
 from scipy.spatial.distance import cosine
 from sklearn.metrics import mean_squared_error
 
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
-from docs.doc_modules.serving_experiments import run_serve_experiment_from_command
 from eir import train
 from eir.data_load.data_preparation_modules.prepare_array import fill_nans_from_stats
+from eir.serve import app, load_experiment
+from eir.serve_modules.serve_api import create_info_endpoint, create_predict_endpoint
 from eir.serve_modules.serve_network_utils import deserialize_array
 from eir.setup.schemas import InputConfig, OutputConfig
 from eir.utils.logging import get_logger
@@ -36,6 +44,29 @@ def get_parametrization():
     params = [get_base_parametrization(compiled=False)]
 
     return params
+
+
+@contextmanager
+def run_server_in_thread(app: FastAPI, port: int = 8888) -> uvicorn.Server:
+    config = uvicorn.Config(
+        app,
+        host="127.0.0.1",
+        port=port,
+        log_level="info",
+    )
+    server = uvicorn.Server(config=config)
+
+    async def serve():
+        await server.serve()
+
+    with ThreadPoolExecutor() as executor:
+        future = executor.submit(asyncio.run, serve())
+        time.sleep(2)
+        try:
+            yield server
+        finally:
+            server.should_exit = True
+            future.result()
 
 
 def get_base_parametrization(compiled: bool = False) -> dict:
@@ -230,7 +261,6 @@ def test_multi_serving(
     crafts the example code (as well as the serving module) expects all
     modalities to be present. This is something we can fix/update in the future.
     """
-
     _, test_data_config = create_test_config_init_base
     experiment, test_config = prep_modelling_test_configs
 
@@ -245,7 +275,22 @@ def test_multi_serving(
 
     saved_model_path = next((test_config.run_path / "saved_models").iterdir())
 
-    command = ["eirserve", "--model-path", str(saved_model_path)]
+    serve_experiment = load_experiment(model_path=str(saved_model_path), device="cpu")
+
+    app.state.serve_experiment = serve_experiment
+
+    create_info_endpoint(
+        app=app,
+        serve_experiment=serve_experiment,
+    )
+
+    create_predict_endpoint(
+        app=app,
+        configs=serve_experiment.configs.input_configs,
+        serve_experiment=serve_experiment,
+    )
+
+    client = TestClient(app=app)
 
     input_configs = experiment.configs.input_configs
 
@@ -275,34 +320,35 @@ def test_multi_serving(
             example_requests.append(example_request)
 
     assert len(example_requests) > 0
-    response = run_serve_experiment_from_command(
-        command=command,
-        url="http://localhost:8000/predict",
-        example_requests=[example_requests],
-        data_loading_function=load_data_for_serve,
-        base_path=None,
-    )
-    assert len(response) == 1
-    all_responses = response[0]["response"]["result"]
-    assert len(all_responses) >= 10
 
-    pass_threshold = 0.6
-    n_passed = 0
-    n_total = 0
-    for idx, random_id in enumerate(ids):
-        cur_response = all_responses[idx]
-        passed = _check_prediction(
-            id_from_request=random_id,
-            response=cur_response,
-            output_configs=experiment.configs.output_configs,
-            labels_csv_path=str(test_data_config.scoped_tmp_path / "labels.csv"),
-            experiment=experiment,
-        )
-        if passed:
-            n_passed += 1
-        n_total += 1
+    with run_server_in_thread(app=app):
+        all_responses = []
+        for example_request in example_requests:
+            loaded_items = load_data_for_serve(data=example_request)
+            response = client.post(url="/predict", json=[loaded_items])
+            assert response.status_code == 200
+            result = response.json()
+            all_responses.append(result["result"])
 
-    assert n_passed / n_total >= pass_threshold
+        assert len(all_responses) >= 10
+
+        pass_threshold = 0.6
+        n_passed = 0
+        n_total = 0
+        for idx, random_id in enumerate(ids):
+            cur_response = all_responses[idx][0]
+            passed = _check_prediction(
+                id_from_request=random_id,
+                response=cur_response,
+                output_configs=experiment.configs.output_configs,
+                labels_csv_path=str(test_data_config.scoped_tmp_path / "labels.csv"),
+                experiment=experiment,
+            )
+            if passed:
+                n_passed += 1
+            n_total += 1
+
+        assert n_passed / n_total >= pass_threshold
 
 
 def _craft_example_request(

@@ -2,6 +2,7 @@ from typing import Tuple
 from unittest import mock
 
 import numpy as np
+import polars as pl
 import pytest
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
@@ -89,46 +90,51 @@ def test_set_up_test_labels(
             con_target_column=target_tabular_info.con_columns[0],
         ),
     ):
-        test_target_labels = predict_target_setup.get_target_labels_for_testing(
+        merged_test_target_labels = predict_target_setup.get_target_labels_for_testing(
             configs_overloaded_for_predict=test_configs,
-            custom_column_label_parsing_ops=None,
             ids=test_ids,
         )
 
-    transformers = test_target_labels.label_transformers["test_output_tabular"]
+    df_labels = merged_test_target_labels.predict_labels
+    transformers = merged_test_target_labels.label_transformers["test_output_tabular"]
 
     assert len(target_tabular_info.cat_columns) == 1
     assert len(target_tabular_info.con_columns) == 1
     con_column = target_tabular_info.con_columns[0]
+    cat_column = target_tabular_info.cat_columns[0]
 
+    assert df_labels[f"test_output_tabular__{con_column}"].dtype == pl.Float64
+    assert df_labels[f"test_output_tabular__{cat_column}"].dtype == pl.Float64
+
+    df_raw_data = pl.read_csv(source=target_tabular_info.file_path)
     con_transformer = transformers["test_output_tabular"][con_column]
-    con_mean = con_transformer.mean_.reshape(1, -1)
-    expected_transformed_value = con_transformer.transform(con_mean).squeeze()
 
-    df_labels_test, dropped_con_indices = set_random_con_targets_to_missing(
-        data_dict=test_target_labels.label_dict
-    )
+    func = con_transformer.transform
+    expected_transformed = func(df_raw_data["Height"].to_numpy().reshape(-1, 1))
+    expected_transformed = expected_transformed.squeeze()
 
-    all_dropped_ids = set(i[0] for i in dropped_con_indices)
-    for id_, target in test_target_labels.label_dict.items():
-        cur_value = target["test_output_tabular"][con_column]
-        if id_ in all_dropped_ids:
-            assert cur_value == expected_transformed_value
+    actually_transformed = df_labels[f"test_output_tabular__{con_column}"].to_numpy()
+    assert np.allclose(actually_transformed, expected_transformed)
 
 
 def set_random_con_targets_to_missing(
-    data_dict: dict[str, dict[str, dict[str, float]]]
-) -> Tuple[dict[str, dict[str, dict[str, float]]], np.ndarray]:
+    df: pl.DataFrame,
+) -> Tuple[pl.DataFrame, np.ndarray]:
     fraction = 0.2
-    keys = list(data_dict.keys())
-    num_rows_to_nan = int(fraction * len(keys))
+    num_rows_to_nan = int(fraction * len(df))
+    random_indices = np.random.randint(0, len(df), num_rows_to_nan)
 
-    random_indices = np.random.choice(keys, num_rows_to_nan, replace=False)
-
-    for key in random_indices:
-        data_dict[key]["test_output_tabular"]["Height"] = np.nan
-
-    return data_dict, random_indices
+    return (
+        df.with_row_index()
+        .with_columns(
+            pl.col("test_output_tabular__Height").map_elements(
+                lambda x, idx=pl.col("index"): np.nan if idx in random_indices else x,
+                return_dtype=pl.Float64,
+            )
+        )
+        .drop("index"),
+        random_indices,
+    )
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
@@ -209,7 +215,6 @@ def test_set_up_test_dataset(
     ):
         test_target_labels = predict_target_setup.get_target_labels_for_testing(
             configs_overloaded_for_predict=test_configs,
-            custom_column_label_parsing_ops=None,
             ids=test_ids,
         )
 
@@ -230,7 +235,7 @@ def test_set_up_test_dataset(
 
     test_dataset = predict_data.set_up_default_dataset(
         configs=test_configs,
-        target_labels_dict=test_target_labels.label_dict,
+        target_labels_df=test_target_labels.predict_labels,
         inputs_as_dict=test_inputs,
         outputs_as_dict=outputs_as_dict,
         missing_ids_per_output=test_target_labels.missing_ids_per_output,

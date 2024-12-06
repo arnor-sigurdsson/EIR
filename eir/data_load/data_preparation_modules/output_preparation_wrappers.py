@@ -1,11 +1,15 @@
+from dataclasses import dataclass
+from functools import partial, update_wrapper
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 import numpy as np
+import polars as pl
 import torch
 from PIL.Image import Image
 
 from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
+    numpy_dtype_to_polars_dtype,
     typed_partial_for_hook,
 )
 from eir.data_load.data_preparation_modules.prepare_array import (
@@ -114,9 +118,18 @@ def prepare_outputs_memory(
     return prepared_outputs
 
 
+@dataclass
+class HookOutput:
+    hook_callable: Callable[..., dict[str, np.ndarray | Image]]
+    return_dtype: Optional[pl.DataType]
+
+
 def get_output_data_loading_hooks(
     outputs: al_output_objects_as_dict,
-) -> Optional[dict[str, Callable[..., np.ndarray | Image]]]:
+) -> Optional[dict[str, HookOutput]]:
+    """
+    Note we use object dtypes for images as they are PIL.Image objects.
+    """
     mapping = {}
 
     for output_name, output_object in outputs.items():
@@ -133,10 +146,18 @@ def get_output_data_loading_hooks(
                     **common_kwargs,
                 )
 
-                mapping[output_name] = typed_partial_for_hook(
+                final_callable = typed_partial_for_output_hook(
                     _extract_nested_output_and_call,
                     output_name=output_name,
                     function=inner_function,
+                )
+
+                arr_shape = output_object.data_dimensions.original_shape
+                polars_dtype = numpy_dtype_to_polars_dtype(np_dtype=output_object.dtype)
+
+                mapping[output_name] = HookOutput(
+                    hook_callable=final_callable,
+                    return_dtype=pl.Array(inner=polars_dtype, shape=arr_shape),
                 )
 
             case ComputedImageOutputInfo():
@@ -148,13 +169,28 @@ def get_output_data_loading_hooks(
                     image_mode=output_type_info.mode,
                 )
 
-                mapping[output_name] = typed_partial_for_hook(
+                final_callable = typed_partial_for_output_hook(
                     _extract_nested_output_and_call,
                     output_name=output_name,
                     function=inner_function,
                 )
 
+                mapping[output_name] = HookOutput(
+                    hook_callable=final_callable,
+                    return_dtype=pl.Object(),
+                )
+
     return mapping
+
+
+def typed_partial_for_output_hook(
+    func: Callable[..., Any], *args: Any, **kwargs: Any
+) -> Callable[..., dict[str, np.ndarray | Image]]:
+    """
+    Just to make mypy happy.
+    """
+    partial_func = partial(func, *args, **kwargs)
+    return update_wrapper(partial_func, func)
 
 
 def _extract_nested_output_and_call(

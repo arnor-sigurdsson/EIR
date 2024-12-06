@@ -6,7 +6,6 @@ import pandas as pd
 from eir.data_load import label_setup
 from eir.data_load.label_setup import (
     TabularFileInfo,
-    al_all_column_ops,
     al_label_transformers,
     transform_label_df,
 )
@@ -48,11 +47,9 @@ def setup_tabular_input_for_testing(
         tabular_data_type_config=input_type_info,
     )
 
-    custom_ops = hooks.custom_column_label_parsing_ops if hooks else None
     predict_labels = get_input_labels_for_predict(
         tabular_file_info=tabular_file_info,
         input_name=input_config.input_info.input_name,
-        custom_label_ops=custom_ops,
         ids=ids,
         output_folder=output_folder,
     )
@@ -67,7 +64,6 @@ def setup_tabular_input_for_testing(
 def get_input_labels_for_predict(
     tabular_file_info: TabularFileInfo,
     input_name: str,
-    custom_label_ops: al_all_column_ops,
     ids: Sequence[str],
     output_folder: str,
 ) -> PredictInputLabels:
@@ -80,7 +76,6 @@ def get_input_labels_for_predict(
     df_labels_test = parse_wrapper(
         label_file_tabular_info=tabular_file_info,
         ids_to_keep=ids,
-        custom_label_ops=custom_label_ops,
     )
 
     label_setup.pre_check_label_df(df=df_labels_test, name="Testing DataFrame")

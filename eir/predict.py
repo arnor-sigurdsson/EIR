@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import Callable, Iterable, Literal, Sequence, Union
 
 import numpy as np
+import polars as pl
 from aislib.misc_utils import ensure_path_exists
 from torch.utils.data import DataLoader
 
 from eir import train
 from eir.data_load import datasets, label_setup
-from eir.data_load.label_setup import al_all_column_ops
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
@@ -51,10 +51,7 @@ from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.schemas import OutputConfig
-from eir.target_setup.target_label_setup import (
-    build_linked_survival_targets_for_missing_ids,
-    gather_all_ids_from_output_configs,
-)
+from eir.target_setup.target_label_setup import gather_all_ids_from_output_configs
 from eir.train import check_dataset_and_batch_size_compatibility
 from eir.train_utils.evaluation import (
     deregister_pre_evaluation_hooks,
@@ -194,6 +191,7 @@ def predict(
     )
 
     criteria = train.get_criteria(outputs_as_dict=predict_experiment.outputs)
+
     loss_func = train.get_loss_callable(
         criteria=criteria,
     )
@@ -304,7 +302,6 @@ class PredictExperiment:
 @dataclass
 class PredictHooks:
     step_func_hooks: "PredictStepFunctionHookStages"
-    custom_column_label_parsing_ops: al_all_column_ops = None
 
 
 @dataclass
@@ -329,10 +326,8 @@ def get_default_predict_experiment(
             output_configs=configs_overloaded_for_predict.output_configs
         )
 
-        label_ops = default_train_hooks.custom_column_label_parsing_ops
         target_labels = get_target_labels_for_testing(
             configs_overloaded_for_predict=configs_overloaded_for_predict,
-            custom_column_label_parsing_ops=label_ops,
             ids=test_ids,
         )
         missing_ids_per_output = target_labels.missing_ids_per_output
@@ -341,14 +336,9 @@ def get_default_predict_experiment(
             input_configs=configs_overloaded_for_predict.input_configs
         )
         target_labels = None
-        linked_survival_targets = build_linked_survival_targets_for_missing_ids(
-            output_configs=configs_overloaded_for_predict.output_configs,
-        )
         missing_ids_per_output = MissingTargetsInfo(
             missing_ids_per_modality={},
-            missing_ids_within_modality={},
-            precomputed_missing_ids={},
-            linked_targets=linked_survival_targets,
+            all_have_same_set=False,
         )
 
     test_inputs = set_up_inputs_for_predict(
@@ -358,14 +348,17 @@ def get_default_predict_experiment(
         output_folder=str(inferred_run_folder),
     )
 
-    label_dict = target_labels.label_dict if target_labels else {}
+    label_df: pl.DataFrame = (
+        target_labels.predict_labels if target_labels else pl.DataFrame()
+    )
     outputs_with_predict_paths = _patch_loaded_output_object_configs(
         output_as_dict=loaded_train_experiment.outputs,
         predict_output_configs=configs_overloaded_for_predict.output_configs,
     )
+
     test_dataset = set_up_default_dataset(
         configs=configs_overloaded_for_predict,
-        target_labels_dict=label_dict,
+        target_labels_df=label_df,
         inputs_as_dict=test_inputs,
         outputs_as_dict=outputs_with_predict_paths,
         missing_ids_per_output=missing_ids_per_output,
@@ -477,7 +470,6 @@ def _get_default_predict_hooks(train_hooks: "Hooks") -> PredictHooks:
     )
     predict_hooks = PredictHooks(
         step_func_hooks=stages,
-        custom_column_label_parsing_ops=train_hooks.custom_column_label_parsing_ops,
     )
 
     return predict_hooks

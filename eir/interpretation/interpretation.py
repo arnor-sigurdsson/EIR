@@ -727,15 +727,12 @@ def get_sample_attribution_producer(
     missing_for_modality = missing_ids_per_output.missing_ids_per_modality
     cur_missing_ids = missing_for_modality[output_name]
 
-    missing_within_modality = missing_ids_per_output.missing_ids_within_modality
-    cur_missing_ids_within = missing_within_modality[output_name][target_column_name]
-
     for batch, raw_inputs in data_producer:
         sample_target_labels = batch.target_labels
         cur_target_label = sample_target_labels[output_name][target_column_name]
 
         cur_id = batch.ids[0]
-        if cur_id in cur_missing_ids or cur_id in cur_missing_ids_within:
+        if cur_id in cur_missing_ids:
             continue
 
         sample_all_modalities_attributions = act_func(
@@ -965,6 +962,14 @@ def _get_interpretation_data_producer(
                     new_label = torch.zeros_like(prev_label)
                     target_labels[output_name][column_name] = new_label
 
+        cur_label = target_labels[output_name][column_name]
+        cur_column_type = column_type
+
+        if cur_column_type == "con" and torch.isnan(cur_label).any():
+            continue
+        elif cur_column_type == "cat" and cur_label < 0:
+            continue
+
         inputs_detached = _detach_all_inputs(tensor_inputs=batch.inputs)
         batch_interpretation = Batch(
             inputs=inputs_detached,
@@ -1027,9 +1032,9 @@ def _get_categorical_sample_indices_for_attributions(
     acc_label_limit = max_attributions_per_class
     indices = []
 
-    for index, sample in enumerate(dataset.samples):
-        target_labels = sample.target_labels
-        cur_sample_target_label = target_labels[output_name][target_column]
+    for idx in range(len(dataset)):
+        row = dataset.target_labels_df.row(idx, named=True)
+        cur_sample_target_label = row[f"{output_name}__{target_column}"]
 
         is_over_limit = acc_label_counts[cur_sample_target_label] == acc_label_limit
         is_not_in_target_classes = (
@@ -1038,7 +1043,7 @@ def _get_categorical_sample_indices_for_attributions(
         if is_over_limit or is_not_in_target_classes:
             continue
 
-        indices.append(index)
+        indices.append(idx)
         acc_label_counts[cur_sample_target_label] += 1
 
     return tuple(indices)

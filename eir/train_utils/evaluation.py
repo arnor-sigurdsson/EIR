@@ -317,13 +317,24 @@ def run_split_evaluation(
         full_gathered_ids_total += split_outputs.ids
 
         if with_labels and len(split_output_objects.compute) > 0:
+
+            filtered = metrics.filter_missing_outputs_and_labels(
+                batch_ids=split_outputs.ids,
+                model_outputs=output_compute,
+                target_labels=target_compute,
+                missing_ids_info=missing_ids_per_output,
+                with_labels=with_labels,
+            )
+
             cur_compute_metrics = compute_eval_metrics_wrapper(
-                val_outputs=output_compute,
-                val_target_labels=target_compute,
-                outputs=split_output_objects.compute,
+                val_outputs=filtered.model_outputs,
+                val_target_labels=filtered.target_labels,
+                output_objects=split_output_objects.compute,
                 experiment_metrics=experiment_metrics,
                 loss_function=loss_function,
                 device=device,
+                val_outputs_for_loss=output_compute,
+                val_targets_for_loss=target_compute,
             )
             batch_computed_metrics.append(cur_compute_metrics)
             batch_sizes.append(len(split_outputs.ids))
@@ -342,7 +353,7 @@ def run_split_evaluation(
         list_of_target_batch_dicts=full_gathered_output_batches_total
     )
 
-    filtered_values = metrics.filter_missing_outputs_and_labels(
+    filtered = metrics.filter_missing_outputs_and_labels(
         batch_ids=full_gathered_ids_total,
         model_outputs=full_gathered_output_batches_stacked,
         target_labels=full_gathered_label_batches_stacked,
@@ -353,9 +364,9 @@ def run_split_evaluation(
     full_gathered_metrics = {}
     if with_labels and len(split_output_objects.gather) > 0:
         full_gathered_metrics = compute_eval_metrics_wrapper(
-            val_outputs=filtered_values.model_outputs,
-            val_target_labels=filtered_values.target_labels,
-            outputs=split_output_objects.gather,
+            val_outputs=filtered.model_outputs,
+            val_target_labels=filtered.target_labels,
+            output_objects=split_output_objects.gather,
             experiment_metrics=experiment_metrics,
             loss_function=loss_function,
             device=device,
@@ -365,15 +376,38 @@ def run_split_evaluation(
 
     all_metrics = {**computed_metrics_averaged, **full_gathered_metrics}
 
+    ids_per_output = _build_ids_per_output(filtered_values=filtered)
+
     evaluation_results = EvaluationResults(
         metrics_with_averages=all_metrics,
-        gathered_outputs=filtered_values.model_outputs,
-        gathered_labels=filtered_values.target_labels,
-        ids_per_output=filtered_values.ids,
+        gathered_outputs=filtered.model_outputs,
+        gathered_labels=filtered.target_labels,
+        ids_per_output=ids_per_output,
         all_ids=full_gathered_ids_total,
     )
 
     return evaluation_results
+
+
+def _build_ids_per_output(
+    filtered_values: metrics.FilteredOutputsAndLabels,
+) -> dict[str, dict[str, list[str]]]:
+    fv = filtered_values
+    ids_per_output = fv.ids
+    if ids_per_output is None:
+        assert fv.common_ids is not None
+        ids_per_output = {}
+        for output_name, inner_dict in fv.model_outputs.items():
+            if output_name not in ids_per_output:
+                ids_per_output[output_name] = {}
+
+            for inner_target_name in inner_dict.keys():
+                ids_per_output[output_name][inner_target_name] = fv.common_ids
+    else:
+        assert fv.common_ids is None
+        return ids_per_output
+
+    return ids_per_output
 
 
 def average_nested_dict_values(data: list[dict[str, Any]], weights: list[int]) -> dict:
@@ -448,7 +482,7 @@ def get_split_outputs_map(output_objects: al_output_objects_as_dict) -> dict[str
 def compute_eval_metrics_wrapper(
     val_outputs: dict[str, dict[str, torch.Tensor]],
     val_target_labels: "al_training_labels_target",
-    outputs: al_output_objects_as_dict,
+    output_objects: al_output_objects_as_dict,
     experiment_metrics: metrics.al_metric_record_dict,
     loss_function: Callable,
     device: str,
@@ -464,11 +498,11 @@ def compute_eval_metrics_wrapper(
     can simplify this again to only accept `val_outputs` and `val_target_labels`.
     """
     val_target_labels = model_training_utils.parse_tabular_target_labels(
-        output_objects=outputs, device=device, labels=val_target_labels
+        output_objects=output_objects, device=device, labels=val_target_labels
     )
 
     eval_metrics_dict = metrics.calculate_batch_metrics(
-        outputs_as_dict=outputs,
+        outputs_as_dict=output_objects,
         outputs=val_outputs,
         labels=val_target_labels,
         mode="val",
@@ -481,7 +515,7 @@ def compute_eval_metrics_wrapper(
     val_losses = loss_function(inputs=outputs_for_loss, targets=targets_for_loss)
     val_loss_avg = metrics.aggregate_losses(losses_dict=val_losses)
     eval_metrics_dict_w_loss = metrics.add_loss_to_metrics(
-        outputs_as_dict=outputs,
+        outputs_as_dict=output_objects,
         losses=val_losses,
         metric_dict=eval_metrics_dict,
     )
@@ -490,7 +524,7 @@ def compute_eval_metrics_wrapper(
     assert isinstance(averaging_functions, dict)
     eval_metrics_dict_w_averages = metrics.add_multi_task_average_metrics(
         batch_metrics_dict=eval_metrics_dict_w_loss,
-        outputs_as_dict=outputs,
+        outputs_as_dict=output_objects,
         loss=val_loss_avg.item(),
         performance_average_functions=averaging_functions,
     )
@@ -528,13 +562,26 @@ def save_tabular_evaluation_results_wrapper(
                         binary_logits=cur_val_outputs
                     )
 
-                cur_val_outputs_np = cur_val_outputs.cpu().numpy()
+                cur_val_ids = val_ids[output_name][column_name]
 
                 cur_val_labels = val_labels[output_name][column_name]
-                cur_val_labels_np = cur_val_labels.cpu().numpy()
-                target_transformers = output_object.target_transformers
+                filtered = metrics.filter_tabular_missing_targets(
+                    outputs=cur_val_outputs,
+                    target_labels=cur_val_labels,
+                    ids=cur_val_ids,
+                    target_type=column_type,
+                )
 
-                cur_val_ids = val_ids[output_name][column_name]
+                to_npy = metrics.general_torch_to_numpy
+                cur_val_outputs_np = to_npy(tensor=filtered.model_outputs)
+
+                cur_val_labels_np = to_npy(tensor=filtered.target_labels)
+                if column_type == "cat":
+                    cur_val_labels_np = cur_val_labels_np.astype(int)
+
+                cur_val_ids = filtered.ids
+
+                target_transformers = output_object.target_transformers
 
                 plot_config = PerformancePlotConfig(
                     val_outputs=cur_val_outputs_np,

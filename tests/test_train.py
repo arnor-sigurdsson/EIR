@@ -134,7 +134,7 @@ def test_get_dataloaders(
 ):
     test_config = create_test_config
     gc = test_config.global_config
-    gc.training_control.weighted_sampling_columns = ["test_output_tabular.Origin"]
+    gc.training_control.weighted_sampling_columns = ["test_output_tabular__Origin"]
 
     train_dataset, valid_dataset = create_test_datasets
     train_sampler = get_train_sampler(
@@ -267,10 +267,13 @@ def test_get_model(create_test_config: Configs, create_test_labels):
     gc = create_test_config.global_config
     target_labels = create_test_labels
 
+    train_ids = tuple(create_test_labels.train_labels["ID"])
+    valid_ids = tuple(create_test_labels.valid_labels["ID"])
+
     inputs_as_dict = set_up_inputs_for_training(
         inputs_configs=create_test_config.input_configs,
-        train_ids=tuple(create_test_labels.train_labels.keys()),
-        valid_ids=tuple(create_test_labels.valid_labels.keys()),
+        train_ids=train_ids,
+        valid_ids=valid_ids,
         hooks=None,
     )
 

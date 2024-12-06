@@ -104,7 +104,7 @@ def test_impute_missing_modalities(
 
     transformers = input_objects["test_tabular"].labels.label_transformers
     origin_extra_label_encoder = transformers["OriginExtraCol"]
-    na_transformer_index = origin_extra_label_encoder.transform(["nan"]).item()
+    na_transformer_index = origin_extra_label_encoder.transform(["__NULL__"]).item()
     filled_na_value = filled_tabular["test_tabular"]["OriginExtraCol"]
     assert na_transformer_index == filled_na_value
     assert filled_tabular["test_tabular"]["ExtraTarget"] == 0.0

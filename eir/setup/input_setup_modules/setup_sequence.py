@@ -3,6 +3,7 @@ import os
 from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import (
     Any,
@@ -527,15 +528,30 @@ def _get_bpe_tokenizer_object(
     return tokenizer
 
 
+def identity_tokenize(raw_input_split: Sequence[str]) -> Sequence[str]:
+    return raw_input_split
+
+
+def join_and_tokenize(
+    raw_input_split: Sequence[str], base_tokenizer: Any
+) -> Sequence[str]:
+    input_joined = " ".join(raw_input_split)
+    return base_tokenizer(input_joined)
+
+
+def make_join_tokenizer(base_tokenizer: Any) -> TokenizerProtocolPreSplit:
+    return cast(
+        TokenizerProtocolPreSplit,
+        partial(join_and_tokenize, base_tokenizer=base_tokenizer),
+    )
+
+
 def get_basic_tokenizer(
     tokenizer_name: al_tokenizer_choices,  # type: ignore
     tokenizer_language: Optional[str],
 ) -> TokenizerProtocolPreSplit:
-    def _identity(raw_input_split: Sequence[str]) -> Sequence[str]:
-        return raw_input_split
-
     if not tokenizer_name:
-        return _identity
+        return identity_tokenize
 
     _validate_pytorch_tokenizer_args(
         tokenizer_name=tokenizer_name, tokenizer_language=tokenizer_language
@@ -544,19 +560,11 @@ def get_basic_tokenizer(
         "Using tokenizer '%s' with language '%s'.", tokenizer_name, tokenizer_language
     )
 
-    tokenizer = get_pytorch_tokenizer(
+    base_tokenizer = get_pytorch_tokenizer(
         tokenizer=tokenizer_name, language=tokenizer_language
     )
 
-    def _join_and_tokenize(raw_input_split: Sequence[str]) -> Sequence[str]:
-        """
-        " ".join(...) since the PyTorch tokenizers operate on a single string.
-        Can be optimized later by not splitting the input in the first place.
-        """
-        input_joined = " ".join(raw_input_split)
-        return tokenizer(input_joined)
-
-    return cast(TokenizerProtocolPreSplit, _join_and_tokenize)
+    return cast(TokenizerProtocolPreSplit, make_join_tokenizer(base_tokenizer))
 
 
 def _validate_pytorch_tokenizer_args(
@@ -578,22 +586,40 @@ def _validate_pytorch_tokenizer_args(
         )
 
 
+@overload
+def encode_text(
+    raw_input: str,
+    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
+    pytorch_vocab: Vocab,
+) -> Sequence[int]: ...
+
+
+@overload
+def encode_text(
+    raw_input: Sequence[str],
+    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
+    pytorch_vocab: Vocab,
+) -> Sequence[int]: ...
+
+
+def encode_text(
+    raw_input: Union[str, Sequence[str]],
+    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
+    pytorch_vocab: Vocab,
+) -> Sequence[int]:
+    """
+    TODO: Restructure this and related logic to not operate on union types.
+    """
+    input_tokenized = tokenizer(raw_input)  # type: ignore
+    input_as_ids = pytorch_vocab(input_tokenized)
+    return input_as_ids
+
+
 def get_tokenizer_encode_func(
     tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
     pytorch_vocab: Vocab,
 ) -> EncodeFuncProtocol:
-    @overload
-    def _encode_func(raw_input: str) -> Sequence[int]: ...
-
-    @overload
-    def _encode_func(raw_input: Sequence[str]) -> Sequence[int]: ...
-
-    def _encode_func(raw_input):
-        input_tokenized = tokenizer(raw_input)
-        input_as_ids = pytorch_vocab(input_tokenized)
-        return input_as_ids
-
-    return _encode_func
+    return partial(encode_text, tokenizer=tokenizer, pytorch_vocab=pytorch_vocab)
 
 
 def get_tokenized_vocab_iterator(

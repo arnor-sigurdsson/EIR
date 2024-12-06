@@ -363,6 +363,14 @@ def _get_maybe_truncated_tensor_iterator(
     return tensor_iterator
 
 
+class IdentityTransform:
+    def __call__(self, x):
+        return x
+
+    def __repr__(self):
+        return self.__class__.__name__ + "()"
+
+
 def get_image_transforms(
     target_size: Sequence[int],
     normalization_stats: ImageNormalizationStats,
@@ -387,7 +395,7 @@ def get_image_transforms(
         crop_transform = transforms.CenterCrop(target_size)
     else:
         resize_transform = transforms.Resize(target_size)
-        crop_transform = transforms.Lambda(lambda x: x)
+        crop_transform = IdentityTransform()
 
     base = [
         resize_transform,

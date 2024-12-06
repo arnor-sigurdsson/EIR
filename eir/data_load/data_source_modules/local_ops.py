@@ -1,14 +1,10 @@
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Any,
     Callable,
-    DefaultDict,
     Generator,
-    Iterable,
     Iterator,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Union,
@@ -16,65 +12,17 @@ from typing import (
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from tqdm import tqdm
 
-from eir.data_load.data_source_modules.common_utils import add_id_to_samples
 from eir.data_load.label_setup import get_file_path_iterator
 from eir.setup.input_setup_modules.setup_sequence import get_sequence_split_function
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.data_load.data_utils import Sample
+    pass
 
 logger = get_logger(name=__name__)
-
-
-def get_file_sample_id_iterator(
-    data_source: str, ids_to_keep: Union[None, Sequence[str]]
-) -> Generator[Tuple[Any, str], None, None]:
-    def _id_from_filename(file: Path) -> str:
-        return file.stem
-
-    def _filter_ids_callable(item: Path, sample_id: str) -> bool:
-        assert ids_to_keep is not None
-        if sample_id in ids_to_keep:
-            return True
-        return False
-
-    base_file_iterator = get_file_path_iterator(
-        data_source=Path(data_source), validate=False
-    )
-
-    sample_id_and_file_iterator = _get_sample_id_data_iterator(
-        base_iterator=base_file_iterator, id_callable=_id_from_filename
-    )
-
-    if ids_to_keep:
-        final_iterator = _get_filter_iterator(
-            base_iterator=sample_id_and_file_iterator,
-            filter_callable=_filter_ids_callable,
-        )
-    else:
-        final_iterator = sample_id_and_file_iterator
-
-    yield from final_iterator
-
-
-def _get_sample_id_data_iterator(
-    base_iterator: Iterable[Path], id_callable: Callable[[Path], str]
-) -> Generator[Tuple[Path, str], None, None]:
-    for item in base_iterator:
-        sample_id = id_callable(item)
-        yield item, sample_id
-
-
-def _get_filter_iterator(
-    base_iterator: Iterable[Tuple[Path, str]],
-    filter_callable: Callable[[Path, str], bool],
-) -> Generator[Any, None, None]:
-    for item in base_iterator:
-        if filter_callable(*item):
-            yield item
 
 
 def get_file_sample_id_iterator_basic(
@@ -95,14 +43,14 @@ def get_file_sample_id_iterator_basic(
             yield sample_id, file
 
 
-def add_sequence_data_from_csv_to_samples(
+def add_sequence_data_from_csv_to_df(
     input_source: str,
-    samples: DefaultDict[str, "Sample"],
+    input_df: pl.DataFrame,
     ids_to_keep: Union[None, Set[str]],
     split_on: Optional[str],
     encode_func: Callable,
     input_name: str = "CSV File Data",
-) -> DefaultDict[str, "Sample"]:
+) -> pl.DataFrame:
     logger.info(
         "Loading sequence data from CSV file %s. Note that this will "
         "load all the sequence data into memory.",
@@ -111,19 +59,39 @@ def add_sequence_data_from_csv_to_samples(
 
     split_func = get_sequence_split_function(split_on=split_on)
     csv_sequence_iterator = get_csv_id_sequence_iterator(
-        data_source=input_source, ids_to_keep=ids_to_keep
+        data_source=input_source,
+        ids_to_keep=ids_to_keep,
     )
-    file_iterator_tqdm = tqdm(csv_sequence_iterator, desc=input_name)
 
-    for sample_id, sequence in file_iterator_tqdm:
-        samples = add_id_to_samples(samples=samples, sample_id=sample_id)
+    ids = []
+    sequences = []
 
+    for sample_id, sequence in tqdm(csv_sequence_iterator, desc=input_name):
         sequence_split = split_func(sequence)
-        sequence_encoded = np.array(encode_func(sequence_split))
+        sequence_encoded = encode_func(sequence_split)
 
-        samples[sample_id].inputs[input_name] = sequence_encoded
+        if isinstance(sequence_encoded, np.ndarray):
+            sequence_encoded = sequence_encoded.tolist()
 
-    return samples
+        ids.append(sample_id)
+        sequences.append(sequence_encoded)
+
+    if not ids:
+        return input_df
+
+    sequence_df = pl.DataFrame(
+        {
+            "ID": pl.Series(name="ID", values=ids, dtype=pl.Utf8),
+            input_name: pl.Series(
+                name=input_name, values=sequences, dtype=pl.List(pl.Int64)
+            ),
+        }
+    )
+
+    if input_df.height == 0:
+        return sequence_df
+    else:
+        return input_df.join(sequence_df, on="ID", how="full", coalesce=True)
 
 
 def get_csv_id_sequence_iterator(

@@ -84,7 +84,8 @@ def test_set_up_datasets(
     assert len(all_array_ids) > test_data_config.n_per_class * n_classes
 
     train_ids, valid_ids = train.split_ids(
-        ids=all_array_ids, valid_size=test_configs.gc.be.valid_size
+        ids=all_array_ids,
+        valid_size=test_configs.gc.be.valid_size,
     )
 
     run_folder = get_run_folder(output_folder=test_configs.gc.be.output_folder)
@@ -122,8 +123,8 @@ def test_set_up_datasets(
         == test_data_config.n_per_class * n_classes
     )
 
-    valid_ids = [i.sample_id for i in valid_dataset.samples]
-    train_ids = [i.sample_id for i in train_dataset.samples]
+    valid_ids = tuple(valid_dataset.input_df["ID"])
+    train_ids = tuple(train_dataset.input_df["ID"])
 
     assert set(valid_ids).isdisjoint(set(train_ids))
     assert len([i for i in valid_ids if i.startswith("SampleIgnore")]) == 0
@@ -292,16 +293,16 @@ def test_set_up_datasets_fails(
             outputs_as_dict=outputs_as_dict,
         )
         if dataset_fail_config.get("corrupt_ids", None):
-            train_dataset.samples[0].sample_id = ""
-            valid_dataset.samples[0].sample_id = ""
+            train_dataset.input_df[0, "ID"] = None
+            valid_dataset.input_df[0, "ID"] = None
             with pytest.raises(ValueError):
                 train_dataset.check_samples()
             with pytest.raises(ValueError):
                 valid_dataset.check_samples()
 
         if dataset_fail_config.get("corrupt_inputs", None):
-            train_dataset.samples[0].inputs = {}
-            valid_dataset.samples[0].inputs = {}
+            train_dataset.input_df[0, "test_genotype"] = None
+            valid_dataset.input_df[0, "test_genotype"] = None
             with pytest.raises(ValueError):
                 train_dataset.check_samples()
             with pytest.raises(ValueError):
@@ -416,7 +417,7 @@ def test_construct_dataset_init_params_from_cl_args(
     )
 
     constructed_args = datasets.construct_default_dataset_kwargs_from_cl_args(
-        target_labels_dict=target_labels.train_labels,
+        target_labels_df=target_labels.train_labels,
         outputs=outputs_as_dict,
         inputs=inputs,
         test_mode=False,
@@ -560,7 +561,7 @@ def check_dataset(
 
     if check_targets:
         transformed_values_in_dataset = set(
-            i.target_labels[output_name][target_column] for i in dataset.samples
+            dataset.target_labels_df[f"{output_name}__{target_column}"]
         )
         expected_transformed_values = set(range(len(classes_tested)))
         assert transformed_values_in_dataset == expected_transformed_values
@@ -574,4 +575,5 @@ def check_dataset(
     test_genotype = test_inputs["test_genotype"]
     assert (test_genotype.sum(1) == 1).all()
 
-    assert test_id == dataset.samples[0].sample_id
+    assert test_id == dataset.target_labels_df[0]["ID"].item()
+    assert test_id == dataset.input_df[0]["ID"].item()

@@ -23,7 +23,6 @@ from torch.optim.optimizer import Optimizer
 
 from eir.data_load.data_augmentation import get_mix_data_hook, hook_mix_loss
 from eir.data_load.data_utils import Batch
-from eir.data_load.label_setup import al_all_column_ops
 from eir.models import model_training_utils
 from eir.models.input.tabular.tabular import get_tabular_inputs
 from eir.predict_modules.predict_tabular_input_setup import (
@@ -88,8 +87,6 @@ class Hooks:
 
     step_func_hooks: "StepFunctionHookStages"
     extra_state: Optional[dict[str, Any]] = None
-    custom_column_label_parsing_ops: al_all_column_ops = None
-    custom_handler_attachers: Union[None, al_handler_attachers] = None
 
 
 def _get_default_step_function_hooks(
@@ -597,6 +594,11 @@ def hook_default_per_target_loss(
     *args,
     **kwargs,
 ) -> dict[str, Any]:
+    """
+    Note that we do not filter within modality missing sample data here
+    after `filter_missing_outputs_and_labels` as that is handled in
+    the respective (tabular and survival output) loss functions.
+    """
     context_manager = get_maybe_amp_context_manager_from_state(state=state)
     with context_manager:
         model_outputs = state["model_outputs"]
@@ -611,11 +613,9 @@ def hook_default_per_target_loss(
             with_labels=True,
         )
 
-        # note here we pass the outputs directly to the loss
-        # function as it handles NaNs itself
         per_target_train_losses = experiment.loss_function(
-            inputs=model_outputs,
-            targets=target_labels,
+            inputs=filtered_outputs.model_outputs,
+            targets=filtered_outputs.target_labels,
         )
 
         state_updates = {

@@ -6,6 +6,7 @@ from pathlib import Path
 from statistics import mean
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Dict,
     Generator,
@@ -40,8 +41,11 @@ from sklearn.preprocessing import KBinsDiscretizer, StandardScaler, label_binari
 from torch.linalg import vector_norm
 
 from eir.data_load.data_utils import get_output_info_generator
-from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
-from eir.setup.schemas import OutputConfig, SurvivalOutputTypeConfig
+from eir.setup.schemas import (
+    OutputConfig,
+    SurvivalOutputTypeConfig,
+    TabularOutputTypeConfig,
+)
 from eir.target_setup.target_label_setup import MissingTargetsInfo
 from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.utils.logging import get_logger
@@ -61,7 +65,7 @@ if TYPE_CHECKING:
 
 # aliases
 # output_name -> target_name -> metric name: value
-al_step_metric_dict = Dict[str, Dict[str, Dict[str, float]]]
+al_step_metric_dict = dict[str, dict[str, dict[str, float]]]
 
 logger = get_logger(name=__name__)
 
@@ -99,7 +103,8 @@ class AverageMetricFunctionProtocol(Protocol):
 
 al_averaging_functions_dict = Dict[str, AverageMetricFunctionProtocol]
 al_metric_record_dict = Dict[
-    str, Tuple["MetricRecord", ...] | "al_averaging_functions_dict"
+    str,
+    Tuple["MetricRecord", ...] | "al_averaging_functions_dict" | "GeneralMetricInfo",
 ]
 
 al_cat_metric_choices = Sequence[
@@ -134,7 +139,7 @@ class MetricRecord:
     name: str
     function: MetricFunctionProtocol | SurvivalMetricFunctionProtocol
     output_type: str = "supervised"
-    only_val: bool = False
+    only_val: bool = True
     minimize_goal: bool = False
 
 
@@ -146,6 +151,11 @@ def calculate_batch_metrics(
     metric_record_dict: al_metric_record_dict,
 ) -> al_step_metric_dict:
     assert mode in ["val", "train"]
+
+    general_info = metric_record_dict["general_metric_info"]
+    assert isinstance(general_info, GeneralMetricInfo)
+    if mode == "train" and general_info.all_are_val_only:
+        return general_info.base_metric_structure
 
     target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
 
@@ -171,10 +181,19 @@ def calculate_batch_metrics(
             cur_metric_records: al_record = cur_records
 
             cur_outputs = outputs[output_name][target_name]
-            cur_outputs_np = cur_outputs.detach().cpu().to(dtype=torch.float32).numpy()
+            cur_target_labels = labels[output_name][target_name]
 
-            cur_labels = labels[output_name][target_name]
-            cur_labels_np = cur_labels.cpu().to(dtype=torch.float32).numpy()
+            filtered = filter_tabular_missing_targets(
+                outputs=cur_outputs,
+                target_labels=cur_target_labels,
+                ids=[],
+                target_type=output_target_type,
+            )
+
+            cur_outputs_np = general_torch_to_numpy(tensor=filtered.model_outputs)
+            cur_labels_np = general_torch_to_numpy(tensor=filtered.target_labels)
+            if output_target_type == "cat":
+                cur_labels_np = cur_labels_np.astype(int)
 
             for metric_record in cur_metric_records:
 
@@ -207,17 +226,25 @@ def calculate_batch_metrics(
             cur_metric_records = cur_records
 
             cur_outputs = outputs[output_name][target_name]
-            cur_outputs_np = cur_outputs.detach().cpu().to(dtype=torch.float32).numpy()
-
-            cur_labels = labels[output_name][target_name]
-            cur_labels_np = cur_labels.cpu().to(dtype=torch.float32).numpy()
+            cur_events = labels[output_name][target_name]
 
             cur_oti = cur_output_object.output_config.output_type_info
             assert isinstance(cur_oti, SurvivalOutputTypeConfig)
 
             cur_time_name = cur_oti.time_column
             cur_times = labels[output_name][cur_time_name]
-            cur_times_np = cur_times.cpu().to(dtype=torch.float32).numpy()
+
+            filtered = filter_survival_missing_targets(
+                model_outputs=cur_outputs,
+                events=cur_events,
+                times=cur_times,
+                cur_ids=[],
+            )
+
+            cur_outputs_np = general_torch_to_numpy(tensor=filtered.model_outputs)
+            cur_labels_np = general_torch_to_numpy(tensor=filtered.events)
+            cur_labels_np = cur_labels_np.astype(int)
+            cur_times_np = general_torch_to_numpy(tensor=filtered.times)
 
             for metric_record in cur_metric_records:
 
@@ -1019,12 +1046,10 @@ def get_available_supervised_metrics() -> (
         "roc-auc-macro": MetricRecord(
             name="roc-auc-macro",
             function=calc_roc_auc_ovo,
-            only_val=True,
         ),
         "ap-macro": MetricRecord(
             name="ap-macro",
             function=calc_average_precision,
-            only_val=True,
         ),
         "f1-macro": MetricRecord(
             name="f1-macro",
@@ -1053,12 +1078,10 @@ def get_available_supervised_metrics() -> (
         "r2": MetricRecord(
             name="r2",
             function=calc_r2,
-            only_val=True,
         ),
         "pcc": MetricRecord(
             name="pcc",
             function=calc_pcc,
-            only_val=True,
         ),
         "mae": MetricRecord(
             name="mae",
@@ -1073,7 +1096,6 @@ def get_available_supervised_metrics() -> (
         "explained-variance": MetricRecord(
             name="explained-variance",
             function=calc_explained_variance,
-            only_val=True,
         ),
     }
 
@@ -1090,7 +1112,6 @@ def get_available_survival_metrics(
                 calc_survival_c_index, target_transformers=target_transformers
             ),
             output_type="survival",
-            only_val=True,
             minimize_goal=False,
         ),
     )
@@ -1098,12 +1119,13 @@ def get_available_survival_metrics(
     return survival_metrics
 
 
-def get_default_supervised_metrics(
+def get_default_metrics(
     target_transformers: dict[str, "al_label_transformers"],
     cat_metrics: al_cat_metric_choices,
     con_metrics: al_con_metric_choices,
     cat_averaging_metrics: Optional[al_cat_metric_choices],
     con_averaging_metrics: Optional[al_con_metric_choices],
+    output_configs: Sequence[OutputConfig],
 ) -> "al_metric_record_dict":
     available_cat_metrics, available_con_metrics = get_available_supervised_metrics()
 
@@ -1138,13 +1160,78 @@ def get_default_supervised_metrics(
         target_transformers=target_transformers
     )
 
+    general_metric_info = _build_general_metric_info(
+        cat_metric_records=cat_metric_records,
+        con_metric_records=con_metric_records,
+        surv_metric_records=surv_metric_records,
+        output_configs=output_configs,
+    )
+
     default_metrics: al_metric_record_dict = {
         "cat": cat_metric_records,
         "con": con_metric_records,
         "survival": surv_metric_records,
         "averaging_functions": averaging_functions,
+        "general_metric_info": general_metric_info,
     }
     return default_metrics
+
+
+@dataclass
+class GeneralMetricInfo:
+    all_are_val_only: bool
+    base_metric_structure: dict[str, dict[str, dict]]
+
+
+def _build_general_metric_info(
+    cat_metric_records: tuple[MetricRecord, ...],
+    con_metric_records: tuple[MetricRecord, ...],
+    surv_metric_records: tuple[MetricRecord, ...],
+    output_configs: Sequence[OutputConfig],
+) -> GeneralMetricInfo:
+    """
+    This function and the created object is used in in the training loop to:
+
+        1. Determine if all metrics are validation-only metrics. If that is the case
+        the metric calculation for training batches is completely skipped.
+        2. If (1) is True, we create a base structure for the metric calculation
+        which is used in other parts of the code (e.g. for running average metrics).
+        The structure is bootstrapped here, even though it is never filled with metrics
+        as the general output_name -> target name nested dict structure is e.g.
+        used when adding losses to the state dict in the training loop.
+    """
+    all_cat_are_val = all(metric.only_val for metric in cat_metric_records)
+    all_con_are_val = all(metric.only_val for metric in con_metric_records)
+    all_surv_are_val = all(metric.only_val for metric in surv_metric_records)
+    all_are_val_only = all([all_cat_are_val, all_con_are_val, all_surv_are_val])
+
+    if all_are_val_only:
+        logger.debug(
+            "All metrics are validation-only metrics, will skip all metric "
+            "calculation for training batches."
+        )
+
+    base_structure: dict[str, Any] = {}
+    for output_config in output_configs:
+        output_name = output_config.output_info.output_name
+        base_structure[output_name] = {}
+
+        oti = output_config.output_type_info
+        match oti:
+            case TabularOutputTypeConfig():
+                targets = list(oti.target_cat_columns) + list(oti.target_con_columns)
+            case SurvivalOutputTypeConfig():
+                targets = [oti.event_column]
+            case _:
+                targets = [output_name]
+
+        for target in targets:
+            base_structure[output_name][target] = {}
+
+    return GeneralMetricInfo(
+        all_are_val_only=all_are_val_only,
+        base_metric_structure=base_structure,
+    )
 
 
 def parse_averaging_metrics(
@@ -1295,100 +1382,148 @@ def get_performance_averaging_functions(
 
 @dataclass
 class FilteredOutputsAndLabels:
-    model_outputs: Dict[str, Dict[str, torch.Tensor]]
-    target_labels: Dict[str, Dict[str, torch.Tensor]]
-    ids: Dict[str, Dict[str, List[str]]]
+    model_outputs: dict[str, dict[str, torch.Tensor]]
+    target_labels: dict[str, dict[str, torch.Tensor]]
+    ids: Optional[dict[str, dict[str, list[str]]]]
+    common_ids: Optional[list[str]]
 
 
 def filter_missing_outputs_and_labels(
-    batch_ids: List[str],
+    batch_ids: list[str],
     model_outputs: dict[str, dict[str, torch.Tensor]],
     target_labels: dict[str, dict[str, torch.Tensor]],
     missing_ids_info: MissingTargetsInfo,
     with_labels: bool = True,
 ) -> FilteredOutputsAndLabels:
+
+    if missing_ids_info.all_have_same_set:
+        return FilteredOutputsAndLabels(
+            model_outputs=model_outputs,
+            target_labels=target_labels,
+            ids=None,
+            common_ids=batch_ids,
+        )
+
     filtered_outputs = {}
     filtered_labels = {}
     filtered_ids: dict[str, dict[str, list[str]]] = {}
 
-    precomputed = missing_ids_info.precomputed_missing_ids
+    missing_per_modality = missing_ids_info.missing_ids_per_modality
 
     for output_name, output_inner_dict in model_outputs.items():
-        filtered_inner_dict = {}
-        filtered_inner_labels = {}
-        filtered_inner_ids = {}
-
-        output_missing_info = precomputed.get(output_name, {})
-        if not output_missing_info:
+        cur_output_missing = missing_per_modality.get(output_name, set())
+        if not cur_output_missing:
             filtered_outputs[output_name] = output_inner_dict
-            if with_labels:
-                filtered_labels[output_name] = target_labels[output_name]
-            else:
-                filtered_labels[output_name] = {
-                    inner_key: torch.tensor([]) for inner_key in output_inner_dict
-                }
-            filtered_ids[output_name] = {
-                inner_key: batch_ids for inner_key in output_inner_dict
-            }
+            filtered_labels[output_name] = (
+                target_labels[output_name]
+                if with_labels
+                else {k: torch.tensor([]) for k in output_inner_dict}
+            )
+            filtered_ids[output_name] = {k: batch_ids for k in output_inner_dict}
             continue
 
-        for inner_key, modality_output_tensor in output_inner_dict.items():
-            cur_missing_ids = output_missing_info.get(inner_key, set())
+        missing_ids = missing_ids_info.missing_ids_per_modality[output_name]
+        valid_indices = [i for i, id_ in enumerate(batch_ids) if id_ not in missing_ids]
 
-            if not cur_missing_ids:
-                filtered_inner_dict[inner_key] = modality_output_tensor
-                if with_labels:
-                    filtered_inner_labels[inner_key] = target_labels[output_name][
-                        inner_key
-                    ]
-                else:
-                    filtered_inner_labels[inner_key] = torch.tensor([])
-                filtered_inner_ids[inner_key] = batch_ids
-                continue
+        device = next(iter(output_inner_dict.values())).device
+        valid_indices_tensor = torch.tensor(
+            valid_indices,
+            device=device,
+            dtype=torch.long,
+        )
 
-            valid_indices = [
-                i for i, id_ in enumerate(batch_ids) if id_ not in cur_missing_ids
-            ]
-            valid_indices_tensor = torch.tensor(
-                valid_indices,
-                device=modality_output_tensor.device,
-                dtype=torch.long,
-            )
+        filtered_outputs[output_name] = {
+            k: v.index_select(0, valid_indices_tensor)
+            for k, v in output_inner_dict.items()
+        }
 
-            output_tensor = modality_output_tensor.index_select(
-                dim=0, index=valid_indices_tensor
-            )
-            filtered_inner_dict[inner_key] = output_tensor
-
-            if with_labels:
-                cur_output_targets = target_labels[output_name]
-                cur_targets = cur_output_targets[inner_key].index_select(
-                    dim=0, index=valid_indices_tensor
-                )
-                filtered_inner_labels[inner_key] = cur_targets
-
-                if output_name in missing_ids_info.linked_targets:
-                    cur_link = missing_ids_info.linked_targets[output_name]
-                    if inner_key == cur_link.target_name:
-                        linked_target = cur_link.linked_target_name
-                        assert linked_target in cur_output_targets
-                        linked_targets = cur_output_targets[linked_target].index_select(
-                            dim=0, index=valid_indices_tensor
-                        )
-                        filtered_inner_labels[linked_target] = linked_targets
-
-            else:
-                filtered_inner_labels[inner_key] = torch.tensor([])
-
-            ids = [batch_ids[i] for i in valid_indices]
-            filtered_inner_ids[inner_key] = ids
-
-        filtered_outputs[output_name] = filtered_inner_dict
-        filtered_labels[output_name] = filtered_inner_labels
-        filtered_ids[output_name] = filtered_inner_ids
+        if with_labels:
+            filtered_labels[output_name] = {
+                k: v.index_select(0, valid_indices_tensor)
+                for k, v in target_labels[output_name].items()
+            }
+        else:
+            filtered_labels[output_name] = {
+                k: torch.tensor([]) for k in output_inner_dict
+            }
+        filtered_ids[output_name] = {
+            k: [batch_ids[i] for i in valid_indices] for k in output_inner_dict
+        }
 
     return FilteredOutputsAndLabels(
         model_outputs=filtered_outputs,
         target_labels=filtered_labels,
         ids=filtered_ids,
+        common_ids=None,
     )
+
+
+@dataclass
+class FilteredTabularTargets:
+    model_outputs: torch.Tensor
+    target_labels: torch.Tensor
+    ids: list[str]
+
+
+def filter_tabular_missing_targets(
+    outputs: torch.Tensor,
+    target_labels: torch.Tensor,
+    ids: list[str],
+    target_type: str,
+) -> FilteredTabularTargets:
+    nan_labels_mask = torch.isnan(target_labels)
+    if target_type == "cat":
+        nan_labels_mask = torch.logical_or(nan_labels_mask, target_labels == -1)
+
+    if ids:
+        cur_ids_np = np.array(ids)
+        nan_labels_mask_np = nan_labels_mask.cpu().numpy()
+        ids = cur_ids_np[~nan_labels_mask_np].tolist()
+
+    predictions = outputs[~nan_labels_mask]
+    target_labels = target_labels[~nan_labels_mask]
+
+    return FilteredTabularTargets(
+        model_outputs=predictions,
+        target_labels=target_labels,
+        ids=ids,
+    )
+
+
+@dataclass
+class FilteredSurvivalTargets:
+    model_outputs: torch.Tensor
+    events: torch.Tensor
+    times: torch.Tensor
+    ids: list[str]
+
+
+def filter_survival_missing_targets(
+    model_outputs: torch.Tensor,
+    events: torch.Tensor,
+    times: torch.Tensor,
+    cur_ids: list[str],
+) -> FilteredSurvivalTargets:
+    nan_labels_mask = events == -1
+    cur_times_nan = torch.isnan(times)
+    nan_labels_mask = torch.logical_or(nan_labels_mask, cur_times_nan)
+
+    predictions = model_outputs[~nan_labels_mask]
+    events = events[~nan_labels_mask]
+    times = times[~nan_labels_mask]
+
+    if cur_ids:
+        nan_labels_mask_np = nan_labels_mask.cpu().numpy()
+        cur_ids = np.array(cur_ids)[~nan_labels_mask_np].tolist()
+
+    return FilteredSurvivalTargets(
+        model_outputs=predictions,
+        events=events,
+        times=times,
+        ids=cur_ids,
+    )
+
+
+def general_torch_to_numpy(tensor: torch.Tensor) -> np.ndarray:
+    array = tensor.cpu().to(dtype=torch.float32).detach().numpy()
+    return array

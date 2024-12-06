@@ -1,4 +1,4 @@
-import warnings
+import multiprocessing
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
@@ -6,20 +6,10 @@ from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
 import torch
 import torch.multiprocessing
 
+multiprocessing.set_start_method("spawn", force=True)
+
 torch.multiprocessing.set_sharing_strategy("file_system")
 from aislib.misc_utils import ensure_path_exists
-
-original_warn = warnings.warn
-
-
-def custom_warn(*args, **kwargs):
-    if "functional optimizers is deprecated" in str(args[0]):
-        return
-    return original_warn(*args, **kwargs)
-
-
-warnings.warn = custom_warn
-
 from ignite.engine import Engine
 from torch import nn
 from torch.optim.optimizer import Optimizer
@@ -57,10 +47,7 @@ from eir.target_setup.target_label_setup import (
 )
 from eir.train_utils import distributed, utils
 from eir.train_utils.criteria import al_criteria_dict, get_criteria, get_loss_callable
-from eir.train_utils.metrics import (
-    get_average_history_filepath,
-    get_default_supervised_metrics,
-)
+from eir.train_utils.metrics import get_average_history_filepath, get_default_metrics
 from eir.train_utils.optim import get_optimizer, maybe_wrap_model_with_swa
 from eir.train_utils.step_logic import (
     Hooks,
@@ -245,12 +232,13 @@ def get_default_experiment(
         extra_modules=extra_modules,
     )
 
-    metrics = get_default_supervised_metrics(
+    metrics = get_default_metrics(
         target_transformers=target_labels.label_transformers,
         cat_metrics=gc.met.cat_metrics,
         con_metrics=gc.met.con_metrics,
         cat_averaging_metrics=gc.met.cat_averaging_metrics,
         con_averaging_metrics=gc.met.con_averaging_metrics,
+        output_configs=configs.output_configs,
     )
 
     experiment = Experiment(

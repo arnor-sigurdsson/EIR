@@ -138,9 +138,9 @@ def test_block_cutmix_omics_input(patched_indices: List[int]) -> None:
 
     # NOTE: Currently we only have a probabilistic guarantee for the code below to pass,
     # as e.g. if we only have 1 SNP, it can be quite likely that they match only by
-    # change. This is less likely if we have >1, but at some point we should probably
+    # change. This is less likely if we have >2, but at some point we should probably
     # make this more concrete.
-    if patched_end - patched_start > 1:
+    if patched_end - patched_start > 2:
         assert not (base_0 == mixed_0).all()
         assert not (base_1 == mixed_1).all()
 

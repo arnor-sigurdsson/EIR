@@ -70,21 +70,26 @@ def prep_modelling_test_configs(
 
     model = create_test_model
 
-    test_metrics = metrics.get_default_supervised_metrics(
+    test_metrics = metrics.get_default_metrics(
         target_transformers=target_labels.label_transformers,
         cat_metrics=gc.met.cat_metrics,
         con_metrics=gc.met.con_metrics,
         cat_averaging_metrics=gc.met.cat_averaging_metrics,
         con_averaging_metrics=gc.met.con_averaging_metrics,
+        output_configs=c.output_configs,
     )
     test_metrics = _patch_metrics(metrics_=test_metrics)
+    test_metrics["general_metric_info"].all_are_val_only = False
 
     train_dataset, valid_dataset = create_test_datasets
 
+    train_ids = tuple(target_labels.train_labels["ID"])
+    valid_ids = tuple(target_labels.valid_labels["ID"])
+
     inputs_as_dict = input_setup.set_up_inputs_for_training(
         inputs_configs=c.input_configs,
-        train_ids=tuple(target_labels.train_labels.keys()),
-        valid_ids=tuple(target_labels.valid_labels.keys()),
+        train_ids=train_ids,
+        valid_ids=valid_ids,
         hooks=None,
     )
 

@@ -12,7 +12,11 @@ from eir.setup.output_setup_modules.survival_output_setup import (
     ComputedSurvivalOutputInfo,
 )
 from eir.train_utils import utils
-from eir.train_utils.metrics import al_step_metric_dict
+from eir.train_utils.metrics import (
+    al_step_metric_dict,
+    filter_survival_missing_targets,
+    general_torch_to_numpy,
+)
 
 if TYPE_CHECKING:
     from eir.train import Experiment
@@ -48,17 +52,30 @@ def save_survival_evaluation_results_wrapper(
         )
 
         ids = val_ids[output_name][event_name]
-        model_outputs = val_outputs[output_name][event_name].cpu()
-        events = val_labels[output_name][event_name].cpu().numpy().astype(int)
+        model_outputs = val_outputs[output_name][event_name]
+        events = val_labels[output_name][event_name]
+        times = val_labels[output_name][time_name]
+
+        filtered = filter_survival_missing_targets(
+            model_outputs=model_outputs,
+            events=events,
+            times=times,
+            cur_ids=ids,
+        )
+
+        model_outputs = filtered.model_outputs
+        events = general_torch_to_numpy(tensor=filtered.events)
+        events = events.astype(int)
+        times = general_torch_to_numpy(tensor=filtered.times)
+        ids = filtered.ids
 
         if model_type == "discrete":
             transformers = output_object.target_transformers
             time_kbins_transformer = transformers[time_name]
             time_bins = time_kbins_transformer.bin_edges_[0]
-            times_binned = val_labels[output_name][time_name].cpu().numpy()
-            times = time_kbins_transformer.inverse_transform(
-                times_binned.reshape(-1, 1)
-            ).flatten()
+            times_binned = times
+            it_func = time_kbins_transformer.inverse_transform
+            times = it_func(times_binned.reshape(-1, 1)).flatten()
 
             hazards = torch.sigmoid(model_outputs).numpy()
             survival_probs = np.cumprod(1 - hazards, 1)
@@ -92,7 +109,6 @@ def save_survival_evaluation_results_wrapper(
             )
 
         else:
-            times = val_labels[output_name][time_name].cpu().numpy()
             risk_scores = model_outputs.numpy()
 
             unique_times, baseline_hazard = estimate_baseline_hazard(

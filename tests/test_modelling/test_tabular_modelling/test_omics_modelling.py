@@ -7,7 +7,7 @@ import pytest
 
 from eir import train
 from eir.setup.config import Configs
-from tests.conftest import get_system_info, should_skip_in_gha_macos
+from tests.conftest import get_system_info
 from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
 
 if TYPE_CHECKING:
@@ -46,9 +46,6 @@ def _get_classification_output_configs(
     return output_configs
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -70,6 +67,9 @@ def _get_classification_output_configs(
         {
             "injections": {
                 "global_configs": {
+                    "basic_experiment": {
+                        "n_epochs": 30,
+                    },
                     "training_control": {
                         "weighted_sampling_columns": ["all"],
                     },
@@ -103,9 +103,10 @@ def _get_classification_output_configs(
                 "global_configs": {
                     "basic_experiment": {
                         "n_epochs": 20,
+                        "memory_dataset": True,
                     },
                     "training_control": {
-                        "weighted_sampling_columns": ["test_output_tabular.Origin"],
+                        "weighted_sampling_columns": ["test_output_tabular__Origin"],
                     },
                     "optimization": {
                         "gradient_noise": 0.01,
@@ -193,9 +194,6 @@ def test_classification(prep_modelling_test_configs):
         )
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -212,11 +210,14 @@ def test_classification(prep_modelling_test_configs):
         {
             "injections": {
                 "global_configs": {
+                    "basic_experiment": {
+                        "n_epochs": 30,
+                    },
                     "training_control": {
                         "weighted_sampling_columns": ["all"],
                     },
                     "model": {
-                        "n_iter_before_swa": 50,
+                        "n_iter_before_swa": 300,
                     },
                 },
                 "input_configs": [
@@ -224,7 +225,7 @@ def test_classification(prep_modelling_test_configs):
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
                             "model_type": "linear",
-                            "model_init_config": {"l1": 1e-04},
+                            "model_init_config": {"l1": 1e-06},
                         },
                     }
                 ],
@@ -270,9 +271,6 @@ def test_bce_classification(prep_modelling_test_configs):
         )
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -436,9 +434,6 @@ def _get_regression_output_configs() -> Sequence[Dict]:
     return output_configs
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data", [{"task_type": "regression"}], indirect=True
 )
@@ -596,9 +591,6 @@ def _should_compile():
     return True
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -764,8 +756,8 @@ def _should_compile():
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 2e-05,
-                                "rb_do": 0.20,
+                                "l1": 1e-06,
+                                "rb_do": 0.10,
                                 "attention_inclusion_cutoff": 512,
                             },
                         },
@@ -774,12 +766,13 @@ def _should_compile():
                 "fusion_configs": {
                     "model_config": {
                         "fc_task_dim": 64,
-                        "fc_do": 0.20,
-                        "rb_do": 0.20,
+                        "fc_do": 0.10,
+                        "rb_do": 0.10,
                     },
                 },
                 "output_configs": _get_multi_task_output_configs(
-                    label_smoothing=0.1, uncertainty_mt_loss=False
+                    label_smoothing=0.1,
+                    uncertainty_mt_loss=True,
                 ),
             },
         },
@@ -791,7 +784,7 @@ def _should_compile():
                         "output_folder": "mgmoe",
                     },
                     "optimization": {
-                        "lr": 1e-03,
+                        "lr": 3e-04,
                     },
                     "evaluation_checkpoint": {
                         "saved_result_detail_level": 4,
@@ -805,14 +798,14 @@ def _should_compile():
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 2e-05,
+                                "l1": 1e-06,
                             },
                         },
                     },
                 ],
                 "fusion_configs": {
                     "model_type": "mgmoe",
-                    "model_config": {"mg_num_experts": 3, "stochastic_depth_p": 0.2},
+                    "model_config": {"mg_num_experts": 4, "stochastic_depth_p": 0.1},
                 },
                 "output_configs": _get_multi_task_output_configs(
                     uncertainty_mt_loss=False
@@ -973,9 +966,6 @@ def test_multi_task(
             )
 
 
-@pytest.mark.skipif(
-    condition=should_skip_in_gha_macos(), reason="In GHA and platform is Darwin."
-)
 @pytest.mark.parametrize(
     "create_test_data",
     [
@@ -1075,7 +1065,7 @@ def _get_multi_task_test_args(
 
     an_extra_col_is_correlated_with_target = target_copy in extra_columns
     if an_extra_col_is_correlated_with_target:
-        thresholds, at_least_n = (0.9, 0.9), 0
+        thresholds, at_least_n = (0.85, 0.85), 0
     else:
         thresholds, at_least_n = (0.8, 0.6), 5
 

@@ -101,8 +101,8 @@ def test_get_criteria(
 
     inputs_as_dict = set_up_inputs_for_training(
         inputs_configs=create_test_config.input_configs,
-        train_ids=list(target_labels.train_labels.keys()),
-        valid_ids=list(target_labels.valid_labels.keys()),
+        train_ids=list(target_labels.train_labels["ID"]),
+        valid_ids=list(target_labels.valid_labels["ID"]),
         hooks=None,
     )
 

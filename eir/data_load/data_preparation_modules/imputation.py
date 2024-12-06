@@ -186,7 +186,7 @@ def _build_tabular_fill_value(
     cat_columns = input_type_info.input_cat_columns
     for cat_column in cat_columns:
         cur_label_encoder = transformers[cat_column]
-        fill_value[cat_column] = cur_label_encoder.transform(["nan"]).item()
+        fill_value[cat_column] = cur_label_encoder.transform(["__NULL__"]).item()
 
     con_columns = input_type_info.input_con_columns
     for con_column in con_columns:

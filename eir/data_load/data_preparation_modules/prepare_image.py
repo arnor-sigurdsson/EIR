@@ -58,7 +58,7 @@ def image_load_wrapper(
 
         pil_image = fromarray(obj=array)
     else:
-        assert isinstance(data_pointer, Path)
+        assert isinstance(data_pointer, (str, Path))
         pil_image = default_image_loader(path=str(data_pointer))
 
     if image_mode is not None:

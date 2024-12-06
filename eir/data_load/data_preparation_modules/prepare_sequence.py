@@ -42,7 +42,7 @@ def sequence_load_wrapper(
         assert isinstance(data_pointer, np.ndarray)
         return data_pointer
     else:
-        assert isinstance(data_pointer, Path)
+        assert isinstance(data_pointer, (str, Path))
         content = load_sequence_from_disk(sequence_file_path=data_pointer)
 
     file_content_split = split_func(content)
@@ -52,7 +52,7 @@ def sequence_load_wrapper(
     return sequence_tokenized
 
 
-def load_sequence_from_disk(sequence_file_path: Path) -> str:
+def load_sequence_from_disk(sequence_file_path: Path | str) -> str:
     with open(sequence_file_path, "r") as infile:
         return infile.read().strip()
 

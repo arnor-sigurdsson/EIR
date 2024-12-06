@@ -1,16 +1,17 @@
 import warnings
 from functools import lru_cache
-from typing import TYPE_CHECKING, Callable, DefaultDict, Generator, Set, Union
+from typing import TYPE_CHECKING, Any, Generator, Set, Union
 
 warnings.filterwarnings("ignore", message=".*newer version of deeplake.*")
 
 import deeplake
+import polars as pl
 from tqdm import tqdm
 
-from eir.data_load.data_source_modules.common_utils import add_id_to_samples
-
 if TYPE_CHECKING:
-    from eir.data_load.data_utils import Sample
+    from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
+        InputHookOutput,
+    )
 
 
 @lru_cache()
@@ -55,14 +56,14 @@ def get_deeplake_input_source_iterable(
         yield value
 
 
-def add_deeplake_data_to_samples(
+def add_deeplake_data_to_df(
     input_source: str,
     input_name: str,
     deeplake_input_inner_key: str,
-    samples: DefaultDict[str, "Sample"],
-    data_loading_hook: Callable,
+    input_df: pl.DataFrame,
+    data_loading_hook: "InputHookOutput",
     ids_to_keep: Union[None, Set[str]],
-) -> DefaultDict[str, "Sample"]:
+) -> pl.DataFrame:
     assert deeplake_input_inner_key is not None, "Deeplake input inner key is None"
 
     deeplake_ds = load_deeplake_dataset(data_source=input_source)
@@ -75,31 +76,62 @@ def add_deeplake_data_to_samples(
         )
 
     total = len(ids_to_keep) if ids_to_keep is not None else len(deeplake_ds)
-    pbar = tqdm(total=total, desc=input_name)
-
     existence_col = f"{deeplake_input_inner_key}_exists"
-    for row in deeplake_ds:
-        if is_deeplake_sample_missing(
-            row=row,
-            existence_col=existence_col,
-            columns=columns,
-        ):
-            continue
 
-        sample_id = row["ID"]
+    ids = []
+    column_arrays: dict[str, Any] = {}
+    hook_callable = data_loading_hook.hook_callable
+    hook_dtype = data_loading_hook.return_dtype
 
-        if ids_to_keep is not None and sample_id not in ids_to_keep:
-            continue
+    with tqdm(total=total, desc=input_name) as pbar:
+        for row in deeplake_ds:
+            if is_deeplake_sample_missing(
+                row=row,
+                existence_col=existence_col,
+                columns=columns,
+            ):
+                continue
 
-        sample_data_pointer = row.row_id
-        sample_data = data_loading_hook(sample_data_pointer)
+            sample_id = row["ID"]
 
-        samples = add_id_to_samples(samples=samples, sample_id=sample_id)
-        samples[sample_id].inputs[input_name] = sample_data
+            if ids_to_keep is not None and sample_id not in ids_to_keep:
+                continue
 
-        pbar.update(1)
+            sample_data_pointer = row.row_id
+            sample_data = hook_callable(sample_data_pointer)
 
-    return samples
+            if isinstance(sample_data, dict):
+                for key in sample_data.keys():
+                    col_name = f"{input_name}__{key}"
+                    if col_name not in column_arrays:
+                        column_arrays[col_name] = []
+
+                for key, value in sample_data.items():
+                    col_name = f"{input_name}__{key}"
+                    column_arrays[col_name].append(value)
+                ids.append(sample_id)
+            else:
+                if input_name not in column_arrays:
+                    column_arrays[input_name] = []
+                column_arrays[input_name].append(sample_data)
+                ids.append(sample_id)
+
+            pbar.update(1)
+
+    if not ids:
+        return input_df
+
+    df_dict = {"ID": pl.Series(name="ID", values=ids, dtype=pl.Utf8)}
+
+    for col_name, values in column_arrays.items():
+        df_dict[col_name] = pl.Series(name=col_name, values=values, dtype=hook_dtype)
+
+    processed_df = pl.DataFrame(df_dict)
+
+    if input_df.height == 0:
+        return processed_df
+    else:
+        return input_df.join(processed_df, on="ID", how="full", coalesce=True)
 
 
 def is_deeplake_sample_missing(

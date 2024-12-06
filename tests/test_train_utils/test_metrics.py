@@ -79,12 +79,13 @@ def get_calculate_batch_metrics_data_test_kwargs():
             "Height": StandardScaler().fit(standard_scaler_fit_arr),
         }
     }
-    metrics_ = metrics.get_default_supervised_metrics(
+    metrics_ = metrics.get_default_metrics(
         target_transformers=target_transformers,
         cat_metrics=["mcc", "acc", "roc-auc-macro", "ap-macro"],
         con_metrics=["loss", "pcc", "r2", "rmse"],
         cat_averaging_metrics=None,
         con_averaging_metrics=None,
+        output_configs=[],
     )
 
     test_outputs_as_dict = _get_metrics_test_module_test_outputs_as_dict()
@@ -556,15 +557,8 @@ def setup_data():
     }
 
     missing_per_modality = {"output1": set()}
-    missing_within_modality = {"output1": {"inner1": set(), "inner2": set()}}
-    output_and_target_names = {
-        "output1": ["inner1", "inner2"],
-    }
     missing_ids_info = get_missing_targets_info(
         missing_ids_per_modality=missing_per_modality,
-        missing_ids_within_modality=missing_within_modality,
-        output_and_target_names=output_and_target_names,
-        output_configs=[],
     )
     return batch_ids, model_outputs, target_labels, missing_ids_info
 
@@ -599,9 +593,6 @@ def test_all_ids_missing(setup_data):
     batch_ids, model_outputs, target_labels, _ = setup_data
     missing_ids_info = get_missing_targets_info(
         missing_ids_per_modality={"output1": set(batch_ids)},
-        missing_ids_within_modality={},
-        output_and_target_names={"output1": ["inner1", "inner2"]},
-        output_configs=[],
     )
 
     result = metrics.filter_missing_outputs_and_labels(

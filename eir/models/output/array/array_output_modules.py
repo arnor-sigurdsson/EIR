@@ -84,10 +84,6 @@ class ArrayOutputWrapperModule(nn.Module):
         return {self.output_name: out}
 
 
-def get_diff_tolerance(num_target_elements: int) -> int:
-    return int(0.001 * num_target_elements)
-
-
 def get_array_output_module(
     feature_extractor: al_output_array_models,
     output_name: str,

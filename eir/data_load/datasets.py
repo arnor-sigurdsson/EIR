@@ -1,15 +1,10 @@
 import reprlib
 from collections import defaultdict
-from copy import copy
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    DefaultDict,
-    Dict,
     Iterable,
-    List,
     Mapping,
     Optional,
     Sequence,
@@ -19,6 +14,8 @@ from typing import (
     Union,
 )
 
+import numpy as np
+import polars as pl
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -28,27 +25,27 @@ from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_output_modalities_wrapper,
 )
 from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
+    InputHookOutput,
     get_input_data_loading_hooks,
     prepare_inputs_disk,
     prepare_inputs_memory,
 )
 from eir.data_load.data_preparation_modules.output_preparation_wrappers import (
+    HookOutput,
     get_output_data_loading_hooks,
     prepare_outputs_disk,
     prepare_outputs_memory,
 )
 from eir.data_load.data_preparation_modules.prepare_tabular import (
-    add_tabular_data_to_samples,
+    add_tabular_data_to_df,
 )
 from eir.data_load.data_source_modules import deeplake_ops
-from eir.data_load.data_source_modules.common_utils import add_id_to_samples
 from eir.data_load.data_source_modules.local_ops import (
-    add_sequence_data_from_csv_to_samples,
+    add_sequence_data_from_csv_to_df,
     get_file_sample_id_iterator_basic,
 )
 from eir.data_load.data_streaming.streaming_dataset import StreamingDataset
-from eir.data_load.data_utils import Sample
-from eir.data_load.label_setup import al_target_label_dict
+from eir.data_load.label_setup import al_target_labels
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
 )
@@ -96,7 +93,7 @@ def set_up_datasets_from_configs(
     )
 
     train_kwargs = construct_default_dataset_kwargs_from_cl_args(
-        target_labels_dict=target_labels.train_labels,
+        target_labels_df=target_labels.train_labels,
         inputs=inputs_as_dict,
         outputs=outputs_as_dict,
         test_mode=False,
@@ -115,7 +112,7 @@ def set_up_datasets_from_configs(
         }
 
     valid_kwargs = construct_default_dataset_kwargs_from_cl_args(
-        target_labels_dict=target_labels.valid_labels,
+        target_labels_df=target_labels.valid_labels,
         inputs=inputs_as_dict,
         outputs=outputs_as_dict,
         test_mode=True,
@@ -138,19 +135,19 @@ def set_up_datasets_from_configs(
 
 
 def construct_default_dataset_kwargs_from_cl_args(
-    target_labels_dict: Union[None, al_target_label_dict],
+    target_labels_df: Optional[al_target_labels],
     inputs: al_input_objects_as_dict,
     outputs: "al_output_objects_as_dict",
     test_mode: bool,
     missing_ids_per_output: "MissingTargetsInfo",
-    ids_to_keep: Union[None, Sequence[str]] = None,
-) -> Dict[str, Any]:
+    ids_to_keep: Optional[Sequence[str]] = None,
+) -> dict[str, Any]:
     ids_to_keep_set = set(ids_to_keep) if ids_to_keep is not None else None
 
     dataset_kwargs = {
         "inputs": inputs,
         "outputs": outputs,
-        "target_labels_dict": target_labels_dict,
+        "target_labels_df": target_labels_df,
         "test_mode": test_mode,
         "missing_ids_per_output": missing_ids_per_output,
         "ids_to_keep": ids_to_keep_set,
@@ -162,17 +159,41 @@ def construct_default_dataset_kwargs_from_cl_args(
 def _check_valid_and_train_datasets(
     train_dataset: al_local_datasets, valid_dataset: al_local_datasets
 ) -> None:
-    if len(train_dataset) < len(valid_dataset):
+    if train_dataset.input_df.height < valid_dataset.input_df.height:
         logger.warning(
             "Size of training dataset (size: %d) is smaller than validation dataset ("
-            "size: %d). Generally it is the opposite, but if this intended please"
+            "size: %d). Generally it is the opposite, but if this is intended please "
             "ignore this message.",
-            len(train_dataset),
-            len(valid_dataset),
+            train_dataset.input_df.height,
+            valid_dataset.input_df.height,
         )
 
-    assert set(valid_dataset.target_labels_dict.keys()).isdisjoint(
-        train_dataset.target_labels_dict.keys()
+    train_ids = set(train_dataset.input_df.get_column("ID").to_list())
+    valid_ids = set(valid_dataset.input_df.get_column("ID").to_list())
+
+    if not train_ids.isdisjoint(valid_ids):
+        overlapping_ids = train_ids.intersection(valid_ids)
+        raise AssertionError(
+            f"Found overlapping IDs between training and "
+            f"validation sets: {overlapping_ids}"
+        )
+
+
+def _identity(input_: Any) -> Any:
+    return input_
+
+
+def _get_default_output_hook() -> HookOutput:
+    return HookOutput(
+        hook_callable=_identity,
+        return_dtype=None,
+    )
+
+
+def _get_default_input_hook() -> InputHookOutput:
+    return InputHookOutput(
+        hook_callable=_identity,
+        return_dtype=None,
     )
 
 
@@ -183,17 +204,22 @@ class DatasetBase(Dataset):
         outputs: "al_output_objects_as_dict",
         test_mode: bool,
         missing_ids_per_output: "MissingTargetsInfo",
-        target_labels_dict: Optional[al_target_label_dict] = None,
+        target_labels_df: Optional[al_target_labels] = None,
         ids_to_keep: Optional[Set[str]] = None,
     ):
         super().__init__()
 
-        self.samples: List[Sample] = []
+        self.input_df = pl.DataFrame()
 
         self.inputs = inputs
         self.outputs = outputs
         self.test_mode = test_mode
-        self.target_labels_dict = target_labels_dict if target_labels_dict else {}
+
+        self.target_labels_df: pl.DataFrame
+        if target_labels_df is None:
+            target_labels_df = pl.DataFrame()
+        self.target_labels_df = target_labels_df
+
         self.missing_ids_per_output = missing_ids_per_output
         self.ids_to_keep = set(ids_to_keep) if ids_to_keep else None
 
@@ -201,11 +227,11 @@ class DatasetBase(Dataset):
         if not self.outputs:
             raise ValueError("Please specify label column name.")
 
-    def set_up_samples(
+    def set_up_dfs(
         self,
-        input_data_loading_hooks: Optional[Mapping[str, Callable]] = None,
-        output_data_loading_hooks: Optional[Mapping[str, Callable]] = None,
-    ) -> List[Sample]:
+        input_data_loading_hooks: Optional[Mapping[str, InputHookOutput]] = None,
+        output_data_loading_hooks: Optional[Mapping[str, HookOutput]] = None,
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """
         We do an extra filtering step at the end to account for the situation where
         we have a target label file with more samples than there are any inputs
@@ -213,113 +239,134 @@ class DatasetBase(Dataset):
         train/val and test folders.
         """
 
-        def _identity(sample_data: Any) -> Any:
-            return sample_data
-
-        def _default_sample_factory() -> Sample:
-            return Sample(sample_id="", inputs={}, target_labels={})
-
         mode_str = "evaluation/test" if self.test_mode else "train"
         logger.debug("Setting up dataset in %s mode.", mode_str)
 
         if not output_data_loading_hooks:
-            output_data_loading_hooks = defaultdict(lambda: _identity)
+            output_data_loading_hooks = defaultdict(_get_default_output_hook)
 
-        samples: DefaultDict[str, Sample] = defaultdict(_default_sample_factory)
-
-        if self.target_labels_dict:
-            samples = _add_target_labels_to_samples(
-                target_labels_dict=self.target_labels_dict,
-                samples=samples,
+        if not self.target_labels_df.is_empty():
+            self.target_labels_df = _target_labels_hook_load_wrapper(
+                target_labels_df=self.target_labels_df,
                 output_data_loading_hooks=output_data_loading_hooks,
             )
 
         if not input_data_loading_hooks:
-            input_data_loading_hooks = defaultdict(lambda: _identity)
+            input_data_loading_hooks = defaultdict(_get_default_input_hook)
 
         ids_to_keep = initialize_ids_to_keep(
-            target_labels_dict=self.target_labels_dict,
+            target_labels_df=self.target_labels_df,
             ids_to_keep=self.ids_to_keep,
         )
-        samples = add_data_to_samples(
+
+        input_df = initialize_input_df(ids_to_keep=ids_to_keep)
+
+        input_df = add_data_to_df(
             inputs=self.inputs,
-            samples=samples,
+            input_df=input_df,
             ids_to_keep=ids_to_keep,
             data_loading_hooks=input_data_loading_hooks,
         )
 
-        samples_list = filter_samples(
-            samples=samples, target_labels_dict=self.target_labels_dict
+        filtered_df = filter_df(
+            input_df=input_df,
+            target_labels_df=self.target_labels_df,
         )
 
         _log_missing_samples_between_modalities(
-            samples=samples_list, input_keys=self.inputs.keys()
+            df=filtered_df,
+            input_keys=self.inputs.keys(),
         )
-        return samples_list
+
+        if self.target_labels_df is not None and not self.target_labels_df.is_empty():
+            target_labels_df = self.target_labels_df.filter(
+                pl.col("ID").is_in(filtered_df.get_column("ID").to_list())
+            )
+            self.target_labels_df = target_labels_df
+            self.target_labels_df = self.target_labels_df.sort("ID")
+
+        filtered_df = filtered_df.sort("ID")
+
+        return filtered_df, self.target_labels_df
 
     def __len__(self):
-        return len(self.samples)
+        raise NotImplementedError()
 
     def __getitem__(self, index: int):
         raise NotImplementedError()
 
-    def check_samples(self):
-        no_ids, no_inputs, no_target_labels = [], [], []
-
-        for s in self.samples:
-            if not s.sample_id:
-                no_ids.append(s)
-
-            if not s.inputs:
-                no_inputs.append(s)
-
-            if self.target_labels_dict:
-                if not s.target_labels:
-                    no_target_labels.append(s)
-
-        if self.samples is None or len(self.samples) == 0:
+    def check_samples(self) -> None:
+        if self.input_df.height == 0:
             raise ValueError(
-                f"Expected to have at least one sample, but got {self.samples} instead."
-                f" Possibly there is a mismatch between input IDs and target IDs."
+                "Expected to have at least one sample, but got empty DataFrame. "
+                "Possibly there is a mismatch between input IDs and target IDs."
             )
 
-        if no_ids:
+        if self.input_df.get_column("ID").is_null().any():
+            missing_ids = (
+                self.input_df.filter(pl.col("ID").is_null()).select("ID").row(0)
+            )
             raise ValueError(
                 f"Expected all observations to have a sample ID associated "
-                f"with them, but got {no_ids}."
+                f"with them, but got rows with null IDs at indices: {missing_ids}"
             )
 
-        if no_inputs:
-            raise ValueError(
-                f"Expected all observations to have an input associated "
-                f"with them, but got {no_inputs}."
-            )
+        input_cols = [col for col in self.input_df.columns if col != "ID"]
+        if input_cols:
+            empty_inputs = self.input_df.with_columns(
+                [pl.all_horizontal(pl.col(input_cols).is_null()).alias("all_null")]
+            ).filter(pl.col("all_null"))
 
-        if self.target_labels_dict:
-            if no_target_labels:
+            if empty_inputs.height > 0:
+                empty_ids = empty_inputs.get_column("ID").to_list()
                 raise ValueError(
-                    f"Expected all observations to have a label associated "
-                    f"with them, but got {no_target_labels}."
+                    f"Expected all observations to have at least one input value "
+                    f"associated with them, but got empty inputs for IDs: {empty_ids}"
                 )
+
+        if not self.target_labels_df.is_empty():
+            target_cols = [col for col in self.target_labels_df.columns if col != "ID"]
+            if target_cols:
+                empty_targets = self.target_labels_df.with_columns(
+                    [pl.all_horizontal(pl.col(target_cols).is_null()).alias("all_null")]
+                ).filter(pl.col("all_null"))
+
+                if empty_targets.height > 0:
+                    empty_ids = empty_targets.get_column("ID").to_list()
+                    raise ValueError(
+                        f"Expected all observations to have at least one target label "
+                        f"associated with them, but got empty targets for "
+                        f"IDs: {empty_ids}"
+                    )
 
 
 def initialize_ids_to_keep(
-    target_labels_dict: Dict, ids_to_keep: Optional[set]
-) -> Optional[set]:
-    if target_labels_dict:
+    target_labels_df: Optional[pl.DataFrame],
+    ids_to_keep: Optional[set[str]],
+) -> Optional[set[str]]:
+
+    if target_labels_df is not None and target_labels_df.height > 0:
+        df_ids = set(target_labels_df.get_column("ID").to_list())
         if ids_to_keep:
-            ids_to_keep = set(i for i in target_labels_dict.keys() if i in ids_to_keep)
-        else:
-            ids_to_keep = set(target_labels_dict.keys())
+            return df_ids.intersection(ids_to_keep)
+        return df_ids
+
     return ids_to_keep
 
 
-def add_data_to_samples(
+def initialize_input_df(ids_to_keep: Optional[set[str]]) -> pl.DataFrame:
+    if ids_to_keep is None:
+        return pl.DataFrame(schema={"ID": pl.Utf8})
+
+    return pl.DataFrame({"ID": list(ids_to_keep)})
+
+
+def add_data_to_df(
     inputs: al_input_objects_as_dict,
-    samples: DefaultDict[str, "Sample"],
-    ids_to_keep: Optional[set],
-    data_loading_hooks: Mapping[str, Callable],
-) -> DefaultDict[str, "Sample"]:
+    input_df: pl.DataFrame,
+    ids_to_keep: Optional[set[str]],
+    data_loading_hooks: Mapping[str, InputHookOutput],
+) -> pl.DataFrame:
     for input_name, input_object in inputs.items():
         input_info = input_object.input_config.input_info
         input_source = input_info.input_source
@@ -327,71 +374,131 @@ def add_data_to_samples(
 
         match input_object:
             case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
-                samples = add_tabular_data_to_samples(
+                input_df = add_tabular_data_to_df(
                     df_tabular=input_object.labels.all_labels,
-                    samples=samples,
+                    input_df=input_df,
                     ids_to_keep=ids_to_keep,
                     source_name=input_name,
                 )
             case ComputedSequenceInputInfo() if Path(input_source).suffix == ".csv":
                 input_type_info = input_object.input_config.input_type_info
                 assert isinstance(input_type_info, SequenceInputDataConfig)
-                samples = add_sequence_data_from_csv_to_samples(
+                input_df = add_sequence_data_from_csv_to_df(
                     input_source=input_source,
                     input_name=input_name,
-                    samples=samples,
+                    input_df=input_df,
                     encode_func=input_object.encode_func,
                     split_on=input_type_info.split_on,
                     ids_to_keep=ids_to_keep,
                 )
             case _:
-                samples = _add_data_to_samples_wrapper(
+                input_df = _add_data_to_df_wrapper(
                     input_source=input_source,
                     input_name=input_name,
-                    samples=samples,
+                    input_df=input_df,
                     ids_to_keep=ids_to_keep,
                     data_loading_hook=data_loading_hooks[input_name],
                     deeplake_input_inner_key=input_inner_key,
                 )
-    return samples
+
+    return input_df
 
 
-def filter_samples(
-    samples: DefaultDict[str, "Sample"], target_labels_dict: Optional[Dict]
-) -> List[Sample]:
-    num_samples_raw = len(samples)
-    if target_labels_dict:
-        samples_list = list(i for i in samples.values() if i.inputs and i.target_labels)
-        num_missing = num_samples_raw - len(samples_list)
-        logger.info(
-            "Filtered out %d samples that had no inputs or no target labels.",
-            num_missing,
+def filter_df(
+    input_df: pl.DataFrame,
+    target_labels_df: Optional[pl.DataFrame] = None,
+) -> pl.DataFrame:
+
+    num_samples_raw = input_df.height
+    if len(input_df.columns) <= 1:
+        return pl.DataFrame(schema=input_df.schema)
+
+    input_valid_mask = _get_valid_mask(df=input_df)
+    has_inputs = input_df.select([pl.col("ID"), input_valid_mask.alias("has_input")])
+
+    filtered_df = input_df.join(has_inputs.filter(pl.col("has_input")), on="ID").drop(
+        "has_input"
+    )
+
+    if target_labels_df is not None and len(target_labels_df.columns) > 1:
+        target_valid_mask = _get_valid_mask(df=target_labels_df)
+        has_targets = target_labels_df.select(
+            [pl.col("ID"), target_valid_mask.alias("has_target")]
         )
-    else:
-        samples_list = list(i for i in samples.values() if i.inputs)
-        num_missing = num_samples_raw - len(samples_list)
-        logger.info(
-            "Filtered out %d samples that had no inputs.",
-            num_missing,
+        filtered_df = filtered_df.join(
+            has_targets.filter(pl.col("has_target")), on="ID"
+        ).drop("has_target")
+
+    num_missing = num_samples_raw - filtered_df.height
+    logger.info(
+        "Filtered out %d samples that had no %s.",
+        num_missing,
+        "inputs or no target labels" if target_labels_df is not None else "inputs",
+    )
+
+    return filtered_df
+
+
+def _get_valid_mask(df: pl.DataFrame) -> pl.Expr:
+    numeric_cols = [
+        col for col in df.columns if col != "ID" and df[col].dtype.is_numeric()
+    ]
+    other_cols = [
+        col for col in df.columns if col != "ID" and not df[col].dtype.is_numeric()
+    ]
+
+    numeric_mask = (
+        pl.any_horizontal(
+            pl.all().exclude("ID", *other_cols).is_not_null()
+            & ~pl.all().exclude("ID", *other_cols).is_nan()
         )
-    return samples_list
+        if numeric_cols
+        else pl.lit(True)
+    )
+    other_mask = (
+        pl.any_horizontal(pl.all().exclude("ID", *numeric_cols).is_not_null())
+        if other_cols
+        else pl.lit(True)
+    )
+    return numeric_mask & other_mask
 
 
 def _log_missing_samples_between_modalities(
-    samples: Sequence[Sample], input_keys: Iterable[str]
+    df: pl.DataFrame,
+    input_keys: Iterable[str],
 ) -> None:
+    """
+    We have the `if col == key or col.startswith(f"{key}__"):` condition there
+    as for e.g. genotype inputs, the column name is just the key itself, but for
+    tabular inputs, we have the key as a prefix to the column name, e.g.
+    "tabular_input__column1".
+    """
     missing_counts = {k: 0 for k in input_keys}
     missing_ids: dict[str, list[str]] = {k: [] for k in input_keys}
     any_missing = False
+    no_samples = df.height
 
-    for sample in samples:
-        for key in input_keys:
-            if key not in sample.inputs:
-                missing_counts[key] += 1
-                missing_ids[key].append(sample.sample_id)
-                any_missing = True
+    for key in input_keys:
+        key_cols = []
+        for col in df.columns:
+            if col == key or col.startswith(f"{key}__"):
+                key_cols.append(col)
 
-    no_samples = len(samples)
+        if not key_cols:
+            missing_counts[key] = no_samples
+            missing_ids[key] = df.get_column("ID").to_list()
+            any_missing = True
+            continue
+
+        missing_mask = df.select(
+            ["ID", pl.all_horizontal(pl.col(key_cols).is_null()).alias("all_null")]
+        ).filter(pl.col("all_null"))
+
+        if missing_mask.height > 0:
+            any_missing = True
+            missing_counts[key] = missing_mask.height
+            missing_ids[key] = missing_mask.get_column("ID").to_list()
+
     message = (
         f"Using total of {no_samples} samples with following counts per "
         f"modality (note missing tabular modalities have been imputed already):\n"
@@ -413,7 +520,7 @@ def _log_missing_samples_between_modalities(
 
     if any_missing:
         warning_message = (
-            "There were missing inputs in samples for some modalities, "
+            "There were missing inputs in samples for some modalities. "
             "Please review the info log above for detailed counts and IDs. "
             "If this is expected, ignore this message. If not, possible "
             "causes are (a) different inputs having different sample IDs "
@@ -423,97 +530,148 @@ def _log_missing_samples_between_modalities(
         logger.warning(warning_message)
 
 
-def _add_target_labels_to_samples(
-    target_labels_dict: al_target_label_dict,
-    samples: DefaultDict[str, Sample],
-    output_data_loading_hooks: Mapping[str, Callable],
-) -> DefaultDict[str, Sample]:
-    target_label_iterator = tqdm(target_labels_dict.items(), desc="Target Labels")
+def _target_labels_hook_load_wrapper(
+    target_labels_df: pl.DataFrame,
+    output_data_loading_hooks: Mapping[str, HookOutput],
+) -> pl.DataFrame:
+    for column in target_labels_df.columns:
+        if "__" not in column or column == "ID":
+            continue
 
-    for sample_id, sample_target_labels_dict in target_label_iterator:
-        add_id_to_samples(samples=samples, sample_id=sample_id)
+        output_name, inner_name = column.split("__", 1)
+        if output_name not in output_data_loading_hooks:
+            continue
 
-        target_labels_loaded = {}
-        for output_name, output_target_labels in sample_target_labels_dict.items():
-            cur_hook = output_data_loading_hooks[output_name]
-            cur_target_labels = cur_hook(output_target_labels)
-            target_labels_loaded[output_name] = cur_target_labels
+        hook = output_data_loading_hooks[output_name]
+        processed_values = [
+            hook.hook_callable({inner_name: x})[inner_name]
+            for x in target_labels_df.get_column(column)
+        ]
 
-        samples[sample_id].target_labels = target_labels_loaded
+        target_labels_df = target_labels_df.with_columns(
+            [
+                pl.Series(
+                    name=column,
+                    values=processed_values,
+                    dtype=hook.return_dtype,
+                )
+            ]
+        )
 
-    return samples
+    return target_labels_df
 
 
-def _add_data_to_samples_wrapper(
+def _add_data_to_df_wrapper(
     input_source: str,
     input_name: str,
-    samples: DefaultDict[str, Sample],
+    input_df: pl.DataFrame,
     ids_to_keep: Union[None, Set[str]],
-    data_loading_hook: Callable,
+    data_loading_hook: InputHookOutput,
     deeplake_input_inner_key: Optional[str] = None,
-) -> DefaultDict[str, Sample]:
+) -> pl.DataFrame:
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_input_inner_key is not None
-        samples = deeplake_ops.add_deeplake_data_to_samples(
+        return deeplake_ops.add_deeplake_data_to_df(
             input_source=input_source,
             input_name=input_name,
-            samples=samples,
+            input_df=input_df,
             ids_to_keep=ids_to_keep,
             deeplake_input_inner_key=deeplake_input_inner_key,
             data_loading_hook=data_loading_hook,
         )
-
     else:
-        samples = _add_file_data_to_samples(
+        return _add_file_data_to_df(
             input_source=input_source,
-            samples=samples,
+            input_df=input_df,
             ids_to_keep=ids_to_keep,
             data_loading_hook=data_loading_hook,
             input_name=input_name,
         )
 
-    return samples
 
-
-def _add_file_data_to_samples(
+def _add_file_data_to_df(
     input_source: str,
     input_name: str,
-    samples: DefaultDict[str, Sample],
+    input_df: pl.DataFrame,
     ids_to_keep: Union[None, Set[str]],
-    data_loading_hook: Callable,
-) -> DefaultDict[str, Sample]:
+    data_loading_hook: InputHookOutput,
+) -> pl.DataFrame:
     file_data_iterator = get_file_sample_id_iterator_basic(
-        data_source=input_source, ids_to_keep=ids_to_keep
+        data_source=input_source,
+        ids_to_keep=ids_to_keep,
     )
-    file_iterator_tqdm = tqdm(file_data_iterator, desc=input_name)
 
-    for sample_id, file in file_iterator_tqdm:
-        sample_data = data_loading_hook(file)
+    ids = []
+    column_arrays: dict[str, Any] = {}
+    hook_callable = data_loading_hook.hook_callable
+    hook_dtype = data_loading_hook.return_dtype
+    is_list_dype = isinstance(hook_dtype, pl.List)
 
-        samples = add_id_to_samples(samples=samples, sample_id=sample_id)
+    for sample_id, file in tqdm(file_data_iterator, desc=input_name):
+        sample_data = hook_callable(file)
 
-        samples[sample_id].inputs[input_name] = sample_data
+        if isinstance(sample_data, Path):
+            sample_data = str(sample_data)
 
-    return samples
+        if isinstance(sample_data, dict):
+            for key in sample_data.keys():
+                col_name = f"{input_name}__{key}"
+                if col_name not in column_arrays:
+                    column_arrays[col_name] = []
+
+            for key, value in sample_data.items():
+                col_name = f"{input_name}__{key}"
+                column_arrays[col_name].append(value)
+            ids.append(sample_id)
+        else:
+            if input_name not in column_arrays:
+                column_arrays[input_name] = []
+
+            if is_list_dype and isinstance(sample_data, np.ndarray):
+                sample_data = sample_data.tolist()
+
+            column_arrays[input_name].append(sample_data)
+            ids.append(sample_id)
+
+    if not ids:
+        return input_df
+
+    df_dict = {"ID": pl.Series(name="ID", values=ids, dtype=pl.Utf8)}
+
+    for col_name, values in column_arrays.items():
+        df_dict[col_name] = pl.Series(name=col_name, values=values, dtype=hook_dtype)
+
+    processed_df = pl.DataFrame(df_dict)
+
+    if input_df.height == 0:
+        return processed_df
+    else:
+        return input_df.join(processed_df, on="ID", how="full", coalesce=True)
 
 
 class DiskDataset(DatasetBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        if self.target_labels_dict:
+        if not self.target_labels_df.is_empty():
             self.init_label_attributes()
 
-        self.samples: list[Sample] = self.set_up_samples()
+        sample_dfs: tuple[pl.DataFrame, pl.DataFrame] = self.set_up_dfs()
+        self.input_df = sample_dfs[0]
+        self.target_labels_df = sample_dfs[1]
         self.check_samples()
 
-    def __getitem__(self, index: int) -> al_getitem_return:
-        """
-        NB: Dataloaders automatically convert arrays to tensors here when returning.
-        """
-        sample = self.samples[index]
+        self.column_map_inputs = _build_column_map(columns=self.input_df.columns)
+        self.column_map_targets = _build_column_map(
+            columns=self.target_labels_df.columns
+        )
 
-        inputs = copy(sample.inputs)
+    def __getitem__(self, index: int) -> al_getitem_return:
+        input_row = self.input_df.row(index, named=True)
+        sample_id = input_row["ID"]
+
+        inputs = process_row_values(row=input_row, column_map=self.column_map_inputs)
+
         inputs_prepared = prepare_inputs_disk(
             inputs=inputs,
             inputs_objects=self.inputs,
@@ -525,51 +683,64 @@ class DiskDataset(DatasetBase):
             inputs_objects=self.inputs,
         )
 
-        target_labels = sample.target_labels
+        targets_final = {}
+        if not self.target_labels_df.is_empty():
+            target_row = self.target_labels_df.row(index, named=True)
+            target_labels = process_row_values(
+                row=target_row,
+                column_map=self.column_map_targets,
+            )
 
-        targets_prepared = prepare_outputs_disk(
-            outputs=target_labels,
-            output_objects=self.outputs,
-            test_mode=self.test_mode,
-        )
+            targets_prepared = prepare_outputs_disk(
+                outputs=target_labels,
+                output_objects=self.outputs,
+                test_mode=self.test_mode,
+            )
 
-        targets_final = impute_missing_output_modalities_wrapper(
-            outputs_values=targets_prepared,
-            output_objects=self.outputs,
-        )
+            targets_final = impute_missing_output_modalities_wrapper(
+                outputs_values=targets_prepared,
+                output_objects=self.outputs,
+            )
 
-        sample_id = sample.sample_id
         return inputs_final, targets_final, sample_id
 
     def __len__(self):
-        return len(self.samples)
+        return self.input_df.height
 
 
 class MemoryDataset(DatasetBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        if self.target_labels_dict:
+        if not self.target_labels_df.is_empty():
             self.init_label_attributes()
 
         input_data_loading_hooks = get_input_data_loading_hooks(inputs=self.inputs)
         output_data_loading_hooks = get_output_data_loading_hooks(outputs=self.outputs)
 
-        self.samples: list[Sample] = self.set_up_samples(
+        sample_dfs: tuple[pl.DataFrame, pl.DataFrame] = self.set_up_dfs(
             input_data_loading_hooks=input_data_loading_hooks,
             output_data_loading_hooks=output_data_loading_hooks,
         )
+        self.input_df = sample_dfs[0]
+        self.target_labels_df = sample_dfs[1]
         self.check_samples()
 
-    def __getitem__(self, index: int) -> al_getitem_return:
-        """
-        NB: Dataloaders automatically convert arrays to tensors here when returning.
-        """
-        sample = self.samples[index]
+        self.column_map_inputs = _build_column_map(columns=self.input_df.columns)
+        self.column_map_targets = _build_column_map(
+            columns=self.target_labels_df.columns
+        )
 
-        inputs = copy(sample.inputs)
+    def __getitem__(self, index: int) -> al_getitem_return:
+        input_row = self.input_df.row(index, named=True)
+        sample_id = input_row["ID"]
+
+        inputs = process_row_values(row=input_row, column_map=self.column_map_inputs)
+
         inputs_prepared = prepare_inputs_memory(
-            inputs=inputs, inputs_objects=self.inputs, test_mode=self.test_mode
+            inputs=inputs,
+            inputs_objects=self.inputs,
+            test_mode=self.test_mode,
         )
 
         inputs_final = impute_missing_modalities_wrapper(
@@ -577,22 +748,68 @@ class MemoryDataset(DatasetBase):
             inputs_objects=self.inputs,
         )
 
-        target_labels = sample.target_labels
+        targets_final = {}
+        if not self.target_labels_df.is_empty():
+            target_row = self.target_labels_df.row(index, named=True)
+            target_labels = process_row_values(
+                row=target_row,
+                column_map=self.column_map_targets,
+            )
 
-        targets_prepared = prepare_outputs_memory(
-            outputs=target_labels,
-            output_objects=self.outputs,
-            test_mode=self.test_mode,
-        )
+            targets_prepared = prepare_outputs_memory(
+                outputs=target_labels,
+                output_objects=self.outputs,
+                test_mode=self.test_mode,
+            )
 
-        targets_final = impute_missing_output_modalities_wrapper(
-            outputs_values=targets_prepared,
-            output_objects=self.outputs,
-        )
-
-        sample_id = sample.sample_id
+            targets_final = impute_missing_output_modalities_wrapper(
+                outputs_values=targets_prepared,
+                output_objects=self.outputs,
+            )
 
         return inputs_final, targets_final, sample_id
 
     def __len__(self):
-        return len(self.samples)
+        return self.input_df.height
+
+
+def _build_column_map(columns: list[str]) -> dict[str, tuple[str, str | None]]:
+    column_map: dict[str, Any] = {}
+    for col in columns:
+        if col == "ID":
+            continue
+        if "__" in col:
+            main_key, sub_key = col.split("__", 1)
+            column_map[col] = (main_key, sub_key)
+        else:
+            column_map[col] = (col, None)
+    return column_map
+
+
+def convert_value(value: Any) -> Any:
+    """
+    Note that this is only needed as when we store arrays in the Array() polars
+    dtype, it always returns a list when we get the cell value. If it returned
+    a numpy array, this would not be needed.
+    """
+    return np.array(value) if isinstance(value, list) else value
+
+
+def process_row_values(
+    row: dict,
+    column_map: dict[str, tuple[str, str | None]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+
+    for col, (main_key, sub_key) in column_map.items():
+        value = row[col]
+        if value is None:
+            continue
+
+        value = convert_value(value=value)
+        if sub_key:
+            result.setdefault(main_key, {})[sub_key] = value
+        else:
+            result[main_key] = value
+
+    return result
