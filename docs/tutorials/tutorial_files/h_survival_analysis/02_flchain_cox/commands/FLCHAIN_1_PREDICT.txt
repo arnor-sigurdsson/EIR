@@ -3,6 +3,6 @@ eirpredict \
 --input_configs eir_tutorials/h_survival_analysis/02_flchain_cox/conf/input_test.yaml \
 --fusion_configs eir_tutorials/h_survival_analysis/02_flchain_cox/conf/fusion.yaml \
 --output_configs eir_tutorials/h_survival_analysis/02_flchain_cox/conf/output_test.yaml \
---model_path eir_tutorials/tutorial_runs/h_survival_analysis/02_flchain_cox/saved_models/02_flchain_cox_model_3600_perf-average=0.8109.pt \
+--model_path eir_tutorials/tutorial_runs/h_survival_analysis/02_flchain_cox/saved_models/02_flchain_cox_model_2800_perf-average=0.8091.pt \
 --evaluate \
 --output_folder eir_tutorials/tutorial_runs/h_survival_analysis/02_flchain_cox/
