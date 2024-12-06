@@ -780,7 +780,6 @@ def read_manual_ids_if_exist(
 def get_tabular_target_file_infos(
     output_configs: Iterable[schemas.OutputConfig],
 ) -> Dict[str, TabularFileInfo]:
-    logger.debug("Setting up target labels.")
 
     tabular_files_info = {}
 

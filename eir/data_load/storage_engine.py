@@ -58,6 +58,8 @@ class HybridStorage:
     def from_polars(self, df: pl.DataFrame) -> None:
         self._num_rows = len(df)
 
+        logger.debug("Converting Polars DataFrame to HybridStorage.")
+
         for idx, col in enumerate(df.columns):
             series = df.get_column(col)
             dtype = series.dtype
@@ -445,15 +447,64 @@ def check_two_storages(
     if target_storage is None or target_storage._num_rows == 0:
         return
 
-    for idx in range(target_storage._num_rows):
-        row = target_storage.get_row(idx)
-        non_id_values = [v for k, v in row.items() if k != "ID"]
+    masks = []
 
-        if all(is_null_value(v) for v in non_id_values):
-            sample_id = row["ID"]
+    if target_storage.numeric_data is not None:
+        numeric_mask = torch.isnan(target_storage.numeric_data).all(dim=0).numpy()
+        masks.append(numeric_mask)
+
+    if target_storage.string_data is not None:
+        id_idx = next(
+            i for i, col in enumerate(target_storage.string_columns) if col.name == "ID"
+        )
+        string_indices = [
+            i for i in range(len(target_storage.string_columns)) if i != id_idx
+        ]
+        if string_indices:
+            string_mask = np.all(
+                [
+                    np.array([not bool(x) for x in target_storage.string_data[i]])
+                    for i in string_indices
+                ],
+                axis=0,
+            )
+            masks.append(string_mask)
+
+    if target_storage.fixed_array_data is not None:
+        fixed_array_mask = torch.all(
+            torch.isnan(target_storage.fixed_array_data),
+            dim=(0, -1),
+        ).numpy()
+        masks.append(fixed_array_mask)
+
+    if target_storage.var_array_data:
+        var_array_mask = np.all(
+            [
+                np.array([len(x) == 0 for x in col_data])
+                for col_data in target_storage.var_array_data
+            ],
+            axis=0,
+        )
+        masks.append(var_array_mask)
+
+    if target_storage.object_data:
+        object_mask = np.all(
+            [
+                np.array([x is None for x in col_data])
+                for col_data in target_storage.object_data.values()
+            ],
+            axis=0,
+        )
+        masks.append(object_mask)
+
+    if masks:
+        all_null_mask = np.all(masks, axis=0)
+        null_rows = np.where(all_null_mask)[0]
+        if len(null_rows) > 0:
+            bad_id = target_storage.get_ids()[null_rows[0]]
             raise ValueError(
                 f"Expected all observations to have at least one target label "
-                f"associated with them, but got empty targets for ID: {sample_id}"
+                f"associated with them, but got empty targets for ID: {bad_id}"
             )
 
     input_ids = set(input_storage.get_ids())
