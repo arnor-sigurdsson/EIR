@@ -42,6 +42,7 @@ def _get_survival_output_configs(type_: str) -> Sequence[Dict]:
     [
         {
             "task_type": "binary",
+            "random_samples_dropped_from_modalities": True,
         },
     ],
     indirect=True,

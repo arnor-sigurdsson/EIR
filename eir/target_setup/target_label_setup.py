@@ -471,7 +471,7 @@ def process_sequence_output(
     per_modality_missing_ids: Dict[str, set[str]],
     train_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
     valid_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
-):
+) -> None:
     cur_labels = set_up_delayed_target_labels(
         train_ids=train_ids,
         valid_ids=valid_ids,
@@ -509,7 +509,7 @@ def process_array_or_image_output(
     train_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
     valid_labels_dict: Dict[str, Dict[str, Dict[str, Any]]],
     dtypes: Dict[str, Dict[str, Any]],
-):
+) -> None:
     cur_labels = set_up_file_target_labels(
         train_ids=train_ids,
         valid_ids=valid_ids,

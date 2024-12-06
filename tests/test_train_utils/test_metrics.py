@@ -117,7 +117,12 @@ def _get_metrics_test_module_test_outputs_as_dict():
                     model_init_config=ResidualMLPOutputModuleConfig()
                 ),
             ),
-            num_outputs_per_target={},
+            num_outputs_per_target={
+                "Origin": 5,
+                "HairColor": 5,
+                "BMI": 1,
+                "Height": 1,
+            },
             target_columns={
                 "con": ["Height", "BMI"],
                 "cat": ["Origin", "HairColor"],
@@ -214,16 +219,14 @@ def test_calculate_losses_good():
 
     common_values = torch.tensor([0, 1, 2, 3, 4], dtype=torch.int64)
     test_criteria, test_labels, test_outputs = set_up_calculate_losses_data(
-        label_values=common_values, output_values=common_values
+        label_values=common_values,
+        output_values=common_values,
     )
 
-    log_empty_once = metrics.log_empty_loss_once()
     perfect_pred_loss = metrics.calculate_prediction_losses(
         criteria=test_criteria,
         targets=test_labels,
         inputs=test_outputs,
-        log_empty_loss_callable=log_empty_once,
-        survival_links={},
     )
 
     assert perfect_pred_loss["test_output_tabular"]["Height"].item() == 0.0
@@ -237,16 +240,14 @@ def test_calculate_losses_bad():
     label_values = torch.tensor([0, 1, 2, 3, 4], dtype=torch.int64)
     output_values = torch.tensor([2, 3, 4, 5, 6], dtype=torch.int64)
     test_criteria, test_labels, test_outputs = set_up_calculate_losses_data(
-        label_values=label_values, output_values=output_values
+        label_values=label_values,
+        output_values=output_values,
     )
 
-    log_empty_once = metrics.log_empty_loss_once()
     bad_prediction_loss = metrics.calculate_prediction_losses(
         criteria=test_criteria,
         targets=test_labels,
         inputs=test_outputs,
-        log_empty_loss_callable=log_empty_once,
-        survival_links={},
     )
 
     expected_rmse = 4.0
@@ -262,7 +263,8 @@ def test_calculate_losses_bad():
 
 
 def set_up_calculate_losses_data(
-    label_values: torch.Tensor, output_values: torch.Tensor
+    label_values: torch.Tensor,
+    output_values: torch.Tensor,
 ):
     def generate_base_dict(values: torch.Tensor):
         base_dict = {

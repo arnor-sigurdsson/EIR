@@ -15,7 +15,7 @@ from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_tran
 from eir.setup.output_setup import set_up_outputs_for_training
 from eir.train import Experiment, converge_sequence_input_and_output
 from eir.train_utils import metrics, optim, step_logic
-from eir.train_utils.criteria import build_survival_links_for_criteria, get_criteria
+from eir.train_utils.criteria import get_criteria
 from eir.train_utils.utils import get_run_folder
 
 al_modelling_test_configs = tuple[Experiment, "ModelTestConfig"]
@@ -26,17 +26,11 @@ def create_test_optimizer(
     model: nn.Module,
     criteria,
     extra_modules: Optional[dict[str, nn.Module]],
-    output_configs: Sequence[schemas.OutputConfig],
 ):
     """
     TODO: Refactor loss module construction out of this function.
     """
-    survival_links = build_survival_links_for_criteria(
-        output_configs=output_configs,
-    )
-    loss_module = train.get_loss_callable(
-        criteria=criteria, survival_links=survival_links
-    )
+    loss_module = train.get_loss_callable(criteria=criteria)
 
     optimizer = optim.get_optimizer(
         model=model,
@@ -120,7 +114,6 @@ def prep_modelling_test_configs(
         model=model,
         criteria=criteria,
         extra_modules=extra_modules,
-        output_configs=c.output_configs,
     )
 
     run_folder = get_run_folder(output_folder=gc.be.output_folder)

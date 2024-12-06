@@ -1,6 +1,7 @@
 import logging
 import random
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -51,14 +52,28 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__)
 
 
+@dataclass()
+class TargetTypeInfo:
+    name: str
+    type_: str
+    cat_is_bce: bool
+
+
 def get_target_class_name(
     sample_label: torch.Tensor,
     target_transformer: "al_label_transformers_object",
-    column_type: str,
-    target_column_name: str,
-):
-    if column_type == "con":
-        return target_column_name
+    target_info: TargetTypeInfo,
+) -> str:
+    """
+    Note that we have a special case when working with BCE, where the
+    mapping of index -> class name breaks down. In this case, we are always looking
+    at index 0 in the produced network outputs (i.e., sample label is patched
+    to be always 0) which noes not represent class_ 0 in the transformer,
+    but rather score towards the positive class (index 1).
+    """
+
+    if target_info.type_ == "con":
+        return target_info.name
 
     tt_it = target_transformer.inverse_transform
 
@@ -73,7 +88,10 @@ def get_target_class_name(
 
             return f"time_{lower_bound:.1f}_to_{upper_bound:.1f}"
         case _:
-            cur_trn_label = tt_it([sample_label.item()])[0]
+            if not target_info.cat_is_bce:
+                cur_trn_label = tt_it([sample_label.item()])[0]
+            else:
+                cur_trn_label = target_transformer.classes_[1]
 
     return cur_trn_label
 
@@ -109,19 +127,17 @@ def stratify_attributions_by_target_classes(
     all_attributions: Sequence["SampleAttribution"],
     target_transformer: "al_label_transformers_object",
     output_name: str,
-    target_column: str,
-    column_type: str,
+    target_info: TargetTypeInfo,
 ) -> DefaultDict[Any, list["SampleAttribution"]]:
     all_attributions_target_class_stratified = defaultdict(list)
 
     for sample in all_attributions:
         cur_labels_all = sample.sample_info.target_labels
-        cur_labels = cur_labels_all[output_name][target_column]
+        cur_labels = cur_labels_all[output_name][target_info.name]
         cur_label_name = get_target_class_name(
             sample_label=cur_labels,
             target_transformer=target_transformer,
-            column_type=column_type,
-            target_column_name=target_column,
+            target_info=target_info,
         )
         all_attributions_target_class_stratified[cur_label_name].append(sample)
 
@@ -263,10 +279,12 @@ def calculate_top_n_tokens(
 
 def get_basic_sample_attributions_to_analyse_generator(
     interpretation_config: schemas.BasicInterpretationConfig,
-    all_attributions: list["SampleAttribution"],
+    all_attributions: Sequence["SampleAttribution"],
 ) -> Generator["SampleAttribution", None, None]:
     strategy = interpretation_config.interpretation_sampling_strategy
     n_samples = interpretation_config.num_samples_to_interpret
+
+    all_attributions = list(all_attributions)
 
     if strategy == "first_n":
         base = all_attributions[:n_samples]

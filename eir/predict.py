@@ -194,12 +194,8 @@ def predict(
     )
 
     criteria = train.get_criteria(outputs_as_dict=predict_experiment.outputs)
-    survival_links = train.build_survival_links_for_criteria(
-        output_configs=predict_experiment.configs.output_configs
-    )
     loss_func = train.get_loss_callable(
         criteria=criteria,
-        survival_links=survival_links,
     )
 
     predict_results = run_split_evaluation(

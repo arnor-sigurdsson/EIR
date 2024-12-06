@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Sequence
+from typing import TYPE_CHECKING, Dict, List, Sequence, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,6 +10,7 @@ from sklearn.preprocessing import LabelEncoder
 
 from eir.experiment_io.label_transformer_io import load_transformers
 from eir.interpretation.interpretation_utils import (
+    TargetTypeInfo,
     get_appropriate_target_transformer,
     get_long_format_attribution_df,
     plot_attributions_bar,
@@ -31,6 +32,10 @@ from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.interpretation.interpretation import SampleAttribution
+    from eir.predict import PredictExperiment
+    from eir.predict_modules.predict_attributions import (
+        LoadedTrainExperimentMixedWithPredict,
+    )
     from eir.train import Experiment
 
 
@@ -38,11 +43,14 @@ logger = get_logger(__name__)
 
 
 def analyze_tabular_input_attributions(
-    experiment: "Experiment",
+    experiment: Union[
+        "Experiment",
+        "PredictExperiment",
+        "LoadedTrainExperimentMixedWithPredict",
+    ],
     input_name: str,
     output_name: str,
-    target_column_name: str,
-    target_column_type: str,
+    target_info: TargetTypeInfo,
     attribution_outfolder: Path,
     all_attributions: Sequence["SampleAttribution"],
 ):
@@ -93,6 +101,9 @@ def analyze_tabular_input_attributions(
         output_object, (ComputedTabularOutputInfo, ComputedSurvivalOutputInfo)
     )
 
+    target_column_name = target_info.name
+    target_column_type = target_info.type_
+
     target_transformer = get_appropriate_target_transformer(
         output_object=output_object,
         target_column_name=target_column_name,
@@ -103,8 +114,7 @@ def analyze_tabular_input_attributions(
         all_attributions=all_attributions,
         target_transformer=target_transformer,
         output_name=output_name,
-        target_column=target_column_name,
-        column_type=target_column_type,
+        target_info=target_info,
     )
 
     for class_name, class_attributions in all_attributions_class_stratified.items():

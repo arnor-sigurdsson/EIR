@@ -2,13 +2,16 @@ import pickle
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Protocol, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from aislib.misc_utils import ensure_path_exists
 
-from eir.interpretation.interpretation_utils import get_target_class_name
+from eir.interpretation.interpretation_utils import (
+    TargetTypeInfo,
+    get_target_class_name,
+)
 from eir.setup.input_setup_modules.setup_omics import (
     ComputedOmicsInputInfo,
     read_bim,
@@ -21,6 +24,10 @@ from eir.visualization import interpretation_visualization as av
 if TYPE_CHECKING:
     from eir.data_load.label_setup import al_label_transformers_object
     from eir.interpretation.interpretation import SampleAttribution
+    from eir.predict import PredictExperiment
+    from eir.predict_modules.predict_attributions import (
+        LoadedTrainExperimentMixedWithPredict,
+    )
     from eir.train import Experiment
 
 al_gradients_dict = Dict[str, List[np.ndarray]]
@@ -48,12 +55,13 @@ def get_omics_consumer(
     target_transformer: "al_label_transformers_object",
     input_name: str,
     output_name: str,
-    target_column: str,
-    column_type: str,
+    target_info: TargetTypeInfo,
 ) -> OmicsConsumerCallable:
     acc_acts: dict[str, np.ndarray] = {}
     acc_acts_masked: dict[str, np.ndarray] = {}
     n_samples: dict[str, int] = {}
+
+    target_name = target_info.name
 
     def _consumer(
         attribution: Optional["SampleAttribution"],
@@ -75,11 +83,12 @@ def get_omics_consumer(
         sample_inputs = attribution.sample_info.inputs
         sample_target_labels = attribution.sample_info.target_labels
 
+        sample_label = sample_target_labels[output_name][target_name]
+
         cur_label_name = get_target_class_name(
-            sample_label=sample_target_labels[output_name][target_column],
+            sample_label=sample_label,
             target_transformer=target_transformer,
-            column_type=column_type,
-            target_column_name=target_column,
+            target_info=target_info,
         )
 
         sample_acts = attribution.sample_attributions[input_name].squeeze()
@@ -106,14 +115,20 @@ def get_omics_consumer(
 
 
 def analyze_omics_input_attributions(
-    experiment: "Experiment",
+    experiment: Union[
+        "Experiment",
+        "PredictExperiment",
+        "LoadedTrainExperimentMixedWithPredict",
+    ],
     input_name: str,
-    target_column_name: str,
-    target_column_type: str,
+    target_info: TargetTypeInfo,
     attribution_outfolder: Path,
     all_attributions: ParsedOmicsAttributions,
 ) -> None:
     exp = experiment
+
+    target_column_type = target_info.type_
+    target_column_name = target_info.name
 
     acc_acts = all_attributions.accumulated_acts
     acc_acts_masked = all_attributions.accumulated_acts_masked

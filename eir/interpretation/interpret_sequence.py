@@ -2,7 +2,7 @@ from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, Sequence, Tuple, Union
 
 import numpy as np
 import torch
@@ -14,6 +14,7 @@ from captum.attr._utils.visualization import (
 )
 
 from eir.interpretation.interpretation_utils import (
+    TargetTypeInfo,
     get_appropriate_target_transformer,
     get_basic_sample_attributions_to_analyse_generator,
     get_long_format_attribution_df,
@@ -34,6 +35,10 @@ from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.interpretation.interpretation import SampleAttribution
+    from eir.predict import PredictExperiment
+    from eir.predict_modules.predict_attributions import (
+        LoadedTrainExperimentMixedWithPredict,
+    )
     from eir.train import Experiment
 
 logger = get_logger(name=__name__)
@@ -49,13 +54,16 @@ class SequenceVisualizationDataRecord:
 
 
 def analyze_sequence_input_attributions(
-    experiment: "Experiment",
+    experiment: Union[
+        "Experiment",
+        "PredictExperiment",
+        "LoadedTrainExperimentMixedWithPredict",
+    ],
     input_name: str,
     output_name: str,
-    target_column_name: str,
-    target_column_type: str,
+    target_info: TargetTypeInfo,
     attribution_outfolder: Path,
-    all_attributions: list["SampleAttribution"],
+    all_attributions: Sequence["SampleAttribution"],
     expected_target_classes_attributions: np.ndarray,
 ) -> None:
     exp = experiment
@@ -67,8 +75,8 @@ def analyze_sequence_input_attributions(
 
     target_transformer = get_appropriate_target_transformer(
         output_object=output_object,
-        target_column_name=target_column_name,
-        target_column_type=target_column_type,
+        target_column_name=target_info.name,
+        target_column_type=target_info.type_,
     )
 
     input_object = exp.inputs[input_name]
@@ -79,7 +87,8 @@ def analyze_sequence_input_attributions(
     assert isinstance(interpretation_config, BasicInterpretationConfig)
 
     samples_to_act_analyze_gen = get_basic_sample_attributions_to_analyse_generator(
-        interpretation_config=interpretation_config, all_attributions=all_attributions
+        interpretation_config=interpretation_config,
+        all_attributions=all_attributions,
     )
 
     viz_records = []
@@ -88,18 +97,17 @@ def analyze_sequence_input_attributions(
         sample_target_labels = sample_attribution.sample_info.target_labels
 
         cur_label_name = get_target_class_name(
-            sample_label=sample_target_labels[output_name][target_column_name],
+            sample_label=sample_target_labels[output_name][target_info.name],
             target_transformer=target_transformer,
-            column_type=target_column_type,
-            target_column_name=target_column_name,
+            target_info=target_info,
         )
 
         extracted_sample_info = extract_sample_info_for_sequence_attribution(
             sample_attribution_object=sample_attribution,
             cur_label_name=cur_label_name,
             output_name=output_name,
-            target_column_name=target_column_name,
-            target_column_type=target_column_type,
+            target_column_name=target_info.name,
+            target_column_type=target_info.type_,
             input_name=input_name,
             vocab=vocab,
             expected_target_classes_attributions=expected_target_classes_attributions,
@@ -141,8 +149,7 @@ def analyze_sequence_input_attributions(
         all_attributions=all_attributions,
         target_transformer=target_transformer,
         output_name=output_name,
-        target_column=target_column_name,
-        column_type=target_column_type,
+        target_info=target_info,
     )
 
     for class_name, target_attributions in acts_stratified_by_target.items():
@@ -157,7 +164,7 @@ def analyze_sequence_input_attributions(
         plot_attributions_bar(
             df_attributions=df_token_importances,
             output_path=target_outfolder / f"token_influence_{class_name}.pdf",
-            title=f"{target_column_name} – {class_name}",
+            title=f"{target_info.name} – {class_name}",
             use_bootstrap=True,
         )
         df_token_importances.to_csv(

@@ -35,16 +35,19 @@ class ChannelBasedRunningStatistics:
     def update(self, data: torch.Tensor):
         data = data.reshape(*list(data.shape[: -self.final_n_dims]) + [-1])
 
+        mask = ~torch.isnan(data)
+        masked_data = data.clone()
+        masked_data[~mask] = 0.0
+
         new_n: int = data.shape[-1]
-        new_var: torch.Tensor = data.var(-1)
-        new_sum: torch.Tensor = data.sum(-1)
+        new_var: torch.Tensor = masked_data.var(-1)
+        new_sum: torch.Tensor = masked_data.sum(-1)
 
         if self.n == 0:
             self.n = new_n
             self.shape = data.shape[:-1]
             self.sum = new_sum
             self.num_var = new_var.mul_(new_n)
-
         else:
             ratio = self.n / new_n
             t = (self.sum / ratio).sub_(new_sum).pow_(2)
@@ -77,10 +80,17 @@ class ElementBasedRunningStatistics:
 
     @torch.no_grad()
     def update(self, x: torch.Tensor):
+        mask = ~torch.isnan(x)
+        if not mask.any():
+            return
+
+        x_masked = x.clone()
+        x_masked[~mask] = self._mean[~mask]
+
         self.n += 1
-        delta = x - self._mean
+        delta = x_masked - self._mean
         self._mean += delta / self.n
-        delta2 = x - self._mean
+        delta2 = x_masked - self._mean
         self._ssdm += delta * delta2
 
     @property

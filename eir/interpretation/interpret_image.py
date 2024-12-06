@@ -1,14 +1,15 @@
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
-from captum.attr._utils.visualization import visualize_image_attr_multiple
+from captum.attr._utils.visualization import Union, visualize_image_attr_multiple
 from torchvision.transforms import Normalize
 
 from eir.interpretation.interpretation_utils import (
+    TargetTypeInfo,
     get_appropriate_target_transformer,
     get_basic_sample_attributions_to_analyse_generator,
     get_target_class_name,
@@ -24,18 +25,25 @@ from eir.setup.schemas import BasicInterpretationConfig
 
 if TYPE_CHECKING:
     from eir.interpretation.interpretation import SampleAttribution
+    from eir.predict import PredictExperiment
+    from eir.predict_modules.predict_attributions import (
+        LoadedTrainExperimentMixedWithPredict,
+    )
     from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
     from eir.train import Experiment
 
 
 def analyze_image_input_attributions(
-    experiment: "Experiment",
+    experiment: Union[
+        "Experiment",
+        "PredictExperiment",
+        "LoadedTrainExperimentMixedWithPredict",
+    ],
     input_name: str,
-    target_column_name: str,
     output_name: str,
-    target_column_type: str,
+    target_info: TargetTypeInfo,
     attribution_outfolder: Path,
-    all_attributions: list["SampleAttribution"],
+    all_attributions: Sequence["SampleAttribution"],
 ) -> None:
     exp = experiment
 
@@ -46,8 +54,8 @@ def analyze_image_input_attributions(
 
     target_transformer = get_appropriate_target_transformer(
         output_object=output_object,
-        target_column_name=target_column_name,
-        target_column_type=target_column_type,
+        target_column_name=target_info.name,
+        target_column_type=target_info.type_,
     )
 
     input_object = exp.inputs[input_name]
@@ -57,17 +65,17 @@ def analyze_image_input_attributions(
     assert isinstance(interpretation_config, BasicInterpretationConfig)
 
     samples_to_act_analyze_gen = get_basic_sample_attributions_to_analyse_generator(
-        interpretation_config=interpretation_config, all_attributions=all_attributions
+        interpretation_config=interpretation_config,
+        all_attributions=all_attributions,
     )
 
     for sample_attribution in samples_to_act_analyze_gen:
         sample_target_labels = sample_attribution.sample_info.target_labels
 
         cur_label_name = get_target_class_name(
-            sample_label=sample_target_labels[output_name][target_column_name],
+            sample_label=sample_target_labels[output_name][target_info.name],
             target_transformer=target_transformer,
-            column_type=target_column_type,
-            target_column_name=target_column_name,
+            target_info=target_info,
         )
 
         attributions = sample_attribution.sample_attributions[input_name].squeeze(0)

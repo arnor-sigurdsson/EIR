@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 from PIL import Image
 from scipy.spatial.distance import cosine
 from sklearn.metrics import mean_squared_error
@@ -13,6 +14,7 @@ from sklearn.metrics import mean_squared_error
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
 from docs.doc_modules.serving_experiments import run_serve_experiment_from_command
 from eir import train
+from eir.data_load.data_preparation_modules.prepare_array import fill_nans_from_stats
 from eir.serve_modules.serve_network_utils import deserialize_array
 from eir.setup.schemas import InputConfig, OutputConfig
 from eir.utils.logging import get_logger
@@ -403,10 +405,22 @@ def _check_prediction(
             expected_array_file = array_folder / f"{id_from_request}.npy"
             expected_array = np.load(expected_array_file)
 
+            expected_ndim = len(output_object.normalization_stats.shape)
+
+            tensor = torch.from_numpy(expected_array).float()
+            while len(tensor.shape) < expected_ndim:
+                tensor = tensor.unsqueeze(0)
+
+            expected_array_no_nan = fill_nans_from_stats(
+                array=tensor,
+                normalization_stats=output_object.normalization_stats,
+            )
+            expected_array_no_nan_npy = expected_array_no_nan.numpy()
+
             do_check_cosine = not output_object.diffusion_config
             if not _validate_array_output(
                 actual_output=actual_output,
-                expected_array=expected_array,
+                expected_array=expected_array_no_nan_npy,
                 data_dimensions=data_dimensions.full_shape(),
                 check_cosine=do_check_cosine,
             ):

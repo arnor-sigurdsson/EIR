@@ -122,14 +122,17 @@ def parse_tabular_target_labels(
 
                 if column_type == ColumnType.CON.value:
                     labels_casted[output_name_][column_name] = cur_labels.to(
-                        dtype=torch.float, device=device
+                        dtype=torch.float,
+                        device=device,
                     )
                 elif column_type == ColumnType.CAT.value:
                     cur_labels = replace_nan_and_cast_to_long(
-                        cur_labels=cur_labels.to(dtype=torch.float), device=device
+                        cur_labels=cur_labels.to(dtype=torch.float),
+                        device=device,
                     )
                     labels_casted[output_name_][column_name] = cur_labels.to(
-                        dtype=torch.long, device=device
+                        dtype=torch.long,
+                        device=device,
                     )
 
     def handle_survival_object(
@@ -148,11 +151,28 @@ def parse_tabular_target_labels(
         event_column = output_type_info.event_column
 
         cur_labels_time = labels[output_name_][time_column]
-        labels_casted[output_name_][time_column] = cur_labels_time.to(
-            dtype=torch.float, device=device
-        )
+
+        loss_function = output_type_info.loss_function
+        model_type = "cox" if loss_function == "CoxPHLoss" else "discrete"
+
+        if model_type == "cox":
+            labels_casted[output_name_][time_column] = cur_labels_time.to(
+                dtype=torch.float, device=device
+            )
+        else:
+            cur_labels_time = replace_nan_and_cast_to_long(
+                cur_labels=cur_labels_time.to(dtype=torch.float),
+                device=device,
+            )
+            labels_casted[output_name_][time_column] = cur_labels_time.to(
+                dtype=torch.float, device=device
+            )
 
         cur_label_event = labels[output_name_][event_column]
+        cur_label_event = replace_nan_and_cast_to_long(
+            cur_labels=cur_label_event.to(dtype=torch.float),
+            device=device,
+        )
         labels_casted[output_name_][event_column] = cur_label_event.to(
             dtype=torch.long, device=device
         )

@@ -113,19 +113,13 @@ def test_get_criteria(
     )
 
     test_criteria = get_criteria(outputs_as_dict=outputs_as_dict)
-    test_input = torch.randn(10, 1)
-    test_target = torch.randn(10, 1)
+    test_input = {"Height": torch.randn(10, 1), "Origin": torch.randn(10, 3)}
+    test_target = {"Height": torch.randn(10, 1), "Origin": torch.randint(0, 3, (10,))}
+    test_criteria["test_output_tabular"](test_input, test_target)
 
-    for output_name, output_object in outputs_as_dict.items():
-        for column_name in output_object.target_columns["con"]:
-            cur_callable = test_criteria[output_name][column_name]
-            assert cur_callable.func is _calc_con_loss
-            cur_callable(input=test_input, target=test_target)
-
-        for column_name in output_object.target_columns["cat"]:
-            cur_callable = test_criteria[output_name][column_name]
-            assert isinstance(cur_callable, nn.CrossEntropyLoss)
-            cur_callable(input=test_input, target=test_target)
+    for output_name in outputs_as_dict.keys():
+        cur_criteria = test_criteria[output_name]
+        cur_criteria(test_input, test_target)
 
 
 def test_build_loss_dict():
@@ -176,7 +170,10 @@ def test_get_label_smoothing():
     ],
 )
 def test_get_supervised_criterion(
-    column_type, loss_name, cat_label_smoothing, expected_type
+    column_type,
+    loss_name,
+    cat_label_smoothing,
+    expected_type,
 ):
     result = get_supervised_criterion(
         column_type_=column_type,
@@ -215,6 +212,6 @@ def test_calc_con_loss(loss_func):
 
 def test_get_loss_callable():
     criteria = MagicMock()
-    loss_callable = get_loss_callable(criteria=criteria, survival_links={})
+    loss_callable = get_loss_callable(criteria=criteria)
     assert isinstance(loss_callable, Callable)
     assert loss_callable.keywords["criteria"] == criteria

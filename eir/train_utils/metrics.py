@@ -356,8 +356,11 @@ def handle_class_mismatch(default_value: float, metric_name: Optional[str] = Non
         def wrapper(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs):
             nonlocal logged
             unique_classes = np.unique(labels)
-            # For binary classification we have this special case
+            # For binary classification as CE we have this special case
             if outputs.shape[1] == 2 and len(unique_classes) == 1:
+                pass
+            # For binary classification as BCE we have this special case
+            elif outputs.shape[1] == 1:
                 pass
             elif len(unique_classes) != outputs.shape[1]:
                 if not logged:
@@ -379,7 +382,7 @@ def handle_class_mismatch(default_value: float, metric_name: Optional[str] = Non
 
 @handle_empty(default_value=np.nan, metric_name="MCC")
 def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
-    prediction = np.argmax(a=outputs, axis=1)
+    prediction = parse_cat_pred(outputs=outputs)
 
     labels = labels.astype(int)
 
@@ -419,7 +422,7 @@ def calc_roc_auc_ovo(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -
 
     if outputs.shape[1] > 2:
         outputs = softmax(x=outputs, axis=1)
-    else:
+    elif outputs.shape[1] == 2:
         outputs = outputs[:, 1]
 
     roc_auc = roc_auc_score(
@@ -440,7 +443,7 @@ def calc_average_precision(
 
     if outputs.shape[1] > 2:
         labels = label_binarize(y=labels, classes=sorted(np.unique(labels)))
-    else:
+    elif outputs.shape[1] == 2:
         outputs = outputs[:, 1]
 
     average_precision = average_precision_score(
@@ -452,10 +455,22 @@ def calc_average_precision(
     return average_precision
 
 
+def parse_cat_pred(outputs: np.ndarray) -> np.ndarray:
+    # Single logit case
+    if outputs.shape[1] == 1:
+        pred = (outputs > 0).astype(int).squeeze()
+    # Multi-class case
+    else:
+        pred = np.argmax(outputs, axis=1)
+
+    return pred
+
+
 @handle_empty(default_value=np.nan, metric_name="ACC")
 def calc_acc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
-    pred = np.argmax(outputs, axis=1)
+    pred = parse_cat_pred(outputs=outputs)
     accuracy = np.mean(pred == labels)
+
     return accuracy
 
 
@@ -463,7 +478,7 @@ def calc_acc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
 def calc_f1_score_macro(
     outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
 ) -> float:
-    pred = np.argmax(outputs, axis=1)
+    pred = parse_cat_pred(outputs=outputs)
     f1 = f1_score(y_true=labels, y_pred=pred, average="macro")
     return f1
 
@@ -472,7 +487,7 @@ def calc_f1_score_macro(
 def calc_precision_macro(
     outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
 ) -> float:
-    pred = np.argmax(outputs, axis=1)
+    pred = parse_cat_pred(outputs=outputs)
     precision = precision_score(y_true=labels, y_pred=pred, average="macro")
     return precision
 
@@ -481,14 +496,14 @@ def calc_precision_macro(
 def calc_recall_macro(
     outputs: np.ndarray, labels: np.ndarray, *args, **kwargs
 ) -> float:
-    pred = np.argmax(outputs, axis=1)
+    pred = parse_cat_pred(outputs=outputs)
     recall = recall_score(y_true=labels, y_pred=pred, average="macro")
     return recall
 
 
 @handle_empty(default_value=np.nan, metric_name="COHEN-KAPPA")
 def calc_cohen_kappa(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
-    pred = np.argmax(outputs, axis=1)
+    pred = parse_cat_pred(outputs=outputs)
     kappa = cohen_kappa_score(y1=labels, y2=pred)
     return kappa
 
@@ -634,8 +649,6 @@ def calculate_prediction_losses(
     criteria: "al_criteria_dict",
     inputs: dict[str, dict[str, torch.Tensor]],
     targets: dict[str, dict[str, torch.Tensor]],
-    log_empty_loss_callable: LogEmptyLossProtocol,
-    survival_links: Optional[dict[str, dict[str, str]]],
 ) -> dict[str, dict[str, torch.Tensor]]:
     """
     We check for empty output tensors and log a warning if we encounter them.
@@ -643,60 +656,16 @@ def calculate_prediction_losses(
     sparsity, and by chance some outputs are empty in a batch.
     """
     losses_dict: dict[str, dict[str, torch.Tensor]] = {}
-    if survival_links is None:
-        survival_links = {}
 
     for output_name, target_dict in targets.items():
-        for output_head_name, cur_inner_target in target_dict.items():
+        cur_inputs = inputs[output_name]
+        cur_targets = targets[output_name]
+        cur_criterion = criteria[output_name]
+        losses_dict[output_name] = {}
 
-            if output_name in survival_links:
-                time_name = survival_links[output_name]["duration"]
-                if output_head_name == time_name:
-                    continue
-
-            if output_head_name not in inputs[output_name]:
-                raise KeyError(f"Missing input for {output_name} {output_head_name}")
-
-            input_tensor = inputs[output_name][output_head_name]
-
-            if output_name not in losses_dict:
-                losses_dict[output_name] = {}
-
-            if input_tensor.nelement() > 0 and cur_inner_target.nelement() > 0:
-
-                if output_name in survival_links:
-
-                    event_name = survival_links[output_name]["event"]
-                    time_name = survival_links[output_name]["duration"]
-
-                    criterion = criteria[output_name][output_head_name]
-                    assert event_name in target_dict
-                    assert time_name in target_dict
-
-                    predicted_event_tensor = input_tensor
-                    time_tensor = target_dict[time_name]
-                    time_tensor_long = time_tensor.to(dtype=torch.long)
-
-                    computed_loss = criterion(
-                        target=cur_inner_target,
-                        input=predicted_event_tensor,
-                        time=time_tensor_long,
-                    )
-
-                else:
-                    criterion = criteria[output_name][output_head_name]
-                    computed_loss = criterion(
-                        input=input_tensor,
-                        target=cur_inner_target,
-                    )
-
-            else:
-                log_empty_loss_callable(
-                    output_name=output_name, output_head_name=output_head_name
-                )
-                computed_loss = torch.tensor(np.nan, requires_grad=True)
-
-            losses_dict[output_name][output_head_name] = computed_loss
+        cur_losses = cur_criterion(cur_inputs, cur_targets)
+        for name, loss in cur_losses.items():
+            losses_dict[output_name][name] = loss
 
     return losses_dict
 
@@ -705,13 +674,12 @@ def aggregate_losses(losses_dict: dict[str, dict[str, torch.Tensor]]) -> torch.T
     losses_values = []
     for output_name, targets_for_output_dict in losses_dict.items():
         for loss in targets_for_output_dict.values():
-            if not torch.isnan(loss).any():
-                losses_values.append(loss)
+            losses_values.append(loss)
 
     if not losses_values:
         return torch.tensor(np.nan, requires_grad=True)
 
-    average_loss = torch.mean(torch.stack(losses_values))
+    average_loss = torch.nanmean(torch.stack(losses_values))
     return average_loss
 
 
@@ -825,7 +793,8 @@ class UncertaintyMultiTaskLoss(nn.Module):
 
         for target_column, loss_value_base in losses_dict.items():
             loss_value_uncertain = self._calc_uncertainty_loss(
-                name=target_column, loss_value=loss_value_base
+                name=target_column,
+                loss_value=loss_value_base,
             )
             losses_uncertain[target_column] = loss_value_uncertain
 

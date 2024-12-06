@@ -48,6 +48,7 @@ from eir.interpretation.interpret_array import (
 from eir.interpretation.interpret_image import analyze_image_input_attributions
 from eir.interpretation.interpret_omics import (
     OmicsConsumerCallable,
+    ParsedOmicsAttributions,
     analyze_omics_input_attributions,
     get_omics_consumer,
 )
@@ -55,6 +56,7 @@ from eir.interpretation.interpret_sequence import analyze_sequence_input_attribu
 from eir.interpretation.interpret_tabular import analyze_tabular_input_attributions
 from eir.interpretation.interpretation_utils import (
     MyIntegratedGradients,
+    TargetTypeInfo,
     get_appropriate_target_transformer,
 )
 from eir.models.input.omics.omics_models import CNNModel, LinearModel
@@ -64,6 +66,7 @@ from eir.setup.output_setup_modules.survival_output_setup import (
 )
 from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
+    TabularOutputTypeConfig,
 )
 from eir.setup.schemas import InputConfig, OutputConfig, SurvivalOutputTypeConfig
 from eir.target_setup.target_label_setup import MissingTargetsInfo
@@ -318,16 +321,27 @@ def tabular_attribution_analysis_wrapper(
             target_column_type=target_column_type,
         )
 
+        is_bce = False
+        output_type_info = output_object.output_config.output_type_info
+        if isinstance(output_type_info, TabularOutputTypeConfig):
+            is_bce = output_type_info.cat_loss_name == "BCEWithLogitsLoss"
+
+        target_column_info = TargetTypeInfo(
+            name=target_column_name,
+            type_=target_column_type,
+            cat_is_bce=is_bce,
+        )
+
         act_consumers = get_attribution_consumers(
             input_names_and_types=input_names_and_types,
             target_transformer=target_transformer,
             output_name=output_name,
-            target_column=target_column_name,
-            column_type=target_column_type,
+            target_info=target_column_info,
         )
 
         all_attributions = process_attributions_for_all_modalities(
-            attribution_producer=act_producer, attribution_consumers=act_consumers
+            attribution_producer=act_producer,
+            attribution_consumers=act_consumers,
         )
 
         for input_name in ao.input_names_ordered:
@@ -346,21 +360,28 @@ def tabular_attribution_analysis_wrapper(
                 input_name=input_name,
                 output_name=output_name,
             )
-            common_kwargs = {
-                "experiment": experiment,
-                "input_name": input_name,
-                "target_column_name": target_column_name,
-                "target_column_type": target_column_type,
-                "all_attributions": all_attributions[input_name],
-                "attribution_outfolder": act_output_folder,
-            }
+
+            cur_attributions = all_attributions[input_name]
 
             if input_type == "omics":
-                analyze_omics_input_attributions(**common_kwargs)
+                assert isinstance(cur_attributions, ParsedOmicsAttributions)
+                analyze_omics_input_attributions(
+                    experiment=experiment,
+                    input_name=input_name,
+                    all_attributions=cur_attributions,
+                    target_info=target_column_info,
+                    attribution_outfolder=act_output_folder,
+                )
 
             elif input_type == "tabular":
+                assert isinstance(cur_attributions, Sequence)
                 analyze_tabular_input_attributions(
-                    **common_kwargs, output_name=output_name
+                    experiment=experiment,
+                    input_name=input_name,
+                    target_info=target_column_info,
+                    all_attributions=cur_attributions,
+                    attribution_outfolder=act_output_folder,
+                    output_name=output_name,
                 )
 
             elif input_type == "sequence":
@@ -371,22 +392,32 @@ def tabular_attribution_analysis_wrapper(
                     model=model_copy,
                     baselines=ao.baselines_with_extras,
                 )
+                assert isinstance(cur_attributions, Sequence)
                 analyze_sequence_input_attributions(
-                    **common_kwargs,
+                    experiment=experiment,
+                    input_name=input_name,
+                    target_info=target_column_info,
+                    all_attributions=cur_attributions,
+                    attribution_outfolder=act_output_folder,
                     expected_target_classes_attributions=expected_value,
                     output_name=output_name,
                 )
             elif input_type == "image":
+                assert isinstance(cur_attributions, Sequence)
                 analyze_image_input_attributions(
-                    **common_kwargs, output_name=output_name
+                    experiment=experiment,
+                    input_name=input_name,
+                    target_info=target_column_info,
+                    all_attributions=cur_attributions,
+                    attribution_outfolder=act_output_folder,
+                    output_name=output_name,
                 )
 
             elif input_type == "array":
-                cur_array_attributions = all_attributions[input_name]
-                assert isinstance(cur_array_attributions, dict)
+                assert isinstance(cur_attributions, dict)
                 analyze_array_input_attributions(
                     attribution_outfolder=act_output_folder,
-                    all_attributions=cur_array_attributions,
+                    all_attributions=cur_attributions,
                 )
 
         ao.hook_handle.remove()
@@ -622,10 +653,14 @@ def get_attribution_consumers(
     ],
     target_transformer: "al_label_transformers_object",
     output_name: str,
-    target_column: str,
-    column_type: str,
-) -> Dict[
-    str, Union["BasicConsumerCallable", OmicsConsumerCallable, ArrayConsumerCallable]
+    target_info: TargetTypeInfo,
+) -> dict[
+    str,
+    Union[
+        "BasicConsumerCallable",
+        OmicsConsumerCallable,
+        ArrayConsumerCallable,
+    ],
 ]:
     consumers_dict = {}
 
@@ -638,8 +673,7 @@ def get_attribution_consumers(
             input_name=input_name,
             target_transformer=target_transformer,
             output_name=output_name,
-            target_column=target_column,
-            column_type=column_type,
+            target_info=target_info,
         )
         if consumer is not None:
             consumers_dict[input_name] = consumer
@@ -659,8 +693,7 @@ def _get_consumer_from_input_type(
     input_type: str,
     input_name: str,
     output_name: str,
-    target_column: str,
-    column_type: str,
+    target_info: TargetTypeInfo,
 ) -> BasicConsumerCallable | OmicsConsumerCallable | ArrayConsumerCallable:
     if input_type in ("sequence", "tabular", "image"):
         return get_basic_consumer()
@@ -670,8 +703,7 @@ def _get_consumer_from_input_type(
             target_transformer=target_transformer,
             input_name=input_name,
             output_name=output_name,
-            target_column=target_column,
-            column_type=column_type,
+            target_info=target_info,
         )
 
     elif input_type == "array":
@@ -679,8 +711,7 @@ def _get_consumer_from_input_type(
             target_transformer=target_transformer,
             input_name=input_name,
             output_name=output_name,
-            target_column=target_column,
-            column_type=column_type,
+            target_info=target_info,
         )
     else:
         raise ValueError(f"Unsupported input type {input_type}.")
@@ -742,7 +773,9 @@ def get_basic_consumer() -> BasicConsumerCallable:
 def process_attributions_for_all_modalities(
     attribution_producer: Generator["SampleAttribution", None, None],
     attribution_consumers: Dict[str, Callable],
-) -> dict[str, Sequence["SampleAttribution"] | dict[str, np.ndarray]]:
+) -> dict[
+    str, Sequence["SampleAttribution"] | dict[str, np.ndarray] | ParsedOmicsAttributions
+]:
     processed_attributions_all_modalities = {}
 
     for sample_attribution in attribution_producer:
@@ -869,7 +902,9 @@ def get_attributions(
 
 def _get_interpretation_data_producer(
     experiment: Union[
-        "Experiment", "PredictExperiment", "LoadedTrainExperimentMixedWithPredict"
+        "Experiment",
+        "PredictExperiment",
+        "LoadedTrainExperimentMixedWithPredict",
     ],
     column_name: str,
     column_type: str,
@@ -919,6 +954,16 @@ def _get_interpretation_data_producer(
                 event_column = output_type_info.event_column
                 time_bin = target_labels[output_name][time_column].to(torch.long)
                 target_labels[output_name][event_column] = time_bin
+            case (ComputedTabularOutputInfo(), "cat"):
+                output_type_info = output_object.output_config.output_type_info
+                assert isinstance(output_type_info, TabularOutputTypeConfig)
+                if output_type_info.cat_loss_name == "BCEWithLogitsLoss":
+                    # here the network only produces 1 output per target
+                    # so we inject the 0 here to get the attributions
+                    # for the positive class
+                    prev_label = target_labels[output_name][column_name]
+                    new_label = torch.zeros_like(prev_label)
+                    target_labels[output_name][column_name] = new_label
 
         inputs_detached = _detach_all_inputs(tensor_inputs=batch.inputs)
         batch_interpretation = Batch(
