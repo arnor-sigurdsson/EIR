@@ -207,13 +207,13 @@ frozenlist = ">=1.1.0"
 
 [[package]]
 name = "aislib"
-version = "0.2.0"
+version = "0.3.0"
 description = ""
 optional = false
 python-versions = "<4.0,>=3.10"
 files = [
-    {file = "aislib-0.2.0-py3-none-any.whl", hash = "sha256:e06fd89dc02e80fb0b03a821de19e2767aa30023f5d0cd83d5c83703c1592c79"},
-    {file = "aislib-0.2.0.tar.gz", hash = "sha256:f71946b8e9297de29af35dc8fb09ae58cf5ccfe1e4c008dd60e6005be39b4c84"},
+    {file = "aislib-0.3.0-py3-none-any.whl", hash = "sha256:56e9e5b08478a999f5da5393f988f9de3ff175f1f336788afc5c990b2be330fb"},
+    {file = "aislib-0.3.0.tar.gz", hash = "sha256:30b2c43da475bdda57ff63ec540df195e1bd154fab4f60c96ba91ab92690fce3"},
 ]
 
 [package.dependencies]
@@ -224,6 +224,7 @@ py = ">=1.11.0,<2.0.0"
 scikit-learn = ">=1.5.1,<2.0.0"
 seaborn = ">=0,<1"
 sympy = ">=1.13.1,<2.0.0"
+termcolor = ">=2.5.0,<3.0.0"
 torch = ">=2.4.0,<3.0.0"
 torchvision = ">=0,<1"
 tqdm = ">=4.66.4,<5.0.0"
@@ -6376,4 +6377,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12.0,<3.13"
-content-hash = "e0c08149759ba5bb3697ccd498562e19ea09958b1bb1f59868d1788080415410"
+content-hash = "a025608aa66e49ec9c3aeae2bd4c85e9f841be972b013f3a6fc5f79741ad22e0"
