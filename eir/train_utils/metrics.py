@@ -997,7 +997,7 @@ def get_buffered_metrics_writer(buffer_interval: int):
 
         fieldnames = ["iteration"] + sorted(metrics.keys())
 
-        existing_rows: list[dict[str, float]] = []
+        existing_rows = []
         if filepath.exists():
             with open(filepath, "r") as f:
                 reader = csv.DictReader(f)
