@@ -720,9 +720,14 @@ def _check_parsed_label_df(
             )
 
             if len(non_null_vals) > 0:
-                assert all(
-                    isinstance(val, str) for val in non_null_vals
-                ), f"Non-string values found in string column {column}"
+                vals_and_types = [(val, type(val)) for val in non_null_vals]
+                all_str = all(isinstance(val, str) for val, _ in vals_and_types)
+
+                if not all_str:
+                    raise ValueError(
+                        f"Non-string values found in string column {column}"
+                        f"Got values {vals_and_types}."
+                    )
 
     return df_labels
 

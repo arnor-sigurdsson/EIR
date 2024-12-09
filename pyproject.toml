@@ -45,7 +45,7 @@ pillow = "^11.0.0"
 pyyaml = "^6.0.2"
 starlette = "^0.41.2"
 websockets = "^14.0"
-polars = "^1.14.0"
+polars = "~1.16.0"
 
 [tool.poetry.group.dev.dependencies]
 memory-profiler = "^0.61.0"
