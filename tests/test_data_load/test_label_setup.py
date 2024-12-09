@@ -670,7 +670,10 @@ def test_check_parsed_label_df_pass(parse_test_cl_args, create_test_data):
     df_labels = label_setup._load_label_df(
         label_fpath=label_fpath,
         columns=label_columns,
-        dtypes={"Origin": pl.Categorical, "ExtraTarget": pl.Categorical},
+        dtypes={
+            "Origin": pl.Categorical,
+            "ExtraTarget": pl.Float32,
+        },
     )
 
     df_labels_checked = label_setup._check_parsed_label_df(
