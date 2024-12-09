@@ -211,28 +211,27 @@ def test_classification(prep_modelling_test_configs):
             "injections": {
                 "global_configs": {
                     "basic_experiment": {
-                        "n_epochs": 30,
-                    },
-                    "training_control": {
-                        "weighted_sampling_columns": ["all"],
-                    },
-                    "model": {
-                        "n_iter_before_swa": 300,
+                        "n_epochs": 12,
                     },
                 },
                 "input_configs": [
                     {
                         "input_info": {"input_name": "test_genotype"},
                         "model_config": {
-                            "model_type": "linear",
-                            "model_init_config": {"l1": 1e-06},
+                            "model_type": "genome-local-net",
+                            "model_init_config": {
+                                "kernel_width": 8,
+                                "channel_exp_base": 2,
+                                "rb_do": 0.20,
+                            },
                         },
                     }
                 ],
                 "fusion_configs": {
                     "model_config": {
-                        "fc_task_dim": 256,
+                        "fc_task_dim": 128,
                         "layers": [2],
+                        "rb_do": 0.20,
                     }
                 },
                 "output_configs": _get_classification_output_configs(
