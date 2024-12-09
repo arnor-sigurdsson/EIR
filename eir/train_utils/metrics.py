@@ -973,41 +973,44 @@ def _ensure_metrics_paths_exists(metrics_files: Dict[str, Dict[str, Path]]) -> N
 
 
 def get_buffered_metrics_writer(buffer_interval: int):
-    buffer = []
+    """
+    One might be tempted to use "a" mode here to append metrics to the log
+    file instead of read-modify-write. However, some cloud storage platforms
+    (e.g., S3) do not support appending (i.e., modifying) to files, raising
+    OSError 95: Operation not supported.
+    """
+    buffer: list[dict[str, float]] = []
 
     def append_metrics_to_file(
         filepath: Path,
-        metrics: Dict[str, float],
+        metrics: dict[str, float],
         iteration: int,
-        write_header=False,
+        write_header: bool = False,
     ) -> None:
         nonlocal buffer
 
-        dict_to_write = {**{"iteration": iteration}, **metrics}
+        dict_to_write = {"iteration": iteration, **metrics}
+        buffer.append(dict_to_write)
 
-        if write_header:
-            with open(str(filepath), "a") as logfile:
-                fieldnames = ["iteration"] + sorted(metrics.keys())
-                writer = csv.DictWriter(logfile, fieldnames=fieldnames)
+        if not (iteration % buffer_interval == 0 or write_header):
+            return
 
-                if write_header:
-                    writer.writeheader()
+        fieldnames = ["iteration"] + sorted(metrics.keys())
 
-        if iteration % buffer_interval == 0:
-            buffer.append(dict_to_write)
+        existing_rows: list[dict[str, float]] = []
+        if filepath.exists():
+            with open(filepath, "r") as f:
+                reader = csv.DictReader(f)
+                existing_rows = [row for row in reader]
 
-            with open(str(filepath), "a") as logfile:
-                fieldnames = ["iteration"] + sorted(metrics.keys())
-                writer = csv.DictWriter(logfile, fieldnames=fieldnames)
+        all_rows = existing_rows + buffer
 
-                source = buffer if buffer_interval != 1 else [dict_to_write]
-                for row in source:
-                    writer.writerow(row)
+        with open(filepath, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(all_rows)
 
-            buffer = []
-
-        else:
-            buffer.append(dict_to_write)
+        buffer.clear()
 
     return append_metrics_to_file
 
