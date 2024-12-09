@@ -1,8 +1,17 @@
+from collections import OrderedDict
+from typing import List, Sequence
+
 import pytest
 import torch
 from torch import nn
 
+from eir.data_load.label_setup import al_label_dict
 from eir.models.input.tabular import tabular as tab
+from eir.models.input.tabular.tabular import (
+    al_emb_lookup_dict,
+    al_unique_embed_vals,
+    set_up_embedding_dict,
+)
 
 
 @pytest.fixture
@@ -43,7 +52,7 @@ def create_test_emb_model():
 def test_get_unique_embed_values(create_emb_test_label_data):
     test_label_dict, emb_cols = create_emb_test_label_data
 
-    unique_emb_dict = tab.get_unique_embed_values(
+    unique_emb_dict = get_unique_embed_values(
         labels_dict=test_label_dict, embedding_cols=emb_cols
     )
     assert len(unique_emb_dict) == 3
@@ -55,7 +64,7 @@ def test_get_unique_embed_values(create_emb_test_label_data):
 def test_set_up_embedding_lookups(create_emb_test_label_data):
     test_label_dict, emb_cols = create_emb_test_label_data
 
-    unique_emb_dict = tab.get_unique_embed_values(test_label_dict, emb_cols)
+    unique_emb_dict = get_unique_embed_values(test_label_dict, emb_cols)
     emb_lookup_dict = tab.set_up_embedding_dict(unique_emb_dict)
     assert len(emb_lookup_dict) == 3
 
@@ -75,7 +84,7 @@ def test_attach_embeddings(create_emb_test_label_data, create_test_emb_model):
     test_label_dict, emb_cols = create_emb_test_label_data
     test_model = create_test_emb_model
 
-    emb_dict = tab.get_embedding_dict(test_label_dict, emb_cols)
+    emb_dict = get_embedding_dict(test_label_dict, emb_cols)
 
     total_emb_dimensions = tab.attach_embeddings(test_model, emb_dict)
 
@@ -96,9 +105,7 @@ def test_lookup_embeddings(create_emb_test_label_data, create_test_emb_model):
     test_label_dict, emb_cols = create_emb_test_label_data
     test_model = create_test_emb_model
 
-    emb_dict = tab.get_embedding_dict(
-        labels_dict=test_label_dict, embedding_cols=emb_cols
-    )
+    emb_dict = get_embedding_dict(labels_dict=test_label_dict, embedding_cols=emb_cols)
     tab.attach_embeddings(model=test_model, embeddings_dict=emb_dict)
 
     cur_lookup_table = emb_dict["Population"]["lookup_table"]
@@ -142,9 +149,7 @@ def test_get_embeddings_from_labels(create_emb_test_label_data, create_test_emb_
     test_label_dict, emb_cols = create_emb_test_label_data
     test_model = create_test_emb_model
 
-    emb_dict = tab.get_embedding_dict(
-        labels_dict=test_label_dict, embedding_cols=emb_cols
-    )
+    emb_dict = get_embedding_dict(labels_dict=test_label_dict, embedding_cols=emb_cols)
     tab.attach_embeddings(model=test_model, embeddings_dict=emb_dict)
 
     test_model.embeddings_dict = emb_dict
@@ -178,3 +183,37 @@ def test_get_embeddings_from_labels(create_emb_test_label_data, create_test_emb_
     # check food, "Fish" at index 0
     id_emb_food = test_embeddings[:, 4:]
     assert (id_emb_food == test_model.embed_Food(torch.LongTensor([0]))).all().item()
+
+
+def get_embedding_dict(
+    labels_dict: "al_label_dict", embedding_cols: List[str]
+) -> al_emb_lookup_dict:
+    """
+    Simple wrapper function to call other embedding functions to create embedding
+    dictionary.
+    """
+    unique_embeddings = get_unique_embed_values(
+        labels_dict=labels_dict,
+        embedding_cols=embedding_cols,
+    )
+    embedding_lookup_dict = set_up_embedding_dict(
+        unique_label_values=unique_embeddings,
+    )
+
+    return embedding_lookup_dict
+
+
+def get_unique_embed_values(
+    labels_dict: "al_label_dict", embedding_cols: Sequence[str]
+) -> al_unique_embed_vals:
+    unique_embeddings_dict: al_unique_embed_vals = OrderedDict(
+        (i, set()) for i in sorted(embedding_cols)
+    )
+
+    for sample_labels in labels_dict.values():
+        for key, value in sample_labels.items():
+            if key in embedding_cols:
+                assert isinstance(value, int)
+                unique_embeddings_dict[key].add(value)
+
+    return unique_embeddings_dict

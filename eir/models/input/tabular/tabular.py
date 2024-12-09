@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -17,7 +16,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 
 if TYPE_CHECKING:
-    from eir.data_load.label_setup import al_label_dict
+    pass
 
 # Aliases
 al_tabular_input = Dict[str, List[str] | torch.Tensor]
@@ -242,22 +241,6 @@ def lookup_embeddings(
     return cur_embedding
 
 
-def get_unique_embed_values(
-    labels_dict: "al_label_dict", embedding_cols: Sequence[str]
-) -> al_unique_embed_vals:
-    unique_embeddings_dict: al_unique_embed_vals = OrderedDict(
-        (i, set()) for i in sorted(embedding_cols)
-    )
-
-    for sample_labels in labels_dict.values():
-        for key, value in sample_labels.items():
-            if key in embedding_cols:
-                assert isinstance(value, int)
-                unique_embeddings_dict[key].add(value)
-
-    return unique_embeddings_dict
-
-
 def get_extra_continuous_inputs_from_labels(
     labels: "al_tabular_input", continuous_columns: Iterable[str]
 ) -> torch.Tensor:
@@ -271,24 +254,6 @@ def get_extra_continuous_inputs_from_labels(
     extra_continuous_stacked = torch.cat(extra_continuous, dim=1)
 
     return extra_continuous_stacked
-
-
-def get_embedding_dict(
-    labels_dict: "al_label_dict", embedding_cols: List[str]
-) -> al_emb_lookup_dict:
-    """
-    Simple wrapper function to call other embedding functions to create embedding
-    dictionary.
-    """
-    unique_embeddings = get_unique_embed_values(
-        labels_dict=labels_dict,
-        embedding_cols=embedding_cols,
-    )
-    embedding_lookup_dict = set_up_embedding_dict(
-        unique_label_values=unique_embeddings,
-    )
-
-    return embedding_lookup_dict
 
 
 def get_unique_values_from_transformers(

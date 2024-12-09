@@ -1,6 +1,5 @@
 import reprlib
 from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -59,7 +58,7 @@ from eir.setup import config
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
-from eir.setup.schemas import InputConfig, OutputConfig, SequenceInputDataConfig
+from eir.setup.schemas import SequenceInputDataConfig
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -325,40 +324,6 @@ class DatasetBase(Dataset):
                 input_storage=self.input_storage,
                 target_storage=self.target_labels_storage,
             )
-
-
-@dataclass()
-class DataSourceTypeInfo:
-    name: str
-    type: str
-
-
-def extract_input_names_and_types(
-    input_configs: Sequence[InputConfig],
-) -> Sequence[DataSourceTypeInfo]:
-    input_names_and_types = []
-    for input_config in input_configs:
-        input_name = input_config.input_info.input_name
-        input_type = input_config.input_info.input_type
-        input_names_and_types.append(
-            DataSourceTypeInfo(name=input_name, type=input_type)
-        )
-
-    return input_names_and_types
-
-
-def extract_output_names_and_types(
-    output_configs: Sequence[OutputConfig],
-) -> Sequence[DataSourceTypeInfo]:
-    output_names_and_types = []
-    for output_config in output_configs:
-        output_name = output_config.output_info.output_name
-        output_type = output_config.output_info.output_type
-        output_names_and_types.append(
-            DataSourceTypeInfo(name=output_name, type=output_type)
-        )
-
-    return output_names_and_types
 
 
 def initialize_ids_to_keep(

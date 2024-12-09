@@ -533,24 +533,6 @@ def is_null_value(value: Any) -> bool:
     return value is None
 
 
-def polars_dtype_to_torch_dtype(polars_dtype: Type[pl.DataType]) -> torch.dtype:
-    dtype_map = {
-        pl.Float64: torch.float64,
-        pl.Float32: torch.float32,
-        pl.Int64: torch.int64,
-        pl.Int32: torch.int32,
-        pl.Int16: torch.int16,
-        pl.Int8: torch.int8,
-        pl.UInt64: torch.uint64,
-        pl.UInt32: torch.uint32,
-        pl.UInt16: torch.uint16,
-        pl.UInt8: torch.uint8,
-        pl.Boolean: torch.bool,
-    }
-
-    return dtype_map[polars_dtype]
-
-
 def polars_dtype_to_str_dtype(polars_dtype: Type[pl.DataType]) -> str:
     dtype_map = {
         pl.Float64: "float64",
