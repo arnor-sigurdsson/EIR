@@ -344,8 +344,9 @@ def get_dataloaders(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=False,
+        pin_memory=pin_memory,
         drop_last=False,
+        persistent_workers=persistent_workers,
     )
 
     return train_dataloader, valid_dataloader
