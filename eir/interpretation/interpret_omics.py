@@ -76,7 +76,8 @@ def get_omics_consumer(
                 acc_acts_masked[key] = value / n_samples[key]
 
             parsed_attributions = ParsedOmicsAttributions(
-                accumulated_acts=acc_acts, accumulated_acts_masked=acc_acts_masked
+                accumulated_acts=acc_acts,
+                accumulated_acts_masked=acc_acts_masked,
             )
             return parsed_attributions
 
@@ -125,6 +126,12 @@ def analyze_omics_input_attributions(
     attribution_outfolder: Path,
     all_attributions: ParsedOmicsAttributions,
 ) -> None:
+    """
+    Note that abs_grads is only used for picking out the top SNPs, and not for
+    the actual plotting of the SNPs saving and plotting of the base manhattan
+    plot. In the aggregated case, then we are plotting the absolute values of
+    the gradients as well.
+    """
     exp = experiment
 
     target_column_type = target_info.type_
@@ -134,8 +141,11 @@ def analyze_omics_input_attributions(
     acc_acts_masked = all_attributions.accumulated_acts_masked
 
     abs_grads = True if target_column_type == "con" else False
+    abs_grads = True if target_info.cat_is_bce else abs_grads
+
     top_gradients_dict = get_snp_cols_w_top_grads(
-        accumulated_grads=acc_acts, abs_grads=abs_grads
+        accumulated_grads=acc_acts,
+        abs_grads=abs_grads,
     )
 
     input_object = exp.inputs[input_name]
@@ -181,7 +191,9 @@ def analyze_omics_input_attributions(
     )
 
     df_snp_grads = _save_snp_gradients(
-        accumulated_grads=acc_acts, outfolder=attribution_outfolder, df_snps=df_snps
+        accumulated_grads=acc_acts,
+        outfolder=attribution_outfolder,
+        df_snps=df_snps,
     )
     df_snp_grads_with_abs = _add_absolute_summed_snp_gradients_to_df(
         df_snp_grads=df_snp_grads
@@ -239,7 +251,7 @@ def rescale_gradients(gradients: np.ndarray) -> np.ndarray:
 
 
 def get_snp_cols_w_top_grads(
-    accumulated_grads: Dict[str, np.ndarray],
+    accumulated_grads: dict[str, np.ndarray],
     n: int = 10,
     custom_indexes_dict: Optional[dict[str, np.ndarray]] = None,
     abs_grads: bool = False,

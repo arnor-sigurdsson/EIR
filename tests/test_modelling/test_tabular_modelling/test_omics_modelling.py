@@ -195,6 +195,13 @@ def test_classification(prep_modelling_test_configs):
 
 
 @pytest.mark.parametrize(
+    "parse_test_cl_args",
+    [
+        {"num_samples_per_class": 3000},
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
     "create_test_data",
     [
         {
@@ -206,12 +213,12 @@ def test_classification(prep_modelling_test_configs):
 @pytest.mark.parametrize(
     "create_test_config_init_base",
     [
-        # Case 1: MLP, linear output
+        # Case 1: GLN
         {
             "injections": {
                 "global_configs": {
                     "basic_experiment": {
-                        "n_epochs": 12,
+                        "n_epochs": 4,
                     },
                 },
                 "input_configs": [
@@ -259,7 +266,9 @@ def test_bce_classification(prep_modelling_test_configs):
             max_thresholds=(0.8, 0.8),
         )
 
-        top_row_grads_dict = {"Asia": [0] * 10, "Europe": [1] * 10, "Africa": [2] * 10}
+        # binary case we are only looking at rows 0 and 1
+        top_height_snp_index = 1
+        top_row_grads_dict = {"Europe": [top_height_snp_index] * 10}
         _check_snps_wrapper(
             test_config=test_config,
             output_name=output_name,

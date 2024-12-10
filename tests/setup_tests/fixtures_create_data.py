@@ -365,7 +365,9 @@ class TestDataConfig:
 
 
 def _create_test_data_config(
-    create_test_data_fixture_request: SubRequest, tmp_path_factory, parsed_test_cl_args
+    create_test_data_fixture_request: SubRequest,
+    tmp_path_factory,
+    parsed_test_cl_args,
 ) -> TestDataConfig:
     request_params = create_test_data_fixture_request.param
     task_type = request_params["task_type"]

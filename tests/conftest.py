@@ -72,11 +72,16 @@ def should_skip_in_gha_macos():
 
 @pytest.fixture(scope="session")
 def parse_test_cl_args(request) -> Dict[str, Any]:
-    n_per_class = request.config.getoption("--num_samples_per_class")
-    num_snps = request.config.getoption("--num_snps")
+    if hasattr(request, "param"):
+        n_per_class = request.param.get(
+            "num_samples_per_class", request.config.getoption("--num_samples_per_class")
+        )
+        num_snps = request.param.get("num_snps", request.config.getoption("--num_snps"))
+    else:
+        n_per_class = request.config.getoption("--num_samples_per_class")
+        num_snps = request.config.getoption("--num_snps")
 
     parsed_args = {"n_per_class": n_per_class, "n_snps": num_snps}
-
     return parsed_args
 
 
