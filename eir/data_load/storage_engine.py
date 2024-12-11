@@ -43,7 +43,7 @@ class HybridStorage:
         self.numeric_data: Optional[torch.Tensor] = None
         self.string_data: Optional[np.ndarray] = None
         self.path_data: Optional[np.ndarray] = None
-        self.fixed_array_data: Optional[torch.Tensor] = None
+        self.fixed_array_data: Optional[list[torch.Tensor]] = None
         self.var_array_data: Optional[list[np.ndarray]] = None
         self.object_data: Optional[dict[str, list[object]]] = None
 
@@ -148,8 +148,7 @@ class HybridStorage:
                 arr = torch.tensor(samples_np)
                 fixed_array_data.append(arr)
 
-            data_stacked = torch.stack(fixed_array_data) if fixed_array_data else None
-            self.fixed_array_data = data_stacked
+            self.fixed_array_data = fixed_array_data
 
         if self.var_array_columns:
             self.var_array_data = []
@@ -284,20 +283,24 @@ class HybridStorage:
                 masks.append(string_mask)
 
         if self.fixed_array_data is not None:
-            fixed_array_mask = torch.all(
-                torch.isnan(self.fixed_array_data),
-                dim=(0, -1),
-            ).numpy()
-            masks.append(fixed_array_mask)
+            fixed_array_masks = []
+            for col_data in self.fixed_array_data:
+                nan_mask = torch.isnan(input=col_data)
+                other_dims = tuple(range(1, len(nan_mask.shape)))
+                fixed_array_mask = torch.all(input=nan_mask, dim=other_dims).numpy()
+                fixed_array_masks.append(fixed_array_mask)
+
+            masks.append(np.all(fixed_array_masks, axis=0))
 
         if self.var_array_data:
-            var_array_mask = np.all(
-                [
-                    np.array([len(x) == 0 for x in col_data])
-                    for col_data in self.var_array_data
-                ],
-                axis=0,
-            )
+            var_masks: list[np.ndarray] = []
+            for arr_data in self.var_array_data:
+                cur_mask: list[bool] = []
+                for arr in arr_data:
+                    cur_mask.append(arr is None or len(arr) == 0)
+                var_masks.append(np.array(cur_mask))
+
+            var_array_mask = np.all(var_masks, axis=0)
             masks.append(var_array_mask)
 
         if self.path_data is not None:
@@ -364,7 +367,7 @@ class HybridStorage:
 
         if self.fixed_array_data is not None:
             for i, col_info in enumerate(self.fixed_array_columns):
-                result[col_info.name] = self.fixed_array_data[i, idx].numpy()
+                result[col_info.name] = self.fixed_array_data[i][idx].numpy()
 
         if self.var_array_data is not None:
             for i, col_info in enumerate(self.var_array_columns):
@@ -471,20 +474,24 @@ def check_two_storages(
             masks.append(string_mask)
 
     if target_storage.fixed_array_data is not None:
-        fixed_array_mask = torch.all(
-            torch.isnan(target_storage.fixed_array_data),
-            dim=(0, -1),
-        ).numpy()
-        masks.append(fixed_array_mask)
+        fixed_array_masks = []
+        for col_data in target_storage.fixed_array_data:
+            nan_mask = torch.isnan(input=col_data)
+            other_dims = tuple(range(1, len(nan_mask.shape)))
+            fixed_array_mask = torch.all(input=nan_mask, dim=other_dims).numpy()
+            fixed_array_masks.append(fixed_array_mask)
+
+        masks.append(np.all(fixed_array_masks, axis=0))
 
     if target_storage.var_array_data:
-        var_array_mask = np.all(
-            [
-                np.array([len(x) == 0 for x in col_data])
-                for col_data in target_storage.var_array_data
-            ],
-            axis=0,
-        )
+        var_masks: list[np.ndarray] = []
+        for arr_data in target_storage.var_array_data:
+            cur_mask: list[bool] = []
+            for arr in arr_data:
+                cur_mask.append(arr is None or len(arr) == 0)
+            var_masks.append(np.array(cur_mask))
+
+        var_array_mask = np.all(var_masks, axis=0)
         masks.append(var_array_mask)
 
     if target_storage.object_data:
@@ -560,10 +567,10 @@ def get_numeric_memory(data: Optional[torch.Tensor]) -> int:
     return data.element_size() * data.nelement()
 
 
-def get_fixed_array_memory(data: Optional[torch.Tensor]) -> int:
+def get_fixed_array_memory(data: Optional[list[torch.Tensor]]) -> int:
     if data is None:
         return 0
-    return data.element_size() * data.nelement()
+    return sum(t.element_size() * t.nelement() for t in data)
 
 
 def get_array_memory(
@@ -604,7 +611,7 @@ def get_total_memory(
     numeric_data: Optional[torch.Tensor] = None,
     string_data: Optional[np.ndarray] = None,
     path_data: Optional[np.ndarray] = None,
-    fixed_array_data: Optional[torch.Tensor] = None,
+    fixed_array_data: Optional[list[torch.Tensor]] = None,
     var_array_data: Optional[list[np.ndarray]] = None,
     object_data: Optional[dict[str, list[object]]] = None,
 ) -> int:
