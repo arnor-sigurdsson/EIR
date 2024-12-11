@@ -9,19 +9,23 @@ if TYPE_CHECKING:
     from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
 
-def get_parametrization():
-    params = [get_base_parametrization(compiled=False)]
+def get_parametrization(memory_dataset):
+    params = [get_base_parametrization(compiled=False, memory_dataset=memory_dataset)]
 
     return params
 
 
-def get_base_parametrization(compiled: bool = False) -> dict:
+def get_base_parametrization(
+    memory_dataset: bool,
+    compiled: bool = False,
+) -> dict:
     params = {
         "injections": {
             "global_configs": {
                 "basic_experiment": {
                     "output_folder": "multi_task_multi_modal",
                     "n_epochs": 12,
+                    "memory_dataset": memory_dataset,
                 },
                 "model": {
                     "compile_model": compiled,
@@ -44,6 +48,15 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 },
                 {
                     "input_info": {"input_name": "test_bytes"},
+                },
+                {
+                    "input_info": {"input_name": "test_array"},
+                    "input_type_info": {
+                        "normalization": None,
+                    },
+                    "model_config": {
+                        "model_type": "lcl",
+                    },
                 },
                 {
                     "input_info": {"input_name": "test_image"},
@@ -176,10 +189,49 @@ def get_base_parametrization(compiled: bool = False) -> dict:
 )
 @pytest.mark.parametrize(
     "create_test_config_init_base",
-    get_parametrization(),
+    get_parametrization(memory_dataset=False),
     indirect=True,
 )
-def test_multi_modal_multi_task(
+def test_multi_modal_multi_task_disk(
+    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+):
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    check_performance_result_wrapper(
+        outputs=experiment.outputs,
+        run_path=test_config.run_path,
+        max_thresholds=(0.80, 0.80),
+        min_thresholds=(2.0, 2.0),
+    )
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "multi_task",
+            "modalities": (
+                "omics",
+                "sequence",
+                "image",
+                "array",
+            ),
+            "extras": {"array_dims": 1},
+            "manual_test_data_creator": lambda: "test_multi_modal_multi_task",
+            "random_samples_dropped_from_modalities": True,
+            "source": "local",
+        },
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    get_parametrization(memory_dataset=True),
+    indirect=True,
+)
+def test_multi_modal_multi_task_memory(
     prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
 ):
     experiment, test_config = prep_modelling_test_configs
