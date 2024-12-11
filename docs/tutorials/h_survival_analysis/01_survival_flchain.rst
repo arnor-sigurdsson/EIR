@@ -59,6 +59,10 @@ Let's configure and train a model on the FLChain data. Here are the key configur
     :language: yaml
     :caption: input.yaml
 
+.. literalinclude:: ../tutorial_files/h_survival_analysis/01_flchain/fusion.yaml
+    :language: yaml
+    :caption: fusion.yaml
+
 .. literalinclude:: ../tutorial_files/h_survival_analysis/01_flchain/output.yaml
     :language: yaml
     :caption: output.yaml
