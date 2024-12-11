@@ -5,7 +5,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-14]
+        os: [ubuntu-24.04, macos-14]
         python-version: ['3.12']
         group: [1, 2, 3, 4, 5]
     steps:
@@ -22,7 +22,7 @@ jobs:
           pip install poetry==1.8.2
           tox -e py_partial
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-22.04'
+        if: matrix.os == 'ubuntu-24.04'
         uses: codecov/codecov-action@v4
         with:
           fail_ci_if_error: true
