@@ -1,7 +1,6 @@
-name: Test
+name: Test and Coverage
 on: [push, pull_request]
 jobs:
-
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -22,3 +21,9 @@ jobs:
           pip install tox==4.14.1
           pip install poetry==1.8.2
           tox -e py_partial
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-22.04'
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
