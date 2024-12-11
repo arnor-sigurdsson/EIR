@@ -46,6 +46,10 @@ which is also supported for survival models
     :language: yaml
     :caption: input.yaml
 
+.. literalinclude:: ../tutorial_files/h_survival_analysis/02_flchain_cox/fusion.yaml
+    :language: yaml
+    :caption: fusion.yaml
+
 .. literalinclude:: ../tutorial_files/h_survival_analysis/02_flchain_cox/output.yaml
     :language: yaml
     :caption: output.yaml

@@ -642,7 +642,14 @@ def save_classification_predictions(
     output_folder: Path,
 ) -> None:
 
-    validation_predictions_total = val_outputs.argmax(axis=1)
+    def sigmoid(x):
+        return 1 / (1 + np.exp(-x))
+
+    # BCEWithLogitsLoss case
+    if val_outputs.shape[1] == 1:
+        validation_predictions_total = sigmoid(val_outputs).round().astype(int)
+    else:
+        validation_predictions_total = val_outputs.argmax(axis=1)
 
     df_predictions = _parse_valid_classification_predictions(
         val_true=val_labels,

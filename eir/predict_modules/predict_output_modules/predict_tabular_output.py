@@ -82,6 +82,7 @@ def predict_tabular_wrapper_with_labels(
             ids=cur_ids,
             predictions=predictions_np,
             labels=target_labels_np,
+            tabular_output_type=target_head_name,
             prediction_classes=classes,
             cat_loss_name=cat_loss_name,
         )
@@ -119,6 +120,7 @@ def _merge_ids_predictions_and_labels(
     ids: Sequence[str],
     predictions: np.ndarray,
     labels: Optional[np.ndarray],
+    tabular_output_type: str,
     cat_loss_name: str,
     prediction_classes: Union[Sequence[str], None] = None,
     label_column_name: str = "True Label",
@@ -134,7 +136,7 @@ def _merge_ids_predictions_and_labels(
     if prediction_classes is None:
         prediction_classes = [f"Score Class {i}" for i in range(predictions.shape[1])]
 
-    if cat_loss_name == "BCEWithLogitsLoss":
+    if tabular_output_type == "cat" and cat_loss_name == "BCEWithLogitsLoss":
         assert predictions.shape[1] == 1, predictions.shape
         assert len(prediction_classes) == 2, len(prediction_classes)
         prediction_classes = prediction_classes[1]
@@ -184,6 +186,7 @@ def predict_tabular_wrapper_no_labels(
         df_predictions = _merge_ids_and_predictions(
             ids=cur_ids,
             predictions=predictions,
+            tabular_output_type=target_head_name,
             prediction_classes=classes,
             cat_loss_name=cat_loss_name,
         )
@@ -206,6 +209,7 @@ def _merge_ids_and_predictions(
     ids: Sequence[str],
     predictions: np.ndarray,
     cat_loss_name: str,
+    tabular_output_type: str,
     prediction_classes: Optional[Sequence[str]] = None,
 ) -> pd.DataFrame:
     df = pd.DataFrame()
@@ -216,7 +220,7 @@ def _merge_ids_and_predictions(
     if prediction_classes is None:
         prediction_classes = [f"Score Class {i}" for i in range(predictions.shape[1])]
 
-    if cat_loss_name == "BCEWithLogitsLoss":
+    if tabular_output_type == "cat" and cat_loss_name == "BCEWithLogitsLoss":
         assert predictions.shape[1] == 1, predictions.shape
         assert len(prediction_classes) == 2, len(prediction_classes)
         prediction_classes = prediction_classes[1]

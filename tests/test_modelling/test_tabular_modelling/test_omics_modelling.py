@@ -869,11 +869,8 @@ def _should_compile():
                         "lr": 1e-03 * 4,
                         "gradient_accumulation_steps": 4,
                     },
-                    "training_control": {
-                        "mixing_alpha": 0.2,
-                    },
                     "attribution_analysis": {
-                        "max_attributions_per_class": 100,
+                        "max_attributions_per_class": 200,
                     },
                 },
                 "input_configs": [
