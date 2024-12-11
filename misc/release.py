@@ -34,7 +34,7 @@ def update_init_file(version: str, init_path: Path) -> None:
 
 def git_commands(version: str) -> None:
     commands = [
-        ["git", "add", "."],
+        ["git", "add", "pyproject.toml", "eir/__init__.py"],
         ["git", "commit", "-m", f"Bump version to {version}"],
         ["git", "tag", version],
     ]
