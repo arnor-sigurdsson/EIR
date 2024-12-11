@@ -299,7 +299,7 @@ def impute_missing_output_modalities(
                 case ComputedArrayOutputInfo():
                     assert output_type == "array"
                     shape = output_object.data_dimensions.full_shape()
-                    approach = "random"
+                    approach = "constant"
 
                 case ComputedTabularOutputInfo() | ComputedSurvivalOutputInfo():
                     assert output_type in ("tabular", "survival")
