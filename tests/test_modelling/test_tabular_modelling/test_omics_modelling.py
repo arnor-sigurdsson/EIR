@@ -864,10 +864,14 @@ def _should_compile():
                     "basic_experiment": {
                         "output_folder": "limited_attributions",
                         "batch_size": 16,
+                        "valid_size": 0.1,
                     },
                     "optimization": {
-                        "lr": 1e-03 * 4,
+                        "lr": 3e-04 * 4,
                         "gradient_accumulation_steps": 4,
+                    },
+                    "training_control": {
+                        "mixing_alpha": 0.1,
                     },
                     "attribution_analysis": {
                         "max_attributions_per_class": 200,
@@ -881,7 +885,6 @@ def _should_compile():
                             "model_init_config": {
                                 "kernel_width": 8,
                                 "channel_exp_base": 2,
-                                "l1": 2e-05,
                             },
                         },
                     },
@@ -1142,7 +1145,10 @@ def _check_identified_snps(
 
 
 def _check_snp_types(
-    cls_name: str, top_grads_msk, expected_idxs, at_least_n: int
+    cls_name: str,
+    top_grads_msk: dict[str, dict[str, np.ndarray]],
+    expected_idxs: list[int],
+    at_least_n: int,
 ) -> bool:
     """
     Adds a check for SNP types (i.e. reference homozygous, heterozygous, alternative

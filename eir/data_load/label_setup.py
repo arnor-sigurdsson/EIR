@@ -335,11 +335,12 @@ def chunked_label_df_parse_wrapper(
     label_file_tabular_info: TabularFileInfo,
     ids_to_keep: Union[None, Sequence[str]],
 ) -> pl.DataFrame:
-
     label_columns, dtypes = _get_all_label_columns_and_dtypes(
         cat_columns=label_file_tabular_info.cat_columns,
         con_columns=label_file_tabular_info.con_columns,
     )
+
+    dtypes = _ensure_id_str_dtype(dtypes=dtypes)
 
     assert isinstance(label_file_tabular_info.parsing_chunk_size, int)
 
@@ -356,13 +357,12 @@ def chunked_label_df_parse_wrapper(
         if chunk.height == 0:
             return None
 
+        chunk = chunk.select([pl.col("ID").cast(pl.Utf8), pl.all().exclude("ID")])
+
         df_labels_filtered = _filter_ids_from_label_df(
             df_labels=chunk,
             ids_to_keep=ids_to_keep,
         )
-
-        if df_labels_filtered.height == 0:
-            return None
 
         if df_labels_filtered.height == 0:
             return None
@@ -381,8 +381,12 @@ def chunked_label_df_parse_wrapper(
             break
 
         for chunk in next_batches:
-            processed_chunk = process_chunk(chunk)
+            processed_chunk = process_chunk(chunk=chunk)
             if processed_chunk is not None:
+                pre_check_label_df(
+                    df=processed_chunk,
+                    name=f"{label_file_tabular_info.file_path}:chunk",
+                )
                 processed_chunks.append(processed_chunk)
 
     if not processed_chunks:
@@ -647,7 +651,7 @@ def _get_currently_available_columns(
     label_fpath: Path,
     requested_columns: List[str],
 ) -> List[str]:
-    label_file_columns_set = set(pl.read_csv(label_fpath, n_rows=0).columns)
+    label_file_columns_set = set(pl.read_csv(source=label_fpath, n_rows=0).columns)
 
     requested_columns_set = set(requested_columns)
 
