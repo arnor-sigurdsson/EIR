@@ -75,8 +75,8 @@ def test_load_labels_for_predict(
     # make sure that target columns are unchanged (within expected bounds)
     assert len(target_tabular_info.con_columns) == 1
     con_target_column = target_tabular_info.con_columns[0]
-    assert df_test[con_target_column].max() < 220
-    assert df_test[con_target_column].min() > 130
+    assert df_test[con_target_column].max() < 260
+    assert df_test[con_target_column].min() > 120
 
     assert len(target_tabular_info.cat_columns) == 1
     cat_target_column = target_tabular_info.cat_columns[0]

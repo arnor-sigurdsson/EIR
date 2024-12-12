@@ -26,15 +26,20 @@ def set_up_label_line_dict(sample_name: str, fieldnames: List[str]):
 
 
 def get_current_test_label_values(
-    values_dict: dict, num_active_elements_in_sample: int, cur_class: str
+    values_dict: dict,
+    num_active_elements_in_sample: int,
+    cur_class: str,
 ) -> dict:
-    class_base_heights = {"Asia": 120, "Europe": 140, "Africa": 160}
+    class_base_heights = {"Asia": 120, "Europe": 130, "Africa": 140}
+    class_multiplier = {"Asia": 3.5, "Europe": 5.0, "Africa": 10.0}
     cur_base_height = class_base_heights[cur_class]
+    cur_class_multiplier = class_multiplier[cur_class]
 
-    added_height = 5 * num_active_elements_in_sample
+    added_height = cur_class_multiplier * num_active_elements_in_sample
     noise = np.random.randn()
 
     height_value = cur_base_height + added_height + noise
+
     values_dict["Height"] = height_value
     values_dict["ExtraTarget"] = height_value - 50
     values_dict["SparseHeight"] = height_value
@@ -54,7 +59,7 @@ def get_current_test_label_values(
 
     time_noise = np.random.normal(0, 100)
 
-    time = max(50, base_time + height_effect + time_noise)
+    time = max(50, int(base_time + height_effect + time_noise))
     values_dict["Time"] = time
 
     return values_dict
