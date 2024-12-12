@@ -59,7 +59,7 @@ def get_current_test_label_values(
 
     time_noise = np.random.normal(0, 100)
 
-    time = max(50, int(base_time + height_effect + time_noise))
+    time = max(50.0, base_time + height_effect + time_noise)
     values_dict["Time"] = time
 
     return values_dict
