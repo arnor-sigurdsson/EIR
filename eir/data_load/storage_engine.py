@@ -6,6 +6,7 @@ from typing import Any, Optional, Type
 import numpy as np
 import polars as pl
 import torch
+from numpy.typing import DTypeLike
 
 from eir.utils.logging import get_logger
 
@@ -32,6 +33,7 @@ class ColumnInfo:
     array_shape: Optional[tuple[int, ...]] = None
     inner_dtype: Optional[str] = None
     torch_dtype: Optional[torch.dtype] = None
+    np_dtype: Optional[DTypeLike] = None
 
 
 class HybridStorage:
@@ -98,6 +100,7 @@ class HybridStorage:
                 torch_dtype = (
                     torch.float32 if "float" in dtype_str.lower() else torch.int64
                 )
+                np_dtype = np.float32 if "float" in dtype_str.lower() else np.int64
                 self.numeric_columns.append(
                     ColumnInfo(
                         name=col,
@@ -105,6 +108,7 @@ class HybridStorage:
                         original_dtype=dtype_str,
                         index=idx,
                         torch_dtype=torch_dtype,
+                        np_dtype=np_dtype,
                     )
                 )
             elif _is_path_dtype(name=col, values=series):
@@ -365,7 +369,8 @@ class HybridStorage:
             values_np = np.where(row_isnan.cpu().numpy(), np.nan, values_np)
 
             for i, col_info in enumerate(self.numeric_columns):
-                result[col_info.name] = values_np[i]
+                value = values_np[i].astype(col_info.np_dtype)
+                result[col_info.name] = value
 
         if self.fixed_array_data is not None:
             for i, col_info in enumerate(self.fixed_array_columns):
