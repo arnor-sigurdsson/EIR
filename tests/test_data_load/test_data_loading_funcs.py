@@ -128,32 +128,65 @@ def _check_if_all_numbers_close(list_of_numbers, abs_tol):
 def patch_dataset_to_be_unbalanced(
     dataset: al_datasets,
 ) -> al_datasets:
-    """Makes dataset unbalanced by limiting samples with Origin=1 to max_values=100"""
     max_values = 100
 
-    origin_col_idx = next(
-        i
-        for i, col in enumerate(dataset.target_labels_storage.numeric_columns)
-        if col.name == "test_output_tabular__Origin"
-    )
-    origin_data = dataset.target_labels_storage.numeric_data[origin_col_idx]
+    origin_data = None
+
+    for data_type in ["int", "float"]:
+        columns = (
+            dataset.target_labels_storage.numeric_int_columns
+            if data_type == "int"
+            else dataset.target_labels_storage.numeric_float_columns
+        )
+        data = (
+            dataset.target_labels_storage.numeric_int_data
+            if data_type == "int"
+            else dataset.target_labels_storage.numeric_float_data
+        )
+
+        try:
+            origin_col_idx = next(
+                i
+                for i, col in enumerate(columns)
+                if col.name == "test_output_tabular__Origin"
+            )
+            origin_data = data[origin_col_idx]
+            break
+        except StopIteration:
+            continue
+
+    if origin_data is None:
+        raise ValueError("Origin column not found in either float or int data")
 
     origin_1_mask = (origin_data == 1).cumsum(0) <= max_values
     keep_indices = torch.where(origin_1_mask | (origin_data != 1))[0]
 
     new_target_storage = HybridStorage()
-    new_target_storage.numeric_columns = (
-        dataset.target_labels_storage.numeric_columns.copy()
+
+    new_target_storage.numeric_int_columns = (
+        dataset.target_labels_storage.numeric_int_columns.copy()
+    )
+    new_target_storage.numeric_float_columns = (
+        dataset.target_labels_storage.numeric_float_columns.copy()
     )
     new_target_storage.string_columns = (
         dataset.target_labels_storage.string_columns.copy()
     )
-    new_target_storage.numeric_data = dataset.target_labels_storage.numeric_data[
-        :, keep_indices
-    ]
-    new_target_storage.string_data = dataset.target_labels_storage.string_data[
-        :, keep_indices.numpy()
-    ]
+
+    if dataset.target_labels_storage.numeric_int_data is not None:
+        new_target_storage.numeric_int_data = (
+            dataset.target_labels_storage.numeric_int_data[:, keep_indices]
+        )
+    if dataset.target_labels_storage.numeric_float_data is not None:
+        new_target_storage.numeric_float_data = (
+            dataset.target_labels_storage.numeric_float_data[:, keep_indices]
+        )
+
+    if dataset.target_labels_storage.string_data is not None:
+        new_target_storage.string_data = dataset.target_labels_storage.string_data[
+            :, keep_indices.numpy()
+        ]
+
     new_target_storage._num_rows = len(keep_indices)
 
     id_col_idx = next(
@@ -165,6 +198,8 @@ def patch_dataset_to_be_unbalanced(
         keep_indices.numpy()
     ]
 
+    new_input_storage = HybridStorage()
+
     input_id_col_idx = next(
         i
         for i, col in enumerate(dataset.input_storage.string_columns)
@@ -174,20 +209,31 @@ def patch_dataset_to_be_unbalanced(
     input_mask = np.isin(input_ids, keep_ids)
     input_indices = torch.from_numpy(np.where(input_mask)[0])
 
-    new_input_storage = HybridStorage()
-    new_input_storage.numeric_columns = dataset.input_storage.numeric_columns.copy()
+    new_input_storage.numeric_int_columns = (
+        dataset.input_storage.numeric_int_columns.copy()
+    )
+    new_input_storage.numeric_float_columns = (
+        dataset.input_storage.numeric_float_columns.copy()
+    )
     new_input_storage.string_columns = dataset.input_storage.string_columns.copy()
-    new_input_storage.numeric_data = dataset.input_storage.numeric_data[
-        :, input_indices
-    ]
-    new_input_storage.string_data = dataset.input_storage.string_data[
-        :, input_indices.numpy()
-    ]
-
-    new_input_storage.path_data = dataset.input_storage.path_data[
-        :, input_indices.numpy()
-    ]
     new_input_storage.path_columns = dataset.input_storage.path_columns.copy()
+
+    if dataset.input_storage.numeric_int_data is not None:
+        new_input_storage.numeric_int_data = dataset.input_storage.numeric_int_data[
+            :, input_indices
+        ]
+    if dataset.input_storage.numeric_float_data is not None:
+        new_input_storage.numeric_float_data = dataset.input_storage.numeric_float_data[
+            :, input_indices
+        ]
+    if dataset.input_storage.string_data is not None:
+        new_input_storage.string_data = dataset.input_storage.string_data[
+            :, input_indices.numpy()
+        ]
+    if dataset.input_storage.path_data is not None:
+        new_input_storage.path_data = dataset.input_storage.path_data[
+            :, input_indices.numpy()
+        ]
 
     new_input_storage._num_rows = len(input_indices)
 

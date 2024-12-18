@@ -37,21 +37,17 @@ class ColumnInfo:
 
 
 class HybridStorage:
-    """
-    Storage for mixed-type data using torch.Tensor for numeric data
-    and numpy arrays for other data types that cannot be neatly
-    represented as tensors.
-    """
-
     def __init__(self):
-        self.numeric_data: Optional[torch.Tensor] = None
+        self.numeric_float_data: Optional[torch.Tensor] = None
+        self.numeric_int_data: Optional[torch.Tensor] = None
         self.string_data: Optional[np.ndarray] = None
         self.path_data: Optional[np.ndarray] = None
         self.fixed_array_data: Optional[list[torch.Tensor]] = None
         self.var_array_data: Optional[list[np.ndarray]] = None
         self.object_data: Optional[dict[str, list[object]]] = None
 
-        self.numeric_columns: list[ColumnInfo] = []
+        self.numeric_float_columns: list[ColumnInfo] = []
+        self.numeric_int_columns: list[ColumnInfo] = []
         self.string_columns: list[ColumnInfo] = []
         self.path_columns: list[ColumnInfo] = []
         self.fixed_array_columns: list[ColumnInfo] = []
@@ -97,20 +93,34 @@ class HybridStorage:
                 continue
 
             if _is_numeric_dtype(dtype=dtype):
-                torch_dtype = (
-                    torch.float32 if "float" in dtype_str.lower() else torch.int64
-                )
-                np_dtype = np.float32 if "float" in dtype_str.lower() else np.int64
-                self.numeric_columns.append(
-                    ColumnInfo(
-                        name=col,
-                        dtype=ColumnType.NUMERIC,
-                        original_dtype=dtype_str,
-                        index=idx,
-                        torch_dtype=torch_dtype,
-                        np_dtype=np_dtype,
+                is_float = "float" in dtype_str.lower()
+                if is_float:
+                    torch_dtype = torch.float32
+                    np_dtype_float = np.float32
+                    self.numeric_float_columns.append(
+                        ColumnInfo(
+                            name=col,
+                            dtype=ColumnType.NUMERIC,
+                            original_dtype=dtype_str,
+                            index=idx,
+                            torch_dtype=torch_dtype,
+                            np_dtype=np_dtype_float,
+                        )
                     )
-                )
+                else:
+                    torch_dtype = torch.int64
+                    np_dtype_int = np.int64
+                    self.numeric_int_columns.append(
+                        ColumnInfo(
+                            name=col,
+                            dtype=ColumnType.NUMERIC,
+                            original_dtype=dtype_str,
+                            index=idx,
+                            torch_dtype=torch_dtype,
+                            np_dtype=np_dtype_int,
+                        )
+                    )
+
             elif _is_path_dtype(name=col, values=series):
                 self.path_columns.append(
                     ColumnInfo(
@@ -120,6 +130,7 @@ class HybridStorage:
                         index=idx,
                     )
                 )
+
             elif _is_string_dtype(dtype=dtype):
                 self.string_columns.append(
                     ColumnInfo(
@@ -139,12 +150,19 @@ class HybridStorage:
                     )
                 )
 
-        if self.numeric_columns:
-            numeric_data = []
-            for col_info in self.numeric_columns:
+        if self.numeric_float_columns:
+            float_data = []
+            for col_info in self.numeric_float_columns:
                 series = df.get_column(name=col_info.name)
-                numeric_data.append(torch.tensor(series.to_numpy()))
-            self.numeric_data = torch.stack(numeric_data) if numeric_data else None
+                float_data.append(torch.tensor(series.to_numpy(), dtype=torch.float32))
+            self.numeric_float_data = torch.stack(float_data) if float_data else None
+
+        if self.numeric_int_columns:
+            int_data = []
+            for col_info in self.numeric_int_columns:
+                series = df.get_column(name=col_info.name)
+                int_data.append(torch.tensor(series.to_numpy(), dtype=torch.int64))
+            self.numeric_int_data = torch.stack(int_data) if int_data else None
 
         if self.fixed_array_columns:
             fixed_array_data = []
@@ -211,7 +229,8 @@ class HybridStorage:
             return result
 
         sections = [
-            ("Numeric", self.numeric_columns),
+            ("Numeric Float", self.numeric_float_columns),
+            ("Numeric Int", self.numeric_int_columns),
             ("Fixed Array", self.fixed_array_columns),
             ("Variable Array", self.var_array_columns),
             ("String", self.string_columns),
@@ -226,7 +245,8 @@ class HybridStorage:
 
     def __str__(self) -> str:
         counts = {
-            "numeric": len(self.numeric_columns),
+            "numeric_float": len(self.numeric_float_columns),
+            "numeric_int": len(self.numeric_int_columns),
             "fixed_array": len(self.fixed_array_columns),
             "var_array": len(self.var_array_columns),
             "string": len(self.string_columns),
@@ -272,8 +292,12 @@ class HybridStorage:
 
         masks = []
 
-        if self.numeric_data is not None:
-            numeric_mask = torch.isnan(self.numeric_data).all(dim=0).numpy()
+        if self.numeric_float_data is not None:
+            numeric_mask = torch.isnan(self.numeric_float_data).all(dim=0).numpy()
+            masks.append(numeric_mask)
+
+        if self.numeric_int_data is not None:
+            numeric_mask = torch.isnan(self.numeric_int_data).all(dim=0).numpy()
             masks.append(numeric_mask)
 
         if self.string_data is not None:
@@ -338,7 +362,6 @@ class HybridStorage:
         self.check_data()
 
         memory_bytes = get_total_memory(
-            numeric_data=self.numeric_data,
             string_data=self.string_data,
             path_data=self.path_data,
             fixed_array_data=self.fixed_array_data,
@@ -358,19 +381,21 @@ class HybridStorage:
     def get_row(self, idx: int) -> dict[str, Any]:
         result: dict[str, Any] = {}
 
-        if self.numeric_data is not None:
-            row_values = self.numeric_data[:, idx]
+        if self.numeric_float_data is not None:
+            row_values = self.numeric_float_data[:, idx]
             row_isnan = torch.isnan(row_values)
-
-            # the isnan check there is to guard against the case where
-            # if we have nan, casting directly to long will corrupt / convert it to 0
-            # in torch
             values_np = row_values.cpu().numpy()
             values_np = np.where(row_isnan.cpu().numpy(), np.nan, values_np)
 
-            for i, col_info in enumerate(self.numeric_columns):
-                value = values_np[i].astype(col_info.np_dtype)
-                result[col_info.name] = value
+            for i, col_info in enumerate(self.numeric_float_columns):
+                result[col_info.name] = values_np[i]
+
+        if self.numeric_int_data is not None:
+            row_values = self.numeric_int_data[:, idx]
+            values_np = row_values.cpu().numpy()
+
+            for i, col_info in enumerate(self.numeric_int_columns):
+                result[col_info.name] = values_np[i]
 
         if self.fixed_array_data is not None:
             for i, col_info in enumerate(self.fixed_array_columns):
@@ -459,8 +484,12 @@ def check_two_storages(
 
     masks = []
 
-    if target_storage.numeric_data is not None:
-        numeric_mask = torch.isnan(target_storage.numeric_data).all(dim=0).numpy()
+    if target_storage.numeric_float_data is not None:
+        numeric_mask = torch.isnan(target_storage.numeric_float_data).all(dim=0).numpy()
+        masks.append(numeric_mask)
+
+    if target_storage.numeric_int_data is not None:
+        numeric_mask = torch.isnan(target_storage.numeric_int_data).all(dim=0).numpy()
         masks.append(numeric_mask)
 
     if target_storage.string_data is not None:
@@ -571,10 +600,16 @@ def polars_dtype_to_str_dtype(polars_dtype: Type[pl.DataType]) -> str:
     return dtype_map[polars_dtype]
 
 
-def get_numeric_memory(data: Optional[torch.Tensor]) -> int:
-    if data is None:
-        return 0
-    return data.element_size() * data.nelement()
+def get_numeric_memory(
+    float_data: Optional[torch.Tensor] = None,
+    int_data: Optional[torch.Tensor] = None,
+) -> int:
+    total = 0
+    if float_data is not None:
+        total += float_data.element_size() * float_data.nelement()
+    if int_data is not None:
+        total += int_data.element_size() * int_data.nelement()
+    return total
 
 
 def get_fixed_array_memory(data: Optional[list[torch.Tensor]]) -> int:
@@ -618,7 +653,8 @@ def format_memory_size(bytes_size: int) -> tuple[float, str]:
 
 
 def get_total_memory(
-    numeric_data: Optional[torch.Tensor] = None,
+    numeric_float_data: Optional[torch.Tensor] = None,
+    numeric_int_data: Optional[torch.Tensor] = None,
     string_data: Optional[np.ndarray] = None,
     path_data: Optional[np.ndarray] = None,
     fixed_array_data: Optional[list[torch.Tensor]] = None,
@@ -627,7 +663,10 @@ def get_total_memory(
 ) -> int:
     return sum(
         [
-            get_numeric_memory(data=numeric_data),
+            get_numeric_memory(
+                float_data=numeric_float_data,
+                int_data=numeric_int_data,
+            ),
             get_fixed_array_memory(data=fixed_array_data),
             get_array_memory(data=string_data),
             get_path_memory(data=path_data),
