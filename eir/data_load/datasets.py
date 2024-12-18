@@ -820,8 +820,7 @@ def process_row_values(
     row: dict,
     column_map: dict[str, tuple[str, str | None]],
 ) -> dict[str, Any]:
-    result = {}
-    nested_results: dict[str, Any] = {}
+    result: dict[str, Any] = {}
 
     for col, (main_key, sub_key) in column_map.items():
         value = row[col]
@@ -830,10 +829,9 @@ def process_row_values(
 
         value = convert_value(value=value)
         if sub_key:
-            if main_key not in nested_results:
-                nested_results[main_key] = {}
-                result[main_key] = nested_results[main_key]
-            nested_results[main_key][sub_key] = value
+            if main_key not in result:
+                result[main_key] = {}
+            result[main_key][sub_key] = value
         else:
             result[main_key] = value
 
