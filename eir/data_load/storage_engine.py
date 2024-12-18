@@ -143,8 +143,13 @@ class HybridStorage:
             numeric_data = []
             for col_info in self.numeric_columns:
                 series = df.get_column(name=col_info.name)
-                numeric_data.append(torch.tensor(series.to_numpy()))
-            self.numeric_data = torch.stack(numeric_data) if numeric_data else None
+                tensor = torch.tensor(series.to_numpy(), dtype=torch.float32)
+                numeric_data.append(tensor)
+
+            final_data = None
+            if numeric_data:
+                final_data = torch.stack(numeric_data).to(dtype=torch.float32)
+            self.numeric_data = final_data
 
         if self.fixed_array_columns:
             fixed_array_data = []
@@ -362,14 +367,16 @@ class HybridStorage:
             row_values = self.numeric_data[:, idx]
             row_isnan = torch.isnan(row_values)
 
-            # the isnan check there is to guard against the case where
-            # if we have nan, casting directly to long will corrupt / convert it to 0
-            # in torch
             values_np = row_values.cpu().numpy()
             values_np = np.where(row_isnan.cpu().numpy(), np.nan, values_np)
 
             for i, col_info in enumerate(self.numeric_columns):
-                value = values_np[i].astype(col_info.np_dtype).item()
+                value = values_np[i]
+                # the isnan check there is to guard against the case where
+                # if we have nan, casting directly to long will corrupt/convert it
+                # to 0 in torch and numpy
+                if not np.isnan(value):
+                    value = value.astype(col_info.np_dtype).item()
                 result[col_info.name] = value
 
         if self.fixed_array_data is not None:
@@ -539,7 +546,7 @@ def check_two_storages(
 
 def is_null_value(value: Any) -> bool:
     value_type = type(value)
-    if value_type is float:
+    if value_type in (float, np.float32, np.float64):
         return np.isnan(value)
     if value_type is str:
         return value in NULL_STRINGS

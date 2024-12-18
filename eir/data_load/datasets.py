@@ -366,6 +366,8 @@ def add_data_to_df(
                     ids_to_keep=ids_to_keep,
                     source_name=input_name,
                 )
+                # TODO: Perhaps delete the input_object.labels.{train,valid}_labels
+                #       after adding the data to the input_df.
             case ComputedSequenceInputInfo() if Path(input_source).suffix == ".csv":
                 input_type_info = input_object.input_config.input_type_info
                 assert isinstance(input_type_info, SequenceInputDataConfig)
