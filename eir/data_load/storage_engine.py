@@ -155,14 +155,22 @@ class HybridStorage:
             for col_info in self.numeric_float_columns:
                 series = df.get_column(name=col_info.name)
                 float_data.append(torch.tensor(series.to_numpy(), dtype=torch.float32))
-            self.numeric_float_data = torch.stack(float_data) if float_data else None
+
+            final_data = None
+            if float_data:
+                final_data = torch.stack(float_data).to(dtype=torch.float32)
+            self.numeric_float_data = final_data
 
         if self.numeric_int_columns:
             int_data = []
             for col_info in self.numeric_int_columns:
                 series = df.get_column(name=col_info.name)
                 int_data.append(torch.tensor(series.to_numpy(), dtype=torch.int64))
-            self.numeric_int_data = torch.stack(int_data) if int_data else None
+
+            final_data = None
+            if int_data:
+                final_data = torch.stack(int_data).to(dtype=torch.int64)
+            self.numeric_int_data = final_data
 
         if self.fixed_array_columns:
             fixed_array_data = []
@@ -384,18 +392,29 @@ class HybridStorage:
         if self.numeric_float_data is not None:
             row_values = self.numeric_float_data[:, idx]
             row_isnan = torch.isnan(row_values)
+
             values_np = row_values.cpu().numpy()
             values_np = np.where(row_isnan.cpu().numpy(), np.nan, values_np)
 
             for i, col_info in enumerate(self.numeric_float_columns):
+                # these are already float32, so no special handling needed for NaN
                 result[col_info.name] = values_np[i]
 
         if self.numeric_int_data is not None:
             row_values = self.numeric_int_data[:, idx]
+            row_isnan = torch.isnan(row_values)
+
             values_np = row_values.cpu().numpy()
+            values_np = np.where(row_isnan.cpu().numpy(), np.nan, values_np)
 
             for i, col_info in enumerate(self.numeric_int_columns):
-                result[col_info.name] = values_np[i]
+                value = values_np[i]
+                # the isnan check there is to guard against the case where
+                # if we have nan, casting directly to long will corrupt/convert it
+                # to 0 in torch and numpy
+                if not np.isnan(value):
+                    value = value.astype(col_info.np_dtype).item()
+                result[col_info.name] = value
 
         if self.fixed_array_data is not None:
             for i, col_info in enumerate(self.fixed_array_columns):
@@ -568,7 +587,7 @@ def check_two_storages(
 
 def is_null_value(value: Any) -> bool:
     value_type = type(value)
-    if value_type is float:
+    if value_type in (float, np.float32, np.float64):
         return np.isnan(value)
     if value_type is str:
         return value in NULL_STRINGS

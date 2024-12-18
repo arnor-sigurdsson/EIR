@@ -37,7 +37,8 @@ al_fill_values = dict[str, bool | int | float | dict[str, int | float]]
 
 
 def impute_missing_modalities_wrapper(
-    inputs_values: dict[str, Any], inputs_objects: "al_input_objects_as_dict"
+    inputs_values: dict[str, Any],
+    inputs_objects: "al_input_objects_as_dict",
 ) -> Dict[str, torch.Tensor]:
     impute_dtypes = _get_default_impute_dtypes(inputs_objects=inputs_objects)
     impute_fill_values = _get_default_impute_fill_values(inputs_objects=inputs_objects)
