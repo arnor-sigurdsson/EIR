@@ -369,7 +369,7 @@ class HybridStorage:
             values_np = np.where(row_isnan.cpu().numpy(), np.nan, values_np)
 
             for i, col_info in enumerate(self.numeric_columns):
-                value = values_np[i].astype(col_info.np_dtype)
+                value = values_np[i].astype(col_info.np_dtype).item()
                 result[col_info.name] = value
 
         if self.fixed_array_data is not None:
