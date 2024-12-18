@@ -353,17 +353,17 @@ class HybridStorage:
         result: dict[str, Any] = {}
 
         if self.numeric_data is not None:
+            row_values = self.numeric_data[:, idx]
+            row_isnan = torch.isnan(row_values)
+
             # the isnan check there is to guard against the case where
             # if we have nan, casting directly to long will corrupt / convert it to 0
             # in torch
-            for i, col_info in enumerate(self.numeric_columns):
-                value_tensor = self.numeric_data[i, idx]
-                if torch.isnan(value_tensor):
-                    value = np.nan
-                else:
-                    value = value_tensor.to(dtype=col_info.torch_dtype).item()
+            values_np = row_values.cpu().numpy()
+            values_np = np.where(row_isnan.cpu().numpy(), np.nan, values_np)
 
-                result[col_info.name] = value
+            for i, col_info in enumerate(self.numeric_columns):
+                result[col_info.name] = values_np[i]
 
         if self.fixed_array_data is not None:
             for i, col_info in enumerate(self.fixed_array_columns):
