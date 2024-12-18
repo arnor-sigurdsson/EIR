@@ -11,6 +11,8 @@ from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
+NULL_STRINGS = frozenset(("", "None", "null", "nan", "__NULL__"))
+
 
 class ColumnType(Enum):
     NUMERIC = "numeric"
@@ -531,13 +533,16 @@ def check_two_storages(
 
 
 def is_null_value(value: Any) -> bool:
-    if isinstance(value, (np.ndarray, torch.Tensor)):
+    value_type = type(value)
+    if value_type is float:
+        return np.isnan(value)
+    if value_type is str:
+        return value in NULL_STRINGS
+    if value_type is type(None):
+        return True
+    if value_type is int:
         return False
-    if isinstance(value, str):
-        return value in ("", "None", "null", "nan", "__NULL__")
-    if isinstance(value, (int, float)):
-        return np.isnan(value) if isinstance(value, float) else False
-    return value is None
+    return False
 
 
 def polars_dtype_to_str_dtype(polars_dtype: Type[pl.DataType]) -> str:
