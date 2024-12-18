@@ -165,7 +165,13 @@ class HybridStorage:
             int_data = []
             for col_info in self.numeric_int_columns:
                 series = df.get_column(name=col_info.name)
-                int_data.append(torch.tensor(series.to_numpy(), dtype=torch.int64))
+                # will be cast to float64 with NaN
+                # copy as the original data is read-only
+                numpy_arr = series.to_numpy().copy()
+
+                numpy_arr[np.isnan(numpy_arr)] = -1
+                tensor = torch.tensor(numpy_arr, dtype=torch.int64)
+                int_data.append(tensor)
 
             final_data = None
             if int_data:
@@ -402,19 +408,15 @@ class HybridStorage:
 
         if self.numeric_int_data is not None:
             row_values = self.numeric_int_data[:, idx]
-            row_isnan = torch.isnan(row_values)
-
             values_np = row_values.cpu().numpy()
-            values_np = np.where(row_isnan.cpu().numpy(), np.nan, values_np)
 
             for i, col_info in enumerate(self.numeric_int_columns):
                 value = values_np[i]
-                # the isnan check there is to guard against the case where
-                # if we have nan, casting directly to long will corrupt/convert it
-                # to 0 in torch and numpy
-                if not np.isnan(value):
-                    value = value.astype(col_info.np_dtype).item()
-                result[col_info.name] = value
+                # Convert -1 sentinel back to None for null values
+                if value == -1:
+                    result[col_info.name] = None
+                else:
+                    result[col_info.name] = value.item()
 
         if self.fixed_array_data is not None:
             for i, col_info in enumerate(self.fixed_array_columns):
