@@ -376,6 +376,8 @@ class HybridStorage:
         self.check_data()
 
         memory_bytes = get_total_memory(
+            numeric_float_data=self.numeric_float_data,
+            numeric_int_data=self.numeric_int_data,
             string_data=self.string_data,
             path_data=self.path_data,
             fixed_array_data=self.fixed_array_data,
