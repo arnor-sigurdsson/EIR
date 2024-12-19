@@ -178,7 +178,8 @@ def plot_attributions_bar(
     )
 
     plt.tight_layout()
-    sns_figure: Optional[plt.Figure] = ax.get_figure()
+    sns_figure: Optional[plt.Figure | plt.SubFigure] = ax.get_figure()
+    assert isinstance(sns_figure, plt.Figure)
     assert sns_figure is not None
 
     if title:

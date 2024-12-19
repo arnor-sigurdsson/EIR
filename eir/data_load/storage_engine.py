@@ -6,10 +6,13 @@ from typing import Any, Optional, Type
 import numpy as np
 import polars as pl
 import torch
+from numpy.typing import DTypeLike
 
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
+
+NULL_STRINGS = frozenset(("", "None", "null", "nan", "__NULL__"))
 
 
 class ColumnType(Enum):
@@ -30,6 +33,7 @@ class ColumnInfo:
     array_shape: Optional[tuple[int, ...]] = None
     inner_dtype: Optional[str] = None
     torch_dtype: Optional[torch.dtype] = None
+    np_dtype: Optional[DTypeLike] = None
 
 
 class HybridStorage:
@@ -96,6 +100,7 @@ class HybridStorage:
                 torch_dtype = (
                     torch.float32 if "float" in dtype_str.lower() else torch.int64
                 )
+                np_dtype = np.float32 if "float" in dtype_str.lower() else np.int64
                 self.numeric_columns.append(
                     ColumnInfo(
                         name=col,
@@ -103,6 +108,7 @@ class HybridStorage:
                         original_dtype=dtype_str,
                         index=idx,
                         torch_dtype=torch_dtype,
+                        np_dtype=np_dtype,
                     )
                 )
             elif _is_path_dtype(name=col, values=series):
@@ -137,8 +143,13 @@ class HybridStorage:
             numeric_data = []
             for col_info in self.numeric_columns:
                 series = df.get_column(name=col_info.name)
-                numeric_data.append(torch.tensor(series.to_numpy()))
-            self.numeric_data = torch.stack(numeric_data) if numeric_data else None
+                tensor = torch.tensor(series.to_numpy(), dtype=torch.float32)
+                numeric_data.append(tensor)
+
+            final_data = None
+            if numeric_data:
+                final_data = torch.stack(numeric_data).to(dtype=torch.float32)
+            self.numeric_data = final_data
 
         if self.fixed_array_columns:
             fixed_array_data = []
@@ -353,16 +364,19 @@ class HybridStorage:
         result: dict[str, Any] = {}
 
         if self.numeric_data is not None:
-            # the isnan check there is to guard against the case where
-            # if we have nan, casting directly to long will corrupt / convert it to 0
-            # in torch
-            for i, col_info in enumerate(self.numeric_columns):
-                value_tensor = self.numeric_data[i, idx]
-                if torch.isnan(value_tensor):
-                    value = np.nan
-                else:
-                    value = value_tensor.to(dtype=col_info.torch_dtype).item()
+            row_values = self.numeric_data[:, idx]
+            row_isnan = torch.isnan(row_values)
 
+            values_np = row_values.cpu().numpy()
+            values_np = np.where(row_isnan.cpu().numpy(), np.nan, values_np)
+
+            for i, col_info in enumerate(self.numeric_columns):
+                value = values_np[i]
+                # the isnan check there is to guard against the case where
+                # if we have nan, casting directly to long will corrupt/convert it
+                # to 0 in torch and numpy
+                if not np.isnan(value):
+                    value = value.astype(col_info.np_dtype).item()
                 result[col_info.name] = value
 
         if self.fixed_array_data is not None:
@@ -531,13 +545,16 @@ def check_two_storages(
 
 
 def is_null_value(value: Any) -> bool:
-    if isinstance(value, (np.ndarray, torch.Tensor)):
+    value_type = type(value)
+    if value_type in (float, np.float32, np.float64):
+        return np.isnan(value)
+    if value_type is str:
+        return value in NULL_STRINGS
+    if value_type is type(None):
+        return True
+    if value_type is int:
         return False
-    if isinstance(value, str):
-        return value in ("", "None", "null", "nan", "__NULL__")
-    if isinstance(value, (int, float)):
-        return np.isnan(value) if isinstance(value, float) else False
-    return value is None
+    return False
 
 
 def polars_dtype_to_str_dtype(polars_dtype: Type[pl.DataType]) -> str:

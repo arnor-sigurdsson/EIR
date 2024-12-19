@@ -366,6 +366,8 @@ def add_data_to_df(
                     ids_to_keep=ids_to_keep,
                     source_name=input_name,
                 )
+                # TODO: Perhaps delete the input_object.labels.{train,valid}_labels
+                #       after adding the data to the input_df.
             case ComputedSequenceInputInfo() if Path(input_source).suffix == ".csv":
                 input_type_info = input_object.input_config.input_type_info
                 assert isinstance(input_type_info, SequenceInputDataConfig)
@@ -829,7 +831,9 @@ def process_row_values(
 
         value = convert_value(value=value)
         if sub_key:
-            result.setdefault(main_key, {})[sub_key] = value
+            if main_key not in result:
+                result[main_key] = {}
+            result[main_key][sub_key] = value
         else:
             result[main_key] = value
 
