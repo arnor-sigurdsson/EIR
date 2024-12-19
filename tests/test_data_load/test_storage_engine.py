@@ -1,6 +1,5 @@
 import numpy as np
 import polars as pl
-import torch
 
 from eir.data_load.storage_engine import NULL_STRINGS, HybridStorage, is_null_value
 
@@ -26,7 +25,7 @@ def test_nan_preservation_in_numeric_data():
 
     row_1 = storage.get_row(1)
     assert np.isnan(row_1["float_col"])
-    assert np.isnan(row_1["mixed_col"])
+    assert row_1["mixed_col"] is None
     assert row_1["float_col2"] == 4.5
     assert row_1["int_col"] == 2
 
@@ -40,50 +39,111 @@ def test_hybrid_storage_dtype_handling():
     df = pl.DataFrame(
         {
             "ID": ["sample1", "sample2"],
-            "int32_col": pl.Series([1, 2], dtype=pl.Int32),
-            "int64_col": pl.Series([3, 4], dtype=pl.Int64),
+            "int32_col": pl.Series([1, None], dtype=pl.Int32),
+            "int64_col": pl.Series([None, 4], dtype=pl.Int64),
             "float32_col": pl.Series([1.5, np.nan], dtype=pl.Float32),
             "float64_col": pl.Series([np.nan, 2.5], dtype=pl.Float64),
         }
     )
 
     storage = HybridStorage()
-    storage.from_polars(df)
+    storage.from_polars(df=df)
 
     row_0 = storage.get_row(0)
-    assert isinstance(row_0["int32_col"], (int, np.integer))
-    assert isinstance(row_0["int64_col"], (int, np.integer))
+    assert row_0["int32_col"] == 1
+    assert row_0["int64_col"] is None
     assert isinstance(row_0["float32_col"], (float, np.floating))
     assert np.isnan(row_0["float64_col"])
 
     row_1 = storage.get_row(1)
-    assert isinstance(row_1["int32_col"], (int, np.integer))
-    assert isinstance(row_1["int64_col"], (int, np.integer))
+    assert row_1["int32_col"] is None
+    assert row_1["int64_col"] == 4
     assert np.isnan(row_1["float32_col"])
     assert isinstance(row_1["float64_col"], (float, np.floating))
 
 
-def test_numeric_data_shape_consistency():
+def test_integer_null_preservation():
     df = pl.DataFrame(
         {
-            "ID": ["sample1", "sample2"],
-            "col1": [1.0, np.nan],
-            "col2": [np.nan, 2.0],
-            "col3": [3.0, 3.0],
+            "ID": ["sample1", "sample2", "sample3"],
+            "int_col1": [1, None, 3],
+            "int_col2": [None, 2, None],
+            "int_col3": pl.Series([1, None, 3], dtype=pl.Int32),
+            "int_col4": pl.Series([None, 2, None], dtype=pl.Int64),
         }
     )
 
     storage = HybridStorage()
-    storage.from_polars(df)
+    storage.from_polars(df=df)
 
-    assert storage.numeric_data is not None
-    expected_shape = (3, 2)  # (num_columns, num_rows)
-    assert storage.numeric_data.shape == expected_shape
+    row_0 = storage.get_row(0)
+    assert row_0["int_col1"] == 1
+    assert row_0["int_col2"] is None
+    assert row_0["int_col3"] == 1
+    assert row_0["int_col4"] is None
 
-    nan_mask = torch.isnan(storage.numeric_data)
-    assert nan_mask[1, 0].item()  # col2, first row
-    assert nan_mask[0, 1].item()  # col1, second row
-    assert not nan_mask[2, :].any()  # col3 has no NaNs
+    row_1 = storage.get_row(1)
+    assert row_1["int_col1"] is None
+    assert row_1["int_col2"] == 2
+    assert row_1["int_col3"] is None
+    assert row_1["int_col4"] == 2
+
+    row_2 = storage.get_row(2)
+    assert row_2["int_col1"] == 3
+    assert row_2["int_col2"] is None
+    assert row_2["int_col3"] == 3
+    assert row_2["int_col4"] is None
+
+
+def test_mixed_numeric_null_handling():
+    df = pl.DataFrame(
+        {
+            "ID": ["sample1", "sample2"],
+            "float_col": [1.5, np.nan],
+            "int_col": [1, None],
+            "float_col2": [np.nan, 2.5],
+            "int_col2": [None, 2],
+        }
+    )
+
+    storage = HybridStorage()
+    storage.from_polars(df=df)
+
+    row_0 = storage.get_row(0)
+    assert row_0["float_col"] == 1.5
+    assert row_0["int_col"] == 1
+    assert np.isnan(row_0["float_col2"])
+    assert row_0["int_col2"] is None
+
+    row_1 = storage.get_row(1)
+    assert np.isnan(row_1["float_col"])
+    assert row_1["int_col"] is None
+    assert row_1["float_col2"] == 2.5
+    assert row_1["int_col2"] == 2
+
+
+def test_numeric_data_tensor_integrity():
+    df = pl.DataFrame(
+        {
+            "ID": ["sample1", "sample2"],
+            "int_col1": [1, None],
+            "int_col2": [None, 2],
+        }
+    )
+
+    storage = HybridStorage()
+    storage.from_polars(df=df)
+
+    assert storage.numeric_int_data is not None
+    expected_shape = (2, 2)  # (num_columns, num_rows)
+    assert storage.numeric_int_data.shape == expected_shape
+
+    # Check that -1 sentinel values are in the correct positions
+    np_data = storage.numeric_int_data.numpy()
+    assert np_data[1, 0] == -1  # int_col2, first row
+    assert np_data[0, 1] == -1  # int_col1, second row
+    assert np_data[0, 0] == 1  # int_col1, first row
+    assert np_data[1, 1] == 2  # int_col2, second row
 
 
 def test_float_null_values():

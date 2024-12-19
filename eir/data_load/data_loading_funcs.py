@@ -89,14 +89,32 @@ def _gather_column_sampling_weights(
             if column == "all":
                 continue
 
-            if any(col.name == column for col in target_storage.numeric_columns):
+            if any(col.name == column for col in target_storage.numeric_int_columns):
                 col_idx = next(
                     i
-                    for i, col in enumerate(target_storage.numeric_columns)
+                    for i, col in enumerate(target_storage.numeric_int_columns)
                     if col.name == column
                 )
-                assert target_storage.numeric_data is not None
-                cur_label_data = target_storage.numeric_data[col_idx].numpy()
+                assert target_storage.numeric_int_data is not None
+                cur_label_data = target_storage.numeric_int_data[col_idx].numpy()
+
+            elif any(
+                col.name == column for col in target_storage.numeric_float_columns
+            ):
+                logger.warning(
+                    f"Computing sampling weights for float column {column}. "
+                    "This is unusual as sampling weights are typically used for "
+                    "categorical data."
+                )
+
+                col_idx = next(
+                    i
+                    for i, col in enumerate(target_storage.numeric_float_columns)
+                    if col.name == column
+                )
+                assert target_storage.numeric_float_data is not None
+                cur_label_data = target_storage.numeric_float_data[col_idx].numpy()
+
             else:
                 raise KeyError(f"Column {column} not found in numeric data")
 
@@ -114,6 +132,7 @@ def _gather_column_sampling_weights(
             )
 
             all_target_label_weight_dicts[column] = cur_weight_dict
+
         except ValueError as e:
             logger.warning(f"Skipping column {column} due to error: {str(e)}.")
         except KeyError:
