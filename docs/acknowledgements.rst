@@ -120,7 +120,7 @@ and so on:
 
 - ``vulture``  – Jendrik Seipp: Find dead code
 
-- ``mypy``  – Jukka Lehtosalo: Optional static typing for Python
+- ``mypy`` : Optional static typing for Python
 
 - ``types-pyyaml`` : Typing stubs for PyYAML
 
