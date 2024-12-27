@@ -119,6 +119,12 @@ Here's how to send requests to the model:
     :language: python
     :caption: Python request example
 
+Here is an example of the response:
+
+.. literalinclude:: ../tutorial_files/h_survival_analysis/01_flchain/request_example/python_request_example.json
+    :language: json
+    :caption: Survival response example
+
 Survival Analysis by Age Groups
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

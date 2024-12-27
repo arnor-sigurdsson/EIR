@@ -145,6 +145,12 @@ Here's an example of sending requests to the model:
 Note that unlike the discrete-time model, this model returns risk scores that are then
 converted to survival probabilities using the baseline hazard function.
 
+Here is an example of the response:
+
+.. literalinclude:: ../tutorial_files/h_survival_analysis/02_flchain_cox/request_example/python_request_example.json
+    :language: json
+    :caption: Survival response example
+
 Survival Analysis by Patient Characteristics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
