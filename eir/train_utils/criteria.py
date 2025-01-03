@@ -506,7 +506,7 @@ def _cox_ph_loss(
 ) -> torch.Tensor:
     valid_mask = (time != -1) & (event != -1)
 
-    # Early returns if no valid samples or no events
+    # Early returns if no valid samples
     if not valid_mask.any():
         return risk_scores.new_zeros((), requires_grad=True)
 
