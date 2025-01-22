@@ -222,7 +222,16 @@ def check_if_should_run_analysis(
 
 
 def get_background_loader(experiment: "Experiment") -> torch.utils.data.DataLoader:
-    background_loader = copy.deepcopy(experiment.train_loader)
+    original_loader = experiment.train_loader
+    shuffle = isinstance(original_loader.sampler, torch.utils.data.RandomSampler)
+
+    background_loader = torch.utils.data.DataLoader(
+        dataset=original_loader.dataset,
+        batch_size=original_loader.batch_size,
+        shuffle=shuffle,
+        num_workers=original_loader.num_workers,
+        pin_memory=original_loader.pin_memory,
+    )
 
     return background_loader
 
