@@ -264,3 +264,24 @@ def validate_tensor_broker_configs(
             f"The following tensor messages are used but not cached: "
             f"{unused_needing_cache}"
         )
+
+
+def validate_global_input_config_sync(
+    global_config: schemas.GlobalConfig,
+    input_configs: Sequence[schemas.InputConfig],
+) -> None:
+    will_compute_attrs = global_config.aa.compute_attributions
+    if not will_compute_attrs:
+        return
+
+    for input_config in input_configs:
+        input_type_info = input_config.input_type_info
+        match input_type_info:
+            case schemas.OmicsInputDataConfig():
+                if input_type_info.snp_file is None:
+                    raise ValueError(
+                        "To compute attributions, the input config must include the "
+                        "path for the snp_file parameter (a .bim file). Kindly "
+                        "fill in the snp_file parameter in the input config"
+                        "with the path to the .bim file."
+                    )

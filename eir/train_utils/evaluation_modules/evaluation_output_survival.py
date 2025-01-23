@@ -109,7 +109,7 @@ def save_survival_evaluation_results_wrapper(
             )
 
         else:
-            risk_scores = model_outputs.numpy()
+            risk_scores = model_outputs.cpu().numpy()
 
             unique_times, baseline_hazard = estimate_baseline_hazard(
                 times=times,
