@@ -122,7 +122,7 @@ def predict_survival_wrapper_with_labels(
             )
 
         else:
-            risk_scores = model_outputs.numpy()
+            risk_scores = model_outputs.cpu().numpy()
 
             baseline_hazard = output_object.baseline_hazard
             unique_times = output_object.baseline_unique_times
