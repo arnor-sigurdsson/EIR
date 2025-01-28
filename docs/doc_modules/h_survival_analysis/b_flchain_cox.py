@@ -50,6 +50,10 @@ def get_flchain_run_1_tabular_info() -> AutoDocExperimentInfo:
             "figures/survival_curves.pdf",
         ),
         (
+            "2400/cox_risk_stratification.pdf",
+            "figures/cox_risk_stratification.pdf",
+        ),
+        (
             "2400/cox_individual_curves.pdf",
             "figures/individual_survival_curves.pdf",
         ),

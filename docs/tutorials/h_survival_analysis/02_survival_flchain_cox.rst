@@ -81,6 +81,10 @@ The model generates survival curves for visualization. Here are some examples fr
     :width: 100%
     :align: center
 
+.. image:: ../tutorial_files/h_survival_analysis/02_flchain_cox/figures/cox_risk_stratification.png
+    :width: 100%
+    :align: center
+
 .. image:: ../tutorial_files/h_survival_analysis/02_flchain_cox/figures/individual_survival_curves.png
     :width: 100%
     :align: center
