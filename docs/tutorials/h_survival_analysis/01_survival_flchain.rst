@@ -93,6 +93,10 @@ some survival curves are plotted in the ``results/samples/<iteration>/`` directo
     :width: 100%
     :align: center
 
+.. image:: ../tutorial_files/h_survival_analysis/01_flchain/figures/discrete_risk_stratification.png
+    :width: 100%
+    :align: center
+
 .. image:: ../tutorial_files/h_survival_analysis/01_flchain/figures/individual_survival_curves.png
     :width: 100%
     :align: center

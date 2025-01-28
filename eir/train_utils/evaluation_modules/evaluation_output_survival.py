@@ -77,11 +77,19 @@ def save_survival_evaluation_results_wrapper(
             it_func = time_kbins_transformer.inverse_transform
             times = it_func(times_binned.reshape(-1, 1)).flatten()
 
-            hazards = torch.sigmoid(model_outputs).numpy()
+            hazards = torch.sigmoid(model_outputs).cpu().numpy()
             survival_probs = np.cumprod(1 - hazards, 1)
             time_bins_except_last = time_bins[:-1]
 
             plot_discrete_survival_curves(
+                times=times,
+                events=events,
+                predicted_probs=survival_probs,
+                time_bins=time_bins_except_last,
+                output_folder=cur_sample_output_folder,
+            )
+
+            plot_discrete_risk_stratification(
                 times=times,
                 events=events,
                 predicted_probs=survival_probs,
@@ -147,6 +155,16 @@ def save_survival_evaluation_results_wrapper(
             )
 
             plot_cox_survival_curves(
+                times=times,
+                events=events,
+                risk_scores=risk_scores,
+                unique_times=unique_times,
+                baseline_survival=baseline_survival,
+                time_points=time_points,
+                output_folder=cur_sample_output_folder,
+            )
+
+            plot_cox_risk_stratification(
                 times=times,
                 events=events,
                 risk_scores=risk_scores,
@@ -253,7 +271,10 @@ def calculate_cox_survival_probs(
     time_points: np.ndarray,
 ) -> np.ndarray:
     interpolated_baseline = np.interp(
-        time_points, unique_times, baseline_survival, right=baseline_survival[-1]
+        time_points,
+        unique_times,
+        baseline_survival,
+        right=baseline_survival[-1],
     )
 
     survival_probs = np.zeros((len(risk_scores), len(time_points)))
@@ -296,6 +317,66 @@ def plot_cox_survival_curves(
     plt.close()
 
 
+def plot_cox_risk_stratification(
+    times: np.ndarray,
+    events: np.ndarray,
+    risk_scores: np.ndarray,
+    unique_times: np.ndarray,
+    baseline_survival: np.ndarray,
+    time_points: np.ndarray,
+    output_folder: Path,
+) -> None:
+    risk_percentiles = [25, 50, 75]
+    risk_thresholds = np.percentile(risk_scores, risk_percentiles)
+
+    colors = ["tab:orange", "tab:green", "tab:red"]
+    group_labels = ["Low Risk (25%)", "Median Risk", "High Risk (75%)"]
+
+    plt.figure(figsize=(12, 8))
+
+    for q, risk, color, label in zip(
+        risk_percentiles,
+        risk_thresholds,
+        colors,
+        group_labels,
+    ):
+        interp_baseline = np.interp(time_points, unique_times, baseline_survival)
+        surv = interp_baseline ** np.exp(risk)
+        plt.plot(
+            time_points,
+            surv,
+            color=color,
+            linestyle="--",
+            label=f"{label} (predicted)",
+        )
+
+    kmf = KaplanMeierFitter()
+
+    mask_low = risk_scores <= risk_thresholds[0]
+    mask_low = mask_low.squeeze()
+    kmf.fit(times[mask_low], events[mask_low], label="KM Low Risk (actual)")
+    kmf.plot_survival_function(color="tab:orange")
+
+    mask_med = (risk_scores > risk_thresholds[0]) & (risk_scores <= risk_thresholds[2])
+    mask_med = mask_med.squeeze()
+    kmf.fit(times[mask_med], events[mask_med], label="KM Median Risk (actual)")
+    kmf.plot_survival_function(color="tab:green")
+
+    mask_high = risk_scores > risk_thresholds[2]
+    mask_high = mask_high.squeeze()
+    kmf.fit(times[mask_high], events[mask_high], label="KM High Risk (actual)")
+    kmf.plot_survival_function(color="tab:red")
+
+    plt.xlabel("Time")
+    plt.ylabel("Survival Probability")
+    plt.title("Risk Stratification: Predicted vs Actual Survival")
+    plt.grid(True, alpha=0.3)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.tight_layout()
+    plt.savefig(f"{output_folder}/cox_risk_stratification.pdf", bbox_inches="tight")
+    plt.close()
+
+
 def plot_cox_individual_curves(
     df: pd.DataFrame,
     time_points: np.ndarray,
@@ -326,26 +407,121 @@ def plot_cox_individual_curves(
 
 
 def plot_discrete_survival_curves(
-    times,
-    events,
-    predicted_probs,
-    time_bins,
-    output_folder,
+    times: np.ndarray,
+    events: np.ndarray,
+    predicted_probs: np.ndarray,
+    time_bins: np.ndarray,
+    output_folder: Path,
 ):
-    kmf = KaplanMeierFitter()
-    kmf.fit(times, events)
+    n_intervals = len(time_bins)
+    at_risk = np.zeros(n_intervals)
+    events_in_bin = np.zeros(n_intervals)
+
+    bin_edges = np.append(time_bins, np.inf)
+
+    for i in range(n_intervals):
+        mask = (times >= bin_edges[i]) & (times < bin_edges[i + 1])
+        at_risk[i] = np.sum(times >= bin_edges[i])
+        events_in_bin[i] = np.sum(events[mask])
+
+    hazard = events_in_bin / at_risk
+    actual_survival = np.cumprod(1 - hazard)
 
     plt.figure(figsize=(10, 6))
-    kmf.plot_survival_function(label="Kaplan-Meier Estimate")
-
-    mean_predicted = predicted_probs.mean(axis=0)
-    plt.step(time_bins, mean_predicted, where="post", label="Mean Predicted")
+    plt.step(time_bins, actual_survival, where="post", label="Actual Survival")
+    plt.step(
+        time_bins, predicted_probs.mean(axis=0), where="post", label="Mean Predicted"
+    )
 
     plt.xlabel("Time")
     plt.ylabel("Survival Probability")
     plt.legend()
-    plt.title("Kaplan-Meier vs Mean Predicted Survival")
-    plt.savefig(f"{output_folder}/survival_curves.png")
+    plt.title("Discrete-time Survival: Actual vs Predicted")
+    plt.savefig(f"{output_folder}/survival_curves.pdf")
+    plt.close()
+
+
+def plot_discrete_risk_stratification(
+    times: np.ndarray,
+    events: np.ndarray,
+    predicted_probs: np.ndarray,
+    time_bins: np.ndarray,
+    output_folder: Path,
+) -> None:
+    risk_scores = predicted_probs.mean(axis=1)
+
+    risk_percentiles = [75, 50, 25]
+    risk_thresholds = np.percentile(risk_scores, [25, 50, 75])
+
+    colors = ["tab:orange", "tab:green", "tab:red"]
+    group_labels = ["Low Risk (75%)", "Median Risk", "High Risk (25%)"]
+
+    plt.figure(figsize=(12, 8))
+
+    bin_edges = np.append(time_bins, np.inf)
+    n_intervals = len(time_bins)
+
+    for risk_level, color, label in zip(risk_percentiles, colors, group_labels):
+        # Low risk (top 25% survival probability)
+        if risk_level == 75:
+            mask = risk_scores > risk_thresholds[2]
+        # Medium risk
+        elif risk_level == 50:
+            mask = (risk_scores > risk_thresholds[0]) & (
+                risk_scores <= risk_thresholds[2]
+            )
+        # High risk (bottom 25% survival probability)
+        else:
+            mask = risk_scores <= risk_thresholds[0]
+
+        mean_pred = predicted_probs[mask].mean(axis=0)
+        plt.step(
+            time_bins,
+            mean_pred,
+            where="post",
+            color=color,
+            linestyle="--",
+            label=f"{label} (predicted)",
+        )
+
+        # Calculate actual survival for this risk group
+        times_group = times[mask]
+        events_group = events[mask]
+
+        at_risk = np.zeros(n_intervals)
+        events_in_bin = np.zeros(n_intervals)
+
+        for i in range(n_intervals):
+            bin_mask = (times_group >= bin_edges[i]) & (times_group < bin_edges[i + 1])
+            at_risk[i] = np.sum(times_group >= bin_edges[i])
+            events_in_bin[i] = np.sum(events_group[bin_mask])
+
+        hazard = np.divide(
+            events_in_bin,
+            at_risk,
+            out=np.zeros_like(events_in_bin),
+            where=at_risk != 0,
+        )
+        actual_survival = np.cumprod(1 - hazard)
+
+        plt.step(
+            time_bins,
+            actual_survival,
+            where="post",
+            color=color,
+            label=f"{label} (actual)",
+        )
+
+    plt.xlabel("Time")
+    plt.ylabel("Survival Probability")
+    plt.title("Risk Stratification: Predicted vs Actual Survival")
+    plt.grid(True, alpha=0.3)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.tight_layout()
+    plt.savefig(
+        f"{output_folder}/discrete_risk_stratification.pdf",
+        bbox_inches="tight",
+    )
     plt.close()
 
 

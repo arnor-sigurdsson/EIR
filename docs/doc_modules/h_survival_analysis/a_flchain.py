@@ -47,8 +47,12 @@ def get_flchain_run_1_tabular_info() -> AutoDocExperimentInfo:
             "figures/flchain_training_curve_C-INDEX_tabular_1.pdf",
         ),
         (
-            "1100/survival_curves.png",
-            "figures/survival_curves.png",
+            "1100/survival_curves.pdf",
+            "figures/survival_curves.pdf",
+        ),
+        (
+            "1100/discrete_risk_stratification.pdf",
+            "figures/discrete_risk_stratification.pdf",
         ),
         (
             "1100/individual_survival_curves.pdf",

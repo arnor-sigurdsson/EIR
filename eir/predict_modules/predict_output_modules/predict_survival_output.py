@@ -13,8 +13,10 @@ from eir.setup.schemas import SurvivalOutputTypeConfig
 from eir.train_utils.evaluation_modules.evaluation_output_survival import (
     calculate_cox_survival_probs,
     plot_cox_individual_curves,
+    plot_cox_risk_stratification,
     plot_cox_survival_curves,
     plot_discrete_individual_survival_curves,
+    plot_discrete_risk_stratification,
     plot_discrete_survival_curves,
 )
 from eir.train_utils.metrics import (
@@ -84,7 +86,7 @@ def predict_survival_wrapper_with_labels(
             time_bins = time_kbins_transformer.bin_edges_[0]
             time_bins_except_last = time_bins[:-1]
 
-            hazards = torch.sigmoid(model_outputs).numpy()
+            hazards = torch.sigmoid(model_outputs).cpu().numpy()
             survival_probs = np.cumprod(1 - hazards, 1)
 
             base_data = {"ID": ids, "Predicted_Risk": hazards[:, -1]}
@@ -100,6 +102,14 @@ def predict_survival_wrapper_with_labels(
             )
 
             plot_discrete_survival_curves(
+                times=times_np,
+                events=events_np,
+                predicted_probs=survival_probs,
+                time_bins=time_bins_except_last,
+                output_folder=output_folder,
+            )
+
+            plot_discrete_risk_stratification(
                 times=times_np,
                 events=events_np,
                 predicted_probs=survival_probs,
@@ -159,6 +169,16 @@ def predict_survival_wrapper_with_labels(
                 output_folder=output_folder,
             )
 
+            plot_cox_risk_stratification(
+                times=times_np,
+                events=events_np,
+                risk_scores=risk_scores,
+                unique_times=unique_times,
+                baseline_survival=baseline_survival,
+                time_points=time_points,
+                output_folder=output_folder,
+            )
+
             surv_prob_cols = {
                 f"Surv_Prob_t{i}": survival_probs[:, i]
                 for i in range(survival_probs.shape[1])
@@ -208,7 +228,7 @@ def predict_survival_wrapper_no_labels(
             time_bins = time_kbins_transformer.bin_edges_[0]
             time_bins_except_last = time_bins[:-1]
 
-            hazards = torch.sigmoid(model_outputs).numpy()
+            hazards = torch.sigmoid(model_outputs).cpu().numpy()
             survival_probs = np.cumprod(1 - hazards, 1)
 
             df = pd.DataFrame(
