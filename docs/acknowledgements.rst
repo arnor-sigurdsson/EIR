@@ -124,7 +124,7 @@ and so on:
 
 - ``types-pyyaml`` : Typing stubs for PyYAML
 
-- ``isort``  – Timothy Crosley: A Python utility / library to sort Python imports.
+- ``isort`` : A Python utility / library to sort Python imports.
 
 - ``pytest-split``  – Jerry Pussinen: Pytest plugin which splits the test suite to equally sized sub suites based on test execution time.
 

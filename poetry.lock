@@ -1213,28 +1213,28 @@ files = [
 
 [[package]]
 name = "deptry"
-version = "0.21.2"
+version = "0.23.0"
 description = "A command line utility to check for unused, missing and transitive dependencies in a Python project."
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "deptry-0.21.2-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:e3b9e0c5ee437240b65e61107b5777a12064f78f604bf9f181a96c9b56eb896d"},
-    {file = "deptry-0.21.2-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:d76bbf48bd62ecc44ca3d414769bd4b7956598d23d9ccb42fd359b831a31cab2"},
-    {file = "deptry-0.21.2-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3080bb88c16ebd35f59cba7688416115b7aaf4630dc5a051dff2649cbf129a1b"},
-    {file = "deptry-0.21.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:adb12d6678fb5dbd320a0a2e37881059d0a45bec6329df4250c977d803fe7f96"},
-    {file = "deptry-0.21.2-cp39-abi3-musllinux_1_1_aarch64.whl", hash = "sha256:7479d3079be69c3bbf5913d8e21090749c1139ee91f81520ffce90b5322476b0"},
-    {file = "deptry-0.21.2-cp39-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:019167b35301edd2bdd4719c8b8f44769be4507cb8a1cd46fff4393cdbe8d31b"},
-    {file = "deptry-0.21.2-cp39-abi3-win_amd64.whl", hash = "sha256:d8add495f0dd19a38aa6d1e09b14b1441bca47c9d945bc7b322efb084313eea3"},
-    {file = "deptry-0.21.2-cp39-abi3-win_arm64.whl", hash = "sha256:06d48e9fa460aad02f9e1b079d9f5a69d622d291b3a0525b722fc91c88032042"},
-    {file = "deptry-0.21.2-pp310-pypy310_pp73-macosx_10_12_x86_64.whl", hash = "sha256:3ef8aed33a2eac357f9565063bc1257bcefa03a37038299c08a4222e28f3cd34"},
-    {file = "deptry-0.21.2-pp310-pypy310_pp73-macosx_11_0_arm64.whl", hash = "sha256:917745db5f8295eb5048e43d9073a9a675ffdba865e9b294d2e7aa455730cb06"},
-    {file = "deptry-0.21.2-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:186ddbc69c1f70e684e83e202795e1054d0c2dfc03b8acc077f65dc3b6a7f4ce"},
-    {file = "deptry-0.21.2-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f3686e86ad7063b5a6e5253454f9d9e4a7a6b1511a99bd4306fda5424480be48"},
-    {file = "deptry-0.21.2-pp310-pypy310_pp73-musllinux_1_1_aarch64.whl", hash = "sha256:1012a88500f242489066f811f6ec0c93328d9340bbf0f87f0c7d2146054d197e"},
-    {file = "deptry-0.21.2-pp310-pypy310_pp73-musllinux_1_1_x86_64.whl", hash = "sha256:769bb658172586d1b03046bdc6b6c94f6a98ecfbac04ff7f77ec61768c75e1c2"},
-    {file = "deptry-0.21.2-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:fb2f43747b58abeec01dc277ef22859342f3bca2ac677818c94940a009b436c0"},
-    {file = "deptry-0.21.2.tar.gz", hash = "sha256:4e870553c7a1fafcd99a83ba4137259525679eecabeff61bc669741efa201541"},
+    {file = "deptry-0.23.0-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:1f2a6817a37d76e8f6b667381b7caf6ea3e6d6c18b5be24d36c625f387c79852"},
+    {file = "deptry-0.23.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:9601b64cc0aed42687fdd5c912d5f1e90d7f7333fb589b14e35bfdfebae866f3"},
+    {file = "deptry-0.23.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e6172b2205f6e84bcc9df25226693d4deb9576a6f746c2ace828f6d13401d357"},
+    {file = "deptry-0.23.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1cfa4b3a46ee8a026eaa38e4b9ba43fe6036a07fe16bf0a663cb611b939f6af8"},
+    {file = "deptry-0.23.0-cp39-abi3-musllinux_1_1_aarch64.whl", hash = "sha256:9d03cc99a61c348df92074a50e0a71b28f264f0edbf686084ca90e6fd44e3abe"},
+    {file = "deptry-0.23.0-cp39-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:9a46f78098f145100dc582a59af8548b26cdfa16cf0fbd85d2d44645e724cb6a"},
+    {file = "deptry-0.23.0-cp39-abi3-win_amd64.whl", hash = "sha256:d53e803b280791d89a051b6183d9dc40411200e22a8ab7e6c32c6b169822a664"},
+    {file = "deptry-0.23.0-cp39-abi3-win_arm64.whl", hash = "sha256:da7678624f4626d839c8c03675452cefc59d6cf57d25c84a9711dae514719279"},
+    {file = "deptry-0.23.0-pp310-pypy310_pp73-macosx_10_12_x86_64.whl", hash = "sha256:40706dcbed54141f2d23afa70a272171c8c46531cd6f0f9c8ef482c906b3cee2"},
+    {file = "deptry-0.23.0-pp310-pypy310_pp73-macosx_11_0_arm64.whl", hash = "sha256:889541844092f18e7b48631852195f36c25c5afd4d7e074b19ba824b430add50"},
+    {file = "deptry-0.23.0-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:aff9156228eb16cd81792f920c1623c00cb59091ae572600ba0eac587da33c0c"},
+    {file = "deptry-0.23.0-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:583154732cfd438a4a090b7d13d8b2016f1ac2732534f34fb689345768d8538b"},
+    {file = "deptry-0.23.0-pp310-pypy310_pp73-musllinux_1_1_aarch64.whl", hash = "sha256:736e7bc557aec6118b2a4d454f0d81f070782faeaa9d8d3c9a15985c9f265372"},
+    {file = "deptry-0.23.0-pp310-pypy310_pp73-musllinux_1_1_x86_64.whl", hash = "sha256:5f7e4b1a5232ed6d352fca7173750610a169377d1951d3e9782947191942a765"},
+    {file = "deptry-0.23.0-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:04afae204654542406318fd3dd6f4a6697579597f37195437daf84a53ee0ebbf"},
+    {file = "deptry-0.23.0.tar.gz", hash = "sha256:4915a3590ccf38ad7a9176aee376745aa9de121f50f8da8fb9ccec87fa93e676"},
 ]
 
 [package.dependencies]
@@ -2048,18 +2048,19 @@ arrow = ">=0.15.0"
 
 [[package]]
 name = "isort"
-version = "5.13.2"
+version = "6.0.0"
 description = "A Python utility / library to sort Python imports."
 optional = false
-python-versions = ">=3.8.0"
+python-versions = ">=3.9.0"
 groups = ["dev"]
 files = [
-    {file = "isort-5.13.2-py3-none-any.whl", hash = "sha256:8ca5e72a8d85860d5a3fa69b8745237f2939afe12dbf656afbcb47fe72d947a6"},
-    {file = "isort-5.13.2.tar.gz", hash = "sha256:48fdfcb9face5d58a4f6dde2e72a1fb8dcaf8ab26f95ab49fab84c2ddefb0109"},
+    {file = "isort-6.0.0-py3-none-any.whl", hash = "sha256:567954102bb47bb12e0fae62606570faacddd441e45683968c8d1734fb1af892"},
+    {file = "isort-6.0.0.tar.gz", hash = "sha256:75d9d8a1438a9432a7d7b54f2d3b45cad9a4a0fdba43617d9873379704a8bdf1"},
 ]
 
 [package.extras]
-colors = ["colorama (>=0.4.6)"]
+colors = ["colorama"]
+plugins = ["setuptools"]
 
 [[package]]
 name = "jedi"
@@ -6540,4 +6541,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12.0,<3.13"
-content-hash = "9eceeae55918bdd9b66e4a741323357030bcd25b6f459d3e8e679c3acced04d4"
+content-hash = "27b5c0bae970673633994ff628b4eb05ca6dd1fe65fc1d1a30b3a9587b89e621"
