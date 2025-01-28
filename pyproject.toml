@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "eir-dl"
-version = "0.13.7"
+version = "0.13.8"
 description = "Deep learning framework for genomics and multi-modal data"
 license = "AGPLv3"
 authors = ["Arnor Sigurdsson"]
