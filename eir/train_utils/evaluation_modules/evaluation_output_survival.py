@@ -271,7 +271,10 @@ def calculate_cox_survival_probs(
     time_points: np.ndarray,
 ) -> np.ndarray:
     interpolated_baseline = np.interp(
-        time_points, unique_times, baseline_survival, right=baseline_survival[-1]
+        time_points,
+        unique_times,
+        baseline_survival,
+        right=baseline_survival[-1],
     )
 
     survival_probs = np.zeros((len(risk_scores), len(time_points)))
