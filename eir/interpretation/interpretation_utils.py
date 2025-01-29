@@ -391,7 +391,7 @@ class MyIntegratedGradients(IntegratedGradients):
 
 
 def get_long_format_attribution_df(
-    parsed_attributions: dict[str, list[float]]
+    parsed_attributions: dict[str, list[float]],
 ) -> pd.DataFrame:
     if not isinstance(parsed_attributions, dict):
         raise TypeError("Input must be a dictionary")

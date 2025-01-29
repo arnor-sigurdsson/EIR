@@ -108,7 +108,7 @@ def test_get_reduce_lr_on_plateu_step_params(
 
 @pytest.fixture()
 def get_dummy_handler_config(
-    prep_modelling_test_configs: Tuple["Experiment", "ModelTestConfig"]
+    prep_modelling_test_configs: Tuple["Experiment", "ModelTestConfig"],
 ) -> HandlerConfig:
     experiment, test_config = prep_modelling_test_configs
     configs = experiment.configs

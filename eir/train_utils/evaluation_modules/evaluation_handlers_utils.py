@@ -572,7 +572,7 @@ def get_dataset_loader_single_sample_generator(
 
 
 def _recursive_batch_dimension_squeeze(
-    inputs: dict[str, torch.Tensor]
+    inputs: dict[str, torch.Tensor],
 ) -> dict[str, torch.Tensor]:
     """
     We need this function as when returning from a dataloader one sample at a time,

@@ -96,7 +96,7 @@ def retrieve_configurable_models(
 
 
 def generate_configurable_model_rst_string(
-    models: list[tuple[Any, str | None, list[str]]]
+    models: list[tuple[Any, str | None, list[str]]],
 ) -> str:
     rst_string = ""
 

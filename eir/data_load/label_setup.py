@@ -272,7 +272,7 @@ class LabelDFParseWrapperProtocol(Protocol):
 
 
 def get_label_parsing_wrapper(
-    label_parsing_chunk_size: Union[None, int]
+    label_parsing_chunk_size: Union[None, int],
 ) -> LabelDFParseWrapperProtocol:
     if label_parsing_chunk_size is None:
         return label_df_parse_wrapper

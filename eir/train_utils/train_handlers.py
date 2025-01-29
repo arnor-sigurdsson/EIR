@@ -414,7 +414,7 @@ def _get_latest_validation_value_score_function(
 
 
 def _parse_metrics_for_train_running_average(
-    monitoring_metrics: List[Tuple[str, str, str]]
+    monitoring_metrics: List[Tuple[str, str, str]],
 ) -> List[Tuple[str, str, str]]:
     """
     We skip computing performance averages on training batches,
