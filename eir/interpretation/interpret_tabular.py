@@ -38,7 +38,6 @@ if TYPE_CHECKING:
     )
     from eir.train import Experiment
 
-
 logger = get_logger(__name__)
 
 

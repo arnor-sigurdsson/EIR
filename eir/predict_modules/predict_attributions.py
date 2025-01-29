@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Literal, Sequence, Union
 
 import polars as pl
 from aislib.misc_utils import ensure_path_exists
-from torch import nn
 from torch.utils.data import DataLoader
 
 from eir.data_load import label_setup
@@ -16,6 +15,7 @@ from eir.experiment_io.experiment_io import (
     load_serialized_train_experiment,
 )
 from eir.interpretation.interpretation import tabular_attribution_analysis_wrapper
+from eir.models.model_setup_modules.meta_setup import al_meta_model
 from eir.predict_modules.predict_data import set_up_default_dataset
 from eir.predict_modules.predict_input_setup import set_up_inputs_for_predict
 from eir.predict_modules.predict_target_setup import (
@@ -138,7 +138,7 @@ def get_background_source_config(
 
 @dataclass
 class LoadedTrainExperimentMixedWithPredict(LoadedTrainExperiment):
-    model: nn.Module
+    model: al_meta_model
     inputs: al_input_objects_as_dict
 
 

@@ -500,7 +500,13 @@ class CNNPassThroughUpscaleModel(nn.Module):
         return self.target_channels * self.final_height * self.final_width
 
     def timestep_embeddings(self, t: torch.Tensor) -> torch.Tensor:
-        return self.timestep_mixing_layer.time_embedding(t)
+        if isinstance(self.timestep_mixing_layer, TimeStepMixingBlock):
+            time_embedding_layer: nn.Module = self.timestep_mixing_layer.time_embedding
+            return time_embedding_layer(t)
+        else:
+            raise ValueError(
+                "timestep_embeddings called but no TimeStepMixingBlock available."
+            )
 
     def forward(self, input: dict[str, torch.Tensor]) -> torch.Tensor:
         out = input[self.output_name]
@@ -547,7 +553,7 @@ class TimeStepMixingBlock(nn.Module):
         self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=input_channels)
         self.act_1 = nn.GELU()
 
-        self.time_embedding = nn.Embedding(
+        self.time_embedding: nn.Embedding = nn.Embedding(
             num_embeddings=n_time_steps,
             embedding_dim=embedding_dim,
         )

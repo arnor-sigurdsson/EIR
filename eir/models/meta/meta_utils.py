@@ -1,9 +1,19 @@
-from typing import TYPE_CHECKING, Dict, Literal, MutableMapping, NewType, Protocol
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Literal,
+    MutableMapping,
+    NewType,
+    Protocol,
+    Union,
+)
 
 import torch
 
 if TYPE_CHECKING:
     from eir.models.fusion.fusion import al_fused_features, al_fusion_model_configs
+    from eir.models.fusion.fusion_default import al_features
+    from eir.models.fusion.fusion_identity import al_identity_features
 
 FeatureExtractorOutType = NewType("FeatureExtractorOutType", torch.Tensor)
 
@@ -26,7 +36,12 @@ class FeatureExtractorProtocolWithL1(Protocol):
 
 
 class FusionModuleProtocol(Protocol):
-    model_config: "al_fusion_model_configs"
+    def __init__(
+        self,
+        model_config: "al_fusion_model_configs",
+        fusion_in_dim: int,
+        fusion_callable: Union["al_features", "al_identity_features"],
+    ) -> None: ...
 
     @property
     def fusion_in_dim(self) -> int: ...
@@ -47,10 +62,17 @@ class OutputModuleProtocol(Protocol):
 
 
 al_input_modules = MutableMapping[
-    str, FeatureExtractorProtocolWithL1 | FeatureExtractorProtocol
+    str,
+    FeatureExtractorProtocolWithL1 | FeatureExtractorProtocol,
 ]
-al_fusion_modules = MutableMapping[str, FusionModuleProtocol]
-al_output_modules = MutableMapping[str, OutputModuleProtocol]
+al_fusion_modules = MutableMapping[
+    str,
+    FusionModuleProtocol,
+]
+al_output_modules = MutableMapping[
+    str,
+    OutputModuleProtocol,
+]
 
 
 def run_meta_forward(

@@ -74,7 +74,9 @@ from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
 from eir.train_utils.optim import AttrDelegatedSWAWrapper
 
 al_meta_model = Union[
-    meta.MetaModel, AttrDelegatedDistributedDataParallel, AttrDelegatedSWAWrapper
+    meta.MetaModel,
+    AttrDelegatedDistributedDataParallel,
+    AttrDelegatedSWAWrapper,
 ]
 
 

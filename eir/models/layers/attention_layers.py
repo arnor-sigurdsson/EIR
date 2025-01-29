@@ -138,6 +138,7 @@ class TransformerBlock(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
+        self.rope_freqs: torch.Tensor
         self._init_rope()
 
     def _init_rope(self):
@@ -148,7 +149,7 @@ class TransformerBlock(nn.Module):
 
     def _apply_rope(self, x: Tensor, seq_len: int) -> Tensor:
         position = torch.arange(seq_len, device=x.device)
-        freqs = torch.outer(position, self.rope_freqs)
+        freqs = torch.outer(input=position, vec2=self.rope_freqs)
 
         # Create rotation matrices
         cos = torch.cos(freqs).view(seq_len, 1, -1)
