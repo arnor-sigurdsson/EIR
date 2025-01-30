@@ -77,7 +77,7 @@ def get_named_predict_dict_iterators(
 def get_train_predict_matched_config_generator(
     train_configs: Configs,
     named_dict_iterators: dict[str, tuple[dict, ...]],
-) -> Generator[tuple[str, dict, dict], None, None]:
+) -> Generator[tuple[str, dict, dict]]:
     train_keys = set(train_configs.__dict__.keys())
 
     single_configs = {
@@ -409,7 +409,7 @@ def _check_matching_tabular_output_configs(
 
 
 def overload_train_configs_for_predict(
-    matched_dict_iterator: Generator[tuple[str, dict, dict], None, None],
+    matched_dict_iterator: Generator[tuple[str, dict, dict]],
 ) -> Configs:
     main_overloaded_kwargs: dict = {}
 

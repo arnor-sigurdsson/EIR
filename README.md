@@ -10,7 +10,7 @@
         <img src="https://img.shields.io/badge/Papers-View%20Here-5F9EA0.svg" /></a>
   
   <a href="https://www.python.org/downloads/" alt="Python">
-        <img src="https://img.shields.io/badge/python-3.12-blue.svg" /></a>
+        <img src="https://img.shields.io/badge/python-3.13-blue.svg" /></a>
   
   <a href="https://pypi.org/project/eir-dl/" alt="Python">
         <img src="https://img.shields.io/pypi/v/eir-dl.svg" /></a>
@@ -47,7 +47,7 @@ Supervised modelling, sequence generation, image generation, array output and su
 
 `pip install eir-dl`
 
-**Important:** The latest version of EIR requires [Python 3.12](https://www.python.org/downloads/). Using an older version of Python will install an outdated version of EIR, which will likely be incompatible with the current documentation and might contain bugs. Please ensure you are using Python 3.12.
+**Important:** The latest version of EIR requires [Python 3.13](https://www.python.org/downloads/). Using an older version of Python will install an outdated version of EIR, which will likely be incompatible with the current documentation and might contain bugs. Please ensure you are using Python 3.13.
 
 ### Installing EIR via Container Engine
 

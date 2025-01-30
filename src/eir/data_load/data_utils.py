@@ -34,7 +34,7 @@ logger = get_logger(name=__name__)
 
 def get_output_info_generator(
     outputs_as_dict: "al_output_objects_as_dict",
-) -> Generator[tuple[str, str, str], None, None]:
+) -> Generator[tuple[str, str, str]]:
     for output_name, output_object in outputs_as_dict.items():
         match output_object:
             case ComputedTabularOutputInfo():

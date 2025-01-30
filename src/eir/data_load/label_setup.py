@@ -437,7 +437,7 @@ def gather_ids_from_data_source(
     data_source: Path,
     validate: bool = True,
 ) -> tuple[str, ...]:
-    iterator: Generator[str, None, None] | Generator[Path, None, None]
+    iterator: Generator[str] | Generator[Path]
     if is_deeplake_dataset(data_source=str(data_source)):
         iterator = build_deeplake_available_id_iterator(
             data_source=data_source,
@@ -458,7 +458,7 @@ def gather_ids_from_data_source(
 
 def build_deeplake_available_id_iterator(
     data_source: Path, inner_key: str
-) -> Generator[str, None, None]:
+) -> Generator[str]:
     deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
     columns = {col.name for col in deeplake_ds.schema.columns}
     existence_col = f"{inner_key}_exists"
@@ -482,9 +482,7 @@ def gather_ids_from_tabular_file(file_path: Path) -> tuple[str, ...]:
     return all_ids
 
 
-def get_file_path_iterator(
-    data_source: Path, validate: bool = True
-) -> Generator[Path, None, None]:
+def get_file_path_iterator(data_source: Path, validate: bool = True) -> Generator[Path]:
     def _file_iterator(file_path: Path):
         with open(str(file_path)) as infile:
             for line in infile:

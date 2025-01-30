@@ -22,7 +22,7 @@ logger = get_logger(name=__name__)
 def get_file_sample_id_iterator_basic(
     data_source: str,
     ids_to_keep: None | set[str],
-) -> Generator[tuple[str, Path], None, None]:
+) -> Generator[tuple[str, Path]]:
     base_file_iterator = get_file_path_iterator(
         data_source=Path(data_source), validate=False
     )

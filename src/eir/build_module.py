@@ -9,7 +9,7 @@ from eir.train import main as main_train
 
 
 @contextmanager
-def patch_sys_args(patched_args: list[str]) -> Generator[None, None, None]:
+def patch_sys_args(patched_args: list[str]) -> Generator[None]:
     old_args = sys.argv
     try:
         sys.argv = patched_args
