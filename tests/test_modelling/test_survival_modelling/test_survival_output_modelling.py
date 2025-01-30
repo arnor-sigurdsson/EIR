@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Dict, Sequence
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -9,8 +10,7 @@ if TYPE_CHECKING:
     pass
 
 
-def _get_survival_output_configs(type_: str) -> Sequence[Dict]:
-
+def _get_survival_output_configs(type_: str) -> Sequence[dict]:
     if type_ == "discrete":
         output_configs = [
             {

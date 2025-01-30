@@ -1,6 +1,6 @@
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
-from typing import Sequence
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import copy_inputs, load_data_for_serve

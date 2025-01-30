@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal, Union
+from typing import Literal
 
 SurvivalLossNames = Literal["NegativeLogLikelihood", "CoxPHLoss"]
 
@@ -37,5 +37,5 @@ class SurvivalOutputTypeConfig:
     event_column: str
     num_durations: int = 10
     loss_function: SurvivalLossNames = "NegativeLogLikelihood"
-    max_duration: Union[None, float] = None
-    label_parsing_chunk_size: Union[None, int] = None
+    max_duration: None | float = None
+    label_parsing_chunk_size: None | int = None

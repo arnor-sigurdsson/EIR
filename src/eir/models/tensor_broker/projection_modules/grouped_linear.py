@@ -1,5 +1,4 @@
 import math
-from typing import Type
 
 import torch
 from torch import nn
@@ -71,9 +70,8 @@ def _apply_all_projections(
 
 
 def create_key_and_dim_order(projections: nn.ModuleDict) -> list[tuple[str, int]]:
-
     key_dim_pairs = []
-    for key in projections.keys():
+    for key in projections:
         dim_batch_padded = int(key.split("_")[1]) + 1
         key_dim_pairs.append((key, dim_batch_padded))
 
@@ -87,7 +85,6 @@ def _apply_projection(
     projection: nn.Module,
     dim: int,
 ) -> torch.Tensor:
-
     x = x.transpose(dim, -1)
     x = projection(x)
     x = x.transpose(dim, -1)
@@ -117,7 +114,7 @@ class GroupedLinearProjectionWrapper(nn.Module):
         target_shape_list = list(target_shape)
 
         self.projection: nn.Module
-        identity_projection_class: Type[nn.Module]
+        identity_projection_class: type[nn.Module]
         if len(input_shape) <= len(target_shape):
             self.projection = GroupedUpProjectionLayer(
                 input_shape=input_shape_list,
@@ -126,7 +123,7 @@ class GroupedLinearProjectionWrapper(nn.Module):
             identity_projection_class = GroupedUpProjectionLayer
 
         elif len(input_shape) > len(target_shape):
-            down_class: Type[nn.Module]
+            down_class: type[nn.Module]
             if self.use_factorized_projection:
                 down_class = GroupedDownProjectionLayerFactorized
             else:
@@ -355,7 +352,7 @@ def _create_projections(
 
     total_target_elements = math.prod(target_shape)
 
-    input_and_target_dim_iter = zip(padded_input_shape, target_shape)
+    input_and_target_dim_iter = zip(padded_input_shape, target_shape, strict=False)
     for dim_index, (input_dim, target_dim) in enumerate(input_and_target_dim_iter):
         if input_dim == target_dim:
             continue

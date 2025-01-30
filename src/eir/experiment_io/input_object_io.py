@@ -2,7 +2,7 @@ import json
 from copy import copy
 from dataclasses import asdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from aislib.misc_utils import ensure_path_exists
@@ -53,9 +53,9 @@ def load_serialized_input_object(
     input_config: schemas.InputConfig,
     input_class: "al_serializable_input_classes",
     *args,
-    output_folder: Union[None, str] = None,
-    run_folder: Union[None, Path] = None,
-    custom_input_name: Union[str, None] = None,
+    output_folder: None | str = None,
+    run_folder: None | Path = None,
+    custom_input_name: str | None = None,
     **kwargs,
 ) -> "al_serializable_input_objects":
     assert output_folder or run_folder
@@ -85,7 +85,7 @@ def load_serialized_input_object(
     assert isinstance(serialized_input_config_object, input_class)
 
     train_input_info_kwargs = serialized_input_config_object.__dict__
-    assert "input_config" in train_input_info_kwargs.keys()
+    assert "input_config" in train_input_info_kwargs
 
     loaded_input_info_kwargs = copy(train_input_info_kwargs)
 
@@ -106,7 +106,6 @@ def get_input_serialization_path(
     input_type: str,
     input_name: str,
 ) -> Path:
-
     base_path = run_folder / "serializations" / f"{input_type}_input_serializations"
     match input_type:
         case "image" | "sequence" | "bytes" | "array" | "omics":
@@ -201,13 +200,11 @@ def serialize_chosen_input_objects(
 
             assert isinstance(
                 input_,
-                (
-                    ComputedImageInputInfo,
-                    ComputedSequenceInputInfo,
-                    ComputedBytesInputInfo,
-                    ComputedArrayInputInfo,
-                    ComputedOmicsInputInfo,
-                ),
+                ComputedImageInputInfo
+                | ComputedSequenceInputInfo
+                | ComputedBytesInputInfo
+                | ComputedArrayInputInfo
+                | ComputedOmicsInputInfo,
             )
 
             ensure_path_exists(path=output_path, is_folder=output_path.is_dir())
@@ -221,7 +218,6 @@ def _serialize_input_object(
     input_object: "al_serializable_input_objects",
     output_folder: Path,
 ) -> None:
-
     input_config = input_object.input_config
     config_path = output_folder / "input_config.yaml"
 
@@ -325,7 +321,7 @@ def _read_serialized_input_object(
     input_class: "al_serializable_input_classes",
     serialized_input_folder: Path,
 ) -> "al_serializable_input_objects":
-    loaded_object: "al_serializable_input_objects"
+    loaded_object: al_serializable_input_objects
     if input_class is ComputedImageInputInfo:
         loaded_object = load_image_input_object(
             serialized_input_folder=serialized_input_folder

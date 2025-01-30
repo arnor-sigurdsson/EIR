@@ -1,9 +1,9 @@
 import re
 import subprocess
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import copy2
-from typing import Callable, Dict, List, Sequence, Tuple
 
 from aislib.misc_utils import ensure_path_exists
 from pdf2image import convert_from_path
@@ -23,10 +23,10 @@ class AutoDocExperimentInfo:
     data_output_path: Path
     conf_output_path: Path
     base_path: Path
-    command: List[str]
-    files_to_copy_mapping: Sequence[Tuple[str, str]]
-    pre_run_command_modifications: Sequence[Callable[[List[str]], List[str]]] = ()
-    post_run_functions: Sequence[Tuple[Callable, Dict]] = ()
+    command: list[str]
+    files_to_copy_mapping: Sequence[tuple[str, str]]
+    pre_run_command_modifications: Sequence[Callable[[list[str]], list[str]]] = ()
+    post_run_functions: Sequence[tuple[Callable, dict]] = ()
     force_run_command: bool = False
 
 
@@ -62,7 +62,7 @@ def make_training_or_predict_tutorial_data(
         func(**kwargs)
 
 
-def save_command_as_text(command: List[str], output_path: Path) -> None:
+def save_command_as_text(command: list[str], output_path: Path) -> None:
     ensure_path_exists(path=output_path)
 
     command_as_str = command[0] + " \\\n"
@@ -94,7 +94,7 @@ def set_up_conf_files(base_path: Path, conf_output_path: Path) -> None:
 def find_and_copy_files(
     run_folder: Path,
     output_folder: Path,
-    patterns: Sequence[Tuple[str, str]],
+    patterns: Sequence[tuple[str, str]],
     strict: bool = True,
 ):
     matched_patterns = {}
@@ -129,11 +129,10 @@ def find_and_copy_files(
                 raise FileNotFoundError(
                     f"No files found for pattern {pattern} in {run_folder}."
                 )
-            else:
-                logger.warning(f"No files found for pattern {pattern} in {run_folder}.")
+            logger.warning(f"No files found for pattern {pattern} in {run_folder}.")
 
 
-def run_experiment_from_command(command: List[str], force_run: bool = False):
+def run_experiment_from_command(command: list[str], force_run: bool = False):
     globals_file = next(i for i in command if "globals" in i)
     globals_dict = load_yaml_config(config_path=globals_file)
     run_folder = Path(globals_dict["basic_experiment"]["output_folder"])
@@ -153,13 +152,13 @@ def run_experiment_from_command(command: List[str], force_run: bool = False):
     return run_folder
 
 
-def run_capture_and_save(command: List[str], output_path: Path, *args, **kwargs):
+def run_capture_and_save(command: list[str], output_path: Path, *args, **kwargs):
     result_text = run_subprocess_and_capture_output(command=command)
 
     output_path.write_text(result_text)
 
 
-def run_subprocess_and_capture_output(command: List[str]):
+def run_subprocess_and_capture_output(command: list[str]):
     result = subprocess.run(args=command, capture_output=True, text=True).stdout
 
     return result

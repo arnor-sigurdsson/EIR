@@ -82,7 +82,7 @@ def test_hook_default_optimizer_backward(prep_modelling_test_configs):
     state = {"iteration": 1, "loss": MagicMock()}
     num_test_steps = 12
 
-    for i in range(num_test_steps):
+    for _i in range(num_test_steps):
         step_logic.hook_default_optimizer_backward(experiment=experiment, state=state)
         state["iteration"] += 1
 
@@ -156,7 +156,7 @@ def test_maybe_apply_gradient_noise_to_model():
         model=model, gradient_noise=gradient_noise
     )
 
-    for name, param in model.named_parameters():
+    for _name, param in model.named_parameters():
         assert (param.grad.data != torch.zeros_like(param)).all()
 
 

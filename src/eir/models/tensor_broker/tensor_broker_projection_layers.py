@@ -166,7 +166,6 @@ def get_projection_layer(
             projected_shape = to_shape_no_batch
 
         case "interpolate":
-
             if len(from_shape_no_batch) != 3:
                 raise ValueError(
                     f"Cannot project from {from_shape_no_batch} to {to_shape_no_batch} "

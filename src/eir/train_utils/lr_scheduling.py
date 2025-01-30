@@ -1,6 +1,7 @@
+from collections.abc import Callable
 from math import isclose
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import numpy as np
 from ignite.contrib.handlers import (
@@ -75,7 +76,7 @@ def attach_lr_scheduler(
 
 def _get_reduce_lr_on_plateau_step_params(
     global_config: GlobalConfig, optimizer: Optimizer
-) -> Dict:
+) -> dict:
     run_folder = get_run_folder(output_folder=global_config.be.output_folder)
     validation_history_fpath = get_average_history_filepath(
         run_folder=run_folder, train_or_val_target_prefix="validation_"
@@ -193,7 +194,7 @@ def _get_cosine_lr_scheduler(
     lr_lower_bound: float,
     cycle_iter_size: int,
     schedule: str,
-) -> Tuple[CosineAnnealingScheduler, Dict]:
+) -> tuple[CosineAnnealingScheduler, dict]:
     """
     We return the arguments because the simulate_values are classmethods, which
     we need to pass the arguments too.
@@ -230,11 +231,11 @@ def _get_cosine_lr_scheduler(
 
 
 def _get_warmup_steps_from_cla(
-    warmup_steps_arg: Optional[Literal["auto"] | int], optimizer: Optimizer
+    warmup_steps_arg: Literal["auto"] | int | None, optimizer: Optimizer
 ) -> int:
     if warmup_steps_arg is None:
         return 0
-    elif warmup_steps_arg == "auto":
+    if warmup_steps_arg == "auto":
         auto_steps = _calculate_auto_warmup_steps(optimizer=optimizer)
         logger.debug(
             "Using calculated %d steps for learning rate warmup due to 'auto' "
@@ -242,8 +243,7 @@ def _get_warmup_steps_from_cla(
             auto_steps,
         )
         return auto_steps
-    else:
-        return int(warmup_steps_arg)
+    return int(warmup_steps_arg)
 
 
 def _calculate_auto_warmup_steps(optimizer: Optimizer) -> int:
@@ -259,7 +259,7 @@ def _calculate_auto_warmup_steps(optimizer: Optimizer) -> int:
 
 
 def _plot_lr_schedule(
-    lr_scheduler: Union[ConcatScheduler, CosineAnnealingScheduler],
+    lr_scheduler: ConcatScheduler | CosineAnnealingScheduler,
     num_events: int,
     lr_scheduler_args: dict,
     output_folder: Path,
@@ -282,7 +282,7 @@ def _attach_warmup_to_scheduler(
     lr_lower_bound: float,
     lr_upper_bound: float,
     duration: int,
-) -> Tuple[ConcatScheduler, Dict]:
+) -> tuple[ConcatScheduler, dict]:
     """
     We have `patched_duration_for_cosine_end` because attaching a warmup to a cosine
     scheduler seems to 'offset' it's length by one step. This means that if we have
@@ -330,7 +330,7 @@ def _step_reduce_on_plateau_scheduler(
     sample_interval: int,
     reduce_on_plateau_scheduler: ReduceLROnPlateau,
     validation_history_fpath: Path,
-    warmup_steps: Union[None, int],
+    warmup_steps: None | int,
 ) -> None:
     """
     We do the warmup manually here because currently ignite does not support warmup

@@ -1,6 +1,7 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial, update_wrapper
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -48,7 +49,7 @@ def prepare_inputs_disk(
     inputs: dict[str, Any],
     inputs_objects: "al_input_objects_as_dict",
     test_mode: bool,
-) -> Dict[str, torch.Tensor]:
+) -> dict[str, torch.Tensor]:
     prepared_inputs = {}
 
     for input_name, data_pointer in inputs.items():
@@ -165,10 +166,10 @@ def _should_skip_modality(modality_dropout_rate: float, test_mode: bool) -> bool
 
 
 def prepare_inputs_memory(
-    inputs: Dict[str, Any],
+    inputs: dict[str, Any],
     inputs_objects: "al_input_objects_as_dict",
     test_mode: bool,
-) -> Dict[str, torch.Tensor]:
+) -> dict[str, torch.Tensor]:
     prepared_inputs = {}
 
     for name, data in inputs.items():
@@ -249,12 +250,12 @@ def typed_partial_for_hook(
 @dataclass
 class InputHookOutput:
     hook_callable: Callable[..., np.ndarray | Image | str]
-    return_dtype: Optional[pl.DataType]
+    return_dtype: pl.DataType | None
 
 
 def get_input_data_loading_hooks(
     inputs: al_input_objects_as_dict,
-) -> Optional[dict[str, InputHookOutput]]:
+) -> dict[str, InputHookOutput] | None:
     """
     Creates data loading hooks for input objects with appropriate polars dtypes.
     Note we use object dtypes for images as they are PIL.Image objects.
@@ -352,7 +353,7 @@ def get_input_data_loading_hooks(
 
 def _get_polars_dtype_for_bytes(
     byte_encoding: str,
-) -> Type[NumericType] | Type[pl.Object]:
+) -> type[NumericType] | type[pl.Object]:
     encoding_dtype_map = {
         "uint8": pl.UInt8,
         "int8": pl.Int8,
@@ -362,7 +363,6 @@ def _get_polars_dtype_for_bytes(
 
 
 def numpy_dtype_to_polars_dtype(np_dtype: np.dtype) -> DataTypeClass:
-
     dtype_str = str(np_dtype)
 
     dtype_map = {

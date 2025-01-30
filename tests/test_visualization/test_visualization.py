@@ -1,5 +1,3 @@
-from typing import Dict
-
 import numpy as np
 import pytest
 
@@ -33,7 +31,7 @@ def acc_grads_inp():
     return accumulated_grads_test
 
 
-def test_get_top_gradients(acc_grads_inp: Dict[str, np.ndarray]):
+def test_get_top_gradients(acc_grads_inp: dict[str, np.ndarray]):
     top_snps_per_class = interpret_omics.get_snp_cols_w_top_grads(acc_grads_inp, 3)
     assert top_snps_per_class["Asia"]["top_n_idxs"].tolist() == [0, 2, 4]
 

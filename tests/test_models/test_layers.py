@@ -15,7 +15,7 @@ def test_get_projection_layer():
     target_dimension = 16
 
     layer = get_1d_projection_layer(input_dimension, target_dimension, "auto")
-    assert isinstance(layer, (LCLResidualBlock, LCL, nn.Linear))
+    assert isinstance(layer, LCLResidualBlock | LCL | nn.Linear)
 
     layer = get_1d_projection_layer(input_dimension, target_dimension, "lcl_residual")
     assert isinstance(layer, LCLResidualBlock)

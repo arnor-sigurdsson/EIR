@@ -1,16 +1,10 @@
 import os
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
-    Union,
     overload,
 )
 
@@ -55,8 +49,8 @@ if TYPE_CHECKING:
 # Aliases
 al_handler = Callable[[Engine, "HandlerConfig"], None]
 al_event = EventsList | CallableEventWithFilter
-al_handler_and_event = Tuple[al_handler, al_event]
-al_sample_interval_handlers = Tuple[al_handler_and_event, ...]
+al_handler_and_event = tuple[al_handler, al_event]
+al_sample_interval_handlers = tuple[al_handler_and_event, ...]
 
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
@@ -67,7 +61,7 @@ class HandlerConfig:
     experiment: "Experiment"
     run_folder: Path
     output_folder: str
-    monitoring_metrics: List[Tuple[str, str, str]]
+    monitoring_metrics: list[tuple[str, str, str]]
 
 
 def configure_trainer(
@@ -147,7 +141,6 @@ def _attach_sample_interval_handlers(
     all_handler_events = [validation_handler_and_event]
 
     if gc.aa.compute_attributions:
-
         try:
             iter_per_epoch = len(exp.train_loader)
         except TypeError:
@@ -174,7 +167,7 @@ def _attach_sample_interval_handlers(
 
 def _get_validation_handler_and_event(
     sample_interval_base: int,
-    iter_per_epoch: Optional[int],
+    iter_per_epoch: int | None,
     n_epochs: int,
     early_stopping_patience: int,
     validation_handler_callable: Callable,
@@ -197,7 +190,7 @@ def _get_validation_handler_and_event(
 
 
 def _get_attribution_handler_and_event(
-    iter_per_epoch: Optional[int],
+    iter_per_epoch: int | None,
     n_epochs: int,
     sample_interval_base: int,
     attributions_every_sample_factor: int,
@@ -241,16 +234,13 @@ def _do_run_completed_handler(iter_per_epoch: int, n_epochs: int, sample_interva
     We need this function to avoid running handlers twice in cases where the total
     number of iterations has a remainder of 0 w.r.t. the sample interval.
     """
-    if (iter_per_epoch * n_epochs) % sample_interval != 0:
-        return True
-
-    return False
+    return iter_per_epoch * n_epochs % sample_interval != 0
 
 
 def _get_monitoring_metrics(
     outputs_as_dict: al_output_objects_as_dict,
     metric_record_dict: al_metric_record_dict,
-) -> List[Tuple[str, str, str]]:
+) -> list[tuple[str, str, str]]:
     """
     The spec for the tuple here follows the metric dict spec, i.e. the tuple is:
     (column_name, metric).
@@ -390,10 +380,7 @@ def _get_early_stopping_event_filter_kwargs(
             )
             has_checked = True
 
-        if iteration % sample_interval == 0:
-            return True
-
-        return False
+        return iteration % sample_interval == 0
 
     return {"event_filter": _early_stopping_event_filter}
 
@@ -414,8 +401,8 @@ def _get_latest_validation_value_score_function(
 
 
 def _parse_metrics_for_train_running_average(
-    monitoring_metrics: List[Tuple[str, str, str]],
-) -> List[Tuple[str, str, str]]:
+    monitoring_metrics: list[tuple[str, str, str]],
+) -> list[tuple[str, str, str]]:
     """
     We skip computing performance averages on training batches,
     as some metrics (e.g. ROC-AUC, R2) can be undefined (e.g. batch with only
@@ -423,7 +410,7 @@ def _parse_metrics_for_train_running_average(
     """
     to_skip = ("perf-average",)
 
-    parsed_metrics: List[Tuple[str, str, str]] = []
+    parsed_metrics: list[tuple[str, str, str]] = []
 
     for output_name, column_name, metric_name in monitoring_metrics:
         if metric_name in to_skip:
@@ -437,11 +424,11 @@ def _parse_metrics_for_train_running_average(
 class MyRunningAverage(RunningAverage):
     def __init__(
         self,
-        src: Optional[Metric] = None,
+        src: Metric | None = None,
         alpha: float = 0.98,
-        output_transform: Optional[Callable] = None,
-        epoch_bound: Optional[bool] = None,
-        device: Optional[Union[str, torch.device]] = None,
+        output_transform: Callable | None = None,
+        epoch_bound: bool | None = None,
+        device: str | torch.device | None = None,
     ):
         super().__init__(
             src=src,
@@ -451,7 +438,7 @@ class MyRunningAverage(RunningAverage):
             device=device,
         )
 
-    def update(self, output: Union[torch.Tensor, float]) -> None:
+    def update(self, output: torch.Tensor | float) -> None:
         """
         We have this checking for nan to avoid corrupting / making the running
         average always become nan if a NaN output value (due to an empty output
@@ -469,7 +456,7 @@ class MyRunningAverage(RunningAverage):
 
 def _attach_running_average_metrics(
     engine: Engine,
-    monitoring_metrics: List[Tuple[str, str, str]],
+    monitoring_metrics: list[tuple[str, str, str]],
 ) -> None:
     """
     For each metric, we create an output_transform function that grabs the
@@ -513,7 +500,7 @@ def _attach_running_average_metrics(
         )
 
 
-def _call_and_undo_ignite_local_rank_side_effects(func: Callable, kwargs: Dict):
+def _call_and_undo_ignite_local_rank_side_effects(func: Callable, kwargs: dict):
     """
     This weird function is needed in the case where a GPU is available, calling some
     functions will trigger obscure ignite side effects that change some environment
@@ -600,7 +587,6 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
     )
 
     for plot_event in _get_plot_events(sample_interval=gc.ec.sample_interval):
-
         if gc.ec.saved_result_detail_level <= 1:
             continue
 
@@ -632,7 +618,7 @@ def _add_checkpoint_handler_wrapper(
     trainer: Engine,
     run_folder: Path,
     output_folder: Path,
-    n_to_save: Union[int, None],
+    n_to_save: int | None,
     checkpoint_interval: int,
     sample_interval: int,
     model: nn.Module,
@@ -686,7 +672,7 @@ def _get_metric_writing_funcs(
     outputs_as_dict: al_output_objects_as_dict,
     run_folder: Path,
     detail_level: int,
-) -> Dict[str, Dict[str, Callable]]:
+) -> dict[str, dict[str, Callable]]:
     buffer_interval = sample_interval // 2
 
     target_generator = get_output_info_generator(outputs_as_dict=outputs_as_dict)
@@ -698,11 +684,11 @@ def _get_metric_writing_funcs(
         detail_level=detail_level,
     )
 
-    writer_funcs: Dict[str, Dict[str, Callable]] = {}
+    writer_funcs: dict[str, dict[str, Callable]] = {}
     for output_name, target_name_file_dict in metrics_files.items():
         writer_funcs[output_name] = {}
 
-        for target_name, target_file in target_name_file_dict.items():
+        for target_name, _target_file in target_name_file_dict.items():
             writer_funcs[output_name][target_name] = get_buffered_metrics_writer(
                 buffer_interval=buffer_interval
             )
@@ -714,8 +700,8 @@ def _get_checkpoint_handler(
     run_folder: Path,
     output_folder: Path,
     n_to_save: int,
-    score_function: Optional[Callable] = None,
-    score_name: Optional[str] = None,
+    score_function: Callable | None = None,
+    score_name: str | None = None,
 ) -> ModelCheckpoint:
     def _default_global_step_transform(engine: Engine, event_name: str) -> int:
         return engine.state.iteration
@@ -740,9 +726,7 @@ def _attach_checkpoint_handler(
     trainer: Engine,
     checkpoint_handler: ModelCheckpoint,
     checkpoint_interval: int,
-    model: Union[
-        nn.Module, AttrDelegatedSWAWrapper, AttrDelegatedDistributedDataParallel
-    ],
+    model: nn.Module | AttrDelegatedSWAWrapper | AttrDelegatedDistributedDataParallel,
 ) -> Engine:
     match model:
         case AttrDelegatedSWAWrapper() | AttrDelegatedDistributedDataParallel():
@@ -762,7 +746,7 @@ def _attach_checkpoint_handler(
 def _write_training_metrics_handler(
     engine: Engine,
     handler_config: HandlerConfig,
-    writer_funcs: Union[Dict[str, Callable], None] = None,
+    writer_funcs: dict[str, Callable] | None = None,
 ):
     """
     Note that trainer.state.metrics contains the *running averages* we are interested
@@ -776,7 +760,7 @@ def _write_training_metrics_handler(
 
     iteration = engine.state.iteration
 
-    is_first_iteration = True if iteration == 1 else False
+    is_first_iteration = iteration == 1
 
     engine_output = engine.state.output
     engine_metrics_dict = engine.state.metrics
@@ -798,13 +782,13 @@ def _write_training_metrics_handler(
 
 
 def _unflatten_engine_metrics_dict(
-    step_base: "al_step_metric_dict", engine_metrics_dict: Dict[str, float]
+    step_base: "al_step_metric_dict", engine_metrics_dict: dict[str, float]
 ) -> "al_step_metric_dict":
     """
     We need this to streamline the 1D dictionary that comes from engine.state.metrics.
     """
 
-    nested_dict: "al_step_metric_dict" = {}
+    nested_dict: al_step_metric_dict = {}
 
     for output_name, output_metric_dict in step_base.items():
         nested_dict[output_name] = {}
@@ -812,18 +796,18 @@ def _unflatten_engine_metrics_dict(
         for target_name, target_metric_dict in output_metric_dict.items():
             nested_dict[output_name][target_name] = {}
 
-            for target_metric_name in target_metric_dict.keys():
+            for target_metric_name in target_metric_dict:
                 eng_run_avg_value = engine_metrics_dict[target_metric_name]
-                nested_dict[output_name][target_name][
-                    target_metric_name
-                ] = eng_run_avg_value
+                nested_dict[output_name][target_name][target_metric_name] = (
+                    eng_run_avg_value
+                )
 
     return nested_dict
 
 
 def _get_plot_events(
     sample_interval: int,
-) -> Tuple[events.CallableEventWithFilter, events.CallableEventWithFilter]:
+) -> tuple[events.CallableEventWithFilter, events.CallableEventWithFilter]:
     plot_events = (
         Events.ITERATION_COMPLETED(every=sample_interval),
         Events.COMPLETED,

@@ -1,7 +1,8 @@
 import os
+from collections.abc import Callable
 from copy import copy
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Tuple, Union
+from typing import TYPE_CHECKING, Any
 
 from torch import distributed as dist
 from torch.nn.parallel import DistributedDataParallel
@@ -17,7 +18,7 @@ logger = get_logger(name=__name__)
 
 def maybe_initialize_distributed_environment(
     configs: "Configs",
-) -> Tuple["Configs", Union[int, None]]:
+) -> tuple["Configs", int | None]:
     is_distributed_run = in_distributed_env()
     if is_distributed_run:
         logger.info(
@@ -72,19 +73,14 @@ def maybe_make_model_distributed(
 
 
 def in_distributed_env() -> bool:
-    if "LOCAL_RANK" in os.environ:
-        return True
-    return False
+    return "LOCAL_RANK" in os.environ
 
 
 def in_master_node() -> bool:
     local_rank = int(os.environ.get("LOCAL_RANK", 0))
     global_rank = int(os.environ.get("RANK", 0))
 
-    if local_rank == 0 and global_rank == 0:
-        return True
-
-    return False
+    return bool(local_rank == 0 and global_rank == 0)
 
 
 def only_call_on_master_node(func: Callable):
@@ -94,7 +90,7 @@ def only_call_on_master_node(func: Callable):
             result = func(*args, **kwargs)
             return result
 
-        return
+        return None
 
     return wrapper
 

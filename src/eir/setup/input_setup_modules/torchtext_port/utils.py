@@ -41,7 +41,9 @@ _replacements = [
     " ",
 ]
 
-_patterns_dict = list((re.compile(p), r) for p, r in zip(_patterns, _replacements))
+_patterns_dict = [
+    (re.compile(p), r) for p, r in zip(_patterns, _replacements, strict=False)
+]
 
 
 def _basic_english_normalize(line):
@@ -113,25 +115,26 @@ def get_tokenizer(tokenizer, language="en"):
 
             try:
                 spacy = spacy.load(language)
-            except IOError:
+            except OSError:
                 # Model shortcuts no longer work in spaCy 3.0+, try using fullnames
                 # List is from
                 # https://github.com/explosion/spaCy/blob/
                 # b903de3fcb56df2f7247e5b6cfa6b66f4ff02b62/spacy/errors.py#L789
-                OLD_MODEL_SHORTCUTS = (
+                old_model_shortcuts = (
                     spacy.errors.OLD_MODEL_SHORTCUTS
                     if hasattr(spacy.errors, "OLD_MODEL_SHORTCUTS")
                     else {}
                 )
-                if language not in OLD_MODEL_SHORTCUTS:
+                if language not in old_model_shortcuts:
                     raise
                 import warnings
 
                 warnings.warn(
                     f'Spacy model "{language}" could not be loaded,'
-                    f' trying "{OLD_MODEL_SHORTCUTS[language]}" instead'
+                    f' trying "{old_model_shortcuts[language]}" instead',
+                    stacklevel=2,
                 )
-                spacy = spacy.load(OLD_MODEL_SHORTCUTS[language])
+                spacy = spacy.load(old_model_shortcuts[language])
             return partial(_spacy_tokenize, spacy=spacy)
         except ImportError:
             print(
@@ -141,9 +144,9 @@ def get_tokenizer(tokenizer, language="en"):
             raise
         except AttributeError:
             print(
-                "Please install SpaCy and the SpaCy {} tokenizer. "
+                f"Please install SpaCy and the SpaCy {language} tokenizer. "
                 "See the docs at https://spacy.io for more "
-                "information.".format(language)
+                "information."
             )
             raise
     elif tokenizer == "moses":
@@ -188,11 +191,11 @@ def get_tokenizer(tokenizer, language="en"):
             print("Please install revtok.")
             raise
     raise ValueError(
-        "Requested tokenizer {}, valid choices are a "
+        f"Requested tokenizer {tokenizer}, valid choices are a "
         "callable that takes a single string as input, "
         '"revtok" for the revtok reversible tokenizer, '
         '"subword" for the revtok caps-aware tokenizer, '
         '"spacy" for the SpaCy English tokenizer, or '
         '"moses" for the NLTK port of the Moses tokenization '
-        "script.".format(tokenizer)
+        "script."
     )

@@ -1,5 +1,6 @@
+from collections.abc import Callable, Sequence
 from functools import partial
-from typing import Callable, Dict, Sequence, Union
+from typing import Union
 
 from eir.experiment_io.input_object_io import load_serialized_input_object
 from eir.predict_modules.predict_tabular_input_setup import (
@@ -44,10 +45,10 @@ def get_input_setup_function_for_predict(
     return mapping[input_type]
 
 
-def get_input_setup_function_map_for_predict() -> (
-    Dict[str, Callable[..., input_setup.al_input_objects]]
-):
-    setup_mapping: Dict[str, Callable[..., input_setup.al_input_objects]] = {
+def get_input_setup_function_map_for_predict() -> dict[
+    str, Callable[..., input_setup.al_input_objects]
+]:
+    setup_mapping: dict[str, Callable[..., input_setup.al_input_objects]] = {
         "omics": partial(
             load_serialized_input_object,
             input_class=ComputedOmicsInputInfo,

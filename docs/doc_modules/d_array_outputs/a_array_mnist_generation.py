@@ -1,9 +1,9 @@
 import base64
 import json
 import os
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
-from typing import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -167,7 +167,7 @@ def visualize_latents(label_file: str, latents_path: str, output_folder: str) ->
     sorted_labels = sorted(merged_df["CLASS"].unique())
 
     plt.figure(figsize=(10, 8))
-    for label, color in zip(sorted_labels, palette):
+    for label, color in zip(sorted_labels, palette, strict=False):
         subset = latents_reduced[merged_df["CLASS"] == label]
         plt.scatter(subset[:, 0], subset[:, 1], c=[color], label=f"{label}")
 
@@ -184,14 +184,16 @@ def visualize_latents(label_file: str, latents_path: str, output_folder: str) ->
 def create_comparison_figures(input_folder: Path, output_folder: Path) -> None:
     images_data = load_images_and_iterations(input_folder)
 
-    for iteration in images_data["inputs"].keys():
+    for iteration in images_data["inputs"]:
         inputs = images_data["inputs"][iteration]
         generated = images_data["generated"][iteration]
 
         fig, axes = plt.subplots(len(inputs), 2, figsize=(5, 10))
         plt.suptitle(f"Iteration {iteration}")
 
-        for i, (input_img, generated_img) in enumerate(zip(inputs, generated)):
+        for i, (input_img, generated_img) in enumerate(
+            zip(inputs, generated, strict=False)
+        ):
             input_img = input_img.reshape(28, 28)
             generated_img = generated_img.reshape(28, 28)
 
@@ -227,9 +229,9 @@ def load_images_and_iterations(
         if image_type == "inputs":
             images_data["inputs"].setdefault(iteration, [None] * 5)[index] = image_data
         elif image_type == "generated":
-            images_data["generated"].setdefault(iteration, [None] * 5)[
-                index
-            ] = image_data
+            images_data["generated"].setdefault(iteration, [None] * 5)[index] = (
+                image_data
+            )
 
     return images_data
 
@@ -389,7 +391,7 @@ def plot_inputs_and_images(input_folder: Path, output_folder: Path) -> None:
         input_file = input_folder / generated_file.name.replace(
             "generated", "inputs"
         ).replace(".npy", ".json")
-        with open(input_file, "r") as json_file:
+        with open(input_file) as json_file:
             input_data = json.load(json_file)
         image_data = np.load(str(generated_file)).squeeze()
         image_data = image_data.clip(0, 255).astype(np.uint8)
@@ -521,7 +523,7 @@ def decode_and_save_images(
 ) -> None:
     os.makedirs(output_folder, exist_ok=True)
 
-    with open(predictions_file, "r") as file:
+    with open(predictions_file) as file:
         predictions = json.load(file)[0]
 
     for i, prediction in enumerate(predictions["response"]["result"]):

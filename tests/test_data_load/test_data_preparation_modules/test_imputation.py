@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 import torch
@@ -59,7 +59,7 @@ from tests.setup_tests.fixtures_create_data import TestDataConfig
 def test_impute_missing_modalities(
     create_test_config: Configs,
     create_test_data: "TestDataConfig",
-    parse_test_cl_args: Dict[str, Any],
+    parse_test_cl_args: dict[str, Any],
 ):
     test_experiment_config = create_test_config
     test_data_config = create_test_data
@@ -82,7 +82,7 @@ def test_impute_missing_modalities(
         inputs_objects=input_objects
     )
 
-    test_inputs_all_avail = {k: torch.empty(10) for k in input_objects.keys()}
+    test_inputs_all_avail = {k: torch.empty(10) for k in input_objects}
 
     no_fill = imputation.impute_missing_modalities(
         inputs_values=test_inputs_all_avail,

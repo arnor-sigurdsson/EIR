@@ -1,5 +1,6 @@
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
+from typing import TYPE_CHECKING, Any
 
 import eir.models.output.sequence.sequence_output_modules
 from eir.models.input.sequence.transformer_models import (
@@ -73,7 +74,7 @@ def get_seq_output_configs(
 
 
 def init_seq_output_config(
-    yaml_config_as_dict: Dict[str, Any],
+    yaml_config_as_dict: dict[str, Any],
     base_output_config: schemas.OutputConfig,
 ) -> schemas.OutputConfig:
     """
@@ -101,7 +102,7 @@ def init_seq_output_config(
 
 def converge_sequence_output_configs_to_input_configs(
     seq_output_configs: Sequence[schemas.OutputConfig],
-    input_configs: Optional[Sequence[schemas.InputConfig]] = None,
+    input_configs: Sequence[schemas.InputConfig] | None = None,
 ) -> Sequence[schemas.InputConfig]:
     converged_input_configs = []
 
@@ -136,7 +137,7 @@ def converge_sequence_output_configs_to_input_configs(
 
 def _build_sequence_input_config_from_output(
     sequence_output_config: schemas.OutputConfig,
-    input_config_to_overload: Optional[schemas.InputConfig] = None,
+    input_config_to_overload: schemas.InputConfig | None = None,
 ) -> schemas.InputConfig:
     output_info = sequence_output_config.output_info
     input_info = schemas.InputDataConfig(
@@ -194,12 +195,12 @@ class ExtractedAttributesFromOutputConfig:
 
     model_config_kwargs: dict[str, Any]
     model_init_config: BasicTransformerFeatureExtractorModelConfig
-    pretrained_config: Optional[schemas.BasicPretrainedConfig]
+    pretrained_config: schemas.BasicPretrainedConfig | None
 
 
 def _build_matched_sequence_model_config_kwargs(
     sequence_output_config: schemas.OutputConfig,
-    input_config_to_overload: Optional[schemas.InputConfig] = None,
+    input_config_to_overload: schemas.InputConfig | None = None,
 ) -> ExtractedAttributesFromOutputConfig:
     sequence_keys_to_exclude = (
         _get_keys_to_exclude_from_output_input_sequence_overloading()
@@ -208,7 +209,7 @@ def _build_matched_sequence_model_config_kwargs(
     if input_config_to_overload:
         input_model_config = input_config_to_overload.model_config
         assert isinstance(
-            input_model_config, (SequenceModelConfig, SequenceOutputModuleConfig)
+            input_model_config, SequenceModelConfig | SequenceOutputModuleConfig
         )
 
         model_config_kwargs = _extract_model_config_kwargs(
@@ -220,7 +221,7 @@ def _build_matched_sequence_model_config_kwargs(
     else:
         output_model_config = sequence_output_config.model_config
         assert isinstance(
-            output_model_config, (SequenceModelConfig, SequenceOutputModuleConfig)
+            output_model_config, SequenceModelConfig | SequenceOutputModuleConfig
         )
 
         model_config_kwargs = _extract_model_config_kwargs(

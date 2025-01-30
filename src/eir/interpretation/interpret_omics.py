@@ -1,8 +1,9 @@
 import pickle
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Protocol, Tuple, Union
+from typing import TYPE_CHECKING, Optional, Protocol, Union
 
 import numpy as np
 import pandas as pd
@@ -30,25 +31,25 @@ if TYPE_CHECKING:
     )
     from eir.train import Experiment
 
-al_gradients_dict = Dict[str, List[np.ndarray]]
-al_top_gradients_dict = Dict[str, Dict[str, np.ndarray]]
-al_scaled_grads_dict = Dict[str, Dict[str, np.ndarray]]
-al_transform_funcs = Dict[str, Tuple[Callable]]
+al_gradients_dict = dict[str, list[np.ndarray]]
+al_top_gradients_dict = dict[str, dict[str, np.ndarray]]
+al_scaled_grads_dict = dict[str, dict[str, np.ndarray]]
+al_transform_funcs = dict[str, tuple[Callable]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 @dataclass
 class ParsedOmicsAttributions:
-    accumulated_acts: Dict[str, np.ndarray]
-    accumulated_acts_masked: Dict[str, np.ndarray]
+    accumulated_acts: dict[str, np.ndarray]
+    accumulated_acts_masked: dict[str, np.ndarray]
 
 
 class OmicsConsumerCallable(Protocol):
     def __call__(
         self,
         attribution: Optional["SampleAttribution"],
-    ) -> Optional[ParsedOmicsAttributions]: ...
+    ) -> ParsedOmicsAttributions | None: ...
 
 
 def get_omics_consumer(
@@ -65,7 +66,7 @@ def get_omics_consumer(
 
     def _consumer(
         attribution: Optional["SampleAttribution"],
-    ) -> Optional[ParsedOmicsAttributions]:
+    ) -> ParsedOmicsAttributions | None:
         nonlocal n_samples
 
         if attribution is None:
@@ -140,7 +141,7 @@ def analyze_omics_input_attributions(
     acc_acts = all_attributions.accumulated_acts
     acc_acts_masked = all_attributions.accumulated_acts_masked
 
-    abs_grads = True if target_column_type == "con" else False
+    abs_grads = target_column_type == "con"
     abs_grads = True if target_info.cat_is_bce else abs_grads
 
     top_gradients_dict = get_snp_cols_w_top_grads(
@@ -164,7 +165,7 @@ def analyze_omics_input_attributions(
         )
         df_snps = df_snps[df_snps["VAR_ID"].isin(subset_snps)]
 
-    classes = sorted(list(top_gradients_dict.keys()))
+    classes = sorted(top_gradients_dict.keys())
     scaled_grads = gather_and_rescale_snps(
         all_gradients_dict=acc_acts,
         top_gradients_dict=top_gradients_dict,
@@ -206,7 +207,7 @@ def analyze_omics_input_attributions(
 
 
 def _save_snp_gradients(
-    accumulated_grads: Dict[str, np.ndarray], outfolder: Path, df_snps: pd.DataFrame
+    accumulated_grads: dict[str, np.ndarray], outfolder: Path, df_snps: pd.DataFrame
 ) -> pd.DataFrame:
     df_output = deepcopy(df_snps)
     for label, grads in accumulated_grads.items():
@@ -253,9 +254,9 @@ def rescale_gradients(gradients: np.ndarray) -> np.ndarray:
 def get_snp_cols_w_top_grads(
     accumulated_grads: dict[str, np.ndarray],
     n: int = 10,
-    custom_indexes_dict: Optional[dict[str, np.ndarray]] = None,
+    custom_indexes_dict: dict[str, np.ndarray] | None = None,
     abs_grads: bool = False,
-) -> Dict[str, Dict[str, np.ndarray]]:
+) -> dict[str, dict[str, np.ndarray]]:
     """
     `accumulated_grads` specs:
 
@@ -270,7 +271,7 @@ def get_snp_cols_w_top_grads(
 
     We use those indexes to grab the top SNPs and grads per class.
     """
-    top_snps_per_class: Dict[str, Dict[str, np.ndarray]] = {}
+    top_snps_per_class: dict[str, dict[str, np.ndarray]] = {}
 
     for cls, grads in accumulated_grads.items():
         if grads is not None:
@@ -304,9 +305,9 @@ def get_snp_cols_w_top_grads(
 
 
 def gather_and_rescale_snps(
-    all_gradients_dict: Dict[str, np.ndarray],
+    all_gradients_dict: dict[str, np.ndarray],
     top_gradients_dict: al_top_gradients_dict,
-    classes: List[str],
+    classes: list[str],
 ) -> al_scaled_grads_dict:
     """
     `accumulated_grads` specs:
@@ -374,7 +375,7 @@ def gather_and_rescale_snps(
 
 
 def save_masked_grads(
-    acc_grads_times_inp: Dict[str, np.ndarray],
+    acc_grads_times_inp: dict[str, np.ndarray],
     top_gradients_dict: al_top_gradients_dict,
     df_snps: pd.DataFrame,
     sample_outfolder: Path,
@@ -384,7 +385,7 @@ def save_masked_grads(
         accumulated_grads_times_input=acc_grads_times_inp,
     )
 
-    classes = sorted(list(top_gradients_dict.keys()))
+    classes = sorted(top_gradients_dict.keys())
     scaled_grads = gather_and_rescale_snps(
         all_gradients_dict=acc_grads_times_inp,
         top_gradients_dict=top_grads_msk_inputs,
@@ -407,10 +408,10 @@ def save_masked_grads(
 
 def index_masked_grads(
     top_grads_dict: al_top_gradients_dict,
-    accumulated_grads_times_input: Dict[str, np.ndarray],
+    accumulated_grads_times_input: dict[str, np.ndarray],
 ) -> al_top_gradients_dict:
     indexes_from_all_grads = {
-        key: top_grads_dict[key]["top_n_idxs"] for key in top_grads_dict.keys()
+        key: top_grads_dict[key]["top_n_idxs"] for key in top_grads_dict
     }
 
     top_gradients_dict_masked_inputs = get_snp_cols_w_top_grads(

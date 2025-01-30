@@ -1,10 +1,8 @@
 import math
-from typing import Optional
 
 import torch
 from torch import nn
-from torch.nn import Parameter
-from torch.nn import functional as F
+from torch.nn import Parameter, functional as F
 from torchvision.ops import StochasticDepth
 
 from eir.models.layers.norm_layers import LayerScale
@@ -21,8 +19,8 @@ class LCL(nn.Module):
         in_features: int,
         out_feature_sets: int,
         num_chunks: int = 10,
-        kernel_size: Optional[int] = None,
-        bias: Optional[bool] = True,
+        kernel_size: int | None = None,
+        bias: bool | None = True,
     ):
         super().__init__()
 
@@ -83,15 +81,10 @@ class LCL(nn.Module):
 
     def extra_repr(self):
         return (
-            "in_features={}, num_chunks={}, kernel_size={}, "
-            "out_feature_sets={}, out_features={}, bias={}".format(
-                self.in_features,
-                self.num_chunks,
-                self.kernel_size,
-                self.out_feature_sets,
-                self.out_features,
-                self.bias is not None,
-            )
+            f"in_features={self.in_features}, num_chunks={self.num_chunks}, "
+            f"kernel_size={self.kernel_size}, "
+            f"out_feature_sets={self.out_feature_sets}, "
+            f"out_features={self.out_features}, bias={self.bias is not None}"
         )
 
     def forward(self, input: torch.Tensor):

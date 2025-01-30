@@ -1,7 +1,7 @@
 import warnings
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Sequence, Tuple
 
 import pytest
 from torch import nn
@@ -25,7 +25,7 @@ def create_test_optimizer(
     global_config: schemas.GlobalConfig,
     model: nn.Module,
     criteria,
-    extra_modules: Optional[dict[str, nn.Module]],
+    extra_modules: dict[str, nn.Module] | None,
 ):
     """
     TODO: Refactor loss module construction out of this function.
@@ -46,8 +46,8 @@ def create_test_optimizer(
 class ModelTestConfig:
     iteration: int
     run_path: Path
-    last_sample_folders: Dict[str, Dict[str, Path]]
-    attributions_paths: Dict[str, Dict[str, Dict[str, Path]]]
+    last_sample_folders: dict[str, dict[str, Path]]
+    attributions_paths: dict[str, dict[str, dict[str, Path]]]
 
 
 @pytest.fixture()
@@ -58,7 +58,7 @@ def prep_modelling_test_configs(
     create_test_dataloaders,
     create_test_model,
     create_test_datasets,
-) -> Tuple[Experiment, ModelTestConfig]:
+) -> tuple[Experiment, ModelTestConfig]:
     """
     Note that the fixtures used in this fixture get indirectly parametrized by
     test_classification and test_regression.
@@ -165,6 +165,7 @@ def _patch_metrics(
         "create its own metrics when train.py default metrics will be "
         "minimal.",
         category=DeprecationWarning,
+        stacklevel=2,
     )
     for type_ in ("con",):
         for metric_record in metrics_[type_]:
@@ -218,9 +219,9 @@ def get_cur_modelling_test_config(
 
 
 def _get_all_attribution_paths(
-    last_sample_folder_per_target_in_each_output: Dict[str, Dict[str, Path]],
+    last_sample_folder_per_target_in_each_output: dict[str, dict[str, Path]],
     input_names: Iterable[str],
-) -> Dict[str, Dict[str, Dict[str, Path]]]:
+) -> dict[str, dict[str, dict[str, Path]]]:
     """
     output_name -> target_name -> input_name: path
     """
@@ -247,7 +248,7 @@ def _get_all_last_sample_folders(
     tabular_targets: config.TabularTargets,
     run_path: Path,
     iteration: int,
-) -> Dict[str, Dict[str, Path]]:
+) -> dict[str, dict[str, Path]]:
     """
     output_name -> target_name: path
     """

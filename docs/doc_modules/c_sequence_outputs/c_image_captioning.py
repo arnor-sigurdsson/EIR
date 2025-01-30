@@ -1,7 +1,7 @@
 import textwrap
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
-from typing import Sequence
 
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -156,7 +156,7 @@ def generate_image_grid(
             axs[i, j].imshow(img)
             axs[i, j].axis("off")
 
-            with open(caption_path, "r") as f:
+            with open(caption_path) as f:
                 caption = f.read()
 
             wrapped_caption = textwrap.fill(caption, 30)
@@ -171,7 +171,7 @@ def get_image_captioning_02_image_and_text_serve() -> AutoDocServingInfo:
 
     server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
-    image_base = "eir_tutorials/c_sequence_output/03_image_captioning/" "data/images"
+    image_base = "eir_tutorials/c_sequence_output/03_image_captioning/data/images"
     example_requests = [
         [
             {"image_captioning": f"{image_base}/000000000009.jpg", "captions": ""},

@@ -1,7 +1,8 @@
 import json
+from collections.abc import Generator, Iterator, Sequence
 from copy import copy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Generator, Iterator, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import torch
 import torch.nn.functional as F
@@ -52,14 +53,14 @@ logger = get_logger(name=__name__)
 
 @dataclass
 class SequenceOutputEvalSamples:
-    auto_samples: Dict[str, list["SequenceOutputEvalSample"]]
-    manual_samples: Dict[str, list["SequenceOutputEvalSample"]]
+    auto_samples: dict[str, list["SequenceOutputEvalSample"]]
+    manual_samples: dict[str, list["SequenceOutputEvalSample"]]
 
 
 @dataclass()
 class SequenceOutputEvalSample:
-    inputs_to_model: Dict[str, Any]
-    target_labels: Dict[str, Any]
+    inputs_to_model: dict[str, Any]
+    target_labels: dict[str, Any]
     sample_id: str
 
 
@@ -70,7 +71,6 @@ def sequence_out_single_sample_evaluation_wrapper(
     iteration: int,
     output_folder: str,
 ) -> None:
-
     gc = experiment.configs.global_config
 
     default_eir_hooks = experiment.hooks
@@ -139,8 +139,10 @@ def sequence_out_single_sample_evaluation_wrapper(
             meta = {}
 
             for batch in batch_generator:
-                batch_indices, batch_eval_data = zip(*batch)
-                batch_eval_types, batch_eval_samples = zip(*batch_eval_data)
+                batch_indices, batch_eval_data = zip(*batch, strict=False)
+                batch_eval_types, batch_eval_samples = zip(
+                    *batch_eval_data, strict=False
+                )
 
                 batch_generated_tokens = autoregressive_sequence_generation(
                     input_objects=input_objects,
@@ -160,8 +162,8 @@ def sequence_out_single_sample_evaluation_wrapper(
                     batch_indices,
                     batch_eval_samples,
                     batch_generated_tokens,
+                    strict=False,
                 ):
-
                     generated_sample = decode_tokens(
                         tokens=generated_tokens,
                         vocab=cur_input_object.vocab,
@@ -214,10 +216,10 @@ def sequence_out_single_sample_evaluation_wrapper(
 def get_sequence_output_manual_input_samples(
     output_configs: Sequence[OutputConfig],
     input_objects: "al_input_objects_as_dict",
-) -> Dict[str, list[SequenceOutputEvalSample]]:
+) -> dict[str, list[SequenceOutputEvalSample]]:
     prepared_samples: dict[str, list[SequenceOutputEvalSample]] = {}
 
-    for config_idx, config in enumerate(output_configs):
+    for _config_idx, config in enumerate(output_configs):
         if not config.sampling_config or config.output_info.output_type != "sequence":
             continue
 
@@ -260,11 +262,11 @@ def get_sequence_output_auto_validation_samples(
     output_configs: Sequence[OutputConfig],
     input_objects: "al_input_objects_as_dict",
     eval_sample_iterator: Iterator[al_getitem_return],
-) -> Dict[str, list[SequenceOutputEvalSample]]:
+) -> dict[str, list[SequenceOutputEvalSample]]:
     prepared_eval_samples: dict[str, list[SequenceOutputEvalSample]] = {}
     input_types = extract_input_types(input_objects=input_objects)
 
-    for config_idx, config in enumerate(output_configs):
+    for _config_idx, config in enumerate(output_configs):
         if not config.sampling_config or config.output_info.output_type != "sequence":
             continue
 
@@ -274,7 +276,7 @@ def get_sequence_output_auto_validation_samples(
 
         prepared_eval_samples[output_name] = []
 
-        for i in range(config.sampling_config.n_eval_inputs):
+        for _i in range(config.sampling_config.n_eval_inputs):
             input_to_model, target_labels, cur_id = next(eval_sample_iterator)
 
             cur_inputs_masked = _mask_targets_for_auto_eval_generation(
@@ -295,10 +297,10 @@ def get_sequence_output_auto_validation_samples(
 
 
 def _mask_targets_for_auto_eval_generation(
-    inputs: Dict[str, Any],
+    inputs: dict[str, Any],
     output_name: str,
-    input_types: Dict[str, str],
-) -> Dict[str, Any]:
+    input_types: dict[str, str],
+) -> dict[str, Any]:
     raw_inputs_masked = {}
 
     for input_name, raw_input in inputs.items():
@@ -316,7 +318,7 @@ def _mask_targets_for_auto_eval_generation(
 
 def _get_eval_sample_generator(
     eval_samples: SequenceOutputEvalSamples, output_name: str
-) -> Generator[Tuple[str, SequenceOutputEvalSample], None, None]:
+) -> Generator[tuple[str, SequenceOutputEvalSample], None, None]:
     cur_config_auto_samples = eval_samples.auto_samples[output_name]
     cur_config_manual_samples = eval_samples.manual_samples[output_name]
 
@@ -374,8 +376,7 @@ def autoregressive_sequence_generation(
     indices = autoregressive_pre_batch.indices
 
     indices_has_finished = {}
-    for i in range(0, sampling_config.generated_sequence_length):
-
+    for _i in range(0, sampling_config.generated_sequence_length):
         target_indices = []
         for sample_index, _ in enumerate(eval_samples):
             cur_generated_tokens = generated_tokens[sample_index]
@@ -493,7 +494,7 @@ def _check_vocab_consistency(
 
 
 def _extract_base_generated_tokens(
-    prepared_inputs: Dict[str, torch.Tensor],
+    prepared_inputs: dict[str, torch.Tensor],
     seq_output_name: str,
 ) -> list[int]:
     """
@@ -527,8 +528,7 @@ def _ensure_no_extra_padding(tokens: list[int], pad_idx: int) -> list[int]:
 def _compute_target_index(current_generated_length: int, max_length: int) -> int:
     if current_generated_length < max_length:
         return current_generated_length
-    else:
-        return max_length - 1
+    return max_length - 1
 
 
 def _prepare_current_autoregressive_input(
@@ -625,9 +625,9 @@ def top_k_top_p_filtering(
     top_p: float = 0.0,
     filter_value: float = -float("Inf"),
 ) -> torch.Tensor:
-    assert (
-        logits.dim() == 2
-    ), f"Expected 2D tensor (batch, vocab_scores). Got: {logits.dim()}D."
+    assert logits.dim() == 2, (
+        f"Expected 2D tensor (batch, vocab_scores). Got: {logits.dim()}D."
+    )
 
     batch_size, vocab_size = logits.size()
 

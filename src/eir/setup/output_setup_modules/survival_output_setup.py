@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Dict, Optional
 
 import numpy as np
 from sklearn.preprocessing import KBinsDiscretizer
@@ -16,7 +15,7 @@ from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
-al_num_outputs_per_target = Dict[str, int]
+al_num_outputs_per_target = dict[str, int]
 
 
 @dataclass
@@ -26,15 +25,15 @@ class ComputedSurvivalOutputInfo:
     target_columns: al_target_columns
     target_transformers: al_label_transformers
 
-    baseline_hazard: Optional[np.ndarray] = None
-    baseline_unique_times: Optional[np.ndarray] = None
+    baseline_hazard: np.ndarray | None = None
+    baseline_unique_times: np.ndarray | None = None
 
 
 def set_up_survival_output(
     output_config: schemas.OutputConfig,
-    target_transformers: Dict[str, al_label_transformers],
-    baseline_hazard: Optional[np.ndarray] = None,
-    baseline_unique_times: Optional[np.ndarray] = None,
+    target_transformers: dict[str, al_label_transformers],
+    baseline_hazard: np.ndarray | None = None,
+    baseline_unique_times: np.ndarray | None = None,
     *args,
     **kwargs,
 ) -> ComputedSurvivalOutputInfo:
@@ -70,7 +69,7 @@ def set_up_num_survival_outputs(
     num_outputs_per_target_dict = {}
     assert len(target_transformers) == 2
     for column, transformer in target_transformers.items():
-        if not isinstance(transformer, (KBinsDiscretizer, IdentityTransformer)):
+        if not isinstance(transformer, KBinsDiscretizer | IdentityTransformer):
             continue
 
         time_column = column

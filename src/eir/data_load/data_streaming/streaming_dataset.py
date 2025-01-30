@@ -2,7 +2,8 @@ import atexit
 import json
 import threading
 import time
-from typing import TYPE_CHECKING, Any, Iterator, Literal, Optional, Sequence, Union
+from collections.abc import Iterator, Sequence
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import torch
@@ -87,9 +88,9 @@ class StreamingDataset(IterableDataset):
         self.fetch_timeout = fetch_timeout
         self.max_consecutive_timeouts = max_consecutive_timeouts
         self.heartbeat_interval = heartbeat_interval
-        self.ws: Optional[websocket.WebSocket] = None
+        self.ws: websocket.WebSocket | None = None
         self.current_batch: list[dict] = []
-        self.heartbeat_thread: Optional[threading.Thread] = None
+        self.heartbeat_thread: threading.Thread | None = None
         self.stop_event = threading.Event()
         self._is_closed = False
 
@@ -183,10 +184,10 @@ class StreamingDataset(IterableDataset):
                     self._reconnect()
                 else:
                     logger.error(f"Unexpected OSError: {e}")
-                    raise StopIteration
+                    raise
             except Exception as e:
                 logger.error(f"Error fetching batch: {e}")
-                raise StopIteration
+                raise
 
         logger.error(
             f"Max consecutive timeouts ({self.max_consecutive_timeouts}) reached."
@@ -208,7 +209,6 @@ class StreamingDataset(IterableDataset):
             atexit.unregister(self.close)
 
     def _process_sample(self, sample: Sample) -> "al_getitem_return":
-
         inputs = sample.inputs
         inputs_request_parsed = prepare_request_input_data(
             request_data=inputs,
@@ -263,7 +263,6 @@ def prepare_inputs_for_in_memory_processing(
     inputs_request_parsed: dict[str, Any],
     input_objects: al_input_objects_as_dict,
 ) -> dict[str, Any]:
-
     inputs_prepared_for_memory = {}
     for name, cur_input in inputs_request_parsed.items():
         input_object = input_objects[name]
@@ -294,7 +293,6 @@ def prepare_request_output_data(
     outputs_prepared: al_outputs_prepared = {}
 
     for output_name, serialized_data in request_data.items():
-
         output_object = output_objects[output_name]
 
         output_config = output_object.output_config
@@ -357,14 +355,12 @@ def prepare_outputs_for_in_memory_processing(
     target_labels: dict[str, Any],
     output_objects: al_output_objects_as_dict,
 ) -> dict[str, Any]:
-
     targets_prepared_for_memory = {}
     for name, cur_target in target_labels.items():
         output_object = output_objects[name]
 
         match output_object:
             case ComputedSequenceOutputInfo():
-
                 value = cur_target[name]
                 assert isinstance(value, Sequence), value
 
@@ -378,13 +374,13 @@ def prepare_outputs_for_in_memory_processing(
 
 
 def apply_tabular_transformers(
-    cur_target: dict[str, Union[int, float, torch.Tensor]],
-    target_transformers: dict[str, Union[StandardScaler, LabelEncoder]],
+    cur_target: dict[str, int | float | torch.Tensor],
+    target_transformers: dict[str, StandardScaler | LabelEncoder],
     target_columns: dict[Literal["con", "cat"], list[str]],
 ) -> dict[str, int | float | torch.Tensor]:
     transformed_target = {}
 
-    for col_type, columns in target_columns.items():
+    for _col_type, columns in target_columns.items():
         for column in columns:
             if column not in cur_target:
                 raise ValueError(f"Column {column} not found in target data.")
@@ -399,7 +395,7 @@ def apply_tabular_transformers(
                 transformed_value = transformer.transform([[value]])[0]
             elif isinstance(transformer, LabelEncoder):
                 transformed_value = transformer.transform([value])
-            elif isinstance(transformer, (KBinsDiscretizer, IdentityTransformer)):
+            elif isinstance(transformer, KBinsDiscretizer | IdentityTransformer):
                 transformed_value = transformer.transform([[value]])[0]
             else:
                 raise ValueError(f"Unknown transformer type for column {column}")

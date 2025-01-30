@@ -1,7 +1,8 @@
 import multiprocessing
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import torch
 import torch.multiprocessing
@@ -104,7 +105,6 @@ def get_default_experiment(
     configs: Configs,
     hooks: Hooks,
 ) -> "Experiment":
-
     gc = configs.global_config
 
     output_folder = gc.be.output_folder
@@ -184,7 +184,7 @@ def get_default_experiment(
     )
 
     train_sampler = None
-    if isinstance(train_dataset, (datasets.DiskDataset, datasets.MemoryDataset)):
+    if isinstance(train_dataset, datasets.DiskDataset | datasets.MemoryDataset):
         train_sampler = get_train_sampler(
             columns_to_sample=gc.tc.weighted_sampling_columns,
             train_dataset=train_dataset,
@@ -277,15 +277,14 @@ def _prepare_run_folder(output_folder: str) -> Path:
 
 def get_dataloaders(
     train_dataset: datasets.al_datasets,
-    train_sampler: Union[None, WeightedRandomSampler, DistributedSampler],
+    train_sampler: None | WeightedRandomSampler | DistributedSampler,
     valid_dataset: datasets.al_local_datasets,
     batch_size: int,
     num_workers: int = 0,
-) -> Tuple:
-
+) -> tuple:
     train_num_workers = num_workers
 
-    if isinstance(train_dataset, (datasets.DiskDataset, datasets.MemoryDataset)):
+    if isinstance(train_dataset, datasets.DiskDataset | datasets.MemoryDataset):
         check_dataset_and_batch_size_compatibility(
             dataset=train_dataset,
             batch_size=batch_size,
@@ -315,7 +314,7 @@ def get_dataloaders(
         name="Validation",
     )
 
-    shuffle: Optional[bool] = False if train_sampler else True
+    shuffle: bool | None = not train_sampler
     if isinstance(train_dataset, datasets.StreamingDataset):
         shuffle = None
 
@@ -368,9 +367,9 @@ def check_dataset_and_batch_size_compatibility(
 
 def _log_model(
     model: nn.Module,
-    structure_file: Optional[Path],
+    structure_file: Path | None,
     verbose: bool = False,
-    parameter_file: Optional[str] = None,
+    parameter_file: str | None = None,
 ) -> None:
     no_params = sum(p.numel() for p in model.parameters())
     no_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -448,7 +447,7 @@ def get_base_trainer(experiment: Experiment) -> Engine:
 
     def step(
         engine: Engine,
-        loader_batch: Tuple[torch.Tensor, al_training_labels_target, List[str]],
+        loader_batch: tuple[torch.Tensor, al_training_labels_target, list[str]],
     ) -> "al_step_metric_dict":
         """
         The output here goes to trainer.output.

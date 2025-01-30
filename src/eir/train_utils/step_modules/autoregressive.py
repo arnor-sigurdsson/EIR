@@ -1,5 +1,3 @@
-from typing import Dict, Tuple
-
 import torch
 from torch._C._nn import pad
 
@@ -15,7 +13,7 @@ def prepare_sequence_input_for_sequence_output(
     cur_seq: torch.Tensor,
     input_name: str,
     device: str,
-) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     assert input_object.tokenizer is not None
     special_tokens = get_special_tokens(
         tokenizer=input_object.tokenizer,
@@ -42,7 +40,7 @@ def sample_autoregressive_batch(
     batch_tensor: torch.Tensor,
     batch_size: int,
     special_tokens: SpecialTokens,
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     The reason for padding with the BOS token is that the tensor we get here
     is already at max_length. If we had e.g. a full, long sequence, we could

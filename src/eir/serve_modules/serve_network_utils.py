@@ -1,6 +1,7 @@
 import base64
+from collections.abc import Sequence
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Dict, Literal, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -57,9 +58,9 @@ def prepare_request_input_data_wrapper(
 
 
 def prepare_request_input_data(
-    request_data: Dict[str, Any],
+    request_data: dict[str, Any],
     input_objects: "al_input_objects_as_dict",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     inputs_prepared: al_inputs_prepared = {}
 
     for name, serialized_data in request_data.items():
@@ -139,8 +140,8 @@ def prepare_request_input_data(
 
 
 def _streamline_tabular_request_data(
-    tabular_input: Dict, transformers: al_label_transformers
-) -> Dict:
+    tabular_input: dict, transformers: al_label_transformers
+) -> dict:
     parsed_output = {}
     for name, value in tabular_input.items():
         cur_transformer = transformers[name]
@@ -157,12 +158,9 @@ def _streamline_tabular_request_data(
 
 def _parse_transformer_output(
     transformer: al_label_transformers_object, value: float | int
-) -> Union[float, int]:
+) -> float | int:
     value_parsed: list
-    if isinstance(transformer, StandardScaler):
-        value_parsed = [[value]]
-    else:
-        value_parsed = [value]
+    value_parsed = [[value]] if isinstance(transformer, StandardScaler) else [value]
 
     value_transformed = transformer.transform(value_parsed)
     if isinstance(transformer, StandardScaler):
@@ -181,7 +179,7 @@ def deserialize_array(array_str: str, dtype: npt.DTypeLike, shape: tuple) -> np.
 
 
 def deserialize_image(
-    image_str: str, image_mode: Optional[Literal["L", "RGB", "RGBA"]]
+    image_str: str, image_mode: Literal["L", "RGB", "RGBA"] | None
 ) -> Image.Image:
     """
     Note we convert to RGB to be compatible with the default_loader.

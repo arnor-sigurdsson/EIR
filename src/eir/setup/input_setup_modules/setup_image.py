@@ -1,6 +1,7 @@
+from collections.abc import Generator, Sequence
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
-from typing import Dict, Generator, Optional, Sequence, Tuple
+from typing import Optional
 
 import numpy as np
 import torch
@@ -37,7 +38,7 @@ class PretrainedImageModelInfo:
     classifier: str
 
 
-def get_timm_configs() -> Dict[str, PretrainedImageModelInfo]:
+def get_timm_configs() -> dict[str, PretrainedImageModelInfo]:
     default_configs = {}
     field_names = {i.name for i in fields(PretrainedImageModelInfo)}
     for name, pretrained_config in _model_pretrained_cfgs.items():
@@ -125,12 +126,11 @@ def set_up_computed_image_input_object(
 
 
 def get_num_channels_wrapper(
-    image_mode: Optional[str],
-    num_channels: Optional[int],
+    image_mode: str | None,
+    num_channels: int | None,
     source: str,
-    deeplake_inner_key: Optional[str],
+    deeplake_inner_key: str | None,
 ) -> int:
-
     if image_mode and num_channels:
         raise ValueError(
             "Got both image mode and number of channels. Please only specify one."
@@ -140,19 +140,17 @@ def get_num_channels_wrapper(
         num_channels = get_num_channels_from_image_mode(image_mode=image_mode)
         return num_channels
 
-    elif num_channels:
+    if num_channels:
         return num_channels
 
-    else:
-        num_channels = infer_num_image_channels(
-            data_source=source,
-            deeplake_inner_key=deeplake_inner_key,
-        )
-        return num_channels
+    num_channels = infer_num_image_channels(
+        data_source=source,
+        deeplake_inner_key=deeplake_inner_key,
+    )
+    return num_channels
 
 
-def get_num_channels_from_image_mode(image_mode: Optional[str]) -> int:
-
+def get_num_channels_from_image_mode(image_mode: str | None) -> int:
     match image_mode:
         case "RGB":
             channels = 3
@@ -170,9 +168,7 @@ def get_num_channels_from_image_mode(image_mode: Optional[str]) -> int:
     return channels
 
 
-def infer_num_image_channels(
-    data_source: str, deeplake_inner_key: Optional[str]
-) -> int:
+def infer_num_image_channels(data_source: str, deeplake_inner_key: str | None) -> int:
     if is_deeplake_dataset(data_source=data_source):
         assert deeplake_inner_key is not None
         deeplake_ds = load_deeplake_dataset(data_source=data_source)
@@ -191,10 +187,7 @@ def infer_num_image_channels(
         test_image_array = np.array(test_image)
         data_pointer = test_file.name
 
-    if test_image_array.ndim == 2:
-        num_channels = 1
-    else:
-        num_channels = test_image_array.shape[-1]
+    num_channels = 1 if test_image_array.ndim == 2 else test_image_array.shape[-1]
 
     logger.info(
         "Inferring number of channels from source %s (using %s) as: %d",
@@ -221,19 +214,18 @@ class ImageNormalizationStats:
 
 def get_image_normalization_values(
     source: str,
-    inner_key: Optional[str],
+    inner_key: str | None,
     model_config: ImageModelConfig | ArrayOutputModuleConfig,
-    mean_normalization_values: Optional[Sequence[float] | torch.Tensor],
-    stds_normalization_values: Optional[Sequence[float] | torch.Tensor],
-    adaptive_normalization_max_samples: Optional[int],
+    mean_normalization_values: Sequence[float] | torch.Tensor | None,
+    stds_normalization_values: Sequence[float] | torch.Tensor | None,
+    adaptive_normalization_max_samples: int | None,
     data_dimensions: DataDimensions,
-    image_mode: Optional[str],
+    image_mode: str | None,
 ) -> ImageNormalizationStats:
-
     pretrained_model_configs = get_timm_configs()
 
-    means: Optional[torch.Tensor | Sequence[float]]
-    stds: Optional[torch.Tensor | Sequence[float]]
+    means: torch.Tensor | Sequence[float] | None
+    stds: torch.Tensor | Sequence[float] | None
 
     means = mean_normalization_values
     stds = stds_normalization_values
@@ -324,8 +316,7 @@ def get_image_normalization_values(
             means = gathered_stats.mean
             stds = gathered_stats.std
             logger.info(
-                "Gathered the following means: %s and standard deviations: %s "
-                "from %s.",
+                "Gathered the following means: %s and standard deviations: %s from %s.",
                 means,
                 stds,
                 input_source,
@@ -354,11 +345,12 @@ def get_image_normalization_values(
 
 
 def _get_maybe_truncated_tensor_iterator(
-    tensor_iterator: Generator[torch.Tensor, None, None], max_samples: Optional[int]
+    tensor_iterator: Generator[torch.Tensor, None, None], max_samples: int | None
 ) -> Generator[torch.Tensor, None, None]:
-
     if max_samples is not None:
-        tensor_iterator = (t for _, t in zip(range(max_samples), tensor_iterator))
+        tensor_iterator = (
+            t for _, t in zip(range(max_samples), tensor_iterator, strict=False)
+        )
 
     return tensor_iterator
 
@@ -376,7 +368,7 @@ def get_image_transforms(
     normalization_stats: ImageNormalizationStats,
     auto_augment: bool,
     resize_approach: str,
-) -> Tuple[transforms.Compose, transforms.Compose]:
+) -> tuple[transforms.Compose, transforms.Compose]:
     if len(target_size) == 1:
         target_size = (target_size[0], target_size[0])
         logger.info(

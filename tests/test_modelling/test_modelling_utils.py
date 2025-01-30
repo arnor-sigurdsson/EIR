@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -14,8 +14,8 @@ def check_performance_result_wrapper(
     min_thresholds: tuple[float, float] = (1.5, 1.0),
     survival_max_thresholds: tuple[float, float] = (0.6, 0.6),
     survival_min_thresholds: tuple[float, float] = (2.0, 2.0),
-    cat_metric: Optional[str] = "mcc",
-    con_metric: Optional[str] = "r2",
+    cat_metric: str | None = "mcc",
+    con_metric: str | None = "r2",
 ) -> None:
     for output_name, output_object in outputs.items():
         output_type = output_object.output_config.output_info.output_type
@@ -78,7 +78,7 @@ def check_test_performance_results(
     output_name: str,
     target_column: str,
     metric: str,
-    thresholds: Tuple[float, float],
+    thresholds: tuple[float, float],
     direction: str = "max",
     check_train: bool = True,
 ):

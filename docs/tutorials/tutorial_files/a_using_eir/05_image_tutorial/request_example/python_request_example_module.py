@@ -19,8 +19,7 @@ def send_request(url: str, payload: list[dict]) -> dict:
 
 
 base = (
-    "eir_tutorials/a_using_eir/05_image_tutorial/data/"
-    "hot_dog_not_hot_dog/food_images"
+    "eir_tutorials/a_using_eir/05_image_tutorial/data/hot_dog_not_hot_dog/food_images"
 )
 payload = [
     {

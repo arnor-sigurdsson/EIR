@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Type, Union
+from typing import TYPE_CHECKING, Any
 
 from eir.models.input.array.array_models import (
     ArrayModelConfig,
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from eir.setup.config import al_input_types
 
 
-def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfig:
+def init_input_config(yaml_config_as_dict: dict[str, Any]) -> schemas.InputConfig:
     cfg = yaml_config_as_dict
 
     validate_keys_against_dataclass(
@@ -83,14 +83,12 @@ def init_input_config(yaml_config_as_dict: Dict[str, Any]) -> schemas.InputConfi
     return input_config
 
 
-def get_inputs_schema_map() -> Dict[
+def get_inputs_schema_map() -> dict[
     str,
-    Union[
-        Type[schemas.OmicsInputDataConfig],
-        Type[schemas.TabularInputDataConfig],
-        Type[schemas.SequenceInputDataConfig],
-        Type[schemas.ByteInputDataConfig],
-    ],
+    type[schemas.OmicsInputDataConfig]
+    | type[schemas.TabularInputDataConfig]
+    | type[schemas.SequenceInputDataConfig]
+    | type[schemas.ByteInputDataConfig],
 ]:
     mapping = {
         "omics": schemas.OmicsInputDataConfig,
@@ -132,16 +130,17 @@ def set_up_input_feature_extractor_config(
 
     model_config_class = get_input_feature_extractor_config_class(input_type=input_type)
 
-    model_type = model_init_kwargs_base.get("model_type", None)
+    model_type = model_init_kwargs_base.get("model_type")
     if not model_type:
         try:
-            model_type = getattr(model_config_class, "model_type")
-        except AttributeError:
-            raise AttributeError(
-                "Not model type specified in model config and could not find default "
-                "value for '%s'.",
+            model_type = model_config_class.model_type
+        except AttributeError as e:
+            logger.error(
+                "Not model type specified in model config and "
+                "could not find default value for '%s'.",
                 input_type,
             )
+            raise e
 
         logger.info(
             "Input model type not specified in model configuration for input name "
@@ -177,9 +176,9 @@ def get_input_feature_extractor_config_class(
     return model_config_setup_map[input_type]
 
 
-def get_input_feature_extractor_config_init_class_map() -> (
-    Dict[str, schemas.al_feature_extractor_configs_classes]
-):
+def get_input_feature_extractor_config_init_class_map() -> dict[
+    str, schemas.al_feature_extractor_configs_classes
+]:
     mapping = {
         "tabular": TabularModelConfig,
         "omics": OmicsModelConfig,
@@ -197,7 +196,7 @@ def set_up_feature_extractor_init_config(
     input_type_info_object: "al_input_types",
     model_init_kwargs: dict,
     model_type: str,
-) -> Dict:
+) -> dict:
     if getattr(input_type_info_object, "pretrained_model", None):
         return {}
 
@@ -222,7 +221,7 @@ def set_up_feature_extractor_init_config(
 def get_is_not_eir_model_condition(
     input_info_object: schemas.InputDataConfig, model_type: str
 ) -> bool:
-    is_possibly_external = getattr(input_info_object, "input_type") in (
+    is_possibly_external = input_info_object.input_type in (
         "sequence",
         "bytes",
         "image",
@@ -232,7 +231,7 @@ def get_is_not_eir_model_condition(
     return not_from_eir
 
 
-def get_feature_extractor_config_type_init_callable_map() -> Dict[str, Type]:
+def get_feature_extractor_config_type_init_callable_map() -> dict[str, type]:
     omics_mapping = get_omics_config_dataclass_mapping()
     array_mapping = get_array_config_dataclass_mapping()
     other_mapping = {
@@ -245,8 +244,8 @@ def get_feature_extractor_config_type_init_callable_map() -> Dict[str, Type]:
 
 
 def set_up_pretrained_config(
-    pretrained_config_dict: Union[None, Dict[str, Any]],
-) -> Union[None, schemas.BasicPretrainedConfig]:
+    pretrained_config_dict: None | dict[str, Any],
+) -> None | schemas.BasicPretrainedConfig:
     if pretrained_config_dict is None:
         return None
 
@@ -259,13 +258,13 @@ def set_up_pretrained_config(
     return config_object
 
 
-def get_pretrained_config_class() -> Type[schemas.BasicPretrainedConfig]:
+def get_pretrained_config_class() -> type[schemas.BasicPretrainedConfig]:
     return schemas.BasicPretrainedConfig
 
 
 def set_up_interpretation_config(
-    input_type: str, interpretation_config_dict: Union[None, Dict[str, Any]]
-) -> Union[None, schemas.BasicInterpretationConfig]:
+    input_type: str, interpretation_config_dict: None | dict[str, Any]
+) -> None | schemas.BasicInterpretationConfig:
     config_class = get_interpretation_config_class(input_type=input_type)
     if config_class is None:
         return None
@@ -280,15 +279,15 @@ def set_up_interpretation_config(
 
 def get_interpretation_config_class(
     input_type: str,
-) -> Union[None, Type[schemas.BasicInterpretationConfig]]:
+) -> None | type[schemas.BasicInterpretationConfig]:
     mapping = get_interpretation_config_schema_map()
 
     return mapping.get(input_type, None)
 
 
-def get_interpretation_config_schema_map() -> (
-    Dict[str, Type[schemas.BasicInterpretationConfig]]
-):
+def get_interpretation_config_schema_map() -> dict[
+    str, type[schemas.BasicInterpretationConfig]
+]:
     mapping = {
         "sequence": schemas.BasicInterpretationConfig,
         "image": schemas.BasicInterpretationConfig,

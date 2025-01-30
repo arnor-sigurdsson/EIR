@@ -1,20 +1,12 @@
 import argparse
 import types
 from collections import Counter
+from collections.abc import Generator, Iterable, Mapping, Sequence
 from copy import copy
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Dict,
-    Generator,
-    Iterable,
-    List,
     Literal,
-    Mapping,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
 )
 
 import configargparse
@@ -54,12 +46,12 @@ from eir.setup.tensor_broker_setup import set_up_tensor_broker_config
 from eir.train_utils.utils import configure_global_eir_logging
 from eir.utils.logging import get_logger
 
-al_input_types = Union[
-    schemas.OmicsInputDataConfig,
-    schemas.TabularInputDataConfig,
-    schemas.SequenceInputDataConfig,
-    schemas.ByteInputDataConfig,
-]
+al_input_types = (
+    schemas.OmicsInputDataConfig
+    | schemas.TabularInputDataConfig
+    | schemas.SequenceInputDataConfig
+    | schemas.ByteInputDataConfig
+)
 
 logger = get_logger(name=__name__)
 
@@ -87,7 +79,7 @@ def get_configs():
     return configs_with_seq_outputs
 
 
-def get_main_cl_args() -> Tuple[argparse.Namespace, List[str]]:
+def get_main_cl_args() -> tuple[argparse.Namespace, list[str]]:
     parser_ = get_main_parser()
     cl_args, extra_cl_args = parser_.parse_known_args()
 
@@ -96,13 +88,13 @@ def get_main_cl_args() -> Tuple[argparse.Namespace, List[str]]:
 
 def get_output_folder_and_log_level_from_cl_args(
     main_cl_args: argparse.Namespace,
-    extra_cl_args: List[str],
-) -> Tuple[str, str]:
+    extra_cl_args: list[str],
+) -> tuple[str, str]:
     global_configs = main_cl_args.global_configs
 
     output_folder = None
     for config in global_configs:
-        with open(config, "r") as f:
+        with open(config) as f:
             config_dict = yaml.safe_load(f)
 
             output_folder = config_dict.get("basic_experiment", {}).get("output_folder")
@@ -131,8 +123,8 @@ def get_main_parser(
         config_file_parser_class=configargparse.YAMLConfigFileParser
     )
 
-    global_required = True if global_nargs == "+" else False
-    output_required = True if output_nargs == "+" else False
+    global_required = global_nargs == "+"
+    output_required = output_nargs == "+"
 
     parser_.add_argument(
         "--global_configs",
@@ -174,7 +166,7 @@ def get_main_parser(
 
 def _recursive_search(
     dict_: Mapping, target: Any, path=None
-) -> Generator[Tuple[str, Any], None, None]:
+) -> Generator[tuple[str, Any], None, None]:
     if not path:
         path = []
 
@@ -202,8 +194,8 @@ class Configs:
 
 
 def generate_aggregated_config(
-    cl_args: Union[argparse.Namespace, types.SimpleNamespace],
-    extra_cl_args_overload: Union[List[str], None] = None,
+    cl_args: argparse.Namespace | types.SimpleNamespace,
+    extra_cl_args_overload: list[str] | None = None,
     strict: bool = True,
 ) -> Configs:
     global_config_iter = get_yaml_iterator_with_injections(
@@ -348,7 +340,7 @@ def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
     fusion_model_type = combined_config["model_type"]
 
     model_dataclass_config_class: (
-        Type[ResidualMLPConfig] | Type[MGMoEModelConfig] | Type[IdentityConfig]
+        type[ResidualMLPConfig] | type[MGMoEModelConfig] | type[IdentityConfig]
     ) = ResidualMLPConfig
     if fusion_model_type == "mgmoe":
         model_dataclass_config_class = MGMoEModelConfig
@@ -401,8 +393,8 @@ def _check_output_config_names(output_configs: Iterable[schemas.OutputConfig]) -
 
 @dataclass
 class TabularTargets:
-    con_targets: Dict[str, Sequence[str]]
-    cat_targets: Dict[str, Sequence[str]]
+    con_targets: dict[str, Sequence[str]]
+    cat_targets: dict[str, Sequence[str]]
 
     def __len__(self):
         all_con = sum(len(i) for i in self.con_targets.values())
@@ -440,12 +432,12 @@ def _check_input_and_output_config_names(
     as it's used for specifying e.g. different model settings for the input feature
     extractor vs. the output module.
     """
-    input_names = set(i.input_info.input_name for i in input_configs)
-    output_names = set(
+    input_names = {i.input_info.input_name for i in input_configs}
+    output_names = {
         i.output_info.output_name
         for i in output_configs
         if i.output_info.output_type not in skip_keys
-    )
+    }
 
     intersection = output_names.intersection(input_names)
     if len(intersection) > 0:

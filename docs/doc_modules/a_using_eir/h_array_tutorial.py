@@ -1,6 +1,6 @@
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
-from typing import Sequence
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -417,7 +417,7 @@ def _plot_performance(base_dir: Path, output_path: Path) -> None:
 
 
 def gather_validation_perf_average(base_dir: Path) -> pd.DataFrame:
-    runs = sorted(list(base_dir.glob("tutorial_08_run_*")))
+    runs = sorted(base_dir.glob("tutorial_08_run_*"))
     data = []
 
     for run in runs:

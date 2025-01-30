@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 def load_output_config_from_yaml(output_config_path: Path) -> "OutputConfig":
-    with open(output_config_path, "r") as infile:
+    with open(output_config_path) as infile:
         output_config_dict = yaml.safe_load(stream=infile)
 
     output_config = init_output_config(yaml_config_as_dict=output_config_dict)

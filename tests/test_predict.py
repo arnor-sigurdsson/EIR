@@ -1,6 +1,6 @@
 from argparse import Namespace
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -118,18 +118,20 @@ def test_load_model(create_test_config: config.Configs, tmp_path: Path):
         if key not in ["_modules"]:
             assert model.__dict__[key] == loaded_model.__dict__[key], key
 
-    for param_model, param_loaded in zip(model.parameters(), loaded_model.parameters()):
+    for param_model, param_loaded in zip(
+        model.parameters(), loaded_model.parameters(), strict=False
+    ):
         assert param_model.data.ne(param_loaded.data).sum() == 0
 
 
 def grab_best_model_path(saved_models_folder: Path):
-    saved_models = [i for i in saved_models_folder.iterdir()]
+    saved_models = list(saved_models_folder.iterdir())
     saved_models.sort(key=lambda x: float(x.stem.split("=")[-1]))
 
     return saved_models[-1]
 
 
-def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
+def _get_predict_test_data_parametrization() -> list[dict[str, Any]]:
     """
     We skip the deeplake tests in the GHA Linux host, as for some reason it raises
     a SIGKILL (-9).
@@ -357,7 +359,7 @@ def _get_predict_test_data_parametrization() -> List[Dict[str, Any]]:
 )
 def test_predict(
     attribution_background_source: str,
-    prep_modelling_test_configs: Tuple[train.Experiment, ModelTestConfig],
+    prep_modelling_test_configs: tuple[train.Experiment, ModelTestConfig],
     tmp_path: Path,
 ):
     experiment, model_test_config = prep_modelling_test_configs
@@ -431,9 +433,7 @@ def _check_sequence_predict_results(tmp_path: Path, expected_n_samples: int) -> 
     )
     assert sequence_predictions_path.exists()
 
-    found_files = list(
-        i for i in sequence_predictions_path.iterdir() if i.suffix == ".txt"
-    )
+    found_files = [i for i in sequence_predictions_path.iterdir() if i.suffix == ".txt"]
     assert len(found_files) == expected_n_samples
 
 
@@ -443,9 +443,7 @@ def _check_array_predict_results(tmp_path: Path, expected_n_samples: int) -> Non
     )
     assert array_predictions_path.exists()
 
-    found_files = list(
-        i for i in array_predictions_path.iterdir() if i.suffix == ".npy"
-    )
+    found_files = [i for i in array_predictions_path.iterdir() if i.suffix == ".npy"]
     assert len(found_files) == expected_n_samples
 
 

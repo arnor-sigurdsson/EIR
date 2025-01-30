@@ -47,10 +47,7 @@ def get_logger(name: str, tqdm_compatible: bool = False) -> logging.Logger:
     logger_.setLevel(logging.DEBUG)
 
     handler: logging.Handler | TQDMLoggingHandler
-    if tqdm_compatible:
-        handler = TQDMLoggingHandler()
-    else:
-        handler = logging.StreamHandler()
+    handler = TQDMLoggingHandler() if tqdm_compatible else logging.StreamHandler()
 
     formatter = ColoredFormatter(
         fmt="%(asctime)s - %(levelname)s - %(name)s - %(message)s",

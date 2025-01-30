@@ -1,11 +1,7 @@
-from typing import Optional
-
 from eir.setup.input_setup_modules.setup_sequence import get_sequence_split_function
 
 
-def streamline_sequence_manual_data(
-    data: str, split_on: Optional[str]
-) -> list[str] | str:
+def streamline_sequence_manual_data(data: str, split_on: str | None) -> list[str] | str:
     """
     This is to specifically handle the case of an empty string / None being passed
     here. If e.g. we call the split_func on '', we will get [''], which will

@@ -1,7 +1,8 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial, update_wrapper
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -121,12 +122,12 @@ def prepare_outputs_memory(
 @dataclass
 class HookOutput:
     hook_callable: Callable[..., dict[str, np.ndarray | Image]]
-    return_dtype: Optional[pl.DataType]
+    return_dtype: pl.DataType | None
 
 
 def get_output_data_loading_hooks(
     outputs: al_output_objects_as_dict,
-) -> Optional[dict[str, HookOutput]]:
+) -> dict[str, HookOutput] | None:
     """
     Note we use object dtypes for images as they are PIL.Image objects.
     """

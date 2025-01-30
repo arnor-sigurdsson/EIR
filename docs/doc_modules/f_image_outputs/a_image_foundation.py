@@ -1,10 +1,10 @@
 import base64
 import json
 import os
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 from shutil import copytree
-from typing import Sequence
 
 import numpy as np
 from PIL import Image
@@ -225,7 +225,6 @@ def _add_small_altercation_versions(static_folder: str) -> None:
     )
 
     for image_path in Path(static_folder).glob("*.png"):
-
         if "altered" in image_path.stem:
             continue
 
@@ -244,7 +243,7 @@ def decode_and_save_images(
 ) -> None:
     os.makedirs(output_folder, exist_ok=True)
 
-    with open(predictions_file, "r") as file:
+    with open(predictions_file) as file:
         predictions = json.load(file)[0]
 
     for i, prediction in enumerate(predictions["response"]["result"]):

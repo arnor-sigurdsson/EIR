@@ -1,6 +1,6 @@
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 from random import shuffle
-from typing import Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 
@@ -15,7 +15,7 @@ def set_up_test_data_root_outpath(base_folder: Path) -> Path:
 def common_split_test_data_wrapper(
     test_folder: Path,
     name: str,
-    post_split_callables: Optional[Dict[str, Callable]] = None,
+    post_split_callables: dict[str, Callable] | None = None,
 ) -> None:
     train_ids = None
     test_ids = None
@@ -55,10 +55,10 @@ def common_split_test_data_wrapper(
 
 def split_test_file_folder(
     test_folder: Path,
-    train_ids: Union[Sequence[str], None] = None,
-    test_ids: Union[Sequence[str], None] = None,
-) -> Tuple[Sequence[Path], Sequence[Path]]:
-    all_arrays = [i for i in test_folder.iterdir()]
+    train_ids: Sequence[str] | None = None,
+    test_ids: Sequence[str] | None = None,
+) -> tuple[Sequence[Path], Sequence[Path]]:
+    all_arrays = list(test_folder.iterdir())
     shuffle(all_arrays)
 
     train_array_test_set_folder = test_folder / "train_set"
@@ -86,7 +86,7 @@ def split_test_file_folder(
 
 def split_label_file(
     label_file_path: Path, train_ids: Sequence[str], test_ids: Sequence[str]
-) -> Tuple[Path, Path]:
+) -> tuple[Path, Path]:
     df = pd.read_csv(label_file_path).set_index("ID")
     df_train, df_test = split_df_by_index(df=df, train_ids=train_ids, test_ids=test_ids)
     label_file_path.unlink()
@@ -106,7 +106,7 @@ def get_ids_from_paths(paths: Iterable[Path]) -> Sequence[str]:
 
 def split_df_by_index(
     df: pd.DataFrame, train_ids: Sequence[str], test_ids: Sequence[str]
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     df_train = df[df.index.isin(train_ids)]
     df_test = df[df.index.isin(test_ids)]
 

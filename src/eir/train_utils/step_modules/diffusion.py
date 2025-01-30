@@ -149,7 +149,6 @@ def p_sample(
     t: torch.Tensor,
     t_index: int,
 ) -> torch.Tensor:
-
     current_state = batch_inputs[output_name]
     output_module = getattr(model.output_modules, output_name)
     t_emb = output_module.feature_extractor.timestep_embeddings(t)
@@ -181,14 +180,13 @@ def p_sample(
 
     if t_index == 0:
         return model_mean
-    else:
-        posterior_variance_t = extract(
-            a=config.posterior_variance,
-            t=t,
-            x_shape=current_state.shape,
-        )
-        noise = torch.randn_like(current_state)
-        return model_mean + torch.sqrt(posterior_variance_t) * noise
+    posterior_variance_t = extract(
+        a=config.posterior_variance,
+        t=t,
+        x_shape=current_state.shape,
+    )
+    noise = torch.randn_like(current_state)
+    return model_mean + torch.sqrt(posterior_variance_t) * noise
 
 
 def extract(

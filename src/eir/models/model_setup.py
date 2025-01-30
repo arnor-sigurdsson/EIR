@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Type, cast
+from typing import TYPE_CHECKING, cast
 
 import torch
 from torch import nn
@@ -28,7 +29,7 @@ from eir.utils.logging import get_logger
 if TYPE_CHECKING:
     from eir.setup.output_setup import al_output_objects_as_dict
 
-al_model_registry = Dict[str, Callable[[str], Type[nn.Module]]]
+al_model_registry = dict[str, Callable[[str], type[nn.Module]]]
 
 logger = get_logger(name=__name__)
 

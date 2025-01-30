@@ -1,5 +1,5 @@
 from copy import copy
-from typing import Any, Dict, Literal, Type, Union
+from typing import Any, Literal
 
 from eir.models.input.array.models_locally_connected import LCLModelConfig
 from eir.models.output.array.array_output_modules import (
@@ -25,12 +25,12 @@ from eir.setup.tensor_broker_setup import set_up_tensor_broker_config
 from eir.utils.logging import get_logger
 
 al_output_model_config_classes = (
-    Type[ResidualMLPOutputModuleConfig]
-    | Type[LinearOutputModuleConfig]
-    | Type[SharedResidualMLPOutputModuleConfig]
-    | Type[TransformerSequenceOutputModuleConfig]
-    | Type[LCLModelConfig]
-    | Type[CNNUpscaleModelConfig]
+    type[ResidualMLPOutputModuleConfig]
+    | type[LinearOutputModuleConfig]
+    | type[SharedResidualMLPOutputModuleConfig]
+    | type[TransformerSequenceOutputModuleConfig]
+    | type[LCLModelConfig]
+    | type[CNNUpscaleModelConfig]
 )
 al_output_model_configs = (
     ResidualMLPOutputModuleConfig
@@ -46,7 +46,7 @@ logger = get_logger(name=__name__)
 
 
 def init_output_config(
-    yaml_config_as_dict: Dict[str, Any],
+    yaml_config_as_dict: dict[str, Any],
 ) -> schemas.OutputConfig:
     cfg = yaml_config_as_dict
 
@@ -123,13 +123,13 @@ def _set_up_basic_sampling_config(
     return sampling_config_object
 
 
-def get_outputs_types_schema_map() -> Dict[
+def get_outputs_types_schema_map() -> dict[
     str,
-    Type[schemas.TabularOutputTypeConfig]
-    | Type[schemas.SequenceOutputTypeConfig]
-    | Type[schemas.ArrayOutputTypeConfig]
-    | Type[schemas.ImageOutputTypeConfig]
-    | Type[schemas.SurvivalOutputTypeConfig],
+    type[schemas.TabularOutputTypeConfig]
+    | type[schemas.SequenceOutputTypeConfig]
+    | type[schemas.ArrayOutputTypeConfig]
+    | type[schemas.ImageOutputTypeConfig]
+    | type[schemas.SurvivalOutputTypeConfig],
 ]:
     mapping = {
         "tabular": schemas.TabularOutputTypeConfig,
@@ -150,9 +150,9 @@ def get_output_module_config_class(
     return model_config_setup_map[output_type]
 
 
-def get_output_module_config_class_map() -> (
-    Dict[str, schemas.al_output_module_configs_classes]
-):
+def get_output_module_config_class_map() -> dict[
+    str, schemas.al_output_module_configs_classes
+]:
     mapping = {
         "tabular": TabularOutputModuleConfig,
         "sequence": SequenceOutputModuleConfig,
@@ -174,17 +174,18 @@ def set_up_output_module_config(
 
     model_type = None
     if model_init_kwargs_base:
-        model_type = model_init_kwargs_base.get("model_type", None)
+        model_type = model_init_kwargs_base.get("model_type")
 
     if not model_type:
         try:
-            model_type = getattr(model_config_class, "model_type")
+            model_type = model_config_class.model_type
         except AttributeError:
-            raise AttributeError(
+            logger.error(
                 "Not model type specified in model config and could not find default "
                 "value for '%s'.",
                 output_type,
             )
+            raise
 
         logger.info(
             "Output model type not specified in model configuration with name '%s', "
@@ -212,7 +213,7 @@ def set_up_output_module_config(
 
 
 def set_up_output_module_init_config(
-    model_init_kwargs_base: Union[None, dict],
+    model_init_kwargs_base: None | dict,
     output_type: Literal["tabular", "sequence", "array"],
     model_type: str,
     output_module_init_class_map: al_output_model_init_map,

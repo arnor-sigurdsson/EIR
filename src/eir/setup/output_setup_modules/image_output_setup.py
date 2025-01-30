@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 from torchvision.transforms import Compose
 
@@ -28,18 +27,17 @@ class ComputedImageOutputInfo:
     all_transforms: Compose
     data_dimensions: DataDimensions
     num_channels: int
-    normalization_stats: Optional[ImageNormalizationStats] = None
-    diffusion_config: Optional[DiffusionConfig] = None
+    normalization_stats: ImageNormalizationStats | None = None
+    diffusion_config: DiffusionConfig | None = None
 
 
 def set_up_image_output(
     output_config: OutputConfig,
-    normalization_stats: Optional[ImageNormalizationStats] = None,
-    diffusion_config: Optional[DiffusionConfig] = None,
+    normalization_stats: ImageNormalizationStats | None = None,
+    diffusion_config: DiffusionConfig | None = None,
     *args,
     **kwargs,
 ) -> ComputedImageOutputInfo:
-
     output_info = output_config.output_info
     output_type_info = output_config.output_type_info
     assert isinstance(output_type_info, ImageOutputTypeConfig)
@@ -86,15 +84,14 @@ def set_up_image_output(
         resize_approach=oti.resize_approach,
     )
 
-    if diffusion_config is None:
-        if output_type_info.loss == "diffusion":
-            time_steps = output_type_info.diffusion_time_steps
-            if time_steps is None:
-                raise ValueError(
-                    "Diffusion loss requires specifying the number of time steps."
-                    "Please set `diffusion_time_steps` in the output config."
-                )
-            diffusion_config = initialize_diffusion_config(time_steps=time_steps)
+    if diffusion_config is None and output_type_info.loss == "diffusion":
+        time_steps = output_type_info.diffusion_time_steps
+        if time_steps is None:
+            raise ValueError(
+                "Diffusion loss requires specifying the number of time steps."
+                "Please set `diffusion_time_steps` in the output config."
+            )
+        diffusion_config = initialize_diffusion_config(time_steps=time_steps)
 
     image_output_object = ComputedImageOutputInfo(
         output_config=output_config,

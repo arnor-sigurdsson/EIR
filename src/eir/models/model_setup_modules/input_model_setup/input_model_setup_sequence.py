@@ -1,7 +1,8 @@
 import math
 from collections import abc
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Literal
 
 import torch
 from torch import nn
@@ -24,11 +25,11 @@ logger = get_logger(name=__name__)
 
 @dataclass
 class SequenceModelObjectsForWrapperModel:
-    feature_extractor: Union[TransformerFeatureExtractor, nn.Module]
-    embeddings: Optional[nn.Embedding]
+    feature_extractor: TransformerFeatureExtractor | nn.Module
+    embeddings: nn.Embedding | None
     embedding_dim: int
     external: bool
-    known_out_features: Union[None, int]
+    known_out_features: None | int
 
 
 def get_sequence_model(
@@ -75,7 +76,7 @@ def get_sequence_model(
 
 def _get_windowed_sequence_parameters(
     max_length: int, window_size: int
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     feature_extractor_max_length = max_length
     num_chunks = 1
     if window_size:
@@ -94,18 +95,18 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
     model_registry_lookup: SequenceModelClassGetterFunction,
     pretrained: bool,
     pretrained_frozen: bool,
-    model_config: Union[BasicTransformerFeatureExtractorModelConfig, dict],
+    model_config: BasicTransformerFeatureExtractorModelConfig | dict,
     num_tokens: int,
     embedding_dim: int,
     feature_extractor_max_length: int,
     num_chunks: int,
-    pool: Union[Literal["max"], Literal["avg"], None],
+    pool: Literal["max"] | Literal["avg"] | None,
 ) -> SequenceModelObjectsForWrapperModel:
     if "sequence-default" in model_type or model_type.startswith("eir-"):
         model_class = model_registry_lookup(model_type=model_type)
-        assert isinstance(
-            model_config, BasicTransformerFeatureExtractorModelConfig
-        ), model_config
+        assert isinstance(model_config, BasicTransformerFeatureExtractorModelConfig), (
+            model_config
+        )
         objects_for_wrapper = _get_basic_sequence_feature_extractor_objects(
             model_config=model_config,
             num_tokens=num_tokens,
@@ -141,7 +142,7 @@ def _get_manual_out_features_for_external_feature_extractor(
     embedding_dim: int,
     num_chunks: int,
     feature_extractor: nn.Module,
-    pool: Union[Literal["max"], Literal["avg"], None],
+    pool: Literal["max"] | Literal["avg"] | None,
 ) -> int:
     input_shape = _get_sequence_input_dim(
         input_length=input_length,
@@ -160,7 +161,7 @@ def _get_manual_out_features_for_external_feature_extractor(
 
 def _get_sequence_input_dim(
     input_length: int, embedding_dim: int
-) -> Tuple[int, int, int]:
+) -> tuple[int, int, int]:
     return 1, input_length, embedding_dim
 
 
@@ -170,7 +171,7 @@ def _get_pretrained_hf_sequence_feature_extractor_objects(
     frozen: bool,
     feature_extractor_max_length: int,
     num_chunks: int,
-    pool: Union[Literal["max"], Literal["avg"], None],
+    pool: Literal["max"] | Literal["avg"] | None,
 ) -> SequenceModelObjectsForWrapperModel:
     _warn_about_unsupported_hf_model(model_name=model_name)
 
@@ -224,10 +225,10 @@ def _get_hf_pretrained_model(model_name: str) -> PreTrainedModel:
 
 def _get_hf_sequence_feature_extractor_objects(
     model_name: str,
-    model_config: Dict[str, Any],
+    model_config: dict[str, Any],
     feature_extractor_max_length: int,
     num_chunks: int,
-    pool: Union[Literal["max"], Literal["avg"], None],
+    pool: Literal["max"] | Literal["avg"] | None,
 ) -> SequenceModelObjectsForWrapperModel:
     _warn_about_unsupported_hf_model(model_name=model_name)
 
@@ -265,7 +266,7 @@ def _pretrained_hf_model_embedding_dim(
         emb_dim = embeddings.dim
     elif hasattr(embeddings, "emb_layers"):
         layers = embeddings.emb_layers
-        assert isinstance(layers, (abc.Sequence, nn.ModuleList))
+        assert isinstance(layers, abc.Sequence | nn.ModuleList)
         emb_dim = layers[0].embedding_dim
     else:
         raise ValueError(f"Could not find embedding dimension for model {model_name}.")
@@ -274,7 +275,7 @@ def _pretrained_hf_model_embedding_dim(
     return emb_dim
 
 
-def _get_hf_model(model_name: str, model_config: Dict[str, Any]) -> PreTrainedModel:
+def _get_hf_model(model_name: str, model_config: dict[str, Any]) -> PreTrainedModel:
     config = AutoConfig.for_model(model_type=model_name, **model_config)
     model = AutoModel.from_config(config=config)
     logger.info(
@@ -322,7 +323,7 @@ def _get_basic_sequence_feature_extractor_objects(
 
 def _warn_about_unsupported_hf_model(model_name: str) -> None:
     unsupported_models = get_unsupported_hf_models()
-    if model_name in unsupported_models.keys():
+    if model_name in unsupported_models:
         reason = unsupported_models[model_name]
         logger.warning(
             "Model '%s' has not been tested for compatibility with EIR due to "

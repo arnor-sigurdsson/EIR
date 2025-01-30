@@ -1,17 +1,11 @@
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
     Optional,
-    Sequence,
-    Tuple,
-    Union,
 )
 
 import torch
@@ -62,10 +56,10 @@ if TYPE_CHECKING:
     from eir.models.model_setup_modules.meta_setup import al_meta_model
     from eir.train import Experiment
 
-al_training_labels_target = Dict[str, Dict[str, torch.Tensor]]
-al_input_batch = Dict[str, torch.Tensor]
-al_ids = List[str]
-al_dataloader_getitem_batch = Tuple[
+al_training_labels_target = dict[str, dict[str, torch.Tensor]]
+al_input_batch = dict[str, torch.Tensor]
+al_ids = list[str]
+al_dataloader_getitem_batch = tuple[
     al_input_batch,
     al_training_labels_target,
     al_ids,
@@ -86,7 +80,7 @@ class Hooks:
     al_handler_attachers = Iterable[Callable[[Engine, HandlerConfig], Engine]]
 
     step_func_hooks: "StepFunctionHookStages"
-    extra_state: Optional[dict[str, Any]] = None
+    extra_state: dict[str, Any] | None = None
 
 
 def _get_default_step_function_hooks(
@@ -179,9 +173,9 @@ def _should_add_uncertainty_loss_hook(
 
 
 def add_l1_loss_hook_if_applicable(
-    step_function_hooks_init_kwargs: Dict[str, list[Callable]],
+    step_function_hooks_init_kwargs: dict[str, list[Callable]],
     configs: Configs,
-) -> Dict[str, List[Callable]]:
+) -> dict[str, list[Callable]]:
     input_l1 = any(
         getattr(input_config.model_config.model_init_config, "l1", None)
         for input_config in configs.input_configs
@@ -212,7 +206,7 @@ def hook_default_prepare_batch(
     loader_batch: al_dataloader_getitem_batch,
     *args,
     **kwargs,
-) -> Dict:
+) -> dict:
     batch = prepare_base_batch_default(
         loader_batch=loader_batch,
         input_objects=experiment.inputs,
@@ -266,12 +260,12 @@ def prepare_base_batch_default(
 
 
 def _prepare_inputs_for_model(
-    batch_inputs: Dict[str, Any],
+    batch_inputs: dict[str, Any],
     input_objects: al_input_objects_as_dict,
     output_objects: al_output_objects_as_dict,
     model: nn.Module,
     device: str,
-) -> Tuple[al_input_batch, al_training_labels_target]:
+) -> tuple[al_input_batch, al_training_labels_target]:
     inputs_prepared = {}
     targets_prepared = {}
 
@@ -289,17 +283,17 @@ def _prepare_inputs_for_model(
                 cur_tensor = cur_tensor.to(dtype=torch.float32)
                 cur_tensor = cur_tensor.to(device=device)
 
-                if input_name in (i for i in output_objects.keys()):
+                if input_name in (i for i in output_objects):
                     matching_output = output_objects[input_name]
                     assert isinstance(
                         matching_output,
-                        (ComputedArrayOutputInfo, ComputedImageOutputInfo),
+                        ComputedArrayOutputInfo | ComputedImageOutputInfo,
                     )
                     output_config = matching_output.output_config
                     output_type_info = output_config.output_type_info
                     assert isinstance(
                         output_type_info,
-                        (schemas.ArrayOutputTypeConfig, schemas.ImageOutputTypeConfig),
+                        schemas.ArrayOutputTypeConfig | schemas.ImageOutputTypeConfig,
                     )
                     loss = output_type_info.loss
 
@@ -352,7 +346,7 @@ def _prepare_inputs_for_model(
             case ComputedSequenceInputInfo():
                 cur_seq = batch_inputs[input_name]
 
-                if input_name in (i for i in output_objects.keys()):
+                if input_name in (i for i in output_objects):
                     cur_seq, cur_targets = prepare_sequence_input_for_sequence_output(
                         input_object=input_object,
                         cur_seq=cur_seq,
@@ -401,8 +395,8 @@ def _prepare_sequence_input_base(
 
 
 def hook_default_model_forward(
-    experiment: "Experiment", state: Dict, batch: "Batch", *args, **kwargs
-) -> Dict:
+    experiment: "Experiment", state: dict, batch: "Batch", *args, **kwargs
+) -> dict:
     inputs = batch.inputs
 
     context_manager = get_maybe_amp_context_manager_from_state(state=state)
@@ -419,8 +413,8 @@ def get_amp_context_manager(device_type: str) -> autocast:
 
 
 def hook_default_optimizer_backward(
-    experiment: "Experiment", state: Dict, *args, **kwargs
-) -> Dict:
+    experiment: "Experiment", state: dict, *args, **kwargs
+) -> dict:
     gc = experiment.configs.global_config
     optimizer_backward_kwargs = get_optimizer_backward_kwargs(
         optimizer_name=gc.opt.optimizer
@@ -483,24 +477,22 @@ def maybe_scale_loss_with_amp_scaler(
     if do_amp and device != "cpu":
         assert amp_scaler is not None
         return amp_scaler.scale(loss)
-    else:
-        return loss
+    return loss
 
 
 def maybe_scale_loss_with_grad_accumulation_steps(
-    loss: torch.Tensor, grad_acc_steps: Optional[int]
+    loss: torch.Tensor, grad_acc_steps: int | None
 ) -> torch.Tensor:
     if grad_acc_steps and grad_acc_steps > 1:
         return loss / grad_acc_steps
-    else:
-        return loss
+    return loss
 
 
 def maybe_apply_gradient_noise_to_model(
     model: "nn.Module", gradient_noise: float
 ) -> None:
     if gradient_noise:
-        for name, weight in model.named_parameters():
+        for _name, weight in model.named_parameters():
             if weight.grad is None:
                 continue
 
@@ -526,21 +518,17 @@ def get_optimizer_step_func(
     if do_amp and device != "cpu":
         assert amp_scaler is not None
         return partial(amp_scaler.step, optimizer=optimizer)
-    else:
-        return optimizer.step
+    return optimizer.step
 
 
-def should_perform_optimizer_step(
-    iteration: int, grad_acc_steps: Optional[int]
-) -> bool:
+def should_perform_optimizer_step(iteration: int, grad_acc_steps: int | None) -> bool:
     if grad_acc_steps and grad_acc_steps > 1:
         return iteration % grad_acc_steps == 0
-    else:
-        return True
+    return True
 
 
 def maybe_update_model_parameters_with_swa(
-    n_iter_before_swa: Optional[int],
+    n_iter_before_swa: int | None,
     model: "al_meta_model",
     iteration: int,
     sample_interval: int,
@@ -556,9 +544,8 @@ def maybe_update_model_parameters_with_swa(
 
 
 def hook_default_compute_metrics(
-    experiment: "Experiment", batch: "Batch", state: Dict, *args, **kwargs
+    experiment: "Experiment", batch: "Batch", state: dict, *args, **kwargs
 ) -> dict[str, Any]:
-
     filtered_outputs = state["filtered_outputs"]
 
     train_batch_metrics = calculate_batch_metrics(
@@ -590,7 +577,7 @@ def hook_default_compute_metrics(
 def hook_default_per_target_loss(
     experiment: "Experiment",
     batch: "Batch",
-    state: Dict,
+    state: dict,
     *args,
     **kwargs,
 ) -> dict[str, Any]:
@@ -626,7 +613,7 @@ def hook_default_per_target_loss(
     return state_updates
 
 
-def hook_default_aggregate_losses(state: Dict, *args, **kwargs) -> Dict:
+def hook_default_aggregate_losses(state: dict, *args, **kwargs) -> dict:
     context_manager = get_maybe_amp_context_manager_from_state(state=state)
     with context_manager:
         train_loss_avg = aggregate_losses(losses_dict=state["per_target_train_losses"])
@@ -636,8 +623,8 @@ def hook_default_aggregate_losses(state: Dict, *args, **kwargs) -> Dict:
 
 
 def get_maybe_amp_context_manager_from_state(
-    state: Dict,
-) -> Union[nullcontext, autocast]:
+    state: dict,
+) -> nullcontext | autocast:
     context_manager = state.get("amp_context_manager", nullcontext())
     return context_manager
 
@@ -645,7 +632,7 @@ def get_maybe_amp_context_manager_from_state(
 def get_hook_iteration_counter() -> Callable:
     iteration_count = 0
 
-    def _counter_iterator(do_increment: bool = True, *args, **kwargs) -> Dict[str, int]:
+    def _counter_iterator(do_increment: bool = True, *args, **kwargs) -> dict[str, int]:
         nonlocal iteration_count
         if do_increment:
             iteration_count += 1
@@ -656,7 +643,7 @@ def get_hook_iteration_counter() -> Callable:
     return _counter_iterator
 
 
-def get_hook_amp_objects(device: str) -> Callable[..., Dict[str, Any]]:
+def get_hook_amp_objects(device: str) -> Callable[..., dict[str, Any]]:
     device_type = "cpu" if device == "cpu" else "cuda"
 
     if device == "cpu":

@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import pytest
 
 from eir import train
@@ -125,7 +123,7 @@ def test_image_modelling(prep_modelling_test_configs):
     )
 
 
-def get_image_test_args(mixing: float) -> Tuple[float, float]:
+def get_image_test_args(mixing: float) -> tuple[float, float]:
     thresholds = (0.7, 0.6)
     if mixing:
         thresholds = (0.0, 0.6)

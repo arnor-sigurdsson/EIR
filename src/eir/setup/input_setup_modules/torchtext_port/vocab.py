@@ -1,11 +1,11 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 
 class Vocab:
     def __init__(
         self,
-        tokens: Optional[list[str]] = None,
-        stoi: Optional[dict[str, int]] = None,
+        tokens: list[str] | None = None,
+        stoi: dict[str, int] | None = None,
     ):
         self.itos: list[str] = []  # index to string
         self.stoi: dict[str, int] = {}  # string to index
@@ -35,7 +35,7 @@ class Vocab:
     def set_default_index(self, index: int) -> None:
         self.default_index = index
 
-    def get_default_index(self) -> Optional[int]:
+    def get_default_index(self) -> int | None:
         return self.default_index
 
     def insert_token(self, token: str, index: int) -> None:

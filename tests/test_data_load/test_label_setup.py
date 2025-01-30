@@ -413,7 +413,7 @@ def test_get_array_path_iterator_file(create_test_data):
         data_source=test_label_file_path
     )
 
-    assert len([i for i in text_file_iterator]) == expected_num_samples
+    assert len(list(text_file_iterator)) == expected_num_samples
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
@@ -425,7 +425,7 @@ def test_get_array_path_iterator_folder(create_test_data):
     expected_num_samples = c.n_per_class * len(c.target_classes)
     folder_iterator = label_setup.get_file_path_iterator(data_source=test_path)
 
-    assert len([i for i in folder_iterator]) == expected_num_samples
+    assert len(list(folder_iterator)) == expected_num_samples
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "binary"}], indirect=True)
@@ -438,12 +438,12 @@ def test_get_array_path_iterator_fail(create_test_data):
     test_label_file_path = c.scoped_tmp_path / "test_paths_fail.txt"
 
     with open(test_label_file_path, "w") as test_label_file:
-        for i in range(5):
+        for _i in range(5):
             test_label_file.write("non/existent/path.npy" + "\n")
 
     with pytest.raises(FileNotFoundError):
         iterator = label_setup.get_file_path_iterator(data_source=test_label_file_path)
-        _ = [i for i in iterator]
+        _ = list(iterator)
 
 
 @pytest.mark.parametrize(
@@ -1005,16 +1005,16 @@ def test_fill_categorical_nans(
             "4",
         }
     else:
-        assert set(
+        assert {
             x
             for x in test_df_filled.get_column("A").unique().to_list()
             if x is not None
-        ) == {"3"}
-        assert set(
+        } == {"3"}
+        assert {
             x
             for x in test_df_filled.get_column("B").unique().to_list()
             if x is not None
-        ) == {"2", "3", "4"}
+        } == {"2", "3", "4"}
 
     assert test_df_filled.get_column("C").is_null().all()
     assert test_df_filled.get_column("D").is_null().sum() == 0

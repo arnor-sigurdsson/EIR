@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import polars as pl
 import pytest
@@ -38,7 +38,7 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("keep_outputs", [option_value])
 
 
-def get_system_info() -> Tuple[bool, str]:
+def get_system_info() -> tuple[bool, str]:
     import os
     import platform
 
@@ -53,10 +53,7 @@ def get_system_info() -> Tuple[bool, str]:
 
 def should_skip_in_gha():
     in_gha, _ = get_system_info()
-    if in_gha:
-        return True
-
-    return False
+    return bool(in_gha)
 
 
 def should_skip_in_gha_macos():
@@ -64,14 +61,11 @@ def should_skip_in_gha_macos():
     We use this to skip some modelling tests as the GHA MacOS runner can be very slow.
     """
     in_gha, platform = get_system_info()
-    if in_gha and platform == "Darwin":
-        return True
-
-    return False
+    return bool(in_gha and platform == "Darwin")
 
 
 @pytest.fixture(scope="session")
-def parse_test_cl_args(request) -> Dict[str, Any]:
+def parse_test_cl_args(request) -> dict[str, Any]:
     if hasattr(request, "param"):
         n_per_class = request.param.get(
             "num_samples_per_class", request.config.getoption("--num_samples_per_class")

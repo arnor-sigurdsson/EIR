@@ -1,5 +1,5 @@
 from math import isclose
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
@@ -46,7 +46,7 @@ def create_dummy_test_optimizer(request):
         adam = Adam(dummy_params, lr=0.001, betas=(0.9, b2))
         return adam, request.param
 
-    elif optimizer_type == "SGD":
+    if optimizer_type == "SGD":
         sgd = SGD(dummy_params, lr=0.001)
         return sgd, request.param
 
@@ -108,7 +108,7 @@ def test_get_reduce_lr_on_plateu_step_params(
 
 @pytest.fixture()
 def get_dummy_handler_config(
-    prep_modelling_test_configs: Tuple["Experiment", "ModelTestConfig"],
+    prep_modelling_test_configs: tuple["Experiment", "ModelTestConfig"],
 ) -> HandlerConfig:
     experiment, test_config = prep_modelling_test_configs
     configs = experiment.configs

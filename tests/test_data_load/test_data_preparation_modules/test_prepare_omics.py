@@ -1,5 +1,5 @@
+from collections.abc import Sequence
 from copy import deepcopy
-from typing import Sequence, Union
 from unittest.mock import patch
 
 import numpy as np
@@ -73,7 +73,7 @@ def test_prepare_genotype_array_test_mode():
         range(0, 100, 2),
     ],
 )
-def test_load_omics_array_from_disk(subset_indices: Union[None, Sequence[int]]):
+def test_load_omics_array_from_disk(subset_indices: None | Sequence[int]):
     test_arr = np.zeros((4, 100))
     test_arr[-1, :50] = 1
     test_arr[0, 50:] = 1

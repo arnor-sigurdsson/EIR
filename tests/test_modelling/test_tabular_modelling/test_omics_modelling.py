@@ -1,6 +1,7 @@
 import pickle
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Literal, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pytest
@@ -21,7 +22,7 @@ def _get_classification_output_configs(
         "shared_mlp_residual",
     ] = "mlp_residual",
     cat_loss_name: str = "CrossEntropyLoss",
-) -> Sequence[Dict]:
+) -> Sequence[dict]:
     output_configs = [
         {
             "output_info": {"output_name": "test_output_tabular"},
@@ -380,9 +381,9 @@ def _check_snps_wrapper(
     test_config: "ModelTestConfig",
     output_name: str,
     target_name: str,
-    top_row_grads_dict: Dict[str, List[int]],
-    at_least_n_snps: Union[str, int] = "all",
-    check_types_skip_cls_names: Sequence[str] = tuple(),
+    top_row_grads_dict: dict[str, list[int]],
+    at_least_n_snps: str | int = "all",
+    check_types_skip_cls_names: Sequence[str] = (),
     all_attribution_target_classes_must_pass: bool = True,
 ):
     expected_top_indices = list(range(50, 1000, 100))
@@ -398,7 +399,7 @@ def _check_snps_wrapper(
         )
 
         for acts_array_path, is_masked in omics_acts_generator:
-            check_types = True if is_masked else False
+            check_types = bool(is_masked)
             _check_identified_snps(
                 array_path=acts_array_path,
                 expected_top_indices=expected_top_indices,
@@ -410,7 +411,7 @@ def _check_snps_wrapper(
             )
 
 
-def _get_snp_attributions_generator(cur_output_act_paths: Dict[str, Path]):
+def _get_snp_attributions_generator(cur_output_act_paths: dict[str, Path]):
     did_run = False
 
     for name, cur_path in cur_output_act_paths.items():
@@ -428,7 +429,7 @@ def _get_snp_attributions_generator(cur_output_act_paths: Dict[str, Path]):
     assert did_run
 
 
-def _get_regression_output_configs() -> Sequence[Dict]:
+def _get_regression_output_configs() -> Sequence[dict]:
     output_configs = [
         {
             "output_info": {"output_name": "test_output_tabular"},
@@ -557,7 +558,7 @@ def _get_multi_task_output_configs(
         "linear",
         "shared_mlp_residual",
     ] = "mlp_residual",
-) -> Sequence[Dict]:
+) -> Sequence[dict]:
     output_configs = [
         {
             "output_info": {"output_name": "test_output_copy"},
@@ -594,9 +595,7 @@ def _get_multi_task_output_configs(
 def _should_compile():
     in_gha, system = get_system_info()
 
-    if in_gha or system == "Darwin":
-        return False
-    return True
+    return not (in_gha or system == "Darwin")
 
 
 @pytest.mark.parametrize(
@@ -903,7 +902,7 @@ def _should_compile():
     indirect=True,
 )
 def test_multi_task(
-    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+    prep_modelling_test_configs: tuple[train.Experiment, "ModelTestConfig"],
 ):
     """
     Sometimes it seems we have the case that the model only gets activated by features
@@ -1042,14 +1041,14 @@ def test_multi_task(
     indirect=True,
 )
 def test_sparse_multi_task(
-    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+    prep_modelling_test_configs: tuple[train.Experiment, "ModelTestConfig"],
 ):
     experiment, test_config = prep_modelling_test_configs
 
     train.train(experiment=experiment)
 
 
-def get_all_tabular_input_columns(configs: Configs) -> List[str]:
+def get_all_tabular_input_columns(configs: Configs) -> list[str]:
     extra_columns = []
     for input_config in configs.input_configs:
         if input_config.input_info.input_type == "tabular":
@@ -1060,8 +1059,8 @@ def get_all_tabular_input_columns(configs: Configs) -> List[str]:
 
 
 def _get_multi_task_test_args(
-    extra_columns: List[str], target_copy: str, mixing: float
-) -> Tuple[Tuple[float, float], int]:
+    extra_columns: list[str], target_copy: str, mixing: float
+) -> tuple[tuple[float, float], int]:
     """
     We use 0 for at_least_n in the case we have correlated input columns because
     in that case the model might not actually be using any of the SNPs (better to use
@@ -1085,11 +1084,11 @@ def _get_multi_task_test_args(
 
 def _check_identified_snps(
     array_path: Path,
-    expected_top_indices: List[int],
-    top_row_grads_dict: Dict[str, List[int]],
+    expected_top_indices: list[int],
+    top_row_grads_dict: dict[str, list[int]],
     check_types: bool,
-    check_types_skip_cls_names: Sequence[str] = tuple(),
-    at_least_n: Union[str, int] = "all",
+    check_types_skip_cls_names: Sequence[str] = (),
+    at_least_n: str | int = "all",
     all_classes_must_pass: bool = True,
 ) -> None:
     """
@@ -1113,7 +1112,7 @@ def _check_identified_snps(
         top_grads_dict = pickle.load(file=f)
 
     classes_acts_success = []
-    for cls in top_grads_dict.keys():
+    for cls in top_grads_dict:
         actual_top = np.array(sorted(top_grads_dict[cls]["top_n_idxs"]))
         expected_top = np.array(expected_top_indices)
 

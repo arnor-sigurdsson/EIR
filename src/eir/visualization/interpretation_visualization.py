@@ -1,6 +1,6 @@
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import matplotlib
 import numpy as np
@@ -73,10 +73,10 @@ def plot_top_gradients(
     df_snps: pd.DataFrame,
     output_folder: Path,
     fname: str = "top_snps.pdf",
-    custom_ylabel: Optional[str] = None,
+    custom_ylabel: str | None = None,
 ):
     n_cls = len(top_gradients_dict.keys())
-    classes = sorted(list(top_gradients_dict.keys()))
+    classes = sorted(top_gradients_dict.keys())
 
     fig = plt.figure(figsize=(n_cls * 4, n_cls * 2 + 1))
     gs = gridspec.GridSpec(n_cls, n_cls, wspace=0.2, hspace=0.2)
@@ -92,7 +92,7 @@ def plot_top_gradients(
             cur_ax = plt.subplot(gs[cls_idx, grad_idx])
             cur_ax.imshow(cur_grads, vmin=0, vmax=1)
 
-            ylabel = row_name if not custom_ylabel else custom_ylabel
+            ylabel = custom_ylabel if custom_ylabel else row_name
             cur_ax.set_ylabel(ylabel)
 
             if cls_idx == n_cls - 1:
@@ -119,7 +119,7 @@ def plot_top_gradients(
                     )
 
     axs = fig.get_axes()
-    for ax, col_title in zip(axs[::n_cls], classes):
+    for ax, col_title in zip(axs[::n_cls], classes, strict=False):
         ax.set_title(f"Top {col_title} SNPs")
 
     for ax in axs:
@@ -174,18 +174,18 @@ def _get_manhattan_axis_and_figure(
     df: pd.DataFrame,
     chr_column_name: str,
     attribution_column_name: str,
-    colors: Optional[Union[Tuple[str, str], List[str]]] = None,
-    figure_size: Tuple[int, int] = (12, 6),
+    colors: tuple[str, str] | list[str] | None = None,
+    figure_size: tuple[int, int] = (12, 6),
     axis_rotation: int = 90,
     gwas_significant_line: bool = False,
     gwas_p_value: float = 5e-08,
     dot_size: int = 8,
     alpha_value: int = 1,
-    axis_label_x: Optional[str] = None,
-    axis_label_y: Optional[str] = None,
+    axis_label_x: str | None = None,
+    axis_label_y: str | None = None,
     axis_label_font_size: int = 9,
     axis_label_font_name: str = "Arial",
-) -> Tuple[Axes, Figure]:
+) -> tuple[Axes, Figure]:
     """Adapted from https://github.com/reneshbedre/bioinfokit#manhattan-plot."""
 
     available_colors = _get_available_colors()
@@ -231,7 +231,7 @@ def _get_manhattan_axis_and_figure(
     return ax, fig
 
 
-def _get_available_colors() -> Tuple[str, ...]:
+def _get_available_colors() -> tuple[str, ...]:
     colors = (
         "#a7414a",
         "#282726",
@@ -280,33 +280,32 @@ def _get_available_colors() -> Tuple[str, ...]:
 def get_colors_list(
     df: pd.DataFrame,
     chr_column_name: str,
-    colors: Optional[Union[Tuple[str, str], List[str]]],
-    available_colors: Tuple[str, ...],
-) -> List[str]:
+    colors: tuple[str, str] | list[str] | None,
+    available_colors: tuple[str, ...],
+) -> list[str]:
     if colors is not None and len(colors) == 2:
         assert isinstance(colors, tuple)
         return get_two_colors_list(
             df=df, chr_column_name=chr_column_name, colors=colors
         )
-    elif colors is not None and len(colors) == df[chr_column_name].nunique():
+    if colors is not None and len(colors) == df[chr_column_name].nunique():
         assert isinstance(colors, list)
         return colors
-    elif colors is None:
+    if colors is None:
         return list(available_colors[: df[chr_column_name].nunique()])
-    else:
-        raise ValueError("Error in color argument.")
+    raise ValueError("Error in color argument.")
 
 
 def get_two_colors_list(
-    df: pd.DataFrame, chr_column_name: str, colors: Tuple[str, str]
-) -> List[str]:
+    df: pd.DataFrame, chr_column_name: str, colors: tuple[str, str]
+) -> list[str]:
     color_1 = int(df[chr_column_name].nunique() / 2) * [colors[0]]
     color_2 = int(df[chr_column_name].nunique() / 2) * [colors[1]]
 
     if df[chr_column_name].nunique() % 2 == 0:
-        color_list = list(chain(*zip(color_1, color_2)))
+        color_list = list(chain(*zip(color_1, color_2, strict=False)))
     elif df[chr_column_name].nunique() % 2 == 1:
-        color_list = list(chain(*zip(color_1, color_2)))
+        color_list = list(chain(*zip(color_1, color_2, strict=False)))
         color_list.append(colors[0])
     else:
         raise ValueError("Error in color argument.")
@@ -317,13 +316,13 @@ def get_two_colors_list(
 def initialize_plot(
     df: pd.DataFrame,
     chr_column_name: str,
-    color_list: List[str],
-    figure_size: Tuple[int, int],
+    color_list: list[str],
+    figure_size: tuple[int, int],
     dot_size: int,
     alpha_value: float,
-) -> Tuple[List[str], List[int], Figure, Axes]:
-    x_labels: List[str] = []
-    x_ticks: List[int] = []
+) -> tuple[list[str], list[int], Figure, Axes]:
+    x_labels: list[str] = []
+    x_ticks: list[int] = []
     fig, ax = plt.subplots(figsize=figure_size)
 
     for i, (label, df1) in enumerate(df.groupby(chr_column_name)):
@@ -339,18 +338,18 @@ def initialize_plot(
         df1_max_ind = df1["ind"].iloc[-1]
         df1_min_ind = df1["ind"].iloc[0]
         x_labels.append(str(label))
-        x_ticks.append(int((df1_max_ind - (df1_max_ind - df1_min_ind) / 2)))
+        x_ticks.append(int(df1_max_ind - (df1_max_ind - df1_min_ind) / 2))
 
     return x_labels, x_ticks, fig, ax
 
 
 def finalize_plot(
     ax: Axes,
-    x_labels: List[str],
-    x_ticks: List[int],
+    x_labels: list[str],
+    x_ticks: list[int],
     axis_rotation: int,
-    axis_label_x: Optional[str],
-    axis_label_y: Optional[str],
+    axis_label_x: str | None,
+    axis_label_y: str | None,
     axis_label_font_size: int,
     axis_label_font_name: str,
 ) -> None:

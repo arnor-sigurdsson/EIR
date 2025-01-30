@@ -1,5 +1,3 @@
-from typing import Optional
-
 import polars as pl
 
 from eir.utils.logging import get_logger
@@ -10,7 +8,7 @@ logger = get_logger(name=__name__)
 def add_tabular_data_to_df(
     df_tabular: pl.DataFrame,
     input_df: pl.DataFrame,
-    ids_to_keep: Optional[set[str]] = None,
+    ids_to_keep: set[str] | None = None,
     source_name: str = "Tabular Data",
 ) -> pl.DataFrame:
     logger.debug(f"Adding tabular data from {source_name}")
@@ -30,5 +28,4 @@ def add_tabular_data_to_df(
 
     if input_df.height == 0:
         return df_tabular_renamed
-    else:
-        return input_df.join(df_tabular_renamed, on="ID", how="full", coalesce=True)
+    return input_df.join(df_tabular_renamed, on="ID", how="full", coalesce=True)

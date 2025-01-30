@@ -1,13 +1,7 @@
+from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Callable,
-    Generator,
-    Iterator,
-    Optional,
-    Set,
-    Tuple,
-    Union,
 )
 
 import numpy as np
@@ -27,8 +21,8 @@ logger = get_logger(name=__name__)
 
 def get_file_sample_id_iterator_basic(
     data_source: str,
-    ids_to_keep: Union[None, Set[str]],
-) -> Generator[Tuple[str, Path], None, None]:
+    ids_to_keep: None | set[str],
+) -> Generator[tuple[str, Path], None, None]:
     base_file_iterator = get_file_path_iterator(
         data_source=Path(data_source), validate=False
     )
@@ -46,8 +40,8 @@ def get_file_sample_id_iterator_basic(
 def add_sequence_data_from_csv_to_df(
     input_source: str,
     input_df: pl.DataFrame,
-    ids_to_keep: Union[None, Set[str]],
-    split_on: Optional[str],
+    ids_to_keep: None | set[str],
+    split_on: str | None,
     encode_func: Callable,
     input_name: str = "CSV File Data",
 ) -> pl.DataFrame:
@@ -90,13 +84,12 @@ def add_sequence_data_from_csv_to_df(
 
     if input_df.height == 0:
         return sequence_df
-    else:
-        return input_df.join(sequence_df, on="ID", how="full", coalesce=True)
+    return input_df.join(sequence_df, on="ID", how="full", coalesce=True)
 
 
 def get_csv_id_sequence_iterator(
-    data_source: str, ids_to_keep: Optional[Set[str]] = None
-) -> Iterator[Tuple[str, str]]:
+    data_source: str, ids_to_keep: set[str] | None = None
+) -> Iterator[tuple[str, str]]:
     df = pd.read_csv(data_source, index_col="ID", dtype={"ID": str})
 
     if "Sequence" not in df.columns:

@@ -1,6 +1,6 @@
+from collections.abc import Sequence
 from pathlib import Path
 from shutil import copytree
-from typing import Sequence
 
 from docs.doc_modules.e_pretraining.utils import get_content_root
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save

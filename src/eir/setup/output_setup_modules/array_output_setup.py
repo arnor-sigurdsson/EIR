@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -26,20 +25,19 @@ class ComputedArrayOutputInfo:
     output_config: OutputConfig
     data_dimensions: DataDimensions
     dtype: np.dtype
-    normalization_stats: Optional[ArrayNormalizationStats] = None
-    diffusion_config: Optional[DiffusionConfig] = None
+    normalization_stats: ArrayNormalizationStats | None = None
+    diffusion_config: DiffusionConfig | None = None
 
 
 def set_up_array_output(
     output_config: OutputConfig,
-    normalization_stats: Optional[ArrayNormalizationStats] = None,
-    data_dimensions: Optional[DataDimensions] = None,
-    diffusion_config: Optional[DiffusionConfig] = None,
-    dtype: Optional[np.dtype] = None,
+    normalization_stats: ArrayNormalizationStats | None = None,
+    data_dimensions: DataDimensions | None = None,
+    diffusion_config: DiffusionConfig | None = None,
+    dtype: np.dtype | None = None,
     *args,
     **kwargs,
 ) -> ComputedArrayOutputInfo:
-
     if data_dimensions is None:
         data_dimensions = get_data_dimension_from_data_source(
             data_source=Path(output_config.output_info.output_source),
@@ -49,15 +47,14 @@ def set_up_array_output(
     output_type_info = output_config.output_type_info
     assert isinstance(output_type_info, ArrayOutputTypeConfig)
 
-    if normalization_stats is None:
-        if output_type_info.normalization is not None:
-            normalization_stats = get_array_normalization_values(
-                source=output_config.output_info.output_source,
-                inner_key=output_config.output_info.output_inner_key,
-                normalization=output_type_info.normalization,
-                data_dimensions=data_dimensions,
-                max_samples=output_type_info.adaptive_normalization_max_samples,
-            )
+    if normalization_stats is None and output_type_info.normalization is not None:
+        normalization_stats = get_array_normalization_values(
+            source=output_config.output_info.output_source,
+            inner_key=output_config.output_info.output_inner_key,
+            normalization=output_type_info.normalization,
+            data_dimensions=data_dimensions,
+            max_samples=output_type_info.adaptive_normalization_max_samples,
+        )
 
     if dtype is None:
         dtype = get_dtype_from_data_source(
@@ -65,15 +62,14 @@ def set_up_array_output(
             deeplake_inner_key=output_config.output_info.output_inner_key,
         )
 
-    if diffusion_config is None:
-        if output_type_info.loss == "diffusion":
-            time_steps = output_type_info.diffusion_time_steps
-            if time_steps is None:
-                raise ValueError(
-                    "Diffusion loss requires specifying the number of time steps."
-                    "Please set `diffusion_time_steps` in the output config."
-                )
-            diffusion_config = initialize_diffusion_config(time_steps=time_steps)
+    if diffusion_config is None and output_type_info.loss == "diffusion":
+        time_steps = output_type_info.diffusion_time_steps
+        if time_steps is None:
+            raise ValueError(
+                "Diffusion loss requires specifying the number of time steps."
+                "Please set `diffusion_time_steps` in the output config."
+            )
+        diffusion_config = initialize_diffusion_config(time_steps=time_steps)
 
     array_output_object = ComputedArrayOutputInfo(
         output_config=output_config,

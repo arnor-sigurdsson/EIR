@@ -1,10 +1,10 @@
 import base64
 import json
 import os
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 from shutil import copytree
-from typing import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -54,29 +54,25 @@ def train_image_col_01_mnist_diffusion() -> AutoDocExperimentInfo:
         mapping.append(
             (
                 f"samples/1000/auto/{i}_generated.png",
-                f"figures/01_mnist_diffusion/examples/"
-                f"auto_generated_iter_1000_{i}.png",
+                f"figures/01_mnist_diffusion/examples/auto_generated_iter_1000_{i}.png",
             )
         )
         mapping.append(
             (
                 f"samples/1000/auto/{i}_inputs/image.png",
-                f"figures/01_mnist_diffusion/examples/"
-                f"auto_inputs_iter_1000_{i}.png",
+                f"figures/01_mnist_diffusion/examples/auto_inputs_iter_1000_{i}.png",
             )
         )
         mapping.append(
             (
                 f"samples/9000/auto/{i}_generated.png",
-                f"figures/01_mnist_diffusion/examples/"
-                f"auto_generated_iter_9000_{i}.png",
+                f"figures/01_mnist_diffusion/examples/auto_generated_iter_9000_{i}.png",
             )
         )
         mapping.append(
             (
                 f"samples/9000/auto/{i}_inputs/image.png",
-                f"figures/01_mnist_diffusion/examples/"
-                f"auto_inputs_iter_9000_{i}.png",
+                f"figures/01_mnist_diffusion/examples/auto_inputs_iter_9000_{i}.png",
             )
         )
 
@@ -246,7 +242,7 @@ def plot_conditional_diffusion_grid(input_folder: Path, output_folder: Path) -> 
 
         output_image = plt.imread(output_file)
 
-        with open(label_file, "r") as f:
+        with open(label_file) as f:
             label = json.load(f)["CLASS"]
 
         plt.subplot(5, 2, i + 1)
@@ -370,7 +366,7 @@ def decode_and_save_images(
 ) -> None:
     os.makedirs(output_folder, exist_ok=True)
 
-    with open(predictions_file, "r") as file:
+    with open(predictions_file) as file:
         predictions = json.load(file)[0]
 
     for i, prediction in enumerate(predictions["response"]["result"]):

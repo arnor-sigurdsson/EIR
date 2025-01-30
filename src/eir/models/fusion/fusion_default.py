@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Callable, Dict
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import torch
 from torch import nn
@@ -13,13 +14,13 @@ from eir.utils.logging import get_logger
 if TYPE_CHECKING:
     pass
 
-al_features = Callable[[Dict[str, torch.Tensor]], torch.Tensor]
+al_features = Callable[[dict[str, torch.Tensor]], torch.Tensor]
 
 
 logger = get_logger(__name__)
 
 
-def default_fuse_features(features: Dict[str, torch.Tensor]) -> torch.Tensor:
+def default_fuse_features(features: dict[str, torch.Tensor]) -> torch.Tensor:
     feature_flatten = {k: v.flatten(start_dim=1) for k, v in features.items()}
     return torch.cat(tuple(feature_flatten.values()), dim=1)
 
@@ -59,7 +60,7 @@ class MLPResidualFusionModule(nn.Module):
     def num_out_features(self) -> int:
         return self.model_config.fc_task_dim
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> torch.Tensor:
         fused_features = self.fusion_callable(inputs)
         out = calculate_module_dict_outputs(
             input_=fused_features,

@@ -1,8 +1,7 @@
+from collections.abc import MutableMapping
 from typing import (
     TYPE_CHECKING,
-    Dict,
     Literal,
-    MutableMapping,
     NewType,
     Protocol,
     Union,
@@ -50,7 +49,7 @@ class FusionModuleProtocol(Protocol):
     def num_out_features(self) -> int: ...
 
     def __call__(
-        self, input: Dict[str, FeatureExtractorOutType]
+        self, input: dict[str, FeatureExtractorOutType]
     ) -> "al_fused_features": ...
 
 
@@ -58,7 +57,7 @@ class OutputModuleProtocol(Protocol):
     def __call__(
         self,
         input: "al_fused_features",
-    ) -> Dict[str, torch.Tensor]: ...
+    ) -> dict[str, torch.Tensor]: ...
 
 
 al_input_modules = MutableMapping[
@@ -79,10 +78,9 @@ def run_meta_forward(
     input_modules: al_input_modules,
     fusion_modules: al_fusion_modules,
     output_modules: al_output_modules,
-    fusion_to_output_mapping: Dict[str, Literal["computed", "pass-through"]],
+    fusion_to_output_mapping: dict[str, Literal["computed", "pass-through"]],
     inputs: dict[str, torch.Tensor],
 ) -> dict[str, dict[str, torch.Tensor]]:
-
     feature_extractors_out = {}
     for module_name, cur_input_module in input_modules.items():
         module_input = inputs[module_name]

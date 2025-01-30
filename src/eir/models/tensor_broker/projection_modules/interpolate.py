@@ -1,5 +1,3 @@
-from typing import Optional, Tuple
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,9 +8,9 @@ class InterpolateProjection(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
-        output_size: Tuple[int, int],
+        output_size: tuple[int, int],
         mode: str = "bilinear",
-        align_corners: Optional[bool] = None,
+        align_corners: bool | None = None,
     ):
         super().__init__()
 
@@ -67,9 +65,9 @@ class InterpolateProjection(nn.Module):
 class ArbitrarySampling(nn.Module):
     def __init__(
         self,
-        output_size: Tuple[int, int],
+        output_size: tuple[int, int],
         mode: str = "bilinear",
-        align_corners: Optional[bool] = None,
+        align_corners: bool | None = None,
     ):
         super().__init__()
 

@@ -1,4 +1,4 @@
-from typing import Iterable, Optional, Sequence, Type, Union
+from collections.abc import Iterable, Sequence
 
 import torch
 from torch_optimizer import _NAME_OPTIM_MAP
@@ -7,9 +7,9 @@ from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
 from eir.utils.logging import get_logger
 
-al_collector_classes = Union[
-    Type["ChannelBasedRunningStatistics"], Type["ElementBasedRunningStatistics"]
-]
+al_collector_classes = (
+    type["ChannelBasedRunningStatistics"] | type["ElementBasedRunningStatistics"]
+)
 
 logger = get_logger(name=__name__)
 
@@ -26,7 +26,7 @@ class ChannelBasedRunningStatistics:
 
     def __init__(self, final_n_dims: int = 2):
         self.final_n_dims: int = final_n_dims
-        self.shape: tuple = tuple()
+        self.shape: tuple = ()
         self.n: int = 0
         self.sum: torch.Tensor = torch.empty(0)
         self.num_var: torch.Tensor = torch.empty(0)
@@ -110,8 +110,8 @@ def collect_stats(
     tensor_iterable: Iterable[torch.Tensor],
     collector_class: al_collector_classes,
     shape: tuple,
-    max_samples: Optional[int] = None,
-    name: Optional[str] = None,
+    max_samples: int | None = None,
+    name: str | None = None,
 ) -> ChannelBasedRunningStatistics | ElementBasedRunningStatistics:
     stats = set_up_collector_instance(collector_class=collector_class, shape=shape)
 
@@ -160,7 +160,6 @@ def get_base_optimizer_names() -> set:
         "adahessian",
         "adabelief",
         "adabeliefw",
-        "soap",
     }
 
     return base_names
@@ -170,13 +169,13 @@ def get_all_optimizer_names() -> Sequence[str]:
     external_optimizers = set(_NAME_OPTIM_MAP.keys())
     base_optimizers = get_base_optimizer_names()
     all_optimizers = set.union(base_optimizers, external_optimizers)
-    all_optimizers_list = sorted(list(all_optimizers))
+    all_optimizers_list = sorted(all_optimizers)
 
     return all_optimizers_list
 
 
 def get_all_hf_model_names() -> Sequence[str]:
-    all_models = sorted(list(MODEL_MAPPING_NAMES.keys()))
+    all_models = sorted(MODEL_MAPPING_NAMES.keys())
     unsupported = get_unsupported_hf_models()
     unsupported_names = unsupported.keys()
     return [i for i in all_models if i not in unsupported_names]

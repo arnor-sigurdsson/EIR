@@ -1,6 +1,7 @@
 from collections import OrderedDict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, Sequence
+from typing import TYPE_CHECKING
 
 import torch
 from torch import nn
@@ -127,7 +128,7 @@ class MGMoEModel(nn.Module):
     def num_out_features(self) -> int:
         return self.model_config.fc_task_dim * len(self.expert_branches)
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> torch.Tensor:
         fused_features = self.fusion_callable(inputs)
 
         gate_attentions = calculate_module_dict_outputs(

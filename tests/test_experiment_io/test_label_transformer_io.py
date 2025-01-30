@@ -100,7 +100,7 @@ def test_save_label_transformer(tmp_run_folder: Path) -> None:
     assert saved_path.exists()
     assert saved_path.suffix == ".json"
 
-    with open(saved_path, "r") as f:
+    with open(saved_path) as f:
         loaded_data = json.load(f)
 
     assert loaded_data["type"] == "StandardScaler"

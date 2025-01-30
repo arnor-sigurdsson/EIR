@@ -29,7 +29,7 @@ class ArrayConsumerCallable(Protocol):
     def __call__(
         self,
         attribution: Optional["SampleAttribution"],
-    ) -> Optional[dict[str, np.ndarray]]: ...
+    ) -> dict[str, np.ndarray] | None: ...
 
 
 def get_array_sum_consumer(
@@ -45,7 +45,7 @@ def get_array_sum_consumer(
 
     def _consumer(
         attribution: Optional["SampleAttribution"],
-    ) -> Optional[dict[str, np.ndarray]]:
+    ) -> dict[str, np.ndarray] | None:
         nonlocal results
         nonlocal n_samples
 

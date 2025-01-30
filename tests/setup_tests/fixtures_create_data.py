@@ -1,8 +1,9 @@
 import json
 import random
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Union
+from typing import Any, Literal
 
 import deeplake
 import numpy as np
@@ -120,7 +121,7 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
     return test_data_config
 
 
-def _get_test_post_split_callables() -> Dict[str, Callable]:
+def _get_test_post_split_callables() -> dict[str, Callable]:
     def _sequence_post_split(
         test_root_folder: Path,
         train_ids: Sequence[str],
@@ -149,7 +150,7 @@ def _merge_labels_from_modalities(base_path: Path) -> None:
         if file.name in ("labels.csv", "labels_train.csv", "labels_test.csv"):
             return
 
-        elif file.name.startswith("labels_"):
+        if file.name.startswith("labels_"):
             assert file.suffix == ".csv"
             dfs.append(pd.read_csv(file, index_col="ID"))
 
@@ -175,7 +176,7 @@ def _merge_labels_from_modalities(base_path: Path) -> None:
 
 def _make_deeplake_test_dataset(
     base_output_folder: Path,
-    sub_folder_name: Union[None, Literal["train_set", "test_set"]],
+    sub_folder_name: None | Literal["train_set", "test_set"],
 ) -> None:
     suffix = f"_{sub_folder_name}" if sub_folder_name is not None else ""
     ds_path = base_output_folder / f"deeplake{suffix}"
@@ -315,7 +316,7 @@ def _make_deeplake_test_dataset(
                 case _:
                     raise ValueError(f"Unknown directory type: {f.name}")
 
-    for sample_id, sample in samples.items():
+    for _sample_id, sample in samples.items():
         ds.append(sample)
 
     ds.commit("Added all samples")
@@ -331,7 +332,7 @@ def _delete_random_rows_from_csv(csv_file: Path, n_to_drop: int):
 def _delete_random_cells_from_csv(
     csv_file: Path,
     fraction_to_drop: float = 0.10,
-    columns: Optional[Sequence[str]] = None,
+    columns: Sequence[str] | None = None,
 ):
     df = pd.read_csv(filepath_or_buffer=csv_file, index_col=0)
 
@@ -352,16 +353,16 @@ def _delete_random_files_from_folder(folder: Path, n_to_drop: int):
 
 @dataclass
 class TestDataConfig:
-    request_params: Dict
+    request_params: dict
     task_type: str
     scoped_tmp_path: Path
-    target_classes: Dict[str, int]
+    target_classes: dict[str, int]
     n_per_class: int
     n_snps: int
-    modalities: Sequence[Union[Literal["omics"], Literal["sequence"]]] = ("omics",)
+    modalities: Sequence[Literal["omics"] | Literal["sequence"]] = ("omics",)
     random_samples_dropped_from_modalities: bool = False
     source: Literal["local", "deeplake"] = "local"
-    extras: Dict[str, Any] = field(default_factory=dict)
+    extras: dict[str, Any] = field(default_factory=dict)
 
 
 def _create_test_data_config(

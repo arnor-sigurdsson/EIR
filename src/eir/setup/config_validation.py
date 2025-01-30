@@ -1,6 +1,7 @@
 import reprlib
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -32,7 +33,6 @@ def validate_train_configs(configs: "Configs") -> None:
 
 def validate_input_configs(input_configs: Sequence[schemas.InputConfig]) -> None:
     for input_config in input_configs:
-
         input_source: str = input_config.input_info.input_source
         is_websocket = input_source.startswith("ws://")
         if is_websocket:
@@ -55,7 +55,6 @@ def validate_input_configs(input_configs: Sequence[schemas.InputConfig]) -> None
 
 
 def base_validate_input_info(input_info: schemas.InputDataConfig) -> None:
-
     input_source = input_info.input_source
 
     if not Path(input_source).exists():
@@ -67,7 +66,6 @@ def base_validate_input_info(input_info: schemas.InputDataConfig) -> None:
 
 def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> None:
     for output_config in output_configs:
-
         output_source = output_config.output_info.output_source
         is_websocket = output_source is not None and output_source.startswith("ws://")
         if is_websocket:
@@ -99,22 +97,20 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                 )
             case ArrayOutputTypeConfig(_, _, loss, _):
                 model_type = output_config.model_config.model_type
-                if loss == "diffusion":
-                    if model_type not in ("cnn",):
-                        raise ValueError(
-                            "Currently, diffusion loss is only supported for output "
-                            "array model type 'cnn'. Please check the model type for "
-                            f"output '{name}'."
-                        )
+                if loss == "diffusion" and model_type not in ("cnn",):
+                    raise ValueError(
+                        "Currently, diffusion loss is only supported for output "
+                        "array model type 'cnn'. Please check the model type for "
+                        f"output '{name}'."
+                    )
             case ImageOutputTypeConfig(_, _, loss, _):
                 model_type = output_config.model_config.model_type
-                if loss == "diffusion":
-                    if model_type not in ("cnn",):
-                        raise ValueError(
-                            "Currently, diffusion loss is only supported for output "
-                            "image model type 'cnn'. Please check the model type for "
-                            f"output '{name}'."
-                        )
+                if loss == "diffusion" and model_type not in ("cnn",):
+                    raise ValueError(
+                        "Currently, diffusion loss is only supported for output "
+                        "image model type 'cnn'. Please check the model type for "
+                        f"output '{name}'."
+                    )
             case SurvivalOutputTypeConfig(
                 time_column, event_column, num_durations, loss_function, _, _
             ):
@@ -190,7 +186,7 @@ def validate_config_sync(
         output_name = output_config.output_info.output_name
         output_type_info = output_config.output_type_info
         assert isinstance(
-            output_type_info, (ArrayOutputTypeConfig, ImageOutputTypeConfig)
+            output_type_info, ArrayOutputTypeConfig | ImageOutputTypeConfig
         )
         is_diffusion = output_type_info.loss == "diffusion"
         if is_diffusion and output_name not in input_names:

@@ -1,8 +1,8 @@
 import base64
 import json
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
-from typing import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -234,7 +234,7 @@ def plot_time_series_predictions(
     output_dir: Path,
     data_format: str,
 ) -> None:
-    with open(meta_file, "r") as f:
+    with open(meta_file) as f:
         meta_data = json.load(f)
 
     output_df = pd.read_csv(output_file, index_col="ID", dtype={"ID": str})
@@ -251,10 +251,10 @@ def plot_time_series_predictions(
         generated_path = Path(run_folder, sample_data["generated"])
 
         if data_format == "sequence":
-            with open(input_path, "r") as f:
+            with open(input_path) as f:
                 input_sequence = [int(x) for x in f.read().strip().split()]
 
-            with open(generated_path, "r") as f:
+            with open(generated_path) as f:
                 generated_sequence = [int(x) for x in f.read().strip().split()]
         elif data_format == "array":
             input_sequence = np.load(input_path).squeeze()
@@ -464,7 +464,7 @@ def plot_time_series_with_uncertainty(
     data_format: str,
     repeat: int = 5,
 ) -> None:
-    with open(request_file, "r") as f:
+    with open(request_file) as f:
         data = json.load(f)
 
     output_df = pd.read_csv(output_csv, index_col="ID")
@@ -609,7 +609,7 @@ def generate_example_requests_arrays(
         cur_arr = sample["input_array"].astype(np.float32)
         cur_arr_base64 = encode_array_to_base64(array_np=cur_arr)
 
-        for cur_repeat in range(repeat):
+        for _cur_repeat in range(repeat):
             example_requests.append(
                 {
                     "stock_input": cur_arr_base64,

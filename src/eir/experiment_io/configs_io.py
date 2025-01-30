@@ -1,6 +1,6 @@
+from collections.abc import Sequence
 from copy import deepcopy
 from pathlib import Path
-from typing import Sequence
 
 import aislib.misc_utils
 import yaml
@@ -33,11 +33,11 @@ def load_configs(configs_root_folder: Path) -> Configs:
     fusion_path = configs_root_folder / "fusion_config.yaml"
     output_path = configs_root_folder / "output_configs.yaml"
 
-    with open(global_path, "r") as infile:
+    with open(global_path) as infile:
         global_config_list = [yaml.safe_load(stream=infile)]
     global_config = get_global_config(global_configs=global_config_list)
 
-    with open(input_path, "r") as infile:
+    with open(input_path) as infile:
         input_config_list = yaml.safe_load(stream=infile)
 
     input_configs = get_input_configs(input_configs=input_config_list)
@@ -45,11 +45,11 @@ def load_configs(configs_root_folder: Path) -> Configs:
         input_configs=input_configs
     )
 
-    with open(fusion_path, "r") as infile:
+    with open(fusion_path) as infile:
         fusion_config_list = [yaml.safe_load(stream=infile)]
     fusion_config = load_fusion_configs(fusion_configs=fusion_config_list)
 
-    with open(output_path, "r") as infile:
+    with open(output_path) as infile:
         output_config_list = yaml.safe_load(stream=infile)
     output_configs = load_output_configs(output_configs=output_config_list)
     output_configs_patched = _patch_sequence_output_configs(
@@ -146,7 +146,6 @@ def save_yaml_configs(
     configs: "Configs",
     for_serialized: bool = False,
 ) -> None:
-
     output_root = run_folder / "configs"
     if for_serialized:
         output_root = run_folder / "serializations" / "configs_stripped"

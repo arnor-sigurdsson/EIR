@@ -1,14 +1,10 @@
+from collections.abc import Callable, Generator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    Generator,
-    List,
     Optional,
-    Sequence,
 )
 
 import numpy as np
@@ -98,7 +94,7 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         iteration=iteration,
     )
 
-    write_eval_header = True if iteration == gc.ec.sample_interval else False
+    write_eval_header = iteration == gc.ec.sample_interval
     metrics.persist_metrics(
         handler_config=handler_config,
         metrics_dict=evaluation_results.metrics_with_averages,
@@ -155,7 +151,7 @@ def run_all_eval_hook_analysis(
     run_folder: Path,
     iteration: int | str,
 ) -> None:
-    for hook_name, hook_output in hook_outputs.items():
+    for _hook_name, hook_output in hook_outputs.items():
         match hook_output:
             case LatentHookOutput():
                 latent_analysis_wrapper(
@@ -317,7 +313,6 @@ def run_split_evaluation(
         full_gathered_ids_total += split_outputs.ids
 
         if with_labels and len(split_output_objects.compute) > 0:
-
             filtered = metrics.filter_missing_outputs_and_labels(
                 batch_ids=split_outputs.ids,
                 model_outputs=output_compute,
@@ -401,7 +396,7 @@ def _build_ids_per_output(
             if output_name not in ids_per_output:
                 ids_per_output[output_name] = {}
 
-            for inner_target_name in inner_dict.keys():
+            for inner_target_name in inner_dict:
                 ids_per_output[output_name][inner_target_name] = fv.common_ids
     else:
         assert fv.common_ids is None
@@ -486,7 +481,7 @@ def compute_eval_metrics_wrapper(
     experiment_metrics: metrics.al_metric_record_dict,
     loss_function: Callable,
     device: str,
-    val_outputs_for_loss: Optional[dict[str, dict[str, torch.Tensor]]] = None,
+    val_outputs_for_loss: dict[str, dict[str, torch.Tensor]] | None = None,
     val_targets_for_loss: Optional["al_training_labels_target"] = None,
 ) -> metrics.al_step_metric_dict:
     """
@@ -533,8 +528,8 @@ def compute_eval_metrics_wrapper(
 
 
 def save_tabular_evaluation_results_wrapper(
-    val_outputs: Dict[str, Dict[str, torch.Tensor]],
-    val_labels: Dict[str, Dict[str, torch.Tensor]],
+    val_outputs: dict[str, dict[str, torch.Tensor]],
+    val_labels: dict[str, dict[str, torch.Tensor]],
     val_ids: dict[str, dict[str, list[str]]],
     iteration: int,
     experiment: "Experiment",
@@ -601,7 +596,7 @@ def save_tabular_evaluation_results_wrapper(
 class PerformancePlotConfig:
     val_outputs: np.ndarray
     val_labels: np.ndarray
-    val_ids: List[str]
+    val_ids: list[str]
     iteration: int
     column_name: str
     column_type: str
@@ -637,11 +632,10 @@ def save_evaluation_results(
 def save_classification_predictions(
     val_labels: np.ndarray,
     val_outputs: np.ndarray,
-    val_ids: List[str],
+    val_ids: list[str],
     transformer: LabelEncoder,
     output_folder: Path,
 ) -> None:
-
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
 
@@ -689,7 +683,7 @@ def _parse_valid_classification_predictions(
 
     df = pd.DataFrame(columns=columns)
 
-    for col_name, data in zip(columns, column_values):
+    for col_name, data in zip(columns, column_values, strict=False):
         df[col_name] = data
 
     return df
@@ -707,7 +701,7 @@ def _inverse_numerical_labels_hook(
 def scale_and_save_regression_predictions(
     val_labels: np.ndarray,
     val_outputs: np.ndarray,
-    val_ids: List[str],
+    val_ids: list[str],
     transformer: StandardScaler,
     output_folder: Path,
 ) -> None:

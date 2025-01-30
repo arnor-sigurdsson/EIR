@@ -1,9 +1,10 @@
 import atexit
 import json
 import shutil
+from collections.abc import Sequence
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Sequence, Union
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import numpy as np
@@ -43,8 +44,8 @@ class StreamDataGatherer:
         self,
         websocket_url: str,
         output_folder: str,
-        input_configs: Dict[str, Any],
-        output_configs: Dict[str, Any],
+        input_configs: dict[str, Any],
+        output_configs: dict[str, Any],
         batch_size: int = 32,
         max_samples: int = 1_000,
     ):
@@ -196,23 +197,21 @@ class StreamDataGatherer:
             if status_data["type"] == "status":
                 logger.info(f"Current status: {status_data['payload']}")
                 return status_data["payload"]
-            else:
-                logger.error(f"Unexpected response to status request: {status_data}")
+            logger.error(f"Unexpected response to status request: {status_data}")
 
 
-def process_single_data(data: Any, info: Dict[str, Any]) -> Any:
+def process_single_data(data: Any, info: dict[str, Any]) -> Any:
     data_type = info["type"]
 
     if data_type in ["array", "omics"]:
         dtype = np.dtype(bool) if data_type == "omics" else np.dtype(np.float32)
         return process_array(data=data, shape=info["shape"], dtype=dtype)
-    elif data_type == "image":
+    if data_type == "image":
         return process_image(data=data, mode=info.get("mode"))
-    elif data_type in ["tabular", "sequence", "survival"]:
+    if data_type in ["tabular", "sequence", "survival"]:
         return data
-    else:
-        logger.warning(f"Unsupported data type: {data_type}")
-        return data
+    logger.warning(f"Unsupported data type: {data_type}")
+    return data
 
 
 def process_array(data: str, shape: list[int], dtype: np.dtype) -> np.ndarray:
@@ -225,9 +224,7 @@ def process_array(data: str, shape: list[int], dtype: np.dtype) -> np.ndarray:
     return array
 
 
-def process_image(
-    data: str, mode: Optional[Literal["L", "RGB", "RGBA"]]
-) -> Image.Image:
+def process_image(data: str, mode: Literal["L", "RGB", "RGBA"] | None) -> Image.Image:
     image = deserialize_image(
         image_str=data,
         image_mode=mode,
@@ -256,8 +253,8 @@ def process_inputs(
 
 
 def process_outputs(
-    sample_output: Dict[str, Any], dataset_info: Dict[str, Any]
-) -> Dict[str, Any]:
+    sample_output: dict[str, Any], dataset_info: dict[str, Any]
+) -> dict[str, Any]:
     processed_outputs = {}
     for output_name, output_data in sample_output.items():
         output_info = dataset_info["outputs"].get(output_name)
@@ -283,7 +280,7 @@ def save_data(
     data: Any,
     save_path: Path,
     sample_id: str,
-    dataframes: Dict[str, pd.DataFrame],
+    dataframes: dict[str, pd.DataFrame],
 ):
     if data_type in ["omics", "array"]:
         assert isinstance(data, np.ndarray)
@@ -309,11 +306,11 @@ def save_data(
 
 
 def save_inputs(
-    processed_input: Dict[str, Any],
+    processed_input: dict[str, Any],
     sample_id: str,
     base_path: Path,
-    inputs: Dict[str, Dict],
-    dataframes: Dict[str, pd.DataFrame],
+    inputs: dict[str, dict],
+    dataframes: dict[str, pd.DataFrame],
 ):
     for input_name, input_config in inputs.items():
         input_type = input_config["type"]
@@ -337,11 +334,11 @@ def save_inputs(
 
 
 def save_outputs(
-    processed_output: Dict[str, Any],
+    processed_output: dict[str, Any],
     sample_id: str,
     base_path: Path,
-    outputs: Dict[str, Dict],
-    dataframes: Dict[str, pd.DataFrame],
+    outputs: dict[str, dict],
+    dataframes: dict[str, pd.DataFrame],
 ):
     for output_name, output_config in outputs.items():
         output_type = output_config["type"]
@@ -364,7 +361,7 @@ def save_outputs(
         )
 
 
-def validate_streaming_setup(configs: Configs) -> Optional[str]:
+def validate_streaming_setup(configs: Configs) -> str | None:
     def is_websocket_url(url: str) -> bool:
         parsed = urlparse(url)
         return parsed.scheme in ("ws", "wss")
@@ -446,7 +443,7 @@ def patch_configs_for_local_data(
     patched_configs = deepcopy(configs)
 
     def update_source(
-        config: Union[InputConfig, OutputConfig],
+        config: InputConfig | OutputConfig,
         config_type: str,
     ) -> None:
         match config:
@@ -513,9 +510,9 @@ def _inject_correct_sequence_input_from_linked_output(
                 ),
                 None,
             )
-            assert (
-                matching_input is not None
-            ), f"No matching input found for {output_name}"
+            assert matching_input is not None, (
+                f"No matching input found for {output_name}"
+            )
 
             matching_input.input_info.input_source = (
                 output_config.output_info.output_source
@@ -529,7 +526,7 @@ def setup_and_gather_streaming_data(
     configs: Configs,
     batch_size: int,
     max_samples: int,
-) -> Optional[tuple[str, Path]]:
+) -> tuple[str, Path] | None:
     try:
         websocket_url = validate_streaming_setup(configs=configs)
         if websocket_url:
@@ -540,11 +537,10 @@ def setup_and_gather_streaming_data(
                 batch_size=batch_size,
                 max_samples=max_samples,
             )
-        else:
-            logger.info(
-                "No streaming setup detected. Proceeding with standard data loading."
-            )
-            return None
+        logger.info(
+            "No streaming setup detected. Proceeding with standard data loading."
+        )
+        return None
     except ValueError as e:
         logger.error(f"Invalid streaming setup: {str(e)}")
         return None

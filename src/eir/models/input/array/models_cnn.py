@@ -1,5 +1,6 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import torch
 from sympy import Symbol
@@ -123,7 +124,7 @@ class CNNModelConfig:
         L1 regularization to apply to the first layer.
     """
 
-    layers: Union[None, List[int]] = None
+    layers: None | list[int] = None
 
     num_output_features: int = 0
 
@@ -144,7 +145,7 @@ class CNNModelConfig:
 
     allow_first_conv_size_reduction: bool = True
 
-    down_sample_every_n_blocks: Optional[int] = 2
+    down_sample_every_n_blocks: int | None = 2
 
     cutoff: int = 32
 
@@ -300,8 +301,7 @@ class CNNModel(nn.Module):
     def num_out_features(self) -> int:
         if self.model_config.num_output_features > 0:
             return self.model_config.num_output_features
-        else:
-            return self.no_out_channels * self.data_size_after_conv
+        return self.no_out_channels * self.data_size_after_conv
 
     def _init_weights(self):
         for m in self.modules():
@@ -310,7 +310,7 @@ class CNNModel(nn.Module):
                 nn.init.kaiming_normal_(tensor=m.weight, a=0.5, mode="fan_out")
 
     @property
-    def residual_blocks(self) -> List[int]:
+    def residual_blocks(self) -> list[int]:
         mc = self.model_config
         if not mc.layers:
             stride_w = mc.down_stride_width
@@ -364,10 +364,10 @@ class CNNModel(nn.Module):
 
 
 def _make_conv_layers(
-    residual_blocks: List[int],
+    residual_blocks: list[int],
     cnn_model_configuration: CNNModelConfig,
     data_dimensions: "DataDimensions",
-) -> List[nn.Module]:
+) -> list[nn.Module]:
     mc = cnn_model_configuration
 
     first_conv_channels = 2**mc.channel_exp_base * mc.first_channel_expansion
@@ -430,7 +430,7 @@ def _make_conv_layers(
 
     if do_add_attention:
         last_block = conv_blocks[-1]
-        assert isinstance(last_block, (CNNResidualBlock, FirstCNNBlock))
+        assert isinstance(last_block, CNNResidualBlock | FirstCNNBlock)
         cur_attention_block = ConvAttentionBlock(
             channels=last_block.out_channels,
             width=first_width,
@@ -440,7 +440,7 @@ def _make_conv_layers(
 
     down_every = mc.down_sample_every_n_blocks
     for block_arch_idx, block_arch_blocks in enumerate(residual_blocks):
-        for layer in range(block_arch_blocks):
+        for _layer in range(block_arch_blocks):
             cur_block = _get_conv_residual_block(
                 conv_blocks=conv_blocks,
                 layer_arch_idx=block_arch_idx,
@@ -499,14 +499,11 @@ def _do_add_attention(
     if attention_inclusion_cutoff == 0:
         return False
 
-    if width * height <= attention_inclusion_cutoff:
-        return True
-
-    return False
+    return width * height <= attention_inclusion_cutoff
 
 
 def _get_conv_residual_block(
-    conv_blocks: List[nn.Module],
+    conv_blocks: list[nn.Module],
     layer_arch_idx: int,
     down_stride_w: int,
     down_stride_h: int,
@@ -574,7 +571,7 @@ def _get_conv_residual_block(
         conv_1_padding_h=conv_param_suggestion_h.padding,
         down_stride_h=conv_param_suggestion_h.stride,
         dilation_h=conv_param_suggestion_h.dilation,
-        full_preact=True if len(conv_blocks) == 1 else False,
+        full_preact=len(conv_blocks) == 1,
         rb_do=mc.rb_do,
         stochastic_depth_p=mc.stochastic_depth_p,
         conv_downsample_identity=need_identity_downsample,
@@ -609,7 +606,7 @@ def auto_find_no_cnn_residual_blocks_needed(
     stride_w: int,
     first_stride_expansion_w: float,
     dilation_w: int,
-    down_sample_every_n_blocks: Optional[int],
+    down_sample_every_n_blocks: int | None,
     input_size_h: int,
     kernel_h: int,
     first_kernel_expansion_h: float,
@@ -617,7 +614,7 @@ def auto_find_no_cnn_residual_blocks_needed(
     first_stride_expansion_h: float,
     dilation_h: int,
     cutoff: int,
-) -> List[int]:
+) -> list[int]:
     """
     Used in order to calculate / set up residual blocks specifications as a list
     automatically when they are not passed in as CL args, based on the minimum
@@ -740,16 +737,15 @@ def auto_find_no_cnn_residual_blocks_needed(
 
             break
 
+        cur_no_blocks = sum(residual_blocks)
+
+        if cur_no_blocks >= 8:
+            residual_blocks[2] += 1
         else:
-            cur_no_blocks = sum(residual_blocks)
+            cur_index = cur_no_blocks // 2
+            residual_blocks[cur_index] += 1
 
-            if cur_no_blocks >= 8:
-                residual_blocks[2] += 1
-            else:
-                cur_index = cur_no_blocks // 2
-                residual_blocks[cur_index] += 1
-
-            cur_size_w, cur_size_h = cur_size_w_next, cur_size_h_next
+        cur_size_w, cur_size_h = cur_size_w_next, cur_size_h_next
 
     return [i for i in residual_blocks if i != 0]
 
@@ -780,7 +776,7 @@ def calc_size_after_conv_sequence(
     input_width: int,
     input_height: int,
     conv_sequence: nn.Sequential,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     current_width = input_width
     current_height = input_height
     for block_index, block in enumerate(conv_sequence):
@@ -793,7 +789,9 @@ def calc_size_after_conv_sequence(
             padded_width = current_width + 2 * conv_layer.padding[1]
             if any(
                 k > s
-                for k, s in zip(conv_layer.kernel_size, (padded_height, padded_width))
+                for k, s in zip(
+                    conv_layer.kernel_size, (padded_height, padded_width), strict=False
+                )
             ):
                 raise ValueError(
                     f"Kernel size of layer "
@@ -936,7 +934,7 @@ def calc_conv_params_needed(
 
 
 def _choose_best_solution(
-    solutions: List[ConvParamSuggestion],
+    solutions: list[ConvParamSuggestion],
     input_target_size: int,
     input_kernel_size: int,
     input_stride: int,
@@ -944,7 +942,7 @@ def _choose_best_solution(
 ) -> ConvParamSuggestion:
     def _calculate_distance(
         solution: ConvParamSuggestion,
-    ) -> Tuple[int, Tuple[int, ...]]:
+    ) -> tuple[int, tuple[int, ...]]:
         """
         We have the second returned value as a tuple so that if >1 solutions
         have the same distance, we get a consistent ordering.
@@ -984,7 +982,7 @@ def _choose_best_solution(
 def _get_conv_param_suggestion_iterator(
     target_size: int, kernel_size: int, stride: int, dilation: int
 ) -> Iterator[ConvParamSuggestion]:
-    def _get_range(base: int) -> List[int]:
+    def _get_range(base: int) -> list[int]:
         return [sug for sug in [base, base + 1, base - 1] if sug > 0]
 
     for k_size in _get_range(base=kernel_size):
@@ -1011,7 +1009,7 @@ def conv_output_formula(
 
 def solve_for_padding(
     input_size: int, target_size: int, dilation: int, stride: int, kernel_size: int
-) -> Union[int, None]:
+) -> int | None:
     p = Symbol("p", integer=True, nonnegative=True)
     padding = solve(
         ((input_size + (2 * p) - dilation * (kernel_size - 1) - 1) / stride + 1)

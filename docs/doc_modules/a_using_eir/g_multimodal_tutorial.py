@@ -1,7 +1,7 @@
+from collections.abc import Sequence
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
-from typing import Sequence
 
 import pandas as pd
 

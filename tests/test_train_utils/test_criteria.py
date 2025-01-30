@@ -1,6 +1,6 @@
+from collections.abc import Callable
 from copy import copy
 from functools import partial
-from typing import Callable
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
@@ -117,7 +117,7 @@ def test_get_criteria(
     test_target = {"Height": torch.randn(10, 1), "Origin": torch.randint(0, 3, (10,))}
     test_criteria["test_output_tabular"](test_input, test_target)
 
-    for output_name in outputs_as_dict.keys():
+    for output_name in outputs_as_dict:
         cur_criteria = test_criteria[output_name]
         cur_criteria(test_input, test_target)
 

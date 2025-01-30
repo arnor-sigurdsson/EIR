@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -17,20 +16,20 @@ class DataDimensions:
     channels: int
     height: int
     width: int
-    extra_dims: tuple[int, ...] = tuple()
-    original_shape: Optional[Tuple[int, ...]] = None
+    extra_dims: tuple[int, ...] = ()
+    original_shape: tuple[int, ...] | None = None
 
     def num_elements(self) -> int:
         base = self.channels * self.height * self.width
         return int(base * np.prod(self.extra_dims))
 
-    def full_shape(self) -> Tuple[int, ...]:
+    def full_shape(self) -> tuple[int, ...]:
         return tuple([self.channels, self.height, self.width] + list(self.extra_dims))
 
 
 def get_data_dimension_from_data_source(
     data_source: Path,
-    deeplake_inner_key: Optional[str] = None,
+    deeplake_inner_key: str | None = None,
 ) -> DataDimensions:
     """
     TODO: Make more dynamic / robust. Also weird to say "width" for a 1D vector.
@@ -48,7 +47,7 @@ def get_data_dimension_from_data_source(
         path = next(iterator)
         shape = np.load(file=path).shape
 
-    extra_dims: tuple[int, ...] = tuple()
+    extra_dims: tuple[int, ...] = ()
     if len(shape) == 1:
         channels, height, width = 1, 1, shape[0]
     elif len(shape) == 2:
@@ -70,7 +69,7 @@ def get_data_dimension_from_data_source(
 
 def get_dtype_from_data_source(
     data_source: Path,
-    deeplake_inner_key: Optional[str] = None,
+    deeplake_inner_key: str | None = None,
 ) -> np.dtype:
     if is_deeplake_dataset(data_source=str(data_source)):
         msg = "Deeplake inner key is required for Deeplake datasets"
@@ -92,6 +91,6 @@ def get_dtype_from_data_source(
     return data_type
 
 
-def get_default_sequence_specials() -> List[str]:
+def get_default_sequence_specials() -> list[str]:
     default_specials = ["<bos>", "<unk>", "<mask>", "<pad>", "<eos>"]
     return default_specials

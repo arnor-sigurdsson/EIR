@@ -2,18 +2,12 @@ import ast
 import json
 import operator
 from collections import defaultdict
+from collections.abc import Generator, Iterable, MutableMapping
 from dataclasses import fields, is_dataclass
 from functools import reduce
 from pathlib import Path
 from typing import (
     Any,
-    DefaultDict,
-    Dict,
-    Generator,
-    Iterable,
-    MutableMapping,
-    Optional,
-    Type,
 )
 
 import yaml
@@ -24,8 +18,8 @@ logger = get_logger(name=__name__)
 
 
 def get_yaml_iterator_with_injections(
-    yaml_config_files: Iterable[str], extra_cl_args: Optional[list[str]]
-) -> Generator[Dict, None, None]:
+    yaml_config_files: Iterable[str], extra_cl_args: list[str] | None
+) -> Generator[dict, None, None]:
     if not extra_cl_args:
         yield from get_yaml_to_dict_iterator(yaml_config_files=yaml_config_files)
         return
@@ -35,7 +29,9 @@ def get_yaml_iterator_with_injections(
 
         yaml_file_path_object = Path(yaml_config_file)
         for extra_arg in extra_cl_args:
-            extra_arg_parsed = extra_arg.lstrip("--")
+            extra_arg_parsed = (
+                extra_arg[2:] if extra_arg.startswith("--") else extra_arg
+            )
             target_file, str_to_inject = extra_arg_parsed.split(".", 1)
 
             if target_file == yaml_file_path_object.stem:
@@ -50,7 +46,7 @@ def get_yaml_iterator_with_injections(
 
 
 def convert_cl_str_to_dict(str_: str) -> dict:
-    def _infinite_dict() -> DefaultDict:
+    def _infinite_dict() -> defaultdict:
         return defaultdict(_infinite_dict)
 
     infinite_dict = _infinite_dict()
@@ -77,8 +73,8 @@ def get_yaml_to_dict_iterator(
         yield load_yaml_config(config_path=yaml_config)
 
 
-def load_yaml_config(config_path: str) -> Dict[str, Any]:
-    with open(config_path, "r") as yaml_file:
+def load_yaml_config(config_path: str) -> dict[str, Any]:
+    with open(config_path) as yaml_file:
         config_as_dict = yaml.load(stream=yaml_file, Loader=yaml.FullLoader)
 
     return config_as_dict
@@ -110,7 +106,7 @@ def object_to_primitives(obj):
 
 
 def validate_keys_against_dataclass(
-    input_dict: Dict[str, Any], dataclass_type: Type, name: str = ""
+    input_dict: dict[str, Any], dataclass_type: type, name: str = ""
 ) -> None:
     if not is_dataclass(dataclass_type):
         raise TypeError(f"Provided type {dataclass_type.__name__} is not a dataclass")

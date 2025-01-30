@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Literal, Sequence, Union
+from typing import Literal
 
 al_cat_loss_names = Literal["CrossEntropyLoss", "BCEWithLogitsLoss"]
 al_con_loss_names = Literal[
@@ -40,7 +41,7 @@ class TabularOutputTypeConfig:
 
     target_cat_columns: Sequence[str] = field(default_factory=list)
     target_con_columns: Sequence[str] = field(default_factory=list)
-    label_parsing_chunk_size: Union[None, int] = None
+    label_parsing_chunk_size: None | int = None
     cat_label_smoothing: float = 0.0
     cat_loss_name: al_cat_loss_names = "CrossEntropyLoss"
     con_loss_name: al_con_loss_names = "MSELoss"

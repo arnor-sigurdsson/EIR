@@ -1,5 +1,5 @@
 # protocol.py
-from typing import Dict, List, TypedDict, Union
+from typing import TypedDict
 
 
 class GetInfoPayload(TypedDict):
@@ -19,11 +19,11 @@ class ResetPayload(TypedDict):
 
 
 class InfoPayload(TypedDict):
-    dataset_info: Dict[str, Union[str, List[int]]]
+    dataset_info: dict[str, str | list[int]]
 
 
 class DataPayload(TypedDict):
-    samples: List[Dict[str, Union[List[float], str]]]
+    samples: list[dict[str, list[float] | str]]
 
 
 class ResetConfirmationPayload(TypedDict):

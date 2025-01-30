@@ -60,7 +60,6 @@ def get_fusion_layer(
     cache_fusion_type: Literal["cross-attention", "sum", "cat+conv"],
     projection_type: Literal["lcl", "lcl_residual", "cnn", "linear", "pool"] = "linear",
 ) -> nn.Module:
-
     match cache_fusion_type:
         case "cross-attention":
             return CrossAttentionFusionLayer(

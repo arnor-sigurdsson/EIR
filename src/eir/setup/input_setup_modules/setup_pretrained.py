@@ -1,6 +1,6 @@
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict
 
 from eir.experiment_io.input_object_io import load_serialized_input_object
 from eir.setup.input_setup_modules.setup_array import set_up_array_input_object
@@ -15,8 +15,8 @@ from eir.setup.input_setup_modules.setup_tabular import (
 
 def get_input_setup_from_pretrained_function_map(
     run_folder: Path, load_module_name: str
-) -> Dict[str, Callable]:
-    pretrained_setup_mapping: Dict[str, Callable] = {
+) -> dict[str, Callable]:
+    pretrained_setup_mapping: dict[str, Callable] = {
         "omics": partial(
             load_serialized_input_object,
             input_class=ComputedOmicsInputInfo,

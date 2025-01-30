@@ -2,7 +2,6 @@ import inspect
 import json
 import re
 from pathlib import Path
-from typing import List
 
 import requests
 from transformers import AutoConfig, PretrainedConfig
@@ -94,7 +93,7 @@ def _get_pretrained_models_header() -> str:
 
 def load_cache() -> dict:
     if Path(CACHE_FILE).exists() and not UPDATE_HF_DOCS:
-        with open(CACHE_FILE, "r") as f:
+        with open(CACHE_FILE) as f:
             return json.load(f)
     else:
         return {}
@@ -106,7 +105,7 @@ def save_cache(cache: dict):
 
 
 def retrieve_configurable_models(
-    model_name_list: List[str],
+    model_name_list: list[str],
 ) -> list[tuple[str, str]]:
     models_ = []
 

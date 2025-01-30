@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -49,7 +50,7 @@ def analyze_image_input_attributions(
 
     output_object = exp.outputs[output_name]
     assert isinstance(
-        output_object, (ComputedTabularOutputInfo, ComputedSurvivalOutputInfo)
+        output_object, ComputedTabularOutputInfo | ComputedSurvivalOutputInfo
     )
 
     target_transformer = get_appropriate_target_transformer(

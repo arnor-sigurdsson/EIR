@@ -1,14 +1,11 @@
+from collections.abc import Callable, Sequence
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
 from typing import (
     TYPE_CHECKING,
-    Callable,
-    List,
     Literal,
-    Optional,
     Protocol,
-    Sequence,
     Union,
 )
 
@@ -181,9 +178,9 @@ class LCLModelConfig:
         attention cutoff >= 256, the attention block will be included.
     """
 
-    patch_size: Optional[tuple[int, int, int]] = None
+    patch_size: tuple[int, int, int] | None = None
 
-    layers: Union[None, List[int]] = None
+    layers: None | list[int] = None
 
     kernel_width: int | Literal["patch"] = 16
     first_kernel_expansion: int = -2
@@ -191,7 +188,7 @@ class LCLModelConfig:
     channel_exp_base: int = 2
     first_channel_expansion: int = 1
 
-    num_lcl_chunks: Union[None, int] = None
+    num_lcl_chunks: None | int = None
 
     rb_do: float = 0.10
     stochastic_depth_p: float = 0.00
@@ -199,7 +196,7 @@ class LCLModelConfig:
 
     cutoff: int | Literal["auto"] = 1024
     direction: Literal["down", "up"] = "down"
-    attention_inclusion_cutoff: Optional[int] = None
+    attention_inclusion_cutoff: int | None = None
 
 
 class LCLModel(nn.Module):
@@ -208,7 +205,7 @@ class LCLModel(nn.Module):
         model_config: Union[LCLModelConfig, "LCLOutputModelConfig"],
         data_dimensions: "DataDimensions",
         flatten_fn: FlattenFunc,
-        dynamic_cutoff: Optional[int] = None,
+        dynamic_cutoff: int | None = None,
     ):
         super().__init__()
 
@@ -284,7 +281,7 @@ class LCLModel(nn.Module):
 
 def parse_kernel_width(
     kernel_width: int | Literal["patch"],
-    patch_size: Optional[tuple[int, int, int]],
+    patch_size: tuple[int, int, int] | None,
 ) -> int:
     if kernel_width == "patch":
         if patch_size is None:
@@ -309,7 +306,7 @@ def flatten_h_w_fortran(x: torch.Tensor) -> torch.Tensor:
 def calc_value_after_expansion(base: int, expansion: int, min_value: int = 0) -> int:
     if expansion > 0:
         return base * expansion
-    elif expansion < 0:
+    if expansion < 0:
         abs_expansion = abs(expansion)
         return max(min_value, base // abs_expansion)
     return base
@@ -323,13 +320,13 @@ class LCParameterSpec:
     dropout_p: float
     stochastic_depth_p: float
     cutoff: int
-    attention_inclusion_cutoff: Optional[int] = None
+    attention_inclusion_cutoff: int | None = None
     direction: Literal["down", "up"] = "down"
 
 
 def _get_lcl_blocks(
     lcl_spec: LCParameterSpec,
-    block_layer_spec: Optional[Sequence[int]],
+    block_layer_spec: Sequence[int] | None,
 ) -> nn.Sequential:
     factory = _get_lcl_block_factory(block_layer_spec=block_layer_spec)
 
@@ -339,7 +336,7 @@ def _get_lcl_blocks(
 
 
 def _get_lcl_block_factory(
-    block_layer_spec: Optional[Sequence[int]],
+    block_layer_spec: Sequence[int] | None,
 ) -> Callable[[LCParameterSpec], nn.Sequential]:
     if not block_layer_spec:
         return generate_lcl_residual_blocks_auto
@@ -371,7 +368,7 @@ def _generate_lcl_blocks_from_spec(
     block_layer_spec_copy[0] -= 1
 
     for cur_layer_index, block_dim in enumerate(block_layer_spec_copy):
-        for block in range(block_dim):
+        for _block in range(block_dim):
             cur_out_feature_sets = 2 ** (s.channel_exp_base + cur_layer_index)
             cur_kernel_width = s.kernel_width
 
@@ -503,10 +500,9 @@ def _should_break_auto(
 ) -> bool:
     if direction == "down":
         return cur_size <= cutoff
-    elif direction == "up":
+    if direction == "up":
         return cur_size >= cutoff
-    else:
-        raise ValueError(f"Unknown direction: {direction}")
+    raise ValueError(f"Unknown direction: {direction}")
 
 
 class LCLAttentionBlock(nn.Module):
@@ -514,7 +510,7 @@ class LCLAttentionBlock(nn.Module):
         self,
         embedding_dim: int,
         in_features: int,
-        num_heads: Union[int, Literal["auto"]] = "auto",
+        num_heads: int | Literal["auto"] = "auto",
         dropout_p: float = 0.0,
         attention_type: Literal["full", "linear"] = "full",
     ):
@@ -579,7 +575,7 @@ class LCLAttentionBlock(nn.Module):
 
 
 def _do_add_attention(
-    in_features: int, embedding_dim: int, attention_inclusion_cutoff: Optional[int]
+    in_features: int, embedding_dim: int, attention_inclusion_cutoff: int | None
 ) -> bool:
     if attention_inclusion_cutoff is None:
         return False

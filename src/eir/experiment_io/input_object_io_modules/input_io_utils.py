@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 def load_input_config_from_yaml(input_config_path: Path) -> "InputConfig":
-    with open(input_config_path, "r") as infile:
+    with open(input_config_path) as infile:
         input_config_dict = yaml.safe_load(stream=infile)
 
     input_config = init_input_config(yaml_config_as_dict=input_config_dict)

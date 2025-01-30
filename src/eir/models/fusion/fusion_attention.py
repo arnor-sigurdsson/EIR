@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import torch
 from einops import rearrange
@@ -319,9 +319,9 @@ class UniDirectionalCrossAttention(nn.Module):
         self,
         x: torch.Tensor,
         context: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-        context_mask: Optional[torch.Tensor] = None,
-        rel_pos_bias: Optional[torch.Tensor] = None,
+        mask: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        rel_pos_bias: torch.Tensor | None = None,
     ) -> torch.Tensor:
         _, i, j, h, device = (
             x.shape[0],
@@ -339,9 +339,9 @@ class UniDirectionalCrossAttention(nn.Module):
         context_qk, context_v = self.context_to_qk(context), self.context_to_v(context)
 
         # split out head
-        qk, context_qk, v, context_v = map(
-            lambda t: rearrange(t, "b n (h d) -> b h n d", h=h),
-            (qk, context_qk, v, context_v),
+        qk, context_qk, v, context_v = (
+            rearrange(t, "b n (h d) -> b h n d", h=h)
+            for t in (qk, context_qk, v, context_v)
         )
 
         # get similarities

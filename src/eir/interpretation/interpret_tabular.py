@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Sequence, Union
+from typing import TYPE_CHECKING, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -56,7 +57,7 @@ def analyze_tabular_input_attributions(
     exp = experiment
     input_object = exp.inputs[input_name]
     assert isinstance(
-        input_object, (ComputedTabularInputInfo, ComputedPredictTabularInputInfo)
+        input_object, ComputedTabularInputInfo | ComputedPredictTabularInputInfo
     )
 
     tabular_type_info_config = input_object.input_config.input_type_info
@@ -97,7 +98,7 @@ def analyze_tabular_input_attributions(
 
     output_object = exp.outputs[output_name]
     assert isinstance(
-        output_object, (ComputedTabularOutputInfo, ComputedSurvivalOutputInfo)
+        output_object, ComputedTabularOutputInfo | ComputedSurvivalOutputInfo
     )
 
     target_column_name = target_info.name
@@ -193,9 +194,9 @@ def set_up_tabular_tensor_slices(
     cat_input_columns: Sequence[str],
     con_input_columns: Sequence[str],
     embedding_module: SimpleTabularModel,
-) -> Dict[str, slice]:
+) -> dict[str, slice]:
     """
-    TODO: Probably better to pass in Dict[column_name, nn.Embedding]
+    TODO: Probably better to pass in dict[column_name, nn.Embedding]
     """
     slices = {}
 
@@ -221,7 +222,7 @@ def set_up_tabular_tensor_slices(
 
 
 def get_cat_to_con_cutoff_from_slices(
-    slices: Dict[str, slice], cat_input_columns: Sequence[str]
+    slices: dict[str, slice], cat_input_columns: Sequence[str]
 ) -> int:
     cutoff = 0
 
@@ -234,22 +235,22 @@ def get_cat_to_con_cutoff_from_slices(
 
 
 def parse_tabular_attributions_for_feature_importance(
-    attribution_tensor_slices: Dict,
+    attribution_tensor_slices: dict,
     all_attributions: Sequence["SampleAttribution"],
     input_name: str,
-) -> Dict[str, List[float]]:
+) -> dict[str, list[float]]:
     """
     Note we need to use abs here to get the absolute feature importance, before
     we sum so different signs don't cancel each other out.
     """
-    column_attributions: Dict[str, List[float]] = {
-        column: [] for column in attribution_tensor_slices.keys()
+    column_attributions: dict[str, list[float]] = {
+        column: [] for column in attribution_tensor_slices
     }
 
     for sample_attribution in all_attributions:
         sample_acts = sample_attribution.sample_attributions[input_name].squeeze(0)
 
-        for column in attribution_tensor_slices.keys():
+        for column in attribution_tensor_slices:
             cur_slice = attribution_tensor_slices[column]
             cur_column_attributions = np.abs(sample_acts[cur_slice]).sum()
             column_attributions[column].append(cur_column_attributions)
@@ -347,7 +348,7 @@ def _gather_categorical_inputs(
 
 
 def map_categorical_labels_to_names(
-    cat_column_transformers: Dict[str, LabelEncoder],
+    cat_column_transformers: dict[str, LabelEncoder],
     cat_column: str,
     categorical_inputs: pd.DataFrame,
 ) -> pd.DataFrame:
@@ -425,7 +426,7 @@ def _save_categorical_acts(
     output_folder: Path,
 ) -> None:
     if len(dfs_categorical_acts_for_class) == 0:
-        return None
+        return
 
     df_cat_categorical_acts = pd.concat(dfs_categorical_acts_for_class)
     df_cat_categorical_acts.index.name = "Input_Value"

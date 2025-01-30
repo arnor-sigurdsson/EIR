@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import List, Sequence
+from collections.abc import Sequence
 
 import pytest
 import torch
@@ -186,7 +186,7 @@ def test_get_embeddings_from_labels(create_emb_test_label_data, create_test_emb_
 
 
 def get_embedding_dict(
-    labels_dict: "al_label_dict", embedding_cols: List[str]
+    labels_dict: "al_label_dict", embedding_cols: list[str]
 ) -> al_emb_lookup_dict:
     """
     Simple wrapper function to call other embedding functions to create embedding

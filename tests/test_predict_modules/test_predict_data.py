@@ -1,4 +1,3 @@
-from typing import Tuple
 from unittest import mock
 
 import numpy as np
@@ -119,7 +118,7 @@ def test_set_up_test_labels(
 
 def set_random_con_targets_to_missing(
     df: pl.DataFrame,
-) -> Tuple[pl.DataFrame, np.ndarray]:
+) -> tuple[pl.DataFrame, np.ndarray]:
     fraction = 0.2
     num_rows_to_nan = int(fraction * len(df))
     random_indices = np.random.randint(0, len(df), num_rows_to_nan)
@@ -127,10 +126,11 @@ def set_random_con_targets_to_missing(
     return (
         df.with_row_index()
         .with_columns(
-            pl.col("test_output_tabular__Height").map_elements(
-                lambda x, idx=pl.col("index"): np.nan if idx in random_indices else x,
-                return_dtype=pl.Float32,
-            )
+            pl.when(pl.col("index").is_in(random_indices))
+            .then(None)
+            .otherwise(pl.col("test_output_tabular__Height"))
+            .cast(pl.Float32)
+            .alias("test_output_tabular__Height")
         )
         .drop("index"),
         random_indices,
@@ -241,7 +241,7 @@ def test_set_up_test_dataset(
         missing_ids_per_output=test_target_labels.missing_ids_per_output,
     )
 
-    classes_tested = sorted(list(test_data_config.target_classes.keys()))
+    classes_tested = sorted(test_data_config.target_classes.keys())
     exp_no_samples = test_data_config.n_per_class * len(classes_tested)
 
     check_dataset(

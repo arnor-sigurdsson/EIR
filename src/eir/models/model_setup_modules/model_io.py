@@ -1,9 +1,10 @@
 import reprlib
 import typing
 from collections import OrderedDict
+from collections.abc import Sequence
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, Sequence, Tuple, Type, Union
+from typing import Any
 
 import torch
 
@@ -15,12 +16,12 @@ logger = get_logger(name=__name__)
 
 def load_model(
     model_path: Path,
-    model_class: Type[al_meta_model],
-    model_init_kwargs: Dict,
+    model_class: type[al_meta_model],
+    model_init_kwargs: dict,
     device: str,
     test_mode: bool,
-    state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
-    state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
+    state_dict_keys_to_keep: None | Sequence[str] = None,
+    state_dict_key_rename: None | Sequence[tuple[str, str]] = None,
     strict_shapes: bool = True,
 ) -> al_meta_model:
     model = model_class(**model_init_kwargs)
@@ -44,8 +45,8 @@ def _load_model_weights(
     model: al_meta_model,
     model_state_dict_path: Path,
     device: str,
-    state_dict_keys_to_keep: Union[None, Sequence[str]] = None,
-    state_dict_key_rename: Union[None, Sequence[Tuple[str, str]]] = None,
+    state_dict_keys_to_keep: None | Sequence[str] = None,
+    state_dict_key_rename: None | Sequence[tuple[str, str]] = None,
     strict_shapes: bool = True,
 ) -> al_meta_model:
     loaded_weights_state_dict = torch.load(
@@ -150,7 +151,7 @@ def strip_orig_mod_prefix(state_dict: dict[str, Any]) -> OrderedDict[str, Any]:
 
 
 def _replace_dict_key_names(
-    dict_: Dict[str, Any], replace_pattern: Tuple[str, str]
+    dict_: dict[str, Any], replace_pattern: tuple[str, str]
 ) -> OrderedDict:
     renamed_dict = OrderedDict()
 
@@ -174,8 +175,8 @@ def _filter_state_dict_keys(
 
 
 def _filter_incompatible_parameter_shapes_for_loading(
-    source_state_dict: Dict[str, Any], destination_state_dict: Dict[str, Any]
-) -> Dict[str, Any]:
+    source_state_dict: dict[str, Any], destination_state_dict: dict[str, Any]
+) -> dict[str, Any]:
     """
     Note that the way this is used is a bit unclear / backwards, but the destination
     state dict is the one that contains weights loaded from the pretrained model,

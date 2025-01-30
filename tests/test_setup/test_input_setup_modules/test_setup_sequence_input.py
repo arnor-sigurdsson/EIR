@@ -1,8 +1,8 @@
 import json
 import os
 import random
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 from unittest import mock
 
 import pytest
@@ -101,7 +101,7 @@ def test_get_tokenized_vocab_iterator():
         tokenizer=basic_english_tokenizer,
         is_from_file=False,
     )
-    results = [i for i in tokenized_vocab_iterator]
+    results = list(tokenized_vocab_iterator)
     assert len(results) == 1
 
     assert results[0] == "the lazy dog jumped over the red fox or whatever".split()
@@ -118,7 +118,7 @@ def test_get_vocab_iterator_basic(tmp_path: Path):
     vocab_iter = setup_sequence.get_vocab_iterator(
         input_source=str(seq_path), split_on=" ", gathered_stats=gathered_stats
     )
-    vocab = set(word for sequence in vocab_iter for word in sequence)
+    vocab = {word for sequence in vocab_iter for word in sequence}
     assert vocab == set(test_pool)
     assert gathered_stats.total_files == 100
 
@@ -210,7 +210,7 @@ def test_get_bpe_tokenizer(tmp_path: Path):
         split_on=" ",
         gathered_stats=gathered_stats_general,
     )
-    vocab = set(word for sequence in vocab_iter_test_general for word in sequence)
+    vocab = {word for sequence in vocab_iter_test_general for word in sequence}
     assert vocab == set(test_pool)
     assert gathered_stats_general.total_files == 100
 
@@ -233,9 +233,7 @@ def test_get_vocab_iterator_basic_diff_split(tmp_path: Path):
         split_on="---",
         gathered_stats=gathered_stats_diff_split,
     )
-    vocab_diff_split = set(
-        word for sequence in vocab_iter_diff_split for word in sequence
-    )
+    vocab_diff_split = {word for sequence in vocab_iter_diff_split for word in sequence}
     assert vocab_diff_split == set(test_pool)
     assert gathered_stats_diff_split.total_files == 100
     assert gathered_stats_diff_split.max_length == 20
@@ -257,7 +255,7 @@ def test_get_vocab_iterator_vocab_file(tmp_path: Path):
         gathered_stats=gathered_stats_vocab,
         vocab_file=str(vocab_file),
     )
-    vocab = set(token for token in vocab_iter_diff_split)
+    vocab = set(vocab_iter_diff_split)
     assert vocab == set(test_pool)
     assert gathered_stats_vocab.total_count == len(vocab)
 
@@ -283,9 +281,7 @@ def test_get_max_length(tmp_path):
         split_on=" ",
         gathered_stats=gathered_stats_max_length,
     )
-    vocab_max_length = set(
-        word for sequence in vocab_iter_max_length for word in sequence
-    )
+    vocab_max_length = {word for sequence in vocab_iter_max_length for word in sequence}
     assert vocab_max_length == set(test_pool)
     assert gathered_stats_max_length.total_files == 200
     assert gathered_stats_max_length.max_length == 20
@@ -322,7 +318,7 @@ def test_possibly_gather_all_stats_from_input(tmp_path):
         gathered_stats=gathered_stats_vocab,
         vocab_file=str(vocab_file),
     )
-    vocab = set(token for token in vocab_iter_diff_split)
+    vocab = set(vocab_iter_diff_split)
     assert vocab == set(test_pool)
     assert gathered_stats_vocab.total_count == len(vocab)
 

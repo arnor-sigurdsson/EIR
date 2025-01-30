@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Optional, Sequence
+from typing import Literal
 
 
 @dataclass
@@ -25,10 +26,10 @@ class ArrayOutputTypeConfig:
         set to ``diffusion``.
     """
 
-    normalization: Optional[Literal["element", "channel"]] = "channel"
-    adaptive_normalization_max_samples: Optional[int] = None
+    normalization: Literal["element", "channel"] | None = "channel"
+    adaptive_normalization_max_samples: int | None = None
     loss: Literal["mse", "diffusion"] = "mse"
-    diffusion_time_steps: Optional[int] = 500
+    diffusion_time_steps: int | None = 500
 
 
 @dataclass
@@ -53,5 +54,5 @@ class ArrayOutputSamplingConfig:
         sequence generation.
     """
 
-    manual_inputs: Sequence[dict[str, str]] = tuple()
+    manual_inputs: Sequence[dict[str, str]] = ()
     n_eval_inputs: int = 10

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import torch
@@ -12,7 +11,7 @@ from eir.setup.input_setup_modules.setup_array import ArrayNormalizationStats
 def array_load_wrapper(
     data_pointer: Path | int,
     input_source: str,
-    deeplake_inner_key: Optional[str] = None,
+    deeplake_inner_key: str | None = None,
 ) -> np.ndarray:
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
@@ -23,7 +22,7 @@ def array_load_wrapper(
             inner_key=deeplake_inner_key,
         )
     else:
-        assert isinstance(data_pointer, (str, Path)), data_pointer
+        assert isinstance(data_pointer, str | Path), data_pointer
         array_data = np.load(str(data_pointer))
 
     assert isinstance(array_data, np.ndarray)
@@ -32,7 +31,7 @@ def array_load_wrapper(
 
 def prepare_array_data(
     array_data: np.ndarray,
-    normalization_stats: Optional[ArrayNormalizationStats],
+    normalization_stats: ArrayNormalizationStats | None,
 ) -> torch.Tensor:
     """Enforce 3 dimensions for now."""
 
@@ -65,7 +64,7 @@ def prepare_array_data(
 
 def fill_nans_from_stats(
     array: torch.Tensor,
-    normalization_stats: Optional[ArrayNormalizationStats],
+    normalization_stats: ArrayNormalizationStats | None,
 ) -> torch.Tensor:
     array = array.to(device="cpu")
     nan_mask = torch.isnan(array)
@@ -88,7 +87,7 @@ def fill_nans_from_stats(
 
 def normalize_array(
     array: torch.Tensor,
-    normalization_stats: Optional[ArrayNormalizationStats],
+    normalization_stats: ArrayNormalizationStats | None,
     epsilon: float = 1e-10,
 ) -> torch.Tensor:
     if normalization_stats is None:
@@ -102,7 +101,7 @@ def normalize_array(
 
 
 def un_normalize_array(
-    array: torch.Tensor, normalization_stats: Optional[ArrayNormalizationStats]
+    array: torch.Tensor, normalization_stats: ArrayNormalizationStats | None
 ) -> torch.Tensor:
     if normalization_stats is None:
         return array

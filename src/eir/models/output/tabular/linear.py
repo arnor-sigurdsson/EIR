@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 import torch
 from torch import nn
@@ -34,14 +34,12 @@ class LinearOutputModule(nn.Module):
         )
 
         sorted_targets = sorted(num_outputs_per_target.items())
-        target_names, target_sizes = zip(*sorted_targets)
+        target_names, target_sizes = zip(*sorted_targets, strict=False)
 
         self.target_names = target_names
         self.target_sizes = list(target_sizes)
 
-    def forward(self, inputs: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: torch.Tensor) -> dict[str, torch.Tensor]:
         outputs = self.linear_layer(inputs)
         split_outputs = torch.split(outputs, self.target_sizes, dim=1)
-        return {
-            target: output for target, output in zip(self.target_names, split_outputs)
-        }
+        return dict(zip(self.target_names, split_outputs, strict=False))

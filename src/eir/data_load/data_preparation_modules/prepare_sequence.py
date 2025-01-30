@@ -1,5 +1,5 @@
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional, Sequence, Union
 
 import numpy as np
 import torch
@@ -18,11 +18,11 @@ from eir.setup.schemas import SequenceInputDataConfig
 
 
 def sequence_load_wrapper(
-    data_pointer: Union[Path, int, np.ndarray],
+    data_pointer: Path | int | np.ndarray,
     input_source: str,
-    split_on: Optional[str],
+    split_on: str | None,
     encode_func: al_encode_funcs,
-    deeplake_inner_key: Optional[str] = None,
+    deeplake_inner_key: str | None = None,
 ) -> np.ndarray:
     """
     In the case of .csv input sources, we have already loaded and tokenized the data.
@@ -42,7 +42,7 @@ def sequence_load_wrapper(
         assert isinstance(data_pointer, np.ndarray)
         return data_pointer
     else:
-        assert isinstance(data_pointer, (str, Path))
+        assert isinstance(data_pointer, str | Path)
         content = load_sequence_from_disk(sequence_file_path=data_pointer)
 
     file_content_split = split_func(content)
@@ -53,7 +53,7 @@ def sequence_load_wrapper(
 
 
 def load_sequence_from_disk(sequence_file_path: Path | str) -> str:
-    with open(sequence_file_path, "r") as infile:
+    with open(sequence_file_path) as infile:
         return infile.read().strip()
 
 
@@ -94,13 +94,10 @@ def prepare_sequence_data(
 
 
 def parse_padding_token_encode_func_input(
-    split_on: Optional[str], padding_token: str
+    split_on: str | None, padding_token: str
 ) -> Sequence[str] | str:
     parsed_token: Sequence[str] | str
 
-    if split_on is None:
-        parsed_token = padding_token
-    else:
-        parsed_token = [padding_token]
+    parsed_token = padding_token if split_on is None else [padding_token]
 
     return parsed_token

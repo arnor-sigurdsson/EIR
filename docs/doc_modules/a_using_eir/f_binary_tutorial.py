@@ -1,7 +1,8 @@
 import base64
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 

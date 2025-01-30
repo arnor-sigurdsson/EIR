@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Dict
 
 import torch
 from torch import nn
@@ -52,7 +51,7 @@ class MyLSTMFusionModule(nn.Module):
     def num_out_features(self) -> int:
         return self.out_dim
 
-    def forward(self, inputs: Dict[str, FeatureExtractorProtocol]) -> al_fused_features:
+    def forward(self, inputs: dict[str, FeatureExtractorProtocol]) -> al_fused_features:
         features = torch.cat(tuple(inputs.values()), dim=1)
         assert features.shape[1] == self.fusion_in_dim
 

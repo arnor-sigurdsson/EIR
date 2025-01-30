@@ -1,6 +1,7 @@
 import math
+from collections.abc import Sequence
 from functools import lru_cache
-from typing import Literal, Sequence, Tuple, Type
+from typing import Literal
 
 import numpy as np
 from torch import nn
@@ -52,7 +53,7 @@ def get_1d_projection_layer(
             bias=True,
         )
 
-    elif projection_layer_type == "lcl_residual":
+    if projection_layer_type == "lcl_residual":
         layer = get_lcl_projection_layer(
             input_dimension=input_dimension,
             target_dimension=target_dimension,
@@ -66,10 +67,9 @@ def get_1d_projection_layer(
                 f"target_dimension={target_dimension} for projection. "
                 f"Try using projection_layer_type='auto'."
             )
-        else:
-            return layer
+        return layer
 
-    elif projection_layer_type == "lcl" or projection_layer_type == "lcl_residual":
+    if projection_layer_type == "lcl" or projection_layer_type == "lcl_residual":
         layer = get_lcl_projection_layer(
             input_dimension=input_dimension,
             target_dimension=target_dimension,
@@ -83,24 +83,21 @@ def get_1d_projection_layer(
                 f"target_dimension={target_dimension} for projection. "
                 f"Try using projection_layer_type='auto'."
             )
-        else:
-            return layer
+        return layer
 
-    elif projection_layer_type == "linear":
+    if projection_layer_type == "linear":
         if input_dimension == target_dimension:
             return nn.Identity()
-        else:
-            return nn.Linear(
-                in_features=input_dimension,
-                out_features=target_dimension,
-                bias=True,
-            )
+        return nn.Linear(
+            in_features=input_dimension,
+            out_features=target_dimension,
+            bias=True,
+        )
 
-    elif projection_layer_type == "cnn":
+    if projection_layer_type == "cnn":
         raise NotImplementedError()
 
-    else:
-        raise ValueError(f"Invalid projection_layer_type: {projection_layer_type}")
+    raise ValueError(f"Invalid projection_layer_type: {projection_layer_type}")
 
 
 def get_lcl_projection_layer(
@@ -111,7 +108,7 @@ def get_lcl_projection_layer(
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     diff_tolerance: int = 0,
 ) -> LCLResidualBlock | LCL | None:
-    layer_class: Type[LCLResidualBlock] | Type[LCL]
+    layer_class: type[LCLResidualBlock] | type[LCL]
     match layer_type:
         case "lcl_residual":
             layer_class = LCLResidualBlock
@@ -153,7 +150,7 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
     kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
     diff_tolerance: int = 0,
-) -> Tuple[int, int] | None:
+) -> tuple[int, int] | None:
     best_diff = np.inf
     best_kernel_width = None
     best_out_feature_sets = None
@@ -171,7 +168,7 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
                 continue
 
             out_features = input_dimension
-            for n in range(n_layers):
+            for _n in range(n_layers):
                 out_features = _compute(
                     input_dimension_=out_features,
                     kernel_width_=kernel_width,

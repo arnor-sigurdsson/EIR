@@ -1,6 +1,7 @@
 from argparse import Namespace
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Sequence, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -119,10 +120,10 @@ def predict_tabular_wrapper_with_labels(
 def _merge_ids_predictions_and_labels(
     ids: Sequence[str],
     predictions: np.ndarray,
-    labels: Optional[np.ndarray],
+    labels: np.ndarray | None,
     tabular_output_type: str,
     cat_loss_name: str,
-    prediction_classes: Union[Sequence[str], None] = None,
+    prediction_classes: Sequence[str] | None = None,
     label_column_name: str = "True Label",
 ) -> pd.DataFrame:
     df = pd.DataFrame()
@@ -210,7 +211,7 @@ def _merge_ids_and_predictions(
     predictions: np.ndarray,
     cat_loss_name: str,
     tabular_output_type: str,
-    prediction_classes: Optional[Sequence[str]] = None,
+    prediction_classes: Sequence[str] | None = None,
 ) -> pd.DataFrame:
     df = pd.DataFrame()
 

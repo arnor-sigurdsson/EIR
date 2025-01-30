@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -14,10 +13,10 @@ from eir.setup.schemas import ByteInputDataConfig
 
 
 def bytes_load_wrapper(
-    data_pointer: Union[Path, int],
+    data_pointer: Path | int,
     input_source: str,
     dtype: str,
-    deeplake_inner_key: Optional[str] = None,
+    deeplake_inner_key: str | None = None,
 ) -> np.ndarray:
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_inner_key is not None
@@ -30,7 +29,7 @@ def bytes_load_wrapper(
         assert isinstance(bytes_data, np.ndarray)
         bytes_data = bytes_data.astype(dtype=dtype)
     else:
-        assert isinstance(data_pointer, (str, Path))
+        assert isinstance(data_pointer, str | Path)
         bytes_data = np.fromfile(file=data_pointer, dtype=dtype)
 
     return bytes_data

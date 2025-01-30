@@ -55,9 +55,6 @@ package-dir = {"" = "src"}
 [tool.setuptools.package-data]
 eir = ["*"]
 
-[tool.isort]
-profile = "black"
-
 [project.scripts]
 eirtrain = "eir.train:main"
 eirpredict = "eir.predict:main"
@@ -71,7 +68,6 @@ dev = [
     "memory-profiler>=0.61.0",
     "pytest>=8.2.2",
     "tox>=4.16.0",
-    "flake8>=7.1.0",
     "jupyter>=1.0.0",
     "ipykernel>=6.29.5",
     "coverage>=7.5.4",
@@ -80,7 +76,6 @@ dev = [
     "pynvim>=0.5.0",
     "pre-commit>=4.0.1",
     "gpustat>=1.1.1",
-    "black>=25.1.0",
     "Sphinx>=8.0.2",
     "sphinx-rtd-theme>=3.0.0",
     "sphinx-copybutton>=0.5.2",
@@ -91,7 +86,53 @@ dev = [
     "vulture>=2.11",
     "mypy>=1.10.1",
     "types-pyyaml>=6.0.12.20240311",
-    "isort>=6.0.0",
     "pytest-split>=0.10.0",
     "deptry>=0.23.0",
+    "ruff>=0.3.0",
 ]
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "B",
+    "C4",
+    "SIM",
+    "N",
+    "UP",
+    "W",
+]
+ignore = ["N812", "SIM102"]
+
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.isort]
+known-first-party = ["eir"]
+combine-as-imports = true
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"train.py" = ["E402"]
+"target_setup_utils.py" = ["N803"]
+"interpretation.py" = ["E402"]
+"deeplake_ops.py" = ["E402"]
+"label_setup.py" = ["E402"]
+"tests/*" = ["S101"]
+"setup_targets_test_data.py" = ["SIM115"]
+"tests/test_setup/test_config.py" = ["SIM115"]
+
+[tool.ruff.lint.pyupgrade]
+keep-runtime-typing = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+exclude = ["src/eir/train_utils/optimization_modules/soap.py"]

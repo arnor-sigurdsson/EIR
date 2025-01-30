@@ -1,6 +1,6 @@
 import textwrap
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Sequence
 
 import pandas as pd
 
@@ -292,7 +292,7 @@ def _get_model_path_for_predict() -> str:
     return model_path
 
 
-def _add_model_path_to_command(command: List[str]) -> List[str]:
+def _add_model_path_to_command(command: list[str]) -> list[str]:
     model_path = _get_model_path_for_predict()
     command = [x.replace("FILL_MODEL", model_path) for x in command]
     return command

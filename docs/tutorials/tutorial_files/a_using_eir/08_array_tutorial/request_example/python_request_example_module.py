@@ -17,8 +17,7 @@ def send_request(url: str, payload: list[dict]) -> dict:
 
 
 base = (
-    "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data/"
-    "arrays_3d"
+    "eir_tutorials/a_using_eir/08_array_tutorial/data/processed_sample_data/arrays_3d"
 )
 payload = [
     {"genotype_as_array": encode_array_to_base64(f"{base}/A374.npy")},

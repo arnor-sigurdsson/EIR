@@ -2,7 +2,7 @@ import base64
 import io
 import string
 import uuid
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -16,7 +16,7 @@ app = FastAPI()
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
         self.validation_ids: set[str] = set()
         self.sample_index: int = 0
 
@@ -41,14 +41,14 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
-    async def send_personal_message(self, message: Dict, websocket: WebSocket):
+    async def send_personal_message(self, message: dict, websocket: WebSocket):
         await websocket.send_json(message)
 
-    async def broadcast(self, message: Dict):
+    async def broadcast(self, message: dict):
         for connection in self.active_connections:
             await connection.send_json(message)
 
-    def set_validation_ids(self, ids: List[str]):
+    def set_validation_ids(self, ids: list[str]):
         self.validation_ids = set(ids)
 
     def reset(self):
@@ -131,17 +131,17 @@ def generate_batch(batch_size: int) -> list[dict[str, Any]]:
 
 class InputInfo(BaseModel):
     type: str
-    shape: List[int] = None
+    shape: list[int] = None
 
 
 class OutputInfo(BaseModel):
     type: str
-    shape: List[int] = None
+    shape: list[int] = None
 
 
 class DatasetInfo(BaseModel):
-    inputs: Dict[str, InputInfo]
-    outputs: Dict[str, OutputInfo]
+    inputs: dict[str, InputInfo]
+    outputs: dict[str, OutputInfo]
 
 
 def get_dataset_info():
@@ -198,17 +198,16 @@ async def websocket_endpoint(websocket: WebSocket):
                     )
                     break
 
-                else:
-                    current_iteration += 1
-                    batch_size = payload.get("batch_size", 64)
-                    batch_data = generate_batch(batch_size=batch_size)
-                    await manager.send_personal_message(
-                        message={
-                            "type": "data",
-                            "payload": batch_data,
-                        },
-                        websocket=websocket,
-                    )
+                current_iteration += 1
+                batch_size = payload.get("batch_size", 64)
+                batch_data = generate_batch(batch_size=batch_size)
+                await manager.send_personal_message(
+                    message={
+                        "type": "data",
+                        "payload": batch_data,
+                    },
+                    websocket=websocket,
+                )
 
             elif message_type == "setValidationIds":
                 validation_ids = payload.get("validation_ids", [])
@@ -243,7 +242,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
 
             elif message_type == "status":
-
                 status_data = {
                     "active_connections": len(manager.active_connections),
                     "validation_ids_count": len(manager.validation_ids),

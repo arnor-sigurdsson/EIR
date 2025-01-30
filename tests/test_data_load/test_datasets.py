@@ -1,7 +1,7 @@
 import csv
 from copy import deepcopy
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Union
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import numpy as np
@@ -132,7 +132,7 @@ def test_set_up_datasets(
 
 
 def _add_bad_arrays_and_targets_for_dataset_testing(
-    test_configs: Configs, test_cl_args: Dict
+    test_configs: Configs, test_cl_args: dict
 ) -> None:
     test_inputs = test_configs.input_configs
     assert len(test_inputs) == 1
@@ -227,7 +227,7 @@ def _set_up_bad_label_file_for_testing(label_file: Path) -> None:
     indirect=True,
 )
 def test_set_up_datasets_fails(
-    dataset_fail_config: Dict,
+    dataset_fail_config: dict,
     create_test_config: Configs,
     create_test_data,
 ):
@@ -235,16 +235,16 @@ def test_set_up_datasets_fails(
 
     configs_copy = deepcopy(test_configs)
 
-    if dataset_fail_config.get("corrupt_arrays", None):
+    if dataset_fail_config.get("corrupt_arrays"):
         _corrupt_arrays_for_testing(
             test_configs=configs_copy,
-            n=dataset_fail_config.get("corrupt_arrays_n", None),
+            n=dataset_fail_config.get("corrupt_arrays_n"),
         )
 
-    if dataset_fail_config.get("corrupt_labels", None):
+    if dataset_fail_config.get("corrupt_labels"):
         _corrupt_label_file_for_testing(
             test_configs=configs_copy,
-            n=dataset_fail_config.get("corrupt_labels_n", None),
+            n=dataset_fail_config.get("corrupt_labels_n"),
         )
 
     all_array_ids = gather_all_ids_from_output_configs(
@@ -292,7 +292,7 @@ def test_set_up_datasets_fails(
             inputs_as_dict=inputs,
             outputs_as_dict=outputs_as_dict,
         )
-        if dataset_fail_config.get("corrupt_ids", None):
+        if dataset_fail_config.get("corrupt_ids"):
             assert train_dataset.input_storage.string_columns[0].name == "ID"
             assert valid_dataset.input_storage.string_columns[0].name == "ID"
             train_dataset.input_storage.string_data[0, 0] = np.nan
@@ -302,7 +302,7 @@ def test_set_up_datasets_fails(
             with pytest.raises(ValueError):
                 valid_dataset.check_samples()
 
-        if dataset_fail_config.get("corrupt_inputs", None):
+        if dataset_fail_config.get("corrupt_inputs"):
             assert train_dataset.input_storage.path_columns[0].name == "test_genotype"
             assert valid_dataset.input_storage.path_columns[0].name == "test_genotype"
             train_dataset.input_storage.path_data[0, 0] = np.nan
@@ -314,7 +314,7 @@ def test_set_up_datasets_fails(
 
 
 def _corrupt_label_file_for_testing(
-    test_configs: Configs, n: Union[int, None] = None
+    test_configs: Configs, n: int | None = None
 ) -> None:
     output_configs = test_configs.output_configs
     assert len(output_configs) == 1
@@ -332,9 +332,7 @@ def _corrupt_label_file_for_testing(
     df_labels.to_csv(test_target_label_file, index=0)
 
 
-def _corrupt_arrays_for_testing(
-    test_configs: Configs, n: Union[int, None] = None
-) -> None:
+def _corrupt_arrays_for_testing(test_configs: Configs, n: int | None = None) -> None:
     test_inputs = test_configs.input_configs
     assert len(test_inputs) == 1
     test_omics_folder = Path(test_inputs[0].input_info.input_source)
@@ -489,7 +487,7 @@ def test_datasets(
     c = create_test_data
     test_configs = create_test_config
     gc = test_configs.global_config
-    classes_tested = sorted(list(c.target_classes.keys()))
+    classes_tested = sorted(c.target_classes.keys())
 
     if dataset_type == "disk":
         gc.be.memory_dataset = False
@@ -553,8 +551,8 @@ def test_datasets(
 def check_dataset(
     dataset: al_datasets,
     exp_no_sample: int,
-    classes_tested: List[str],
-    target_transformers: Dict[str, al_label_transformers],
+    classes_tested: list[str],
+    target_transformers: dict[str, al_label_transformers],
     check_targets: bool = True,
     output_name: str = "test_output_tabular",
     target_column="Origin",

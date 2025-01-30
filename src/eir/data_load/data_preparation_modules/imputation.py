@@ -1,4 +1,4 @@
-from typing import Any, Dict, Literal, Tuple, Union
+from typing import Any, Literal, Union
 
 import torch
 
@@ -39,7 +39,7 @@ al_fill_values = dict[str, bool | int | float | dict[str, int | float]]
 def impute_missing_modalities_wrapper(
     inputs_values: dict[str, Any],
     inputs_objects: "al_input_objects_as_dict",
-) -> Dict[str, torch.Tensor]:
+) -> dict[str, torch.Tensor]:
     impute_dtypes = _get_default_impute_dtypes(inputs_objects=inputs_objects)
     impute_fill_values = _get_default_impute_fill_values(inputs_objects=inputs_objects)
     inputs_imputed = impute_missing_modalities(
@@ -65,7 +65,7 @@ def impute_missing_modalities(
             fill_value = fill_values[input_name]
             dtype = dtypes[input_name]
 
-            shape: Tuple[int, ...]
+            shape: tuple[int, ...]
             approach: Literal["constant", "random"]
             match input_object:
                 case ComputedOmicsInputInfo():
@@ -121,7 +121,7 @@ def impute_missing_modalities(
 
 
 def impute_single_missing_modality(
-    shape: Tuple[int, ...],
+    shape: tuple[int, ...],
     fill_value: Any,
     dtype: Any,
     approach: Literal["constant", "random"],
@@ -291,7 +291,7 @@ def impute_missing_output_modalities(
             fill_value = fill_values[output_name]
             dtype = dtypes[output_name]
 
-            shape: Tuple[int, ...]
+            shape: tuple[int, ...]
             approach: Literal["constant", "random"]
             match output_object:
                 case ComputedSequenceOutputInfo():

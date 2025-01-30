@@ -193,7 +193,7 @@ def _sequence_output_test_check_wrapper(
 
         did_check = False
         for f in Path(latest_sample).rglob("*_generated.txt"):
-            with open(f, "r") as infile:
+            with open(f) as infile:
                 content = infile.read().split()
 
                 intersection = set(content).intersection(set_all)

@@ -216,9 +216,9 @@ def _post_process_tabular_output(
                     target_column_type,
                 )
 
-            cur_class_to_confidence_mapping = {
-                k: v for k, v in zip(cur_classes, cur_output_normalized)
-            }
+            cur_class_to_confidence_mapping = dict(
+                zip(cur_classes, cur_output_normalized, strict=False)
+            )
 
             processed_outputs[cur_column] = cur_class_to_confidence_mapping
 
@@ -258,7 +258,6 @@ def process_survival_prediction(
     output_model_config: schemas.TabularOutputModuleConfig,
     cur_model_outputs: dict[str, torch.Tensor | list[int] | np.ndarray],
 ) -> dict:
-
     assert isinstance(output_model_config, schemas.TabularOutputModuleConfig)
     assert isinstance(
         output_object.output_config.output_type_info, schemas.SurvivalOutputTypeConfig
@@ -289,7 +288,6 @@ def _process_discrete_survival_prediction(
     output_object: ComputedSurvivalOutputInfo,
     cur_model_outputs: dict[str, torch.Tensor],
 ) -> dict:
-
     processed_outputs: dict[str, dict[str, Any]] = {}
 
     output_type_info = output_object.output_config.output_type_info
@@ -317,7 +315,6 @@ def _process_cox_survival_prediction(
     output_object: ComputedSurvivalOutputInfo,
     cur_model_outputs: dict[str, torch.Tensor],
 ) -> dict:
-
     processed_outputs: dict[str, dict[str, Any]] = {}
 
     output_type_info = output_object.output_config.output_type_info

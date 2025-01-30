@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 import torch
 import torch.nn as nn
@@ -69,7 +69,7 @@ class CNNUpscaleModelConfig:
     attention_inclusion_cutoff: int = 256
     allow_pooling: bool = True
     num_ca_blocks: int = 1
-    up_every_n_blocks: Optional[int] = None
+    up_every_n_blocks: int | None = None
     n_final_extra_blocks: int = 1
 
 
@@ -84,7 +84,7 @@ class CNNUpscaleResidualBlock(nn.Module):
         rb_do: float = 0.0,
         stochastic_depth_p: float = 0.0,
     ):
-        super(CNNUpscaleResidualBlock, self).__init__()
+        super().__init__()
 
         self.in_channels = in_channels
         self.in_height = in_height
@@ -179,10 +179,7 @@ def _do_add_attention(
     if attention_inclusion_cutoff == 0:
         return False
 
-    if width * height <= attention_inclusion_cutoff:
-        return True
-
-    return False
+    return width * height <= attention_inclusion_cutoff
 
 
 def setup_blocks(
@@ -196,7 +193,7 @@ def setup_blocks(
     up_sample_every_n_blocks: int,
     n_final_extra_blocks: int,
     allow_pooling: bool = True,
-) -> Tuple[nn.Sequential, int, int, int]:
+) -> tuple[nn.Sequential, int, int, int]:
     blocks = nn.Sequential()
     current_height = initial_height
     current_width = initial_width
@@ -244,7 +241,6 @@ def setup_blocks(
 
         up_every = up_sample_every_n_blocks
         if up_every and block_counter % up_every == 0:
-
             do_height = current_height < target_height
             do_width = current_width < target_width
 
@@ -312,7 +308,7 @@ class CNNUpscaleModel(nn.Module):
         data_dimensions: "DataDimensions",
         target_dimensions: "DataDimensions",
     ):
-        super(CNNUpscaleModel, self).__init__()
+        super().__init__()
 
         self.model_config = model_config
 
@@ -400,9 +396,9 @@ class CNNPassThroughUpscaleModel(nn.Module):
         feature_extractor_infos: dict[str, "FeatureExtractorInfo"],
         target_dimensions: "DataDimensions",
         output_name: str,
-        diffusion_time_steps: Optional[int] = None,
+        diffusion_time_steps: int | None = None,
     ) -> None:
-        super(CNNPassThroughUpscaleModel, self).__init__()
+        super().__init__()
 
         self.model_config = model_config
         self.feature_extractor_infos = feature_extractor_infos
@@ -503,10 +499,9 @@ class CNNPassThroughUpscaleModel(nn.Module):
         if isinstance(self.timestep_mixing_layer, TimeStepMixingBlock):
             time_embedding_layer: nn.Module = self.timestep_mixing_layer.time_embedding
             return time_embedding_layer(t)
-        else:
-            raise ValueError(
-                "timestep_embeddings called but no TimeStepMixingBlock available."
-            )
+        raise ValueError(
+            "timestep_embeddings called but no TimeStepMixingBlock available."
+        )
 
     def forward(self, input: dict[str, torch.Tensor]) -> torch.Tensor:
         out = input[self.output_name]
@@ -542,7 +537,7 @@ class TimeStepMixingBlock(nn.Module):
         input_width: int,
         n_time_steps: int,
     ):
-        super(TimeStepMixingBlock, self).__init__()
+        super().__init__()
 
         self.input_channels = input_channels
         self.input_height = input_height
@@ -605,9 +600,9 @@ class CrossAttentionArrayOutBlock(nn.Module):
         input_height: int,
         input_width: int,
         context_num_elements: int,
-        context_dimension: Optional[tuple[int, ...]],
+        context_dimension: tuple[int, ...] | None,
     ):
-        super(CrossAttentionArrayOutBlock, self).__init__()
+        super().__init__()
 
         self.input_channels = input_channels
         self.input_height = input_height

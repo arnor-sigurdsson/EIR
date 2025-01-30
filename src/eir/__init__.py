@@ -13,16 +13,16 @@ class ShowWarningProtocol(Protocol):
         category: type[Warning],
         filename: str,
         lineno: int,
-        file: Optional[TextIO] = None,
-        line: Optional[str] = None,
+        file: TextIO | None = None,
+        line: str | None = None,
     ) -> None: ...
 
 
 @dataclass
 class WarningRule:
     module_pattern: str
-    categories: Optional[list[type[Warning]]] = None
-    message_pattern: Optional[str] = None
+    categories: list[type[Warning]] | None = None
+    message_pattern: str | None = None
 
 
 class WarningFilter:
@@ -48,8 +48,8 @@ class WarningFilter:
         category: type[Warning],
         filename: str,
         lineno: int,
-        file: Optional[TextIO] = None,
-        line: Optional[str] = None,
+        file: TextIO | None = None,
+        line: str | None = None,
     ) -> None:
         for module_pattern, message_pattern, categories in self._compiled_rules:
             if module_pattern.search(filename):

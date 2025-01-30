@@ -1,5 +1,4 @@
 import inspect
-from typing import Tuple
 from unittest.mock import patch
 
 from ignite.engine import Events
@@ -8,7 +7,7 @@ from eir.train import Experiment
 from eir.train_utils import train_handlers
 from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
-al_prep_modelling_test_configs = Tuple[Experiment, ModelTestConfig]
+al_prep_modelling_test_configs = tuple[Experiment, ModelTestConfig]
 
 
 def test_unflatten_engine_metrics_dict():

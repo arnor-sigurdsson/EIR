@@ -1,8 +1,9 @@
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import torch
@@ -70,7 +71,7 @@ def analyze_sequence_input_attributions(
 
     output_object = exp.outputs[output_name]
     assert isinstance(
-        output_object, (ComputedTabularOutputInfo, ComputedSurvivalOutputInfo)
+        output_object, ComputedTabularOutputInfo | ComputedSurvivalOutputInfo
     )
 
     target_transformer = get_appropriate_target_transformer(
@@ -219,7 +220,7 @@ def extract_raw_inputs_from_tokens(tokens: torch.Tensor, vocab: Vocab) -> Sequen
 
 
 def _parse_out_sequence_expected_value(
-    sample_target_labels: Dict[str, Dict[str, torch.Tensor]],
+    sample_target_labels: dict[str, dict[str, torch.Tensor]],
     output_name: str,
     target_column_name: str,
     expected_values: np.ndarray,
@@ -276,7 +277,7 @@ def truncate_sequence_attribution_to_padding(
 
 def _truncate_attributions_and_raw_inputs(
     attributions: np.ndarray, raw_inputs: Sequence[str], truncate_start_idx: int
-) -> Tuple[np.ndarray, Sequence[str]]:
+) -> tuple[np.ndarray, Sequence[str]]:
     attrs_copy = copy(attributions)
     raw_inputs_copy = copy(raw_inputs)
 
@@ -295,7 +296,7 @@ def save_html(out_path: Path, html_string: str) -> None:
 
 def get_sequence_token_importance(
     attributions: Sequence["SampleAttribution"], vocab: Vocab, input_name: str
-) -> Dict[str, list[float]]:
+) -> dict[str, list[float]]:
     token_importances = defaultdict(list)
 
     for act in attributions:
@@ -309,7 +310,9 @@ def get_sequence_token_importance(
         seq_attrs_values_sum = seq_attrs_abs.sum(1).squeeze()
         assert len(seq_attrs_values_sum) == len(orig_seq_input)
 
-        for token, attribution in zip(orig_seq_input, seq_attrs_values_sum):
+        for token, attribution in zip(
+            orig_seq_input, seq_attrs_values_sum, strict=False
+        ):
             token_importances[token].append(attribution)
 
     return token_importances
@@ -335,7 +338,7 @@ def get_sequence_html(
                     "<tr>",
                     format_classname(record.sample_id),
                     format_classname(record.label_name),
-                    format_classname("{0:.2f}".format(record.attribution_score)),
+                    format_classname(f"{record.attribution_score:.2f}"),
                     format_word_importances(
                         record.raw_input_tokens, record.token_attributions
                     ),
@@ -351,13 +354,13 @@ def get_sequence_html(
         )
         dom.append("<b>Legend: </b>")
 
-        for value, label in zip([-1, 0, 1], ["Negative", "Neutral", "Positive"]):
+        for value, label in zip(
+            [-1, 0, 1], ["Negative", "Neutral", "Positive"], strict=False
+        ):
             dom.append(
-                '<span style="display: inline-block; width: 10px; height: 10px; \
+                f'<span style="display: inline-block; width: 10px; height: 10px; \
                 border: 1px solid; background-color: \
-                {value}"></span> {label}  '.format(
-                    value=_get_color(value), label=label
-                )
+                {_get_color(value)}"></span> {label}  '
             )
         dom.append("</div>")
 

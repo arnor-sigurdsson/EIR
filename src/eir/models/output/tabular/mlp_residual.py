@@ -1,6 +1,7 @@
 from collections import OrderedDict
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Literal, Sequence, Union
+from typing import TYPE_CHECKING, Literal
 
 import torch
 from torch import nn
@@ -44,7 +45,7 @@ class ResidualMLPOutputModuleConfig(ResidualMLPConfig):
         Which type of final layer to use to construct tabular output prediction.
     """
 
-    final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]] = "linear"
+    final_layer_type: Literal["linear"] | Literal["mlp_residual"] = "linear"
 
 
 class ResidualMLPOutputModule(nn.Module):
@@ -89,7 +90,7 @@ class ResidualMLPOutputModule(nn.Module):
             (multi_task_branches, *final_layers)
         )
 
-    def forward(self, inputs: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward(self, inputs: torch.Tensor) -> dict[str, torch.Tensor]:
         output_modules_out = calculate_module_dict_outputs(
             input_=inputs, module_dict=self.multi_task_branches
         )
@@ -113,8 +114,8 @@ def get_default_tabular_output_final_layers(
     fc_task_dim: int,
     dropout_p: float,
     num_outputs_per_target: "al_num_outputs_per_target",
-    task_names: Union[None, Sequence[str]],
-    final_layer_type: Union[Literal["linear"], Literal["mlp_residual"]],
+    task_names: None | Sequence[str],
+    final_layer_type: Literal["linear"] | Literal["mlp_residual"],
 ) -> Sequence[nn.ModuleDict]:
     final_layers = []
     if final_layer_type == "linear":

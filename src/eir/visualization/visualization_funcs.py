@@ -1,15 +1,10 @@
+from collections.abc import Callable
 from pathlib import Path
 from textwrap import wrap
 from typing import (
     TYPE_CHECKING,
-    Callable,
-    Dict,
-    List,
     Literal,
-    Optional,
     Protocol,
-    Tuple,
-    Union,
 )
 
 import matplotlib
@@ -43,7 +38,7 @@ def add_series_to_axis(
     ax_object: plt.Axes,
     series: pd.Series,
     skiprows: int,
-    ax_plot_kwargs: Union[Dict, None] = None,
+    ax_plot_kwargs: dict | None = None,
 ) -> plt.Axes:
     if ax_plot_kwargs is None:
         ax_plot_kwargs = {}
@@ -85,7 +80,7 @@ def add_series_to_axis(
 
 def generate_validation_curve_from_series(
     series: pd.Series, title_extra: str = "", skiprows: int = 200
-) -> Tuple[Optional[plt.Figure], Optional[plt.Axes]]:
+) -> tuple[plt.Figure | None, plt.Axes | None]:
     fig, ax = plt.subplots()
 
     valid_series_cut = series[series.index > skiprows]
@@ -139,7 +134,7 @@ def generate_validation_curve_from_series(
 
 
 class SeriesMinMaxProtocol(Protocol):
-    def __call__(self, series: pd.Series) -> Union[int, str]: ...
+    def __call__(self, series: pd.Series) -> int | str: ...
 
 
 def _get_min_or_max_funcs(
@@ -164,7 +159,7 @@ def _parse_metrics_colname(column_name: str) -> str:
 def _get_validation_extreme_value_and_iter(
     extreme_index_func: Callable,
     validation_values: pd.Series,
-) -> Tuple[Optional[int], Optional[float]]:
+) -> tuple[int | None, float | None]:
     """
     For sparse targets, we might get e.g. for ROC AUC:
 
@@ -229,8 +224,8 @@ def gen_eval_graphs(plot_config: "PerformancePlotConfig"):
 
 
 def select_performance_curve_funcs(
-    column_type: str, n_classes: Optional[int] = None
-) -> List[Callable]:
+    column_type: str, n_classes: int | None = None
+) -> list[Callable]:
     if column_type == "cat":
         if not n_classes or n_classes < 2:
             raise ValueError("Expected number of classes to be not None and >2.")
@@ -241,9 +236,8 @@ def select_performance_curve_funcs(
                 generate_binary_pr_curve,
                 generate_binary_prediction_distribution,
             ]
-        else:
-            return [generate_multi_class_roc_curve, generate_multi_class_pr_curve]
-    elif column_type == "con":
+        return [generate_multi_class_roc_curve, generate_multi_class_pr_curve]
+    if column_type == "con":
         return [generate_regression_prediction_plot]
 
     raise ValueError(f"Unknown column type {column_type}.")
@@ -360,14 +354,19 @@ def generate_binary_prediction_distribution(
     classes = transformer.classes_
     fig, ax = plt.subplots()
 
-    for class_index, class_name in zip(range(2), classes):
+    for class_index, class_name in zip(range(2), classes, strict=False):
         cur_class_mask = np.argwhere(y_true == class_index)
         cur_probabilities = y_outp[cur_class_mask, 1]
 
         ax.hist(cur_probabilities, rwidth=0.90, label=class_name, alpha=0.5)
 
     ax.legend(loc="upper left")
-    props = dict(boxstyle="round", facecolor="none", alpha=0.25, edgecolor="gray")
+    props = {
+        "boxstyle": "round",
+        "facecolor": "none",
+        "alpha": 0.25,
+        "edgecolor": "gray",
+    }
     ax.text(
         0.80,
         0.95,
@@ -394,9 +393,9 @@ def generate_multi_class_roc_curve(
     *args,
     **kwargs,
 ):
-    fpr: dict[int | str, np.ndarray] = dict()
-    tpr: dict[int | str, np.ndarray] = dict()
-    roc_auc: dict[int, float] = dict()
+    fpr: dict[int | str, np.ndarray] = {}
+    tpr: dict[int | str, np.ndarray] = {}
+    roc_auc: dict[int, float] = {}
 
     unique_classes = sorted(transformer.classes_)
     n_classes = len(unique_classes)
@@ -444,7 +443,7 @@ def generate_multi_class_roc_curve(
     )
 
     colors = iter(plt.get_cmap("tab20", n_classes)(np.arange(n_classes)))
-    for i, color in zip(range(n_classes), colors):
+    for i, color in zip(range(n_classes), colors, strict=False):
         plt.plot(
             fpr[i],
             tpr[i],
@@ -477,8 +476,8 @@ def generate_multi_class_pr_curve(
     *args,
     **kwargs,
 ):
-    precision: dict[int | str, np.ndarray] = dict()
-    recall: dict[int | str, np.ndarray] = dict()
+    precision: dict[int | str, np.ndarray] = {}
+    recall: dict[int | str, np.ndarray] = {}
 
     unique_classes = sorted(transformer.classes_)
     n_classes = len(unique_classes)
@@ -491,7 +490,7 @@ def generate_multi_class_pr_curve(
 
     y_true_bin = label_binarize(y_true, classes=range(n_classes))
 
-    average_precision = dict()
+    average_precision = {}
     for i in range(n_classes):
         precision[i], recall[i], _ = precision_recall_curve(
             y_true_bin[:, i], y_outp[:, i]
@@ -513,12 +512,11 @@ def generate_multi_class_pr_curve(
         precision["micro"],
         color="gold",
         lw=2,
-        label=f"Micro-Average Precision-Recall "
-        f"(area = {average_precision_micro:0.4g})",
+        label=f"Micro-Average Precision-Recall (area = {average_precision_micro:0.4g})",
     )
 
     colors = iter(plt.get_cmap("tab20", n_classes)(np.arange(n_classes)))
-    for i, color in zip(range(n_classes), colors):
+    for i, color in zip(range(n_classes), colors, strict=False):
         plt.plot(
             recall[i],
             precision[i],
@@ -544,12 +542,15 @@ def generate_multi_class_pr_curve(
 def generate_confusion_matrix(
     y_true: np.ndarray,
     y_outp: np.ndarray,
-    classes: List[str],
+    classes: list[str],
     outfolder: Path,
     normalize: Literal["true", "pred", "all", None] = None,
     title_extra: str = "",
-    cmap: matplotlib.colors.Colormap = sns.color_palette("rocket", as_cmap=True),
+    cmap: matplotlib.colors.Colormap | None = None,
 ):
+    if cmap is None:
+        cmap = sns.color_palette("rocket", as_cmap=True)
+
     if not title_extra:
         if normalize:
             title_extra = "Normalized confusion matrix"

@@ -1,9 +1,10 @@
+from collections.abc import Sequence
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from random import sample
-from typing import TYPE_CHECKING, Literal, Sequence, Union
+from typing import TYPE_CHECKING, Literal, Union
 
 import polars as pl
 from aislib.misc_utils import ensure_path_exists
@@ -125,7 +126,7 @@ def get_background_source_config(
         )
         return predict_configs
 
-    elif background_source_in_predict_cl_args == "train":
+    if background_source_in_predict_cl_args == "train":
         logger.info(
             "Background for attribution analysis will be loaded from sources "
             "previously used for training run with name '%s'.",

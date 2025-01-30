@@ -1,18 +1,12 @@
 import reprlib
+from collections.abc import Generator, Iterable, Sequence
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    Generator,
-    Iterable,
     Optional,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
 )
 
 import numpy as np
@@ -184,8 +178,7 @@ def update_labels_df(
 
     if master_df.columns == ["ID"]:
         return new_labels_renamed
-    else:
-        return master_df.join(new_labels_renamed, on="ID", how="full", coalesce=True)
+    return master_df.join(new_labels_renamed, on="ID", how="full", coalesce=True)
 
 
 def set_up_all_target_labels_wrapper(
@@ -278,12 +271,12 @@ def set_up_all_target_labels_wrapper(
 
 def process_tabular_output(
     output_name: str,
-    tabular_target_labels_info: Dict[str, Any],
+    tabular_target_labels_info: dict[str, Any],
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     all_ids: set[str],
-    label_transformers: Dict[str, Any],
-    per_modality_missing_ids: Dict[str, set[str]],
+    label_transformers: dict[str, Any],
+    per_modality_missing_ids: dict[str, set[str]],
     train_labels_df: pl.DataFrame,
     valid_labels_df: pl.DataFrame,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -319,7 +312,7 @@ def process_sequence_output(
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     output_source: str,
-    per_modality_missing_ids: Dict[str, set[str]],
+    per_modality_missing_ids: dict[str, set[str]],
     train_labels_df: pl.DataFrame,
     valid_labels_df: pl.DataFrame,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -358,7 +351,7 @@ def process_array_or_image_output(
     valid_ids: Sequence[str],
     output_config: schemas.OutputConfig,
     output_source: str,
-    per_modality_missing_ids: Dict[str, set[str]],
+    per_modality_missing_ids: dict[str, set[str]],
     train_labels_df: pl.DataFrame,
     valid_labels_df: pl.DataFrame,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -378,11 +371,8 @@ def process_array_or_image_output(
     is_deeplake = is_deeplake_dataset(data_source=output_source)
     col_name = f"{output_name}__{output_name}"
 
-    polars_dtype: Type[pl.Int64] | Type[pl.Utf8]
-    if is_deeplake:
-        polars_dtype = pl.Int64
-    else:
-        polars_dtype = pl.Utf8
+    polars_dtype: type[pl.Int64] | type[pl.Utf8]
+    polars_dtype = pl.Int64 if is_deeplake else pl.Utf8
 
     train_labels_df = update_labels_df(
         master_df=train_labels_df,
@@ -406,12 +396,12 @@ def process_array_or_image_output(
 def process_survival_output(
     n_bins: int,
     output_name: str,
-    tabular_target_labels_info: Dict[str, Any],
+    tabular_target_labels_info: dict[str, Any],
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
     all_ids: set[str],
-    label_transformers: Dict[str, Any],
-    per_modality_missing_ids: Dict[str, set[str]],
+    label_transformers: dict[str, Any],
+    per_modality_missing_ids: dict[str, set[str]],
     train_labels_df: pl.DataFrame,
     valid_labels_df: pl.DataFrame,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -554,7 +544,6 @@ def fit_duration_transformer(
     durations: np.ndarray,
     n_bins: int,
 ) -> KBinsDiscretizer | IdentityTransformer:
-
     if not n_bins:
         return IdentityTransformer()
 
@@ -622,7 +611,6 @@ def find_sequence_output_missing_ids(
     valid_ids: Sequence[str],
     output_source: str,
 ) -> set[str]:
-
     seq_ids = set(gather_ids_from_data_source(data_source=Path(output_source)))
 
     train_ids_set = set(train_ids)
@@ -681,18 +669,17 @@ def set_up_file_target_labels(
 
 
 def gather_torch_null_missing_ids(labels: pl.DataFrame, output_name: str) -> set[str]:
-
     missing_ids = (
-        labels.filter((pl.col(output_name).is_null())).get_column("ID").to_list()
+        labels.filter(pl.col(output_name).is_null()).get_column("ID").to_list()
     )
 
-    return set(str(id_) for id_ in missing_ids)
+    return {str(id_) for id_ in missing_ids}
 
 
 def gather_data_pointers_from_data_source(
     data_source: Path,
     validate: bool = True,
-    output_inner_key: Optional[str] = None,
+    output_inner_key: str | None = None,
 ) -> dict[str, str | int]:
     """
     Disk: ID -> file path
@@ -746,7 +733,7 @@ def build_deeplake_available_pointer_iterator(
 
 def gather_all_ids_from_output_configs(
     output_configs: Sequence[schemas.OutputConfig],
-) -> Tuple[str, ...]:
+) -> tuple[str, ...]:
     all_ids: set[str] = set()
     for config in output_configs:
         cur_source = Path(config.output_info.output_source)
@@ -757,8 +744,7 @@ def gather_all_ids_from_output_configs(
             cur_ids = gather_ids_from_data_source(data_source=cur_source)
         else:
             raise NotImplementedError(
-                "Only csv and directory data sources are supported."
-                f" Got: {cur_source}"
+                f"Only csv and directory data sources are supported. Got: {cur_source}"
             )
         all_ids.update(cur_ids)
 
@@ -766,12 +752,12 @@ def gather_all_ids_from_output_configs(
 
 
 def read_manual_ids_if_exist(
-    manual_valid_ids_file: Union[None, str],
-) -> Union[Sequence[str], None]:
+    manual_valid_ids_file: None | str,
+) -> Sequence[str] | None:
     if not manual_valid_ids_file:
         return None
 
-    with open(manual_valid_ids_file, "r") as infile:
+    with open(manual_valid_ids_file) as infile:
         manual_ids = tuple(line.strip() for line in infile)
 
     return manual_ids
@@ -779,8 +765,7 @@ def read_manual_ids_if_exist(
 
 def get_tabular_target_file_infos(
     output_configs: Iterable[schemas.OutputConfig],
-) -> Dict[str, TabularFileInfo]:
-
+) -> dict[str, TabularFileInfo]:
     tabular_files_info = {}
 
     for output_config in output_configs:

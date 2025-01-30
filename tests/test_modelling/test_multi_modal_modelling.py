@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -193,7 +193,7 @@ def get_base_parametrization(
     indirect=True,
 )
 def test_multi_modal_multi_task_disk(
-    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+    prep_modelling_test_configs: tuple[train.Experiment, "ModelTestConfig"],
 ):
     experiment, test_config = prep_modelling_test_configs
 
@@ -232,7 +232,7 @@ def test_multi_modal_multi_task_disk(
     indirect=True,
 )
 def test_multi_modal_multi_task_memory(
-    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+    prep_modelling_test_configs: tuple[train.Experiment, "ModelTestConfig"],
 ):
     experiment, test_config = prep_modelling_test_configs
 
