@@ -193,7 +193,7 @@ def test_top_k_top_p_filtering():
     indirect=True,
 )
 def test_autoregressive_sequence_generation(
-    prep_modelling_test_configs: Tuple["Experiment", "ModelTestConfig"]
+    prep_modelling_test_configs: Tuple["Experiment", "ModelTestConfig"],
 ) -> None:
     experiment, test_config = prep_modelling_test_configs
     experiment.model.eval()

@@ -245,7 +245,7 @@ def get_feature_extractor_config_type_init_callable_map() -> Dict[str, Type]:
 
 
 def set_up_pretrained_config(
-    pretrained_config_dict: Union[None, Dict[str, Any]]
+    pretrained_config_dict: Union[None, Dict[str, Any]],
 ) -> Union[None, schemas.BasicPretrainedConfig]:
     if pretrained_config_dict is None:
         return None

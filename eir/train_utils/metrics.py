@@ -1106,7 +1106,7 @@ def get_available_supervised_metrics() -> (
 
 
 def get_available_survival_metrics(
-    target_transformers: dict[str, "al_label_transformers"]
+    target_transformers: dict[str, "al_label_transformers"],
 ) -> tuple[MetricRecord]:
     survival_metrics: tuple[MetricRecord] = (
         MetricRecord(

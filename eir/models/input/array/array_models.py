@@ -1,9 +1,18 @@
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Dict, Literal, Optional, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Literal,
+    Optional,
+    Protocol,
+    Type,
+    TypeGuard,
+    Union,
+)
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 
 from eir.models.input.array.models_cnn import CNNModel, CNNModelConfig
 from eir.models.input.array.models_locally_connected import (
@@ -195,6 +204,15 @@ class ArrayModelConfig:
     pre_normalization: al_pre_normalization = None
 
 
+class FeatureExtractorWithL1Weights(Protocol):
+    @property
+    def l1_penalized_weights(self) -> Tensor: ...
+
+
+def has_l1_weights(obj: nn.Module) -> TypeGuard[FeatureExtractorWithL1Weights]:
+    return hasattr(obj, "l1_penalized_weights")
+
+
 class ArrayWrapperModel(nn.Module):
     def __init__(
         self,
@@ -214,7 +232,9 @@ class ArrayWrapperModel(nn.Module):
         return self.feature_extractor.num_out_features
 
     @property
-    def l1_penalized_weights(self) -> torch.Tensor:
+    def l1_penalized_weights(self) -> Tensor:
+        if not has_l1_weights(self.feature_extractor):
+            raise AttributeError("Feature extractor does not have l1_penalized_weights")
         return self.feature_extractor.l1_penalized_weights
 
     def forward(self, x):

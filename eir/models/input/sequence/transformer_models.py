@@ -324,7 +324,7 @@ def get_hf_transformer_forward(
 
 
 def _get_sequence_pooling_func(
-    pool: Union[Literal["avg"], Literal["max"], None]
+    pool: Union[Literal["avg"], Literal["max"], None],
 ) -> Callable:
     def _identity(input: torch.Tensor) -> torch.Tensor:
         return input
@@ -495,7 +495,7 @@ class SequenceOutputTransformerFeatureExtractor(TransformerFeatureExtractor):
 
 
 def get_positional_representation_class(
-    position_model_config: Literal["encode", "embed"]
+    position_model_config: Literal["encode", "embed"],
 ) -> Union[Type["PositionalEncoding"], Type["PositionalEmbedding"]]:
     if position_model_config == "encode":
         return PositionalEncoding

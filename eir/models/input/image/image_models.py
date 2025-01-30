@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Dict, Literal, Protocol, Type
+from typing import Any, Dict, Literal, Protocol, Type, TypeGuard
 
 from torch import Tensor, nn
 
@@ -50,6 +50,16 @@ class ImageModelConfig:
     freeze_pretrained_model: bool = False
 
 
+class FeatureExtractorWithForwardFeatures(Protocol):
+    def forward_features(self, x: Tensor) -> Tensor: ...
+
+
+def has_forward_features(
+    obj: nn.Module,
+) -> TypeGuard[FeatureExtractorWithForwardFeatures]:
+    return hasattr(obj, "forward_features")
+
+
 class ImageWrapperModel(nn.Module):
     def __init__(
         self,
@@ -74,11 +84,9 @@ class ImageWrapperModel(nn.Module):
         return reduce(lambda x, y: x * y, self.output_shape)
 
     def forward(self, input: Tensor) -> Tensor:
-
-        has_forward_features = hasattr(self.feature_extractor, "forward_features")
         has_num_out_features = self.model_config.num_output_features > 0
 
-        if has_forward_features and not has_num_out_features:
+        if has_forward_features(self.feature_extractor) and not has_num_out_features:
             out = self.feature_extractor.forward_features(input)
         else:
             out = self.feature_extractor(input)

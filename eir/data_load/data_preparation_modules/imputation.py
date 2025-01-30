@@ -176,7 +176,7 @@ def _build_tabular_fill_value(
         "ComputedTabularInputInfo",
         "ComputedPredictTabularInputInfo",
         "ComputedServeTabularInputInfo",
-    ]
+    ],
 ) -> dict[str, int | float]:
     fill_value = {}
     transformers = input_object.labels.label_transformers

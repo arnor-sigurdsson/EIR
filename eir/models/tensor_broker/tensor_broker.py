@@ -121,7 +121,7 @@ def create_tensor_shapes_estimation_hook(
 
 
 def estimate_tensor_shapes(
-    module_storage: nn.Module,
+    module_storage: "ModuleStorage",
     fusion_to_output_mapping: Dict[str, Literal["computed", "pass-through"]],
     example_input_data: Dict[str, torch.Tensor],
 ) -> Tuple[Dict[str, torch.Size], Dict[str, torch.Size]]:

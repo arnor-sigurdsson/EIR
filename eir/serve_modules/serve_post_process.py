@@ -179,7 +179,7 @@ def general_post_process(
 
 
 def _ensure_streamlined_tabular_values(
-    tabular_model_outputs: dict[str, torch.Tensor | list[int] | np.ndarray]
+    tabular_model_outputs: dict[str, torch.Tensor | list[int] | np.ndarray],
 ) -> dict[str, torch.Tensor]:
     tensor_outputs = {
         k: v for k, v in tabular_model_outputs.items() if isinstance(v, torch.Tensor)

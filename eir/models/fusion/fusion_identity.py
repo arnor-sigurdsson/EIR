@@ -4,11 +4,9 @@ from typing import Callable, Dict
 import torch
 from torch import nn
 
-from eir.models.fusion.fusion_default import default_fuse_features
+from eir.models.fusion.fusion_default import al_features, default_fuse_features
 
-al_identity_features = Callable[
-    [Dict[str, torch.Tensor]], torch.Tensor | Dict[str, torch.Tensor]
-]
+al_identity_features = Callable[[dict[str, torch.Tensor]], dict[str, torch.Tensor]]
 
 
 @dataclasses.dataclass
@@ -16,12 +14,16 @@ class IdentityConfig:
     pass
 
 
+def pass_through_fuse(features: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    return features
+
+
 class IdentityFusionModel(nn.Module):
     def __init__(
         self,
         model_config: IdentityConfig,
         fusion_in_dim: int,
-        fusion_callable: al_identity_features = default_fuse_features,
+        fusion_callable: al_identity_features | al_features = default_fuse_features,
         **kwargs,
     ):
         super().__init__()

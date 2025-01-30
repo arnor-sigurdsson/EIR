@@ -1,10 +1,11 @@
-from functools import partial
-from typing import TYPE_CHECKING, Callable, Dict, Literal, NewType, Type, cast
+from typing import TYPE_CHECKING, Dict, Literal, NewType, Type, cast
 
 import torch
 from torch import nn
 
 from eir.models.fusion import fusion_default, fusion_identity, fusion_mgmoe
+from eir.models.fusion.fusion_default import al_features, default_fuse_features
+from eir.models.fusion.fusion_identity import al_identity_features, pass_through_fuse
 from eir.models.layers.mlp_layers import ResidualMLPConfig
 from eir.models.meta.meta_utils import FusionModuleProtocol, al_fusion_modules
 from eir.utils.logging import get_logger
@@ -22,10 +23,6 @@ if TYPE_CHECKING:
     from eir.models.meta.meta_utils import al_input_modules
 
 logger = get_logger(name=__name__)
-
-
-def pass_through_fuse(features: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-    return features
 
 
 def get_fusion_modules(
@@ -55,10 +52,17 @@ def get_fusion_modules(
 
     if any_tabular or array_and_no_diffusion:
         fusion_class = get_fusion_class(fusion_model_type=fusion_model_type)
+
+        fusion_callable: al_features | al_identity_features
+        if fusion_model_type == "pass-through":
+            fusion_callable = pass_through_fuse
+        else:
+            fusion_callable = default_fuse_features
+
         computing_fusion_module = fusion_class(
             model_config=model_config,
             fusion_in_dim=fusion_in_dim,
-            out_feature_per_feature_extractor=out_feature_per_feature_extractor,
+            fusion_callable=fusion_callable,
         )
         fusion_modules["computed"] = computing_fusion_module
 
@@ -151,15 +155,11 @@ def _get_fusion_input_dimension(modules_to_fuse: "al_input_modules") -> int:
 
 def get_fusion_class(
     fusion_model_type: str,
-) -> Type[nn.Module] | Callable:
+) -> Type[FusionModuleProtocol]:
     if fusion_model_type == "mgmoe":
-        return fusion_mgmoe.MGMoEModel
+        return cast(Type[FusionModuleProtocol], fusion_mgmoe.MGMoEModel)
     elif fusion_model_type == "mlp-residual":
-        return fusion_default.MLPResidualFusionModule
-    elif fusion_model_type == "identity":
-        return fusion_identity.IdentityFusionModel
-    elif fusion_model_type == "pass-through":
-        return partial(
-            fusion_identity.IdentityFusionModel, fusion_callable=pass_through_fuse
-        )
+        return cast(Type[FusionModuleProtocol], fusion_default.MLPResidualFusionModule)
+    elif fusion_model_type in ("identity", "pass-through"):
+        return cast(Type[FusionModuleProtocol], fusion_identity.IdentityFusionModel)
     raise ValueError(f"Unrecognized fusion model type: {fusion_model_type}.")

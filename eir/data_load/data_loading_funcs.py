@@ -187,7 +187,7 @@ def _get_column_label_weights_and_counts(
 
 
 def _aggregate_column_sampling_weights(
-    all_target_columns_weights_and_counts: dict[str, al_sample_weight_and_counts]
+    all_target_columns_weights_and_counts: dict[str, al_sample_weight_and_counts],
 ) -> Tuple[Sequence[float], int]:
     """
     We sum up the normalized weights for each target column to create the final sampling

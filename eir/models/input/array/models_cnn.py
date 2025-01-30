@@ -460,8 +460,10 @@ def _make_conv_layers(
 
             n_blocks = len([i for i in conv_blocks if isinstance(i, CNNResidualBlock)])
             if down_every and n_blocks % down_every == 0:
+                cur_in_channels = conv_blocks[-1].out_channels
+                assert isinstance(cur_in_channels, int)
                 down_block = DownSamplingResidualBlock(
-                    in_channels=conv_blocks[-1].out_channels,
+                    in_channels=cur_in_channels,
                     in_width=cur_width,
                     in_height=cur_height,
                 )

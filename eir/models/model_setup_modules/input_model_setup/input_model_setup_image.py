@@ -1,5 +1,5 @@
 from copy import copy
-from typing import Any, Dict, Union
+from typing import Any, Dict, Protocol, TypeGuard, Union
 
 import timm
 import torch
@@ -95,6 +95,16 @@ def _check_image_model_num_output_features_compatibility(
             )
 
 
+class FeatureExtractorWithForwardFeatures(Protocol):
+    def forward_features(self, x: torch.Tensor) -> torch.Tensor: ...
+
+
+def has_forward_features(
+    obj: nn.Module,
+) -> TypeGuard[FeatureExtractorWithForwardFeatures]:
+    return hasattr(obj, "forward_features")
+
+
 def estimate_feature_extractor_out_shape(
     feature_extractor: nn.Module,
     data_dimensions: DataDimensions,
@@ -106,11 +116,10 @@ def estimate_feature_extractor_out_shape(
         device=device,
     )
 
-    has_forward_features = hasattr(feature_extractor, "forward_features")
     has_num_out_features = num_output_features > 0
 
     with torch.inference_mode():
-        if has_forward_features and not has_num_out_features:
+        if has_forward_features(feature_extractor) and not has_num_out_features:
             feature_extractor_out = feature_extractor.forward_features(example_input)
         else:
             feature_extractor_out = feature_extractor(example_input)

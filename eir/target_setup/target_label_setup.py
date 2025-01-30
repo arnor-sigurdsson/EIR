@@ -766,7 +766,7 @@ def gather_all_ids_from_output_configs(
 
 
 def read_manual_ids_if_exist(
-    manual_valid_ids_file: Union[None, str]
+    manual_valid_ids_file: Union[None, str],
 ) -> Union[Sequence[str], None]:
     if not manual_valid_ids_file:
         return None
