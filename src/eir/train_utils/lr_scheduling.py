@@ -67,7 +67,7 @@ def attach_lr_scheduler(
             event_name=Events.ITERATION_COMPLETED,
             handler=_step_reduce_on_plateau_scheduler,
             reduce_on_plateau_scheduler=lr_scheduler,
-            **step_scheduler_params
+            **step_scheduler_params,
         )
     else:
         raise ValueError()

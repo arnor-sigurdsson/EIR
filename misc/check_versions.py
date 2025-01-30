@@ -2,7 +2,7 @@ import tomlkit
 
 
 def _get_module_version():
-    with open("eir/__init__.py", "r") as infile:
+    with open("src/eir/__init__.py", "r") as infile:
         file_contents = infile.readline()
 
     version = file_contents.split("__version__ = ")[-1].strip().replace('"', "")
@@ -13,7 +13,7 @@ def _get_project_meta():
     with open("pyproject.toml") as infile:
         file_contents = infile.read()
 
-    return tomlkit.parse(file_contents)["tool"]["poetry"]
+    return tomlkit.parse(file_contents)["project"]
 
 
 module_version = _get_module_version()
