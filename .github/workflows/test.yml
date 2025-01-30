@@ -20,7 +20,7 @@ jobs:
           PYTEST_GROUP: ${{ matrix.group }}
         run: |
           pip install tox==4.23.2
-          tox -e py_partial
+          uv run tox -e py_partial
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-24.04'
         uses: codecov/codecov-action@v4

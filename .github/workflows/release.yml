@@ -25,7 +25,7 @@ jobs:
           PYTEST_GROUP: ${{ matrix.group }}
         run: |
           pip install tox==4.23.2
-          tox -e py_partial
+          uv run tox -e py_partial
 
   getrelease:
     name: Get release
