@@ -4,7 +4,8 @@ max-line-length = 88
 max-complexity = 26
 exclude =
     .tox,
+    .venv,
     data,
     runs,
     eir_tutorials,
-    eir/train_utils/optimization_modules/soap.py,
+    src/eir/train_utils/optimization_modules/soap.py,

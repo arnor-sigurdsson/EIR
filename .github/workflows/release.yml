@@ -19,13 +19,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v5
       - name: Run tests with Python ${{ matrix.python-version }} on ${{ matrix.os }}
         env:
           PYTEST_GROUP: ${{ matrix.group }}
         run: |
           pip install tox==4.23.2
-          pip install poetry==2.0.1
-          tox -e py_partial
+          uv run tox -e py_partial
 
   getrelease:
     name: Get release
@@ -69,7 +69,8 @@ jobs:
         with:
           python-version: '3.12'
           architecture: x64
-      - run: pip install poetry==2.0.1
-      - run: poetry build
-      - run: poetry publish --username=__token__ --password=${{ secrets.PYPI_TOKEN }}
-
+      - uses: astral-sh/setup-uv@v5
+      - name: Build package
+        run: uv build --no-sources
+      - name: Upload to PyPI
+        run: uv publish --token=${{ secrets.PYPI_TOKEN }}

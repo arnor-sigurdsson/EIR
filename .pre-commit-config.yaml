@@ -1,12 +1,18 @@
 default_language_version:
   python: python3
 repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.5.25
+    hooks:
+      - id: uv-lock
+
   - repo: https://github.com/ambv/black
     rev: 25.1.0
     hooks:
       - id: black
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v5.0.0
     hooks:
       - id: check-added-large-files
         args: ['--maxkb=8192']
@@ -15,24 +21,17 @@ repos:
     rev: 5.12.0
     hooks:
       - id: isort
-        name: Run isort
-        entry: isort
-        language: system
-        types: [ python ]
-        stages: [ pre-commit ]
 
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
 
   - repo: local
     hooks:
-      - id: flake8
-        name: Run flake8
-        entry: flake8
-        language: system
-        types: [ python ]
-        stages: [ pre-commit ]
-
       - id: check-versions
         name: Check project versions
         entry: python ./misc/check_versions.py
-        language: system
-        stages: [ pre-commit ]
+        language: python
+        additional_dependencies: ['tomlkit']
+        types: [python]
