@@ -1,16 +1,11 @@
 import inspect
 import math
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import partial
 from typing import (
-    Callable,
-    Dict,
     Literal,
-    Optional,
     Protocol,
-    Sequence,
-    Tuple,
-    Type,
     Union,
 )
 
@@ -67,7 +62,7 @@ class SequenceModelConfig:
 
     """
 
-    model_init_config: Union["BasicTransformerFeatureExtractorModelConfig", Dict]
+    model_init_config: Union["BasicTransformerFeatureExtractorModelConfig", dict]
 
     model_type: Literal["sequence-default"] | str = "sequence-default"
 
@@ -76,7 +71,7 @@ class SequenceModelConfig:
     position: Literal["encode", "embed"] = "encode"
     position_dropout: float = 0.10
     window_size: int = 0
-    pool: Union[Literal["avg"], Literal["max"], None] = None
+    pool: Literal["avg"] | Literal["max"] | None = None
 
     pretrained_model: bool = False
     freeze_pretrained_model: bool = False
@@ -92,8 +87,8 @@ class TransformerWrapperModel(nn.Module):
         max_length: int,
         external_feature_extractor: bool,
         device: str,
-        embeddings: Optional[nn.Embedding] = None,
-        pre_computed_num_out_features: Optional[int] = None,
+        embeddings: nn.Embedding | None = None,
+        pre_computed_num_out_features: int | None = None,
     ) -> None:
         super().__init__()
         self.model_config = model_config
@@ -167,10 +162,10 @@ class TransformerWrapperModel(nn.Module):
 
 
 def get_embedding_dim_for_sequence_model(
-    embedding_dim: Union[None, int], num_tokens: int, num_heads: int
+    embedding_dim: None | int, num_tokens: int, num_heads: int
 ) -> int:
     if embedding_dim is None:
-        auto_emb_dim = math.ceil((int(num_tokens**0.25) / num_heads)) * num_heads
+        auto_emb_dim = math.ceil(int(num_tokens**0.25) / num_heads) * num_heads
         logger.info(
             "Setting up automatic embedding dimension of %d based on %d "
             "tokens and %d attention heads.",
@@ -207,8 +202,8 @@ def _get_transformer_wrapper_feature_extractor(
     embedding_dim: int,
     max_length: int,
     device: str,
-    pool: Union[Literal["avg"], Literal["max"], None] = None,
-) -> Tuple[Dict[str, int], Callable[[torch.Tensor], torch.Tensor]]:
+    pool: Literal["avg"] | Literal["max"] | None = None,
+) -> tuple[dict[str, int], Callable[[torch.Tensor], torch.Tensor]]:
     dynamic_extras = {"padding": 0}
 
     feature_extractor_forward = _get_feature_extractor_forward(
@@ -255,11 +250,11 @@ def _get_transformer_wrapper_feature_extractor(
 
 def _get_feature_extractor_forward(
     is_hf_model: bool,
-    feature_extractor: Union[nn.Module, PreTrainedModel],
+    feature_extractor: nn.Module | PreTrainedModel,
     input_length: int,
     embedding_size: int,
     device: str,
-    pool: Union[Literal["avg"], Literal["max"], None] = None,
+    pool: Literal["avg"] | Literal["max"] | None = None,
 ) -> SimpleFeatureExtractorForwardProtocol | HFFeatureExtractorForwardProtocol:
     if is_hf_model:
         return get_hf_transformer_forward(
@@ -273,7 +268,7 @@ def _get_feature_extractor_forward(
 
 
 def _get_simple_transformer_forward(
-    pool: Union[Literal["avg"], Literal["max"], None] = None,
+    pool: Literal["avg"] | Literal["max"] | None = None,
 ):
     pooling_func = _get_sequence_pooling_func(pool=pool)
 
@@ -295,7 +290,7 @@ def get_hf_transformer_forward(
     input_length: int,
     embedding_dim: int,
     device: str,
-    pool: Union[Literal["avg"], Literal["max"], None] = None,
+    pool: Literal["avg"] | Literal["max"] | None = None,
 ):
     forward_argnames = inspect.getfullargspec(feature_extractor_.forward)[0]
 
@@ -324,7 +319,7 @@ def get_hf_transformer_forward(
 
 
 def _get_sequence_pooling_func(
-    pool: Union[Literal["avg"], Literal["max"], None],
+    pool: Literal["avg"] | Literal["max"] | None,
 ) -> Callable:
     def _identity(input: torch.Tensor) -> torch.Tensor:
         return input
@@ -338,10 +333,10 @@ def _get_sequence_pooling_func(
     if pool is None:
         return _identity
 
-    elif pool == "max":
+    if pool == "max":
         return _max
 
-    elif pool == "avg":
+    if pool == "avg":
         return _avg
 
     raise ValueError()
@@ -353,7 +348,7 @@ def _build_transformer_forward_kwargs(
     input_length: int,
     embedding_dim: int,
     device: str,
-) -> Dict:
+) -> dict:
     """
     TODO: Deprecate.
     """
@@ -412,7 +407,7 @@ class BasicTransformerFeatureExtractorModelConfig:
 
     num_heads: int = 8
     num_layers: int = 2
-    dim_feedforward: Union[int, Literal["auto"]] = "auto"
+    dim_feedforward: int | Literal["auto"] = "auto"
     dropout: float = 0.10
 
 
@@ -455,13 +450,12 @@ class TransformerFeatureExtractor(nn.Module):
 
 
 def parse_dim_feedforward(
-    dim_feedforward: Union[int, Literal["auto"]], embedding_dim: int
+    dim_feedforward: int | Literal["auto"], embedding_dim: int
 ) -> int:
     if dim_feedforward == "auto":
         dim_feedforward = embedding_dim * 4
         logger.info(
-            "Setting dim_feedfoward to %d based on embedding_dim=%d and 'auto' "
-            "option.",
+            "Setting dim_feedfoward to %d based on embedding_dim=%d and 'auto' option.",
             dim_feedforward,
             embedding_dim,
         )
@@ -496,10 +490,10 @@ class SequenceOutputTransformerFeatureExtractor(TransformerFeatureExtractor):
 
 def get_positional_representation_class(
     position_model_config: Literal["encode", "embed"],
-) -> Union[Type["PositionalEncoding"], Type["PositionalEmbedding"]]:
+) -> type["PositionalEncoding"] | type["PositionalEmbedding"]:
     if position_model_config == "encode":
         return PositionalEncoding
-    elif position_model_config == "embed":
+    if position_model_config == "embed":
         return PositionalEmbedding
     raise ValueError(
         "Unknown value for positional representation. "

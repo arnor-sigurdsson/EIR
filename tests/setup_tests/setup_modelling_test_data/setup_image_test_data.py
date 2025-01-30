@@ -32,7 +32,7 @@ def create_test_image_data(
 
     image_output_folder = set_up_test_data_root_outpath(base_folder=image_output_folder)
 
-    for cls, snp_row_idx in c.target_classes.items():
+    for cls, _snp_row_idx in c.target_classes.items():
         for sample_idx in range(c.n_per_class):
             sample_outpath = image_output_folder / f"{sample_idx}_{cls}.png"
 

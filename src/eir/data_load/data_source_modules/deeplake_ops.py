@@ -1,7 +1,8 @@
 import warnings
+from collections.abc import Generator
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generator, Set, Union
+from typing import TYPE_CHECKING, Any
 
 warnings.filterwarnings("ignore", message=".*newer version of deeplake.*")
 
@@ -16,14 +17,12 @@ if TYPE_CHECKING:
     )
 
 
-@lru_cache()
+@lru_cache
 def is_deeplake_dataset(data_source: str) -> bool:
-    if deeplake.exists(data_source):
-        return True
-    return False
+    return bool(deeplake.exists(data_source))
 
 
-@lru_cache()
+@lru_cache
 def load_deeplake_dataset(data_source: str) -> deeplake.ReadOnlyDataset:
     dataset = deeplake.open_read_only(
         url=data_source,
@@ -41,7 +40,7 @@ def load_deeplake_dataset(data_source: str) -> deeplake.ReadOnlyDataset:
 
 def get_deeplake_input_source_iterable(
     deeplake_dataset: deeplake.ReadOnlyDataset, inner_key: str
-) -> Generator[Union[deeplake.Column, deeplake.ColumnView], None, None]:
+) -> Generator[deeplake.Column | deeplake.ColumnView, None, None]:
     columns = {col.name for col in deeplake_dataset.schema.columns}
 
     existence_col = f"{inner_key}_exists"
@@ -64,7 +63,7 @@ def add_deeplake_data_to_df(
     deeplake_input_inner_key: str,
     input_df: pl.DataFrame,
     data_loading_hook: "InputHookOutput",
-    ids_to_keep: Union[None, Set[str]],
+    ids_to_keep: None | set[str],
 ) -> pl.DataFrame:
     assert deeplake_input_inner_key is not None, "Deeplake input inner key is None"
 
@@ -107,7 +106,7 @@ def add_deeplake_data_to_df(
                 sample_data = str(sample_data)
 
             if isinstance(sample_data, dict):
-                for key in sample_data.keys():
+                for key in sample_data:
                     col_name = f"{input_name}__{key}"
                     if col_name not in column_arrays:
                         column_arrays[col_name] = []
@@ -140,8 +139,7 @@ def add_deeplake_data_to_df(
 
     if input_df.height == 0:
         return processed_df
-    else:
-        return input_df.join(processed_df, on="ID", how="full", coalesce=True)
+    return input_df.join(processed_df, on="ID", how="full", coalesce=True)
 
 
 def is_deeplake_sample_missing(

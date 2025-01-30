@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 import numpy as np
 import torch
@@ -34,10 +34,10 @@ def prepare_image_data(
 
 
 def image_load_wrapper(
-    data_pointer: Union[Path, int],
+    data_pointer: Path | int,
     input_source: str,
-    image_mode: Optional[str],
-    deeplake_inner_key: Optional[str] = None,
+    image_mode: str | None,
+    deeplake_inner_key: str | None = None,
 ) -> Image:
     """
     Squeeze there since deeplake seems to support only 3D images. Therefore,
@@ -58,7 +58,7 @@ def image_load_wrapper(
 
         pil_image = fromarray(obj=array)
     else:
-        assert isinstance(data_pointer, (str, Path))
+        assert isinstance(data_pointer, str | Path)
         pil_image = default_image_loader(path=str(data_pointer))
 
     if image_mode is not None:

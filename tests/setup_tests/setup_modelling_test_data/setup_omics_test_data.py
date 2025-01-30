@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -77,7 +77,7 @@ def _create_and_save_test_array_omics(
     return snps_this_sample
 
 
-def _set_up_base_test_omics_array(n_snps: int) -> Tuple[np.ndarray, np.ndarray]:
+def _set_up_base_test_omics_array(n_snps: int) -> tuple[np.ndarray, np.ndarray]:
     """
     IMPORTANT NOTE ON MEMORY LAYOUT in DeepLake V4:
     This function ensures proper memory layout for storage in DeepLake. The PyTorch
@@ -117,7 +117,7 @@ def _create_test_array(
     base_array: np.ndarray,
     snp_idxs_candidates: np.ndarray,
     snp_row_idx: int,
-) -> Tuple[np.ndarray, List[int]]:
+) -> tuple[np.ndarray, list[int]]:
     # make samples have missing for chosen, otherwise might have alleles chosen
     # below by random, without having the phenotype
     base_array[:, snp_idxs_candidates] = 0

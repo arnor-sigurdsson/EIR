@@ -17,7 +17,6 @@ from eir.setup.input_setup_modules.setup_image import (
 def load_image_input_object(
     serialized_input_folder: Path,
 ) -> ComputedImageInputInfo:
-
     config_path = serialized_input_folder / "input_config.yaml"
     normalization_stats_path = serialized_input_folder / "normalization_stats.json"
     num_channels_path = serialized_input_folder / "num_channels.json"

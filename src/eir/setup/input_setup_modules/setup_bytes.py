@@ -1,7 +1,8 @@
 import typing
 from collections import OrderedDict
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
-from typing import Dict, Hashable, Literal, Sequence
+from typing import Literal
 
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import get_default_sequence_specials
@@ -43,7 +44,7 @@ def set_up_bytes_input_for_training(
 
 
 def build_bytes_vocab(
-    byte_encoding: Literal["uint8"], specials: Sequence[Hashable] = tuple()
+    byte_encoding: Literal["uint8"], specials: Sequence[Hashable] = ()
 ) -> typing.OrderedDict[int | Hashable, int]:
     bytes_vocab: typing.OrderedDict[int | Hashable, int] = OrderedDict()
 
@@ -60,6 +61,6 @@ def build_bytes_vocab(
     return bytes_vocab
 
 
-def _get_encoding_to_num_tokens_map() -> Dict[str, int]:
+def _get_encoding_to_num_tokens_map() -> dict[str, int]:
     mapping = {"uint8": 256}
     return mapping

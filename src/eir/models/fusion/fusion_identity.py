@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Callable, Dict
+from collections.abc import Callable
 
 import torch
 from torch import nn
@@ -42,8 +42,8 @@ class IdentityFusionModel(nn.Module):
         return self.fusion_in_dim
 
     def forward(
-        self, inputs: Dict[str, torch.Tensor]
-    ) -> torch.Tensor | Dict[str, torch.Tensor]:
+        self, inputs: dict[str, torch.Tensor]
+    ) -> torch.Tensor | dict[str, torch.Tensor]:
         fused_features = self.fusion_callable(inputs)
 
         return fused_features

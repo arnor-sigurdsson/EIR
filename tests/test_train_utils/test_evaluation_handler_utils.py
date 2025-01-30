@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Tuple
+from typing import Any
 
 import numpy as np
 import pytest
@@ -204,7 +204,7 @@ def _generate_manual_sample_test_data(tmp_path) -> dict[str, Any]:
     indirect=True,
 )
 def test_prepare_sequence_output_manual_sample_data(
-    prep_modelling_test_configs: Tuple["Experiment", "ModelTestConfig"],
+    prep_modelling_test_configs: tuple["Experiment", "ModelTestConfig"],
     tmp_path: Path,
 ):
     experiment, test_config = prep_modelling_test_configs

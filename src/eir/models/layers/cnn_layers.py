@@ -1,5 +1,5 @@
 import math
-from typing import Literal, Tuple
+from typing import Literal
 
 import torch
 from einops import rearrange
@@ -15,7 +15,7 @@ logger = get_logger(name=__name__)
 
 class SEBlock(nn.Module):
     def __init__(self, channels: int, reduction: int):
-        super(SEBlock, self).__init__()
+        super().__init__()
         reduced_channels = max(1, channels // reduction)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
 
@@ -86,7 +86,6 @@ class ECABlock(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-
         y = self.avg_pool(x)  # [B, C, 1, 1]
 
         y = y.squeeze(-1).transpose(-1, -2)  # [B, 1, C]
@@ -295,7 +294,7 @@ class CNNResidualBlockBase(nn.Module):
 def _compute_conv_2_parameters(
     conv_1_kernel_size: int,
     dilation: int,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     conv_2_kernel = (
         conv_1_kernel_size - 1 if conv_1_kernel_size % 2 == 0 else conv_1_kernel_size
     )
@@ -333,7 +332,6 @@ class CNNResidualBlock(CNNResidualBlockBase):
         self.full_preact = full_preact
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-
         out = self.conv_ds(x)
 
         out = self.norm_1(out)
@@ -420,16 +418,9 @@ class DownSamplingResidualBlock(nn.Module):
 def _compute_params_for_down_sampling(
     cur_height: int, cur_width: int
 ) -> tuple[int, int]:
+    stride_h = 1 if cur_height == 1 else 2
 
-    if cur_height == 1:
-        stride_h = 1
-    else:
-        stride_h = 2
-
-    if cur_width == 1:
-        stride_w = 1
-    else:
-        stride_w = 2
+    stride_w = 1 if cur_width == 1 else 2
 
     return stride_h, stride_w
 
@@ -443,7 +434,7 @@ class UpSamplingResidualBlock(nn.Module):
         upsample_height: bool = True,
         upsample_width: bool = True,
     ):
-        super(UpSamplingResidualBlock, self).__init__()
+        super().__init__()
         """
         Note: Always applying a Conv to the upsampled identity seems to help
         stabilize training.

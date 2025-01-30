@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
@@ -156,8 +157,7 @@ def _get_image_out_parametrization(loss: str) -> dict[str, Any]:
                 },
                 {
                     "name": "first_downsample_layer",
-                    "layer_path": "input_modules.test_image.feature_extractor"
-                    ".conv.3",
+                    "layer_path": "input_modules.test_image.feature_extractor.conv.3",
                     "cache_tensor": True,
                 },
             ]

@@ -1,14 +1,10 @@
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from difflib import get_close_matches
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
     Literal,
-    Optional,
-    Sequence,
-    Tuple,
 )
 
 import torch
@@ -64,7 +60,7 @@ def prepare_example_test_batch(
         inputs_values={}, inputs_objects=input_objects
     )
 
-    loader_batch: al_dataloader_getitem_batch = (imputed_inputs, {}, list())
+    loader_batch: al_dataloader_getitem_batch = (imputed_inputs, {}, [])
     batch_as_list = [loader_batch] * batch_size
     loader_batch_collated = default_collate(batch=batch_as_list)
 
@@ -80,16 +76,15 @@ def prepare_example_test_batch(
 
 
 def create_tensor_shapes_estimation_hook(
-    output_shapes: Dict[str, torch.Size],
-    input_shapes: Dict[str, torch.Size],
+    output_shapes: dict[str, torch.Size],
+    input_shapes: dict[str, torch.Size],
     layer_path: str,
 ) -> Callable:
-
     def hook(
         module: nn.Module,
-        args: Tuple[torch.Tensor, ...],
-        kwargs: Dict[str, torch.Tensor],
-        output: torch.Tensor | Dict[str, torch.Tensor],
+        args: tuple[torch.Tensor, ...],
+        kwargs: dict[str, torch.Tensor],
+        output: torch.Tensor | dict[str, torch.Tensor],
     ):
         if isinstance(output, torch.Tensor):
             output_shapes[layer_path] = output.shape[1:]
@@ -122,11 +117,11 @@ def create_tensor_shapes_estimation_hook(
 
 def estimate_tensor_shapes(
     module_storage: "ModuleStorage",
-    fusion_to_output_mapping: Dict[str, Literal["computed", "pass-through"]],
-    example_input_data: Dict[str, torch.Tensor],
-) -> Tuple[Dict[str, torch.Size], Dict[str, torch.Size]]:
-    output_shapes: Dict[str, torch.Size] = {}
-    input_shapes: Dict[str, torch.Size] = {}
+    fusion_to_output_mapping: dict[str, Literal["computed", "pass-through"]],
+    example_input_data: dict[str, torch.Tensor],
+) -> tuple[dict[str, torch.Size], dict[str, torch.Size]]:
+    output_shapes: dict[str, torch.Size] = {}
+    input_shapes: dict[str, torch.Size] = {}
 
     hooks = []
 
@@ -170,8 +165,8 @@ class ModuleStorage(nn.Module):
         self.output_modules = output_modules
 
     def forward(
-        self, inputs: Dict[str, torch.Tensor]
-    ) -> Dict[str, Dict[str, torch.Tensor]]:
+        self, inputs: dict[str, torch.Tensor]
+    ) -> dict[str, dict[str, torch.Tensor]]:
         return run_meta_forward(
             input_modules=self.input_modules,
             fusion_modules=self.fusion_modules,
@@ -183,12 +178,11 @@ class ModuleStorage(nn.Module):
 
 def attach_store_forward_hook(
     module: nn.Module,
-    cache: Dict[str, CachedTensor],
+    cache: dict[str, CachedTensor],
     layer_path: str,
     layer_cache_target: Literal["input", "output"],
 ) -> Callable[[], None]:
-    def hook(module: nn.Module, args: Tuple[torch.Tensor, ...], output: torch.Tensor):
-
+    def hook(module: nn.Module, args: tuple[torch.Tensor, ...], output: torch.Tensor):
         if layer_cache_target == "input":
             cache[layer_path] = CachedTensor(
                 tensor=args[0],
@@ -213,14 +207,14 @@ def attach_store_forward_hook(
 def attach_tensor_broker_module_injection(
     target_module: nn.Module,
     tensor_broker_module: nn.Module,
-    tensor_cache: Dict[str, CachedTensor],
+    tensor_cache: dict[str, CachedTensor],
     tensor_cache_key: str,
 ) -> Callable[[], None]:
     def hook(
         module: nn.Module,
-        args: Tuple[torch.Tensor, ...],
-        kwargs: Dict[str, torch.Tensor],
-    ) -> Tuple[Tuple[torch.Tensor, ...], Dict[str, torch.Tensor]]:
+        args: tuple[torch.Tensor, ...],
+        kwargs: dict[str, torch.Tensor],
+    ) -> tuple[tuple[torch.Tensor, ...], dict[str, torch.Tensor]]:
         if len(args) > 0:
             input_tensor = args[0]
         else:
@@ -239,10 +233,9 @@ def attach_tensor_broker_module_injection(
         if len(args) > 0:
             new_args = (tensor_broker_out,) + args[1:]
             return new_args, kwargs
-        else:
-            new_kwargs = kwargs.copy()
-            new_kwargs["x" if "x" in kwargs else "input"] = tensor_broker_out
-            return args, new_kwargs
+        new_kwargs = kwargs.copy()
+        new_kwargs["x" if "x" in kwargs else "input"] = tensor_broker_out
+        return args, new_kwargs
 
     handle = target_module.register_forward_pre_hook(hook, with_kwargs=True)
 
@@ -258,13 +251,12 @@ def get_tensor_broker(
     input_modules: al_input_modules,
     fusion_modules: al_fusion_modules,
     output_modules: al_output_modules,
-    fusion_to_output_mapping: Dict[str, Literal["computed", "pass-through"]],
+    fusion_to_output_mapping: dict[str, Literal["computed", "pass-through"]],
     input_configs: Sequence[InputConfig],
     fusion_configs: Sequence[FusionConfig],
     output_configs: Sequence[OutputConfig],
     device: str,
 ) -> nn.ModuleDict:
-
     tensor_broker_modules = nn.ModuleDict()
     all_configs = list(input_configs) + list(fusion_configs) + list(output_configs)
 
@@ -294,7 +286,7 @@ def get_tensor_broker(
         example_input_data=example_batch.inputs,
     )
 
-    tensor_cache: Dict[str, CachedTensor] = {}
+    tensor_cache: dict[str, CachedTensor] = {}
     all_named_modules: dict[str, nn.Module] = dict(module_storage.named_modules())
 
     have_been_cached_mapping: dict[str, tuple[str, str]] = {}
@@ -337,7 +329,6 @@ def get_tensor_broker(
 
             if tmc.use_from_cache:
                 for from_name in tmc.use_from_cache:
-
                     from_path, cache_target = have_been_cached_mapping[from_name]
                     message_name = f"{to_name}: {from_path}>>>{to_path}"
                     # . is not allowed in layer names in Torch
@@ -389,10 +380,10 @@ def get_tensor_broker(
 
 
 def fuzzy_dict_lookup(
-    d: Dict[str, Any],
+    d: dict[str, Any],
     key: str,
     num_suggestions: int = 3,
-    custom_prefix_message: Optional[str] = None,
+    custom_prefix_message: str | None = None,
 ) -> Any:
     if key in d:
         return d[key]

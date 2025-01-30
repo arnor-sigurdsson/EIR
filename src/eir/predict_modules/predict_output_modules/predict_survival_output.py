@@ -1,6 +1,6 @@
 from argparse import Namespace
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -30,9 +30,9 @@ if TYPE_CHECKING:
 
 def predict_survival_wrapper_with_labels(
     predict_config: "PredictExperiment",
-    all_predictions: Dict[str, Dict[str, torch.Tensor]],
-    all_labels: Dict[str, Dict[str, torch.Tensor]],
-    all_ids: Dict[str, Dict[str, List[str]]],
+    all_predictions: dict[str, dict[str, torch.Tensor]],
+    all_labels: dict[str, dict[str, torch.Tensor]],
+    all_ids: dict[str, dict[str, list[str]]],
     predict_cl_args: Namespace,
 ) -> None:
     for output_name, output_object in predict_config.outputs.items():
@@ -199,8 +199,8 @@ def predict_survival_wrapper_with_labels(
 
 def predict_survival_wrapper_no_labels(
     predict_config: "PredictExperiment",
-    all_predictions: Dict[str, Dict[str, torch.Tensor]],
-    all_ids: Dict[str, Dict[str, List[str]]],
+    all_predictions: dict[str, dict[str, torch.Tensor]],
+    all_ids: dict[str, dict[str, list[str]]],
     predict_cl_args: Namespace,
 ) -> None:
     for output_name, output_object in predict_config.outputs.items():
@@ -238,7 +238,7 @@ def predict_survival_wrapper_no_labels(
                 }
             )
 
-            for i, t in enumerate(time_bins_except_last):
+            for i, _t in enumerate(time_bins_except_last):
                 df[f"Surv_Prob_t{i}"] = survival_probs[:, i]
 
             plot_discrete_individual_survival_curves(

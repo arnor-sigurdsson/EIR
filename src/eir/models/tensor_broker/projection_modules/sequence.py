@@ -1,5 +1,5 @@
 import math
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import torch
 from torch import nn
@@ -22,7 +22,7 @@ class SequenceProjectionLayer(nn.Module):
         self,
         input_shape_no_batch: torch.Size,
         target_embedding_dim: int,
-        target_seq_len: Optional[int] = None,
+        target_seq_len: int | None = None,
     ):
         super().__init__()
         self.input_shape = input_shape_no_batch

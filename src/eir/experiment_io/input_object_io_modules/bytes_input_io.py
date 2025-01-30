@@ -10,10 +10,10 @@ from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 def load_bytes_input_object(
     serialized_input_folder: Path,
 ) -> ComputedBytesInputInfo:
-    with open(serialized_input_folder / "vocab.json", "r") as f:
+    with open(serialized_input_folder / "vocab.json") as f:
         vocab = json.load(f)
 
-    with open(serialized_input_folder / "computed_max_length.json", "r") as f:
+    with open(serialized_input_folder / "computed_max_length.json") as f:
         computed_max_length = json.load(f)
 
     input_config = load_input_config_from_yaml(

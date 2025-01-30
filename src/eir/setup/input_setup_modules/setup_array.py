@@ -39,11 +39,10 @@ def set_up_array_input_object(
     input_config: schemas.InputConfig,
     normalization_stats: Optional["ArrayNormalizationStats"] = None,
     data_dimensions: Optional["DataDimensions"] = None,
-    dtype: Optional[np.dtype] = None,
+    dtype: np.dtype | None = None,
     *args,
     **kwargs,
 ) -> ComputedArrayInputInfo:
-
     if data_dimensions is None:
         data_dimensions = get_data_dimension_from_data_source(
             data_source=Path(input_config.input_info.input_source),
@@ -53,15 +52,14 @@ def set_up_array_input_object(
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.ArrayInputDataConfig)
 
-    if normalization_stats is None:
-        if input_type_info.normalization is not None:
-            normalization_stats = get_array_normalization_values(
-                source=input_config.input_info.input_source,
-                inner_key=input_config.input_info.input_inner_key,
-                normalization=input_type_info.normalization,
-                data_dimensions=data_dimensions,
-                max_samples=input_type_info.adaptive_normalization_max_samples,
-            )
+    if normalization_stats is None and input_type_info.normalization is not None:
+        normalization_stats = get_array_normalization_values(
+            source=input_config.input_info.input_source,
+            inner_key=input_config.input_info.input_inner_key,
+            normalization=input_type_info.normalization,
+            data_dimensions=data_dimensions,
+            max_samples=input_type_info.adaptive_normalization_max_samples,
+        )
 
     if dtype is None:
         dtype = get_dtype_from_data_source(
@@ -84,15 +82,15 @@ class ArrayNormalizationStats:
     shape: tuple
     means: torch.Tensor
     stds: torch.Tensor
-    type: Optional[Literal["element", "channel"]]
+    type: Literal["element", "channel"] | None
 
 
 def get_array_normalization_values(
     source: str,
-    inner_key: Optional[str],
-    normalization: Optional[Literal["element", "channel"]],
+    inner_key: str | None,
+    normalization: Literal["element", "channel"] | None,
     data_dimensions: DataDimensions,
-    max_samples: Optional[int],
+    max_samples: int | None,
 ) -> ArrayNormalizationStats:
     input_source = source
     deeplake_inner_key = inner_key
@@ -158,13 +156,13 @@ def get_array_normalization_values(
 def _add_extra_dims_if_needed(
     normalization_tensor: torch.Tensor,
     data_shape: tuple,
-    normalization_type: Optional[Literal["element", "channel"]],
+    normalization_type: Literal["element", "channel"] | None,
 ) -> torch.Tensor:
     if normalization_type == "element":
         assert normalization_tensor.shape == data_shape
         return normalization_tensor
 
-    elif normalization_type == "channel":
+    if normalization_type == "channel":
         assert normalization_tensor.dim() == 1
         assert normalization_tensor.shape[0] == data_shape[0]
 
@@ -174,11 +172,10 @@ def _add_extra_dims_if_needed(
 
         return reshaped_tensor
 
-    else:
-        raise ValueError(
-            f"Invalid normalization type: {normalization_type}. "
-            f"Must be one of ['element', 'channel']"
-        )
+    raise ValueError(
+        f"Invalid normalization type: {normalization_type}. "
+        f"Must be one of ['element', 'channel']"
+    )
 
 
 def _check_normalization_stats(

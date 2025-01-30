@@ -1,21 +1,15 @@
 import copy
 import warnings
 from collections import defaultdict
+from collections.abc import Callable, Generator, Iterable, Sequence
 from dataclasses import dataclass
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    DefaultDict,
-    Dict,
-    Generator,
-    Iterable,
     Literal,
     Optional,
     Protocol,
-    Sequence,
-    Tuple,
     Union,
 )
 
@@ -92,13 +86,13 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 # Type aliases
-al_explainers = Union[MyIntegratedGradients, NoiseTunnel]
+type al_explainers = MyIntegratedGradients | NoiseTunnel
 
 
 class WrapperModelForAttribution(nn.Module):
     """
     We need this wrapper module because libraries often only handle torch.Tensor or
-    List[torch.Tensor] inputs. However, we do not want to restrict our modules to
+    list[torch.Tensor] inputs. However, we do not want to restrict our modules to
     only accept those formats, rather using a dict. Hence, we use this module to
     accept the list libraries expect, but call the wrapped model with a matched dict.
     """
@@ -121,13 +115,13 @@ class WrapperModelForAttribution(nn.Module):
 
     def match_tuple_inputs_and_names(
         self, input_sequence: Sequence[torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         if isinstance(input_sequence, torch.Tensor):
             input_sequence = list(input_sequence)
 
         matched = {
             k: v
-            for k, v in zip(self.input_names, input_sequence)
+            for k, v in zip(self.input_names, input_sequence, strict=False)
             if not k.startswith("__extras_")
         }
 
@@ -213,7 +207,7 @@ def attribution_analysis_handler(
 
 def check_if_should_run_analysis(
     input_configs: Sequence[InputConfig],
-) -> Tuple[set, bool]:
+) -> tuple[set, bool]:
     all_types = {i.input_info.input_type for i in input_configs}
 
     if all_types == {"bytes"}:
@@ -321,7 +315,7 @@ def tabular_attribution_analysis_wrapper(
 
         output_object = exp.outputs[output_name]
         assert isinstance(
-            output_object, (ComputedTabularOutputInfo, ComputedSurvivalOutputInfo)
+            output_object, ComputedTabularOutputInfo | ComputedSurvivalOutputInfo
         )
 
         target_transformer = get_appropriate_target_transformer(
@@ -462,15 +456,12 @@ def _do_skip_analyzing_input(
         and output_config.output_info.output_type == "sequence"
         for output_config in output_configs
     )
-    if input_name_in_output:
-        return True
-
-    return False
+    return bool(input_name_in_output)
 
 
 def compute_expected_value(
     model: nn.Module,
-    baselines: Dict[str, torch.Tensor],
+    baselines: dict[str, torch.Tensor],
 ) -> np.ndarray:
     outputs = model(baselines)
     return outputs.mean(0).detach().cpu().numpy()
@@ -523,7 +514,7 @@ def get_attribution_object(
     hook_handle = model.register_forward_hook(hook_partial)
 
     # Convert to list for wrapper model
-    input_names, values_ordered = zip(*baseline_data_no_extras.items())
+    input_names, values_ordered = zip(*baseline_data_no_extras.items(), strict=False)
     input_names, values_ordered = tuple(input_names), tuple(values_ordered)
 
     assert not model.training
@@ -551,7 +542,7 @@ class AttributionCallable(Protocol):
     def __call__(
         self,
         *args,
-        inputs: Dict[str, torch.Tensor],
+        inputs: dict[str, torch.Tensor],
         sample_label: torch.Tensor,
         **kwargs,
     ) -> list[np.ndarray]: ...
@@ -563,13 +554,13 @@ def get_attribution(
     input_names: Sequence[str],
     *args,
     **kwargs,
-) -> Optional[dict[str, np.ndarray]]:
-    input_attributions = attribution_callable(inputs=inputs, *args, **kwargs)
+) -> dict[str, np.ndarray] | None:
+    input_attributions = attribution_callable(*args, inputs=inputs, **kwargs)
 
     if input_attributions is None:
         return None
 
-    name_matched_attribution = {k: v for k, v in zip(input_names, input_attributions)}
+    name_matched_attribution = dict(zip(input_names, input_attributions, strict=False))
 
     return name_matched_attribution
 
@@ -587,7 +578,7 @@ def get_oom_adaptive_attribution_callable(
 
     def calculate_attributions_adaptive(
         *args,
-        inputs: Dict[str, torch.Tensor],
+        inputs: dict[str, torch.Tensor],
         sample_label: torch.Tensor,
         **kwargs,
     ) -> list[np.ndarray]:
@@ -605,46 +596,44 @@ def get_oom_adaptive_attribution_callable(
                 baseline_names_ordered=baseline_names_ordered,
                 n_steps=n_steps,
             )
-        else:
-            while True:
-                try:
-                    res = get_attributions(
-                        inputs=inputs,
-                        sample_label=sample_label,
-                        internal_batch_size=internal_batch_size,
-                        explainer=explainer,
-                        column_type=column_type,
-                        baselines=baseline_values,
-                        baseline_names_ordered=baseline_names_ordered,
-                        n_steps=n_steps,
-                    )
-                    has_successfully_run = True
+        while True:
+            try:
+                res = get_attributions(
+                    inputs=inputs,
+                    sample_label=sample_label,
+                    internal_batch_size=internal_batch_size,
+                    explainer=explainer,
+                    column_type=column_type,
+                    baselines=baseline_values,
+                    baseline_names_ordered=baseline_names_ordered,
+                    n_steps=n_steps,
+                )
+                has_successfully_run = True
 
-                    if internal_batch_size is not None:
-                        logger.debug(
-                            "Attribution IG internal batch size successfully set "
-                            "to %d.",
-                            internal_batch_size,
-                        )
-
-                    return res
-
-                except OutOfMemoryError as e:  # type: ignore
-                    if internal_batch_size == 1:
-                        raise e
-
-                    if internal_batch_size is None:
-                        internal_batch_size = max(1, batch_size // 2)
-                    else:
-                        internal_batch_size = max(1, internal_batch_size // 2)
-
+                if internal_batch_size is not None:
                     logger.debug(
-                        "CUDA OOM error, reducing attribution IG "
-                        "internal batch size to %d.",
+                        "Attribution IG internal batch size successfully set to %d.",
                         internal_batch_size,
                     )
-                    torch.cuda.empty_cache()
-                    continue
+
+                return res
+
+            except OutOfMemoryError as e:  # type: ignore
+                if internal_batch_size == 1:
+                    raise e
+
+                if internal_batch_size is None:
+                    internal_batch_size = max(1, batch_size // 2)
+                else:
+                    internal_batch_size = max(1, internal_batch_size // 2)
+
+                logger.debug(
+                    "CUDA OOM error, reducing attribution IG "
+                    "internal batch size to %d.",
+                    internal_batch_size,
+                )
+                torch.cuda.empty_cache()
+                continue
 
     return calculate_attributions_adaptive
 
@@ -652,8 +641,8 @@ def get_oom_adaptive_attribution_callable(
 @dataclass
 class SampleAttribution:
     sample_info: Batch
-    sample_attributions: Dict[str, np.ndarray]
-    raw_inputs: Dict
+    sample_attributions: dict[str, np.ndarray]
+    raw_inputs: dict
 
 
 def get_attribution_consumers(
@@ -694,7 +683,7 @@ class BasicConsumerCallable(Protocol):
     def __call__(
         self,
         attribution: Optional["SampleAttribution"],
-    ) -> Optional[Sequence["SampleAttribution"]]: ...
+    ) -> Sequence["SampleAttribution"] | None: ...
 
 
 def _get_consumer_from_input_type(
@@ -707,7 +696,7 @@ def _get_consumer_from_input_type(
     if input_type in ("sequence", "tabular", "image"):
         return get_basic_consumer()
 
-    elif input_type == "omics":
+    if input_type == "omics":
         return get_omics_consumer(
             target_transformer=target_transformer,
             input_name=input_name,
@@ -715,15 +704,14 @@ def _get_consumer_from_input_type(
             target_info=target_info,
         )
 
-    elif input_type == "array":
+    if input_type == "array":
         return get_array_sum_consumer(
             target_transformer=target_transformer,
             input_name=input_name,
             output_name=output_name,
             target_info=target_info,
         )
-    else:
-        raise ValueError(f"Unsupported input type {input_type}.")
+    raise ValueError(f"Unsupported input type {input_type}.")
 
 
 def get_sample_attribution_producer(
@@ -762,11 +750,11 @@ def get_sample_attribution_producer(
 
 
 def get_basic_consumer() -> BasicConsumerCallable:
-    results: list["SampleAttribution"] = []
+    results: list[SampleAttribution] = []
 
     def _consumer(
         attribution: Optional["SampleAttribution"],
-    ) -> Optional[Sequence["SampleAttribution"]]:
+    ) -> Sequence["SampleAttribution"] | None:
         if attribution is None:
             return results
 
@@ -778,7 +766,7 @@ def get_basic_consumer() -> BasicConsumerCallable:
 
 def process_attributions_for_all_modalities(
     attribution_producer: Generator["SampleAttribution", None, None],
-    attribution_consumers: Dict[str, Callable],
+    attribution_consumers: dict[str, Callable],
 ) -> dict[
     str, Sequence["SampleAttribution"] | dict[str, np.ndarray] | ParsedOmicsAttributions
 ]:
@@ -828,7 +816,7 @@ def _convert_all_batch_tensors_to_cpu(batch: Batch) -> Batch:
 
     new_inputs = {k: v.cpu() for k, v in batch.inputs.items()}
 
-    new_target_labels: Dict[str, Dict[str, torch.Tensor]] = {}
+    new_target_labels: dict[str, dict[str, torch.Tensor]] = {}
     for output_name, target_labels in batch.target_labels.items():
         target_labels_on_cpu = {k: v.cpu() for k, v in target_labels.items()}
         new_target_labels[output_name] = target_labels_on_cpu
@@ -860,7 +848,7 @@ def _prepare_eval_attribution_outfolder(
 
 
 def _grab_single_target_from_model_output_hook(
-    self: Union[CNNModel, LinearModel],
+    self: CNNModel | LinearModel,
     input_: torch.Tensor,
     output: dict[str, dict[str, torch.Tensor]],
     output_target_column: str,
@@ -871,24 +859,23 @@ def _grab_single_target_from_model_output_hook(
 
 def get_attributions(
     explainer: al_explainers,
-    inputs: Dict[str, torch.Tensor],
+    inputs: dict[str, torch.Tensor],
     sample_label: torch.Tensor,
     column_type: str,
     baselines: tuple[torch.Tensor, ...],
     baseline_names_ordered: tuple[str, ...],
     n_steps: int,
-    internal_batch_size: Union[int, None],
+    internal_batch_size: int | None,
 ) -> list[np.ndarray]:
-
     tuple_inputs = tuple(inputs[n] for n in baseline_names_ordered)
     baselines_averaged = tuple(i.mean(0).unsqueeze(0) for i in baselines)
 
-    common_kwargs = dict(
-        inputs=tuple_inputs,
-        baselines=baselines_averaged,
-        n_steps=n_steps,
-        internal_batch_size=internal_batch_size,
-    )
+    common_kwargs = {
+        "inputs": tuple_inputs,
+        "baselines": baselines_averaged,
+        "n_steps": n_steps,
+        "internal_batch_size": internal_batch_size,
+    }
 
     if column_type == "con":
         output = explainer.attribute(**common_kwargs)
@@ -916,10 +903,10 @@ def _get_interpretation_data_producer(
     column_type: str,
     output_name: str,
     dataset: al_local_datasets,
-) -> Generator[Tuple[Batch, dict[str, Any]], None, None]:
+) -> Generator[tuple[Batch, dict[str, Any]], None, None]:
     output_object = experiment.outputs[output_name]
     assert isinstance(
-        output_object, (ComputedTabularOutputInfo, ComputedSurvivalOutputInfo)
+        output_object, ComputedTabularOutputInfo | ComputedSurvivalOutputInfo
     )
 
     target_transformer = output_object.target_transformers[column_name]
@@ -974,9 +961,12 @@ def _get_interpretation_data_producer(
         cur_label = target_labels[output_name][column_name]
         cur_column_type = column_type
 
-        if cur_column_type == "con" and torch.isnan(cur_label).any():
-            continue
-        elif cur_column_type == "cat" and cur_label < 0:
+        if (
+            cur_column_type == "con"
+            and torch.isnan(cur_label).any()
+            or cur_column_type == "cat"
+            and cur_label < 0
+        ):
             continue
 
         inputs_detached = _detach_all_inputs(tensor_inputs=batch.inputs)
@@ -986,12 +976,12 @@ def _get_interpretation_data_producer(
             ids=batch.ids,
         )
 
-        raw_inputs = {k: v for k, v in loader_batch[0].items()}
+        raw_inputs = dict(loader_batch[0].items())
 
         yield batch_interpretation, raw_inputs
 
 
-def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):
+def _detach_all_inputs(tensor_inputs: dict[str, torch.Tensor]):
     inputs_detached = {}
 
     for input_name, value in tensor_inputs.items():
@@ -1002,7 +992,7 @@ def _detach_all_inputs(tensor_inputs: Dict[str, torch.Tensor]):
 
 def _get_attributions_dataloader(
     dataset: al_local_datasets,
-    max_attributions_per_class: Optional[int],
+    max_attributions_per_class: int | None,
     output_name: str,
     target_column: str,
     column_type: str,
@@ -1034,8 +1024,8 @@ def _get_categorical_sample_indices_for_attributions(
     output_name: str,
     target_column: str,
     target_classes_numerical: Sequence[int],
-) -> Tuple[int, ...]:
-    acc_label_counts: DefaultDict[int | float | torch.Tensor, int] = defaultdict(
+) -> tuple[int, ...]:
+    acc_label_counts: defaultdict[int | float | torch.Tensor, int] = defaultdict(
         lambda: 0
     )
     acc_label_limit = max_attributions_per_class
@@ -1060,7 +1050,7 @@ def _get_categorical_sample_indices_for_attributions(
 
 def _get_continuous_sample_indices_for_attributions(
     dataset: al_local_datasets, max_attributions_per_class: int, *args, **kwargs
-) -> Tuple[int, ...]:
+) -> tuple[int, ...]:
     acc_label_limit = max_attributions_per_class
     num_sample = len(dataset)
     indices = np.random.choice(num_sample, acc_label_limit)

@@ -52,14 +52,14 @@ def test_hybrid_storage_dtype_handling():
     row_0 = storage.get_row(0)
     assert row_0["int32_col"] == 1
     assert row_0["int64_col"] is None
-    assert isinstance(row_0["float32_col"], (float, np.floating))
+    assert isinstance(row_0["float32_col"], float | np.floating)
     assert np.isnan(row_0["float64_col"])
 
     row_1 = storage.get_row(1)
     assert row_1["int32_col"] is None
     assert row_1["int64_col"] == 4
     assert np.isnan(row_1["float32_col"])
-    assert isinstance(row_1["float64_col"], (float, np.floating))
+    assert isinstance(row_1["float64_col"], float | np.floating)
 
 
 def test_integer_null_preservation():

@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Protocol, Type
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 from eir.data_load.label_setup import al_label_transformers
 from eir.setup import schemas
@@ -37,21 +38,21 @@ al_output_objects = (
     | ComputedImageOutputInfo
     | ComputedSurvivalOutputInfo
 )
-al_output_objects_as_dict = Dict[str, al_output_objects]
+al_output_objects_as_dict = dict[str, al_output_objects]
 
 al_output_classes = (
-    Type[ComputedTabularOutputInfo]
-    | Type[ComputedSequenceOutputInfo]
-    | Type[ComputedArrayOutputInfo]
-    | Type[ComputedImageOutputInfo]
-    | Type[ComputedSurvivalOutputInfo]
+    type[ComputedTabularOutputInfo]
+    | type[ComputedSequenceOutputInfo]
+    | type[ComputedArrayOutputInfo]
+    | type[ComputedImageOutputInfo]
+    | type[ComputedSurvivalOutputInfo]
 )
 
 
 def set_up_outputs_for_training(
     output_configs: schemas.al_output_configs,
     input_objects: Optional["al_input_objects_as_dict"] = None,
-    target_transformers: Optional[Dict[str, al_label_transformers]] = None,
+    target_transformers: dict[str, al_label_transformers] | None = None,
 ) -> al_output_objects_as_dict:
     all_outputs = set_up_outputs_general(
         output_configs=output_configs,
@@ -80,7 +81,7 @@ class OutputSetupGetterFunction(Protocol):
 def set_up_outputs_general(
     output_configs: schemas.al_output_configs,
     setup_func_getter: OutputSetupGetterFunction,
-    setup_func_kwargs: Dict[str, Any],
+    setup_func_kwargs: dict[str, Any],
 ) -> al_output_objects_as_dict:
     all_outputs = {}
 

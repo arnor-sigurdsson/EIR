@@ -2,7 +2,7 @@ import tomlkit
 
 
 def _get_module_version():
-    with open("src/eir/__init__.py", "r") as infile:
+    with open("src/eir/__init__.py") as infile:
         file_contents = infile.readline()
 
     version = file_contents.split("__version__ = ")[-1].strip().replace('"', "")

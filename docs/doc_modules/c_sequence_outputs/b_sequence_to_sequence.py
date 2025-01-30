@@ -1,6 +1,6 @@
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
-from typing import Sequence
 
 import pandas as pd
 
@@ -157,10 +157,10 @@ def save_translations(folder_path: Path, output_folder: Path) -> None:
 
     data = pd.DataFrame(columns=["Spanish", "English Translation"])
 
-    for inp, gen in zip(input_files, generated_files):
-        with open(inp, "r") as file:
+    for inp, gen in zip(input_files, generated_files, strict=False):
+        with open(inp) as file:
             sentences = file.readlines()
-        with open(gen, "r") as file:
+        with open(gen) as file:
             translations = file.readlines()
 
         temp_df = pd.DataFrame(

@@ -1,6 +1,7 @@
 from collections import Counter
+from collections.abc import Iterable, Sequence
 from statistics import mean
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -13,12 +14,12 @@ if TYPE_CHECKING:
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
-al_sample_weight_and_counts = Dict[str, torch.Tensor | list[int]]
+al_sample_weight_and_counts = dict[str, torch.Tensor | list[int]]
 
 
 def get_weighted_random_sampler(
     target_storage: "HybridStorage",
-    columns_to_sample: List[str],
+    columns_to_sample: list[str],
 ) -> WeightedRandomSampler:
     """
     Takes a HybridStorage with target data and returns a WeightedRandomSampler
@@ -59,8 +60,8 @@ def get_weighted_random_sampler(
 
 
 def _build_weighted_sample_dict_from_config_sequence(
-    config_list: List[str],
-) -> Dict[str, List[str]]:
+    config_list: list[str],
+) -> dict[str, list[str]]:
     weighted_sample_dict = {}
 
     for weighted_sample_config_string in config_list:
@@ -81,7 +82,7 @@ def _gather_column_sampling_weights(
     target_storage: "HybridStorage",
     output_name: str,
     columns_to_sample: Iterable[str],
-) -> Dict[str, al_sample_weight_and_counts]:
+) -> dict[str, al_sample_weight_and_counts]:
     all_target_label_weight_dicts: dict[str, al_sample_weight_and_counts] = {}
 
     for column in columns_to_sample:
@@ -145,11 +146,11 @@ def _gather_column_sampling_weights(
 
 
 def _get_column_label_weights_and_counts(
-    label_iterable: Iterable[int | float], column_name: Optional[str] = None
+    label_iterable: Iterable[int | float], column_name: str | None = None
 ) -> dict[str, torch.Tensor | list[int]]:
-    def _check_labels(label_list: List[int]):
+    def _check_labels(label_list: list[int]):
         labels_set = set(label_list)
-        found_labels = sorted(list(labels_set))
+        found_labels = sorted(labels_set)
         expected_labels = list(range(len(found_labels)))
 
         if found_labels != expected_labels:
@@ -188,7 +189,7 @@ def _get_column_label_weights_and_counts(
 
 def _aggregate_column_sampling_weights(
     all_target_columns_weights_and_counts: dict[str, al_sample_weight_and_counts],
-) -> Tuple[Sequence[float], int]:
+) -> tuple[Sequence[float], int]:
     """
     We sum up the normalized weights for each target column to create the final sampling
     weights.

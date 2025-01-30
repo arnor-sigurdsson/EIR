@@ -1,4 +1,4 @@
-from typing import Dict, Literal
+from typing import Literal
 
 import torch
 from torch import nn
@@ -17,7 +17,7 @@ class MetaModel(nn.Module):
         input_modules: al_input_modules,
         fusion_modules: al_fusion_modules,
         output_modules: al_output_modules,
-        fusion_to_output_mapping: Dict[str, Literal["computed", "pass-through"]],
+        fusion_to_output_mapping: dict[str, Literal["computed", "pass-through"]],
         tensor_broker: nn.ModuleDict,
     ):
         super().__init__()
@@ -32,7 +32,6 @@ class MetaModel(nn.Module):
         self,
         inputs: dict[str, torch.Tensor],
     ) -> dict[str, dict[str, torch.Tensor]]:
-
         output_modules_out = run_meta_forward(
             input_modules=self.input_modules,
             fusion_modules=self.fusion_modules,

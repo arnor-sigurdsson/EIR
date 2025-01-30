@@ -1,5 +1,5 @@
 from collections import Counter, OrderedDict
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
 
@@ -7,7 +7,7 @@ from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
 def vocab(
     ordered_dict: dict[str, int],
     min_freq: int = 1,
-    specials: Optional[list[str]] = None,
+    specials: list[str] | None = None,
     special_first: bool = True,
 ) -> Vocab:
     """
@@ -64,9 +64,9 @@ def vocab(
 def build_vocab_from_iterator(
     iterator: Iterable,
     min_freq: int = 1,
-    specials: Optional[list[str]] = None,
+    specials: list[str] | None = None,
     special_first: bool = True,
-    max_tokens: Optional[int] = None,
+    max_tokens: int | None = None,
     sort_by_freq: bool = False,
 ) -> Vocab:
     """

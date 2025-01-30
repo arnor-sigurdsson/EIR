@@ -1,14 +1,9 @@
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    Iterable,
-    List,
     Literal,
-    Sequence,
-    Set,
-    Union,
 )
 
 import torch
@@ -19,9 +14,9 @@ if TYPE_CHECKING:
     pass
 
 # Aliases
-al_tabular_input = Dict[str, List[str] | torch.Tensor]
-al_unique_embed_vals = Dict[str, Set[int]]
-al_emb_lookup_dict = Dict[str, Dict[str, Dict[int, int]]]
+al_tabular_input = dict[str, list[str] | torch.Tensor]
+al_unique_embed_vals = dict[str, set[int]]
+al_emb_lookup_dict = dict[str, dict[str, dict[int, int]]]
 
 
 @dataclass
@@ -162,7 +157,7 @@ def get_tabular_inputs(
     tabular_model: SimpleTabularModel,
     tabular_input: "al_tabular_input",
     device: str,
-) -> Union[torch.Tensor, None]:
+) -> torch.Tensor | None:
     """
     We want to have a wrapper function to gather all extra inputs needed by the model.
     """
@@ -257,9 +252,9 @@ def get_extra_continuous_inputs_from_labels(
 
 
 def get_unique_values_from_transformers(
-    transformers: Dict[str, LabelEncoder | StandardScaler],
+    transformers: dict[str, LabelEncoder | StandardScaler],
     keys_to_use: str | list[str],
-) -> Dict[str, Set[Any]]:
+) -> dict[str, set[Any]]:
     out: dict[str, Any] = {}
 
     if not keys_to_use:

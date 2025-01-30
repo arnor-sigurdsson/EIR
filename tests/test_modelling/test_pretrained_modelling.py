@@ -1,7 +1,8 @@
+from collections.abc import Sequence
 from copy import deepcopy
 from pathlib import Path
 from shutil import copytree
-from typing import TYPE_CHECKING, Dict, Sequence, Tuple
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
 
-def _get_pre_trained_module_setup_parametrization() -> Dict:
+def _get_pre_trained_module_setup_parametrization() -> dict:
     base = {
         "injections": {
             "global_configs": {
@@ -158,7 +159,7 @@ def _get_pre_trained_module_setup_parametrization() -> Dict:
     indirect=True,
 )
 def test_pre_trained_module_setup(
-    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+    prep_modelling_test_configs: tuple[train.Experiment, "ModelTestConfig"],
 ):
     experiment, test_config = prep_modelling_test_configs
 
@@ -377,7 +378,7 @@ def _add_new_feature_extractor_to_experiment(
     indirect=True,
 )
 def test_pre_training_and_loading(
-    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+    prep_modelling_test_configs: tuple[train.Experiment, "ModelTestConfig"],
 ):
     experiment, test_config = prep_modelling_test_configs
 
@@ -427,8 +428,8 @@ def _get_experiment_overloaded_for_pretrained_extractor(
     experiment: train.Experiment,
     test_config: "ModelTestConfig",
     rename_pretrained_inputs: bool,
-    skip_pretrained_keys: Sequence[str] = tuple(),
-) -> Tuple[train.Experiment, "ModelTestConfig"]:
+    skip_pretrained_keys: Sequence[str] = (),
+) -> tuple[train.Experiment, "ModelTestConfig"]:
     pretrained_configs = _get_input_configs_with_pretrained_modifications(
         run_path=test_config.run_path,
         pretrained_configs=experiment.configs,
@@ -472,7 +473,7 @@ def _get_input_configs_with_pretrained_modifications(
     pretrained_configs: train.Configs,
     run_path: Path,
     rename_pretrained_inputs: bool,
-    skip_pretrained_keys: Sequence[str] = tuple(),
+    skip_pretrained_keys: Sequence[str] = (),
 ) -> train.Configs:
     """
     `rename_pretrained_inputs`:
@@ -555,7 +556,7 @@ def _get_experiment_overloaded_for_pretrained_checkpoint(
     experiment: train.Experiment,
     test_config: "ModelTestConfig",
     change_architecture: bool = False,
-) -> Tuple[train.Experiment, "ModelTestConfig"]:
+) -> tuple[train.Experiment, "ModelTestConfig"]:
     """
     :param change_architecture:
         If True, we will change the architecture of the model to be different from the

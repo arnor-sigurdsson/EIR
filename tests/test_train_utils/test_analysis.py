@@ -35,7 +35,7 @@ def test_parse_valid_classification_preds():
     )
 
     assert df_valid_preds.shape[0] == 10
-    assert set(df_valid_preds["ID"]) == set("Test_ID_" + str(i) for i in range(1, 11))
+    assert set(df_valid_preds["ID"]) == {"Test_ID_" + str(i) for i in range(1, 11)}
     assert (df_valid_preds["True_Label"] == test_val_true).all()
     assert (df_valid_preds["Predicted"] == test_val_preds).all()
 

@@ -43,7 +43,7 @@ def test_prepare_array_data_invalid_dimensions():
         prepare_array_data(array_data=array_data, normalization_stats=None)
 
     expected_error_message = (
-        "Array has 4 dimensions, " "currently only 1, 2, or 3 are supported."
+        "Array has 4 dimensions, currently only 1, 2, or 3 are supported."
     )
     assert str(exc_info.value) == expected_error_message
 
@@ -168,6 +168,6 @@ def test_prepare_array_data_invalid_dimensions_with_normalization():
         )
 
     expected_error_message = (
-        "Array has 4 dimensions, " "currently only 1, 2, or 3 are supported."
+        "Array has 4 dimensions, currently only 1, 2, or 3 are supported."
     )
     assert str(exc_info.value) == expected_error_message

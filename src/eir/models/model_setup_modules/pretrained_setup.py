@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence, Tuple, Union
+from typing import TYPE_CHECKING
 
 from eir.experiment_io.experiment_io import load_serialized_train_experiment
 from eir.experiment_io.io_utils import get_run_folder_from_model_path
@@ -114,7 +115,7 @@ def overload_meta_model_feature_extractors_with_pretrained(
 
 def _build_all_replacements_tuples_for_loading_pretrained_module(
     input_configs: Sequence[schemas.InputConfig],
-) -> Sequence[Tuple[str, str]]:
+) -> Sequence[tuple[str, str]]:
     replacement_patterns = []
     for input_config in input_configs:
         if input_config.pretrained_config:
@@ -130,7 +131,7 @@ def _build_all_replacements_tuples_for_loading_pretrained_module(
 
 def _build_replace_tuple_when_loading_pretrained_module(
     load_module_name: str, current_input_name: str
-) -> Union[None, Tuple[str, str]]:
+) -> None | tuple[str, str]:
     if load_module_name == current_input_name:
         return None
 

@@ -106,7 +106,7 @@ def save_survival_evaluation_results_wrapper(
                 }
             )
 
-            for i, t in enumerate(time_bins_except_last):
+            for i, _t in enumerate(time_bins_except_last):
                 df[f"Surv_Prob_t{i}"] = survival_probs[:, i]
 
             plot_discrete_individual_survival_curves(
@@ -206,7 +206,6 @@ def maybe_save_survival_hazards_and_times(
     baseline_hazards: np.ndarray,
     unique_times: np.ndarray,
 ) -> None:
-
     sof = serialization_output_folder
     baseline_hazard_path = sof / "baseline_hazard.npy"
     baseline_unique_times_path = sof / "baseline_unique_times.npy"
@@ -302,7 +301,9 @@ def plot_cox_survival_curves(
     risk_quantiles = np.percentile(risk_scores, [25, 50, 75])
 
     for q, risk in zip(
-        ["Low Risk (25%)", "Median Risk", "High Risk (75%)"], risk_quantiles
+        ["Low Risk (25%)", "Median Risk", "High Risk (75%)"],
+        risk_quantiles,
+        strict=False,
     ):
         interp_baseline = np.interp(time_points, unique_times, baseline_survival)
         surv = interp_baseline ** np.exp(risk)
@@ -334,11 +335,12 @@ def plot_cox_risk_stratification(
 
     plt.figure(figsize=(12, 8))
 
-    for q, risk, color, label in zip(
+    for _q, risk, color, label in zip(
         risk_percentiles,
         risk_thresholds,
         colors,
         group_labels,
+        strict=False,
     ):
         interp_baseline = np.interp(time_points, unique_times, baseline_survival)
         surv = interp_baseline ** np.exp(risk)
@@ -461,7 +463,9 @@ def plot_discrete_risk_stratification(
     bin_edges = np.append(time_bins, np.inf)
     n_intervals = len(time_bins)
 
-    for risk_level, color, label in zip(risk_percentiles, colors, group_labels):
+    for risk_level, color, label in zip(
+        risk_percentiles, colors, group_labels, strict=False
+    ):
         # Low risk (top 25% survival probability)
         if risk_level == 75:
             mask = risk_scores > risk_thresholds[2]

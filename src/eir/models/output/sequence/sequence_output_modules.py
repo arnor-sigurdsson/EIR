@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Literal
+from typing import TYPE_CHECKING, Literal
 
 import torch
 from torch import nn
@@ -67,7 +67,7 @@ class SequenceOutputModule(nn.Module):
         self,
         output_object: "ComputedSequenceOutputInfo",
         output_name: str,
-        feature_dimensionalities_and_types: Dict[str, "FeatureExtractorInfo"],
+        feature_dimensionalities_and_types: dict[str, "FeatureExtractorInfo"],
         *args,
         **kwargs,
     ):

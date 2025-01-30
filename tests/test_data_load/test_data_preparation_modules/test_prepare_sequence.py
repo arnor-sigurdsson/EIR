@@ -8,7 +8,7 @@ from eir.setup.schemas import SequenceInputDataConfig
 
 
 def test_prepare_sequence_data():
-    test_input = np.array([i for i in range(100)])
+    test_input = np.array(list(range(100)))
     test_input_copy = deepcopy(test_input)
 
     encode_func_mock = MagicMock()

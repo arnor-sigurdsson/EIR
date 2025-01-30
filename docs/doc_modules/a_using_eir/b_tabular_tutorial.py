@@ -1,7 +1,7 @@
 import json
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Sequence
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from docs.doc_modules.serve_experiments_utils import load_data_for_serve
@@ -245,7 +245,7 @@ def _get_model_path_for_predict() -> str:
     return model_path
 
 
-def _add_model_path_to_command(command: List[str]) -> List[str]:
+def _add_model_path_to_command(command: list[str]) -> list[str]:
     model_path = _get_model_path_for_predict()
     command = [x.replace("FILL_MODEL", model_path) for x in command]
     return command

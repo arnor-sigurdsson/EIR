@@ -1,5 +1,4 @@
-from typing import Dict, List
-
+import numpy as np
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
@@ -62,7 +61,7 @@ def test_get_tabular_attribution_df_uneven_lists():
 
 
 def test_get_tabular_attribution_df_empty_input():
-    input_data: Dict[str, List[float]] = {}
+    input_data: dict[str, list[float]] = {}
     expected_output = pd.DataFrame(columns=["Input", "Attribution"])
 
     result = get_long_format_attribution_df(parsed_attributions=input_data)
@@ -95,8 +94,8 @@ def test_get_tabular_attribution_df_output_types():
     result = get_long_format_attribution_df(parsed_attributions=input_data)
 
     assert isinstance(result, pd.DataFrame)
-    assert result.dtypes["Input"] == object
-    assert result.dtypes["Attribution"] == float
+    assert result.dtypes["Input"] is np.dtype("O")
+    assert result.dtypes["Attribution"] is np.dtype("float64")
 
 
 @pytest.mark.parametrize(

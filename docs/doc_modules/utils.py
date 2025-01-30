@@ -1,6 +1,5 @@
 import shutil
 from pathlib import Path
-from typing import Union
 
 
 def get_saved_model_path(run_folder: Path) -> str:
@@ -11,7 +10,7 @@ def get_saved_model_path(run_folder: Path) -> str:
     return str(model_path)
 
 
-def zip_folder(target_folder: str, destination_zip: Union[str, None] = None) -> None:
+def zip_folder(target_folder: str, destination_zip: str | None = None) -> None:
     if destination_zip is None:
         destination_zip = f"{target_folder}.zip"
 

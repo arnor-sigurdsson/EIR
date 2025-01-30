@@ -1,5 +1,5 @@
 import copy
-from typing import Dict, Sequence
+from collections.abc import Sequence
 
 import pytest
 
@@ -143,15 +143,13 @@ def _get_common_model_config_overload() -> dict:
 def _parse_model_specific_config_values(model_config: dict, model_name: str) -> dict:
     mc = copy.copy(model_config)
 
-    if model_name == "prophetnet":
-        mc.pop("num_hidden_layers")
-    elif model_name == "xlm-prophetnet":
+    if model_name == "prophetnet" or model_name == "xlm-prophetnet":
         mc.pop("num_hidden_layers")
 
     return mc
 
 
-def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
+def get_test_external_sequence_models_parametrization() -> Sequence[dict]:
     """
     Some models seem to fail tracing or a bit troublesome to configure, skip for now.
     """
@@ -162,8 +160,7 @@ def get_test_external_sequence_models_parametrization() -> Sequence[Dict]:
     for model in all_models:
         if any(i for i in {"big_bird", "bigbird", "gpt_neo", "reformer"} if i in model):
             continue
-        else:
-            all_models_filtered.append(model)
+        all_models_filtered.append(model)
 
     all_parameterizations = []
 

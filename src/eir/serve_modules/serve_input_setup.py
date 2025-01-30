@@ -1,7 +1,8 @@
+from collections.abc import Callable, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Sequence, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import torch
 from torch.utils.data._utils.collate import default_collate
@@ -47,10 +48,10 @@ class ServeBatch:
     directly.
     """
 
-    pre_hook_inputs: Dict[str, torch.Tensor]
-    inputs: Dict[str, torch.Tensor]
+    pre_hook_inputs: dict[str, torch.Tensor]
+    inputs: dict[str, torch.Tensor]
     inputs_split: Sequence[dict[str, torch.Tensor]]
-    target_labels: Dict[str, Dict[str, torch.Tensor]]
+    target_labels: dict[str, dict[str, torch.Tensor]]
     ids: list[str]
 
 
@@ -173,7 +174,7 @@ def _setup_tabular_input_for_serve(
     return serve_tabular_info
 
 
-def _load_request_data(data: Sequence) -> Sequence[Dict[str, Any]]:
+def _load_request_data(data: Sequence) -> Sequence[dict[str, Any]]:
     input_data = data
     inputs_loaded = input_data
 
@@ -184,7 +185,6 @@ def general_pre_process_raw_inputs_wrapper(
     raw_inputs: Sequence[dict[str, Any]],
     experiment: Union["Experiment", "ServeExperiment"],
 ) -> Sequence[dict[str, torch.Tensor]]:
-
     all_preprocessed = []
 
     for raw_input in raw_inputs:

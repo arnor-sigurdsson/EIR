@@ -1,5 +1,4 @@
 from copy import deepcopy
-from typing import Tuple
 
 import pytest
 import torch
@@ -323,7 +322,7 @@ def valid_test_inputs(draw):
 
 @given(valid_test_inputs())
 @settings(deadline=None)
-def test_calc_conv_params_needed_fuzzy(test_input: Tuple[int, int, int, int]) -> None:
+def test_calc_conv_params_needed_fuzzy(test_input: tuple[int, int, int, int]) -> None:
     solution = models_cnn.calc_conv_params_needed(*test_input)
 
     assert solution.kernel_size >= 1

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Dict, Literal, Protocol, Type, TypeGuard
+from typing import Any, Literal, Protocol, TypeGuard
 
 from torch import Tensor, nn
 
@@ -8,14 +8,13 @@ from eir.models.input.array.models_cnn import CNNModelConfig
 
 
 class ImageModelClassGetterFunction(Protocol):
-    def __call__(self, model_type: str) -> Type["ImageWrapperModel"]: ...
+    def __call__(self, model_type: str) -> type["ImageWrapperModel"]: ...
 
 
-def get_image_model_class(model_type: str) -> Type["ImageWrapperModel"]:
+def get_image_model_class(model_type: str) -> type["ImageWrapperModel"]:
     if model_type == "image-wrapper-default":
         return ImageWrapperModel
-    else:
-        raise ValueError()
+    raise ValueError()
 
 
 @dataclass
@@ -42,7 +41,7 @@ class ImageModelConfig:
     """
 
     model_type: Literal["cnn"] | str
-    model_init_config: CNNModelConfig | Dict[str, Any]
+    model_init_config: CNNModelConfig | dict[str, Any]
 
     num_output_features: int = 0
 

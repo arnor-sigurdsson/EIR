@@ -1,5 +1,6 @@
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Callable, Dict, Literal, Optional, Sequence
+from typing import Literal
 
 import torch.backends
 import torch.cuda
@@ -58,7 +59,7 @@ def get_test_inputs_inits(
     input_config_dicts: Sequence[dict],
     split_to_test: bool,
     source: Literal["local", "deeplake"],
-    extra_kwargs: Optional[dict] = None,
+    extra_kwargs: dict | None = None,
 ) -> Sequence[dict]:
     if extra_kwargs is None:
         extra_kwargs = {}
@@ -69,7 +70,7 @@ def get_test_inputs_inits(
     for init_dict in input_config_dicts:
         cur_name = init_dict["input_info"]["input_name"]
 
-        cur_base_func_keys = [i for i in base_func_map.keys() if cur_name.startswith(i)]
+        cur_base_func_keys = [i for i in base_func_map if cur_name.startswith(i)]
         assert len(cur_base_func_keys) == 1
         cur_base_func_key = cur_base_func_keys[0]
 
@@ -103,7 +104,7 @@ def get_test_outputs_inits(
     for init_dict in output_configs_dicts:
         cur_name = init_dict["output_info"]["output_name"]
 
-        cur_base_func_keys = [i for i in base_func_map.keys() if cur_name.startswith(i)]
+        cur_base_func_keys = [i for i in base_func_map if cur_name.startswith(i)]
         assert len(cur_base_func_keys) == 1
         cur_base_func_key = cur_base_func_keys[0]
 
@@ -132,7 +133,7 @@ def get_test_outputs_inits(
     return inits
 
 
-def get_output_test_init_base_func_map() -> Dict[str, Callable]:
+def get_output_test_init_base_func_map() -> dict[str, Callable]:
     mapping = {
         "test_output_tabular": get_test_tabular_base_output_inits,
         "test_output_copy": get_test_tabular_base_output_inits,
@@ -148,7 +149,7 @@ def get_output_test_init_base_func_map() -> Dict[str, Callable]:
     return mapping
 
 
-def get_input_test_init_base_func_map() -> Dict[str, Callable]:
+def get_input_test_init_base_func_map() -> dict[str, Callable]:
     mapping = {
         "test_genotype": get_test_omics_input_init,
         "test_tabular": get_test_tabular_input_init,
@@ -189,7 +190,7 @@ def _inject_train_source_path(
 def get_test_omics_input_init(
     test_path: Path,
     split_to_test: bool,
-    init_dict: Dict,
+    init_dict: dict,
     source: Literal["local", "deeplake"],
     *args,
     **kwargs,
@@ -293,7 +294,7 @@ def get_test_sequence_input_init(
 
 def get_test_bytes_input_init(
     test_path: Path, split_to_test: bool, *args, **kwargs
-) -> Dict:
+) -> dict:
     input_source = test_path / "sequence"
     if split_to_test:
         input_source = input_source / "train_set"
@@ -323,7 +324,7 @@ def get_test_image_input_init(
     source: Literal["local", "deeplake"],
     *args,
     **kwargs,
-) -> Dict:
+) -> dict:
     input_source = _inject_train_source_path(
         test_path=test_path,
         source=source,
@@ -386,7 +387,7 @@ def get_test_array_input_init(
 def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
     if model_type in ("identity", "pass-through"):
         return [{}]
-    elif model_type in ("mlp-residual", "mgmoe"):
+    if model_type in ("mlp-residual", "mgmoe"):
         return [
             {
                 "model_config": {
@@ -397,13 +398,12 @@ def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
                 }
             }
         ]
-    else:
-        raise ValueError("Unknown fusion model type: '%s'" % model_type)
+    raise ValueError(f"Unknown fusion model type: '{model_type}'")
 
 
 def get_test_tabular_base_output_inits(
     test_path: Path, split_to_test: bool, *args, **kwargs
-) -> Dict:
+) -> dict:
     label_file = test_path / "labels.csv"
     if split_to_test:
         label_file = test_path / "labels_train.csv"
@@ -427,7 +427,7 @@ def get_test_sequence_base_output_inits(
     test_path: Path,
     split_to_test: bool,
     source: Literal["local", "deeplake"],
-) -> Dict:
+) -> dict:
     output_source = _inject_train_source_path(
         test_path=test_path,
         source=source,
@@ -458,7 +458,7 @@ def get_test_array_base_output_inits(
     test_path: Path,
     split_to_test: bool,
     source: Literal["local", "deeplake"],
-) -> Dict:
+) -> dict:
     output_source = _inject_train_source_path(
         test_path=test_path,
         source=source,
@@ -483,7 +483,7 @@ def get_test_image_base_output_inits(
     test_path: Path,
     split_to_test: bool,
     source: Literal["local", "deeplake"],
-) -> Dict:
+) -> dict:
     output_source = _inject_train_source_path(
         test_path=test_path,
         source=source,
@@ -508,7 +508,7 @@ def get_test_image_base_output_inits(
 
 def get_test_survival_base_output_inits(
     test_path: Path, split_to_test: bool, *args, **kwargs
-) -> Dict:
+) -> dict:
     label_file = test_path / "labels.csv"
     if split_to_test:
         label_file = test_path / "labels_train.csv"

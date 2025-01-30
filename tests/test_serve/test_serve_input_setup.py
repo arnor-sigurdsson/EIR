@@ -43,13 +43,17 @@ def test_general_pre_process(mock_serve_experiment):
         },
     ]
 
-    with patch(
-        "eir.serve_modules.serve_input_setup.parse_request_input_data_wrapper"
-    ) as mock_parse, patch(
-        "eir.serve_modules.serve_input_setup.general_pre_process_raw_inputs_wrapper"
-    ) as mock_prepare, patch(
-        "eir.serve_modules.serve_input_setup.call_hooks_stage_iterable"
-    ) as mock_collate:
+    with (
+        patch(
+            "eir.serve_modules.serve_input_setup.parse_request_input_data_wrapper"
+        ) as mock_parse,
+        patch(
+            "eir.serve_modules.serve_input_setup.general_pre_process_raw_inputs_wrapper"
+        ) as mock_prepare,
+        patch(
+            "eir.serve_modules.serve_input_setup.call_hooks_stage_iterable"
+        ) as mock_collate,
+    ):
         mock_parse.return_value = data
         mock_prepare.return_value = [
             {
@@ -87,11 +91,12 @@ def test_parse_request_input_data_wrapper():
     data = [{"feature1": 1.0, "feature2": "category1"}]
     input_objects = {"tabular_input": Mock(spec=ComputedServeTabularInputInfo)}
 
-    with patch(
-        "eir.serve_modules.serve_input_setup._load_request_data"
-    ) as mock_load, patch(
-        "eir.serve_modules.serve_input_setup.prepare_request_input_data_wrapper"
-    ) as mock_prepare:
+    with (
+        patch("eir.serve_modules.serve_input_setup._load_request_data") as mock_load,
+        patch(
+            "eir.serve_modules.serve_input_setup.prepare_request_input_data_wrapper"
+        ) as mock_prepare,
+    ):
         mock_load.return_value = data
         mock_prepare.return_value = [
             {"tabular_input": {"feature1": 1.0, "feature2": 0}}
@@ -187,11 +192,14 @@ def test_general_pre_process_raw_inputs(mock_serve_experiment):
     }
     mock_serve_experiment.inputs["sequence_input"].encode_func = lambda x: [1, 2, 3, 4]
 
-    with patch(
-        "eir.serve_modules.serve_input_setup.prepare_inputs_memory"
-    ) as mock_prepare, patch(
-        "eir.serve_modules.serve_input_setup.impute_missing_modalities_wrapper"
-    ) as mock_impute:
+    with (
+        patch(
+            "eir.serve_modules.serve_input_setup.prepare_inputs_memory"
+        ) as mock_prepare,
+        patch(
+            "eir.serve_modules.serve_input_setup.impute_missing_modalities_wrapper"
+        ) as mock_impute,
+    ):
         mock_prepare.return_value = {
             "tabular_input": torch.tensor([1.0, 0]),
             "sequence_input": torch.tensor([1, 2, 3, 4]),

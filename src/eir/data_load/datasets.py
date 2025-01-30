@@ -1,16 +1,10 @@
 import reprlib
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
-    Mapping,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     Union,
 )
 
@@ -73,7 +67,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 # Type Aliases
 al_datasets = Union["MemoryDataset", "DiskDataset", "StreamingDataset"]
 al_local_datasets = Union["MemoryDataset", "DiskDataset"]
-al_dataset_types = Type[al_datasets]
+al_dataset_types = type[al_datasets]
 # embeddings --> remain str, cat targets --> int, con extra/target --> float
 al_sample_label_dict_target = dict[str, dict[str, int | float | torch.Tensor]]
 al_inputs = dict[str, torch.Tensor] | dict[str, Any]
@@ -85,11 +79,10 @@ def set_up_datasets_from_configs(
     target_labels: "MergedTargetLabels",
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
-    train_ids_to_keep: Optional[Sequence[str]] = None,
-    valid_ids_to_keep: Optional[Sequence[str]] = None,
-    websocket_url: Optional[str] = None,
-) -> Tuple[al_datasets, al_local_datasets]:
-
+    train_ids_to_keep: Sequence[str] | None = None,
+    valid_ids_to_keep: Sequence[str] | None = None,
+    websocket_url: str | None = None,
+) -> tuple[al_datasets, al_local_datasets]:
     train_dataset_class: al_dataset_types = (
         MemoryDataset if configs.gc.be.memory_dataset else DiskDataset
     )
@@ -129,24 +122,24 @@ def set_up_datasets_from_configs(
     valid_dataset: al_datasets = valid_dataset_class(**valid_kwargs)
 
     if not websocket_url:
-        assert isinstance(train_dataset, (MemoryDataset, DiskDataset))
-        assert isinstance(valid_dataset, (MemoryDataset, DiskDataset))
+        assert isinstance(train_dataset, MemoryDataset | DiskDataset)
+        assert isinstance(valid_dataset, MemoryDataset | DiskDataset)
         _check_valid_and_train_datasets(
             train_dataset=train_dataset,
             valid_dataset=valid_dataset,
         )
 
-    assert isinstance(valid_dataset, (MemoryDataset, DiskDataset))
+    assert isinstance(valid_dataset, MemoryDataset | DiskDataset)
     return train_dataset, valid_dataset
 
 
 def construct_default_dataset_kwargs_from_cl_args(
-    target_labels_df: Optional[al_target_labels],
+    target_labels_df: al_target_labels | None,
     inputs: al_input_objects_as_dict,
     outputs: "al_output_objects_as_dict",
     test_mode: bool,
     missing_ids_per_output: "MissingTargetsInfo",
-    ids_to_keep: Optional[Sequence[str]] = None,
+    ids_to_keep: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     ids_to_keep_set = set(ids_to_keep) if ids_to_keep is not None else None
 
@@ -211,8 +204,8 @@ class DatasetBase(Dataset):
         outputs: "al_output_objects_as_dict",
         test_mode: bool,
         missing_ids_per_output: "MissingTargetsInfo",
-        target_labels_df: Optional[al_target_labels] = None,
-        ids_to_keep: Optional[Set[str]] = None,
+        target_labels_df: al_target_labels | None = None,
+        ids_to_keep: set[str] | None = None,
     ):
         super().__init__()
 
@@ -239,8 +232,8 @@ class DatasetBase(Dataset):
 
     def set_up_dfs(
         self,
-        input_data_loading_hooks: Optional[Mapping[str, InputHookOutput]] = None,
-        output_data_loading_hooks: Optional[Mapping[str, HookOutput]] = None,
+        input_data_loading_hooks: Mapping[str, InputHookOutput] | None = None,
+        output_data_loading_hooks: Mapping[str, HookOutput] | None = None,
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """
         We do an extra filtering step at the end to account for the situation where
@@ -327,10 +320,9 @@ class DatasetBase(Dataset):
 
 
 def initialize_ids_to_keep(
-    target_labels_df: Optional[pl.DataFrame],
-    ids_to_keep: Optional[set[str]],
-) -> Optional[set[str]]:
-
+    target_labels_df: pl.DataFrame | None,
+    ids_to_keep: set[str] | None,
+) -> set[str] | None:
     if target_labels_df is not None and target_labels_df.height > 0:
         df_ids = set(target_labels_df.get_column("ID").to_list())
         if ids_to_keep:
@@ -340,7 +332,7 @@ def initialize_ids_to_keep(
     return ids_to_keep
 
 
-def initialize_input_df(ids_to_keep: Optional[set[str]]) -> pl.DataFrame:
+def initialize_input_df(ids_to_keep: set[str] | None) -> pl.DataFrame:
     if ids_to_keep is None:
         return pl.DataFrame(schema={"ID": pl.Utf8})
 
@@ -350,7 +342,7 @@ def initialize_input_df(ids_to_keep: Optional[set[str]]) -> pl.DataFrame:
 def add_data_to_df(
     inputs: al_input_objects_as_dict,
     input_df: pl.DataFrame,
-    ids_to_keep: Optional[set[str]],
+    ids_to_keep: set[str] | None,
     data_loading_hooks: Mapping[str, InputHookOutput],
 ) -> pl.DataFrame:
     for input_name, input_object in inputs.items():
@@ -394,9 +386,8 @@ def add_data_to_df(
 
 def filter_df(
     input_df: pl.DataFrame,
-    target_labels_df: Optional[pl.DataFrame] = None,
+    target_labels_df: pl.DataFrame | None = None,
 ) -> pl.DataFrame:
-
     num_samples_raw = input_df.height
     if len(input_df.columns) <= 1:
         return pl.DataFrame(schema=input_df.schema)
@@ -584,9 +575,9 @@ def _add_data_to_df_wrapper(
     input_source: str,
     input_name: str,
     input_df: pl.DataFrame,
-    ids_to_keep: Union[None, Set[str]],
+    ids_to_keep: None | set[str],
     data_loading_hook: InputHookOutput,
-    deeplake_input_inner_key: Optional[str] = None,
+    deeplake_input_inner_key: str | None = None,
 ) -> pl.DataFrame:
     if deeplake_ops.is_deeplake_dataset(data_source=input_source):
         assert deeplake_input_inner_key is not None
@@ -598,21 +589,20 @@ def _add_data_to_df_wrapper(
             deeplake_input_inner_key=deeplake_input_inner_key,
             data_loading_hook=data_loading_hook,
         )
-    else:
-        return _add_file_data_to_df(
-            input_source=input_source,
-            input_df=input_df,
-            ids_to_keep=ids_to_keep,
-            data_loading_hook=data_loading_hook,
-            input_name=input_name,
-        )
+    return _add_file_data_to_df(
+        input_source=input_source,
+        input_df=input_df,
+        ids_to_keep=ids_to_keep,
+        data_loading_hook=data_loading_hook,
+        input_name=input_name,
+    )
 
 
 def _add_file_data_to_df(
     input_source: str,
     input_name: str,
     input_df: pl.DataFrame,
-    ids_to_keep: Union[None, Set[str]],
+    ids_to_keep: None | set[str],
     data_loading_hook: InputHookOutput,
 ) -> pl.DataFrame:
     file_data_iterator = get_file_sample_id_iterator_basic(
@@ -633,7 +623,7 @@ def _add_file_data_to_df(
             sample_data = str(sample_data)
 
         if isinstance(sample_data, dict):
-            for key in sample_data.keys():
+            for key in sample_data:
                 col_name = f"{input_name}__{key}"
                 if col_name not in column_arrays:
                     column_arrays[col_name] = []
@@ -664,8 +654,7 @@ def _add_file_data_to_df(
 
     if input_df.height == 0:
         return processed_df
-    else:
-        return input_df.join(processed_df, on="ID", how="full", coalesce=True)
+    return input_df.join(processed_df, on="ID", how="full", coalesce=True)
 
 
 class DiskDataset(DatasetBase):

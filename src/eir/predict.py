@@ -1,9 +1,10 @@
 import json
 from argparse import Namespace
+from collections.abc import Callable, Iterable, Sequence
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Literal, Sequence, Union
+from typing import Literal
 
 import numpy as np
 import polars as pl
@@ -75,7 +76,7 @@ class PredictSpecificCLArgs:
     model_path: str
     evaluate: bool
     output_folder: str
-    attribution_background_source: Union[Literal["train"], Literal["predict"]]
+    attribution_background_source: Literal["train"] | Literal["predict"]
 
 
 def main():
@@ -116,13 +117,12 @@ def main():
 
 
 def _verify_predict_cl_args(predict_cl_args: Namespace):
-    if predict_cl_args.evaluate:
-        if len(predict_cl_args.output_configs) == 0:
-            raise ValueError(
-                "If you want to evaluate, you must specify at least one output config."
-                "This is needed to know the target column(s) and values to compute"
-                "metrics for (i.e., to compare predicted vs. true values)."
-            )
+    if predict_cl_args.evaluate and len(predict_cl_args.output_configs) == 0:
+        raise ValueError(
+            "If you want to evaluate, you must specify at least one output config."
+            "This is needed to know the target column(s) and values to compute"
+            "metrics for (i.e., to compare predicted vs. true values)."
+        )
 
 
 def run_predict(predict_cl_args: Namespace):
@@ -279,7 +279,7 @@ def _convert_dict_values_to_python_objects(object_):
 
     if isinstance(object_, np.number):
         return object_.item()
-    elif isinstance(object_, dict):
+    if isinstance(object_, dict):
         for key, value in object_.items():
             object_[key] = _convert_dict_values_to_python_objects(object_=value)
 

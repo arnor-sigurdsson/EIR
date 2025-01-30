@@ -1,7 +1,7 @@
 import argparse
 import sys
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from typing import Callable, Generator
 
 from eir import __version__
 from eir.predict import main as main_predict

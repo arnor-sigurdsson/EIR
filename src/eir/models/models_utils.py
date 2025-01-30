@@ -1,17 +1,10 @@
 from collections import OrderedDict
+from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    Iterable,
     Literal,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
 )
 
 import torch
@@ -30,7 +23,7 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
-def merge_module_dicts(module_dicts: Tuple[nn.ModuleDict, ...]) -> nn.ModuleDict:
+def merge_module_dicts(module_dicts: tuple[nn.ModuleDict, ...]) -> nn.ModuleDict:
     def _check_inputs():
         assert all(i.keys() == module_dicts[0].keys() for i in module_dicts)
 
@@ -53,10 +46,10 @@ def merge_module_dicts(module_dicts: Tuple[nn.ModuleDict, ...]) -> nn.ModuleDict
 def construct_blocks(
     num_blocks: int,
     block_constructor: Callable,
-    block_kwargs: Dict,
+    block_kwargs: dict,
 ) -> nn.Sequential:
     blocks = []
-    for i in range(num_blocks):
+    for _i in range(num_blocks):
         cur_block = block_constructor(**block_kwargs)
         blocks.append(cur_block)
     return nn.Sequential(*blocks)
@@ -137,8 +130,8 @@ def construct_multi_branches(
 def get_final_layer(
     in_features: int,
     num_outputs_per_target: "al_num_outputs_per_target",
-    layer_type: Union[Literal["linear"], Literal["mlp_residual"]] = "linear",
-    layer_type_specific_kwargs: Optional[Dict] = None,
+    layer_type: Literal["linear"] | Literal["mlp_residual"] = "linear",
+    layer_type_specific_kwargs: dict | None = None,
 ) -> nn.ModuleDict:
     final_module_dict = nn.ModuleDict()
 
@@ -174,7 +167,7 @@ def _get_mlp_residual_final_spec(
     num_outputs: int,
     dropout_p: float,
     stochastic_depth_p: float,
-) -> Tuple[Type[nn.Module], Dict[str, Any]]:
+) -> tuple[type[nn.Module], dict[str, Any]]:
     spec = (
         MLPResidualBlock,
         {
@@ -192,7 +185,7 @@ def _get_mlp_basic_final_spec(
     in_features: int,
     num_outputs: int,
     bias: bool = True,
-) -> Tuple[Type[nn.Module], Dict[str, Any]]:
+) -> tuple[type[nn.Module], dict[str, Any]]:
     spec = (
         nn.Linear,
         {
@@ -206,7 +199,7 @@ def _get_mlp_basic_final_spec(
 
 
 def initialize_modules_from_spec(
-    spec: "OrderedDict[str, Tuple[Type[nn.Module], Dict]]",
+    spec: "OrderedDict[str, tuple[type[nn.Module], dict]]",
 ) -> nn.Sequential:
     module_dict = OrderedDict()
     for name, recipe in spec.items():
@@ -220,7 +213,7 @@ def initialize_modules_from_spec(
     return nn.Sequential(module_dict)
 
 
-def initialize_module(module: Type[nn.Module], module_args: Dict) -> nn.Module:
+def initialize_module(module: type[nn.Module], module_args: dict) -> nn.Module:
     return module(**module_args)
 
 
@@ -235,9 +228,9 @@ def calculate_module_dict_outputs(
 
 
 def get_output_dimensions_for_input(
-    module: Union[PreTrainedModel, nn.Module],
-    input_shape: Tuple[int, ...],
-    pool: Union[Literal["max"], Literal["avg"], None],
+    module: PreTrainedModel | nn.Module,
+    input_shape: tuple[int, ...],
+    pool: Literal["max"] | Literal["avg"] | None,
     hf_model: bool = False,
 ) -> torch.LongTensor:
     cpu_device = torch.device("cpu")

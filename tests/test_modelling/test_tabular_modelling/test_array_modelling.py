@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Sequence
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -27,7 +28,7 @@ def get_array_data_to_test():
     return cases
 
 
-def _get_classification_output_configs() -> Sequence[Dict]:
+def _get_classification_output_configs() -> Sequence[dict]:
     output_configs = [
         {
             "output_info": {"output_name": "test_output_tabular"},
@@ -110,7 +111,7 @@ def test_array_classification(prep_modelling_test_configs):
 
 
 def check_array_activations(
-    attribution_path: Dict[str, Dict[str, Path]],
+    attribution_path: dict[str, dict[str, Path]],
     target_name: str,
     at_least_n_matches: int,
     all_attribution_target_classes_must_pass=True,
@@ -149,7 +150,7 @@ def check_array_activations(
         assert sum(successes) >= must_match_n
 
 
-def _get_regression_output_configs() -> Sequence[Dict]:
+def _get_regression_output_configs() -> Sequence[dict]:
     output_configs = [
         {
             "output_info": {"output_name": "test_output_tabular"},

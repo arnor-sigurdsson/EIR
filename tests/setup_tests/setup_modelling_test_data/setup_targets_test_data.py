@@ -1,12 +1,11 @@
 import csv
 from pathlib import Path
-from typing import List
 
 import numpy as np
 
 
 def set_up_label_file_writing(
-    base_path: Path, fieldnames: List[str], extra_name: str = ""
+    base_path: Path, fieldnames: list[str], extra_name: str = ""
 ):
     label_file = str(base_path / f"labels{extra_name}.csv")
 
@@ -18,9 +17,9 @@ def set_up_label_file_writing(
     return label_file_handle, writer
 
 
-def set_up_label_line_dict(sample_name: str, fieldnames: List[str]):
+def set_up_label_line_dict(sample_name: str, fieldnames: list[str]):
     label_line_dict = {k: None for k in fieldnames}
-    assert "ID" in label_line_dict.keys()
+    assert "ID" in label_line_dict
     label_line_dict["ID"] = sample_name
     return label_line_dict
 

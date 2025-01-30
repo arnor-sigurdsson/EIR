@@ -1,6 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from eir.models.input.sequence.transformer_models import SequenceModelConfig
 from eir.setup.input_setup_modules import setup_sequence
@@ -22,7 +22,7 @@ class ComputedSequenceOutputInfo:
     embedding_dim: int
     computed_max_length: int
     encode_func: setup_sequence.al_encode_funcs
-    tokenizer: Optional[setup_sequence.al_tokenizers]
+    tokenizer: setup_sequence.al_tokenizers | None
 
 
 def set_up_sequence_output(

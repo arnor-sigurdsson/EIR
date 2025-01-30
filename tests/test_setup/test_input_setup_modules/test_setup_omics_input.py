@@ -1,5 +1,3 @@
-from typing import List
-
 import pandas as pd
 import pytest
 
@@ -13,7 +11,7 @@ from eir.setup.input_setup_modules import setup_omics
         ([0, 10, 20, 30, 40, 50, 60, 70, 120, 999], [0, 10, 20, 30, 40, 50, 60, 70]),
     ],
 )
-def test_setup_subset_indices(indices_to_subset: List[int], expected: List[int]):
+def test_setup_subset_indices(indices_to_subset: list[int], expected: list[int]):
     test_data = []
     for i in range(100):
         cur_row_data = ["1", str(i), "0.1", str(i), "A", "T"]

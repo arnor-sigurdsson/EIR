@@ -1,6 +1,6 @@
 import json
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -276,9 +276,9 @@ def plot_survival_analysis_results(
     request_file: Path,
     output_folder: Path,
     stratify_by: str = "sex",
-    color_dict: Optional[dict[str, str]] = None,
-    label_dict: Optional[dict[str, str]] = None,
-    title: Optional[str] = None,
+    color_dict: dict[str, str] | None = None,
+    label_dict: dict[str, str] | None = None,
+    title: str | None = None,
 ):
     plt.style.use("seaborn-v0_8-whitegrid")
     plt.rcParams.update(
@@ -300,12 +300,11 @@ def plot_survival_analysis_results(
     def get_age_group(age: float) -> str:
         if age < 55:
             return "1"
-        elif age < 65:
+        if age < 65:
             return "2"
-        elif age < 75:
+        if age < 75:
             return "3"
-        else:
-            return "4"
+        return "4"
 
     default_color_schemes = {
         "sex": {
@@ -357,13 +356,15 @@ def plot_survival_analysis_results(
     colors = color_dict or default_color_schemes.get(stratify_by, {})
     labels = label_dict or default_label_schemes.get(stratify_by, {})
 
-    with open(request_file, "r") as f:
+    with open(request_file) as f:
         data = json.load(f)
 
     times = None
     stratified_data = {}
 
-    for request, response in zip(data[0]["request"], data[0]["response"]["result"]):
+    for request, response in zip(
+        data[0]["request"], data[0]["response"]["result"], strict=False
+    ):
         strat_value = (
             get_age_group(request["flchain"]["age"])
             if stratify_by == "age"
@@ -460,7 +461,7 @@ def _get_model_path_for_predict() -> str:
     return model_path
 
 
-def _add_model_path_to_command(command: List[str]) -> List[str]:
+def _add_model_path_to_command(command: list[str]) -> list[str]:
     model_path = _get_model_path_for_predict()
     command = [x.replace("FILL_MODEL", model_path) for x in command]
     return command

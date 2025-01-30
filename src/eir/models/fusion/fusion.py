@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, Literal, NewType, Type, cast
+from typing import TYPE_CHECKING, Literal, NewType, cast
 
 import torch
 from torch import nn
@@ -16,7 +16,7 @@ al_fusion_model_configs = (
 )
 
 ComputedType = NewType("ComputedType", torch.Tensor)
-PassThroughType = NewType("PassThroughType", Dict[str, torch.Tensor])
+PassThroughType = NewType("PassThroughType", dict[str, torch.Tensor])
 al_fused_features = dict[str, ComputedType | PassThroughType | torch.Tensor]
 
 if TYPE_CHECKING:
@@ -29,7 +29,7 @@ def get_fusion_modules(
     fusion_model_type: str,
     model_config: al_fusion_model_configs,
     modules_to_fuse: "al_input_modules",
-    out_feature_per_feature_extractor: Dict[str, int],
+    out_feature_per_feature_extractor: dict[str, int],
     output_types: dict[str, Literal["tabular", "sequence", "array"]],
     any_diffusion: bool,
     strict: bool = True,
@@ -126,14 +126,14 @@ def _check_fusion_modules(
             f"set fusion_model_type to 'pass-through'."
         )
 
-    elif output_set.issubset(computed_set) and fusion_model_type == "pass-through":
+    if output_set.issubset(computed_set) and fusion_model_type == "pass-through":
         raise ValueError(
             f"When using only {computed_set} outputs, pass-through is not supported. "
             f"Got {fusion_model_type}. Kindly set the fusion_model_type "
             "to 'mlp-residual', 'mgmoe', or 'identity'."
         )
 
-    elif (
+    if (
         pass_through_set.intersection(output_set)
         and fusion_model_type != "pass-through"
     ):
@@ -155,11 +155,11 @@ def _get_fusion_input_dimension(modules_to_fuse: "al_input_modules") -> int:
 
 def get_fusion_class(
     fusion_model_type: str,
-) -> Type[FusionModuleProtocol]:
+) -> type[FusionModuleProtocol]:
     if fusion_model_type == "mgmoe":
-        return cast(Type[FusionModuleProtocol], fusion_mgmoe.MGMoEModel)
-    elif fusion_model_type == "mlp-residual":
-        return cast(Type[FusionModuleProtocol], fusion_default.MLPResidualFusionModule)
-    elif fusion_model_type in ("identity", "pass-through"):
-        return cast(Type[FusionModuleProtocol], fusion_identity.IdentityFusionModel)
+        return cast(type[FusionModuleProtocol], fusion_mgmoe.MGMoEModel)
+    if fusion_model_type == "mlp-residual":
+        return cast(type[FusionModuleProtocol], fusion_default.MLPResidualFusionModule)
+    if fusion_model_type in ("identity", "pass-through"):
+        return cast(type[FusionModuleProtocol], fusion_identity.IdentityFusionModel)
     raise ValueError(f"Unrecognized fusion model type: {fusion_model_type}.")

@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Sequence
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -129,7 +130,7 @@ def _extract_input_con_transformers(
     return con_transformers
 
 
-def prep_missing_con_dict(con_transformers: al_label_transformers) -> Dict[str, float]:
+def prep_missing_con_dict(con_transformers: al_label_transformers) -> dict[str, float]:
     train_means = {
         column: transformer.mean_[0] for column, transformer in con_transformers.items()
     }

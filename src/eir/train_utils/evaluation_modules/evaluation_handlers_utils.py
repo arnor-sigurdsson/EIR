@@ -1,9 +1,10 @@
 import json
+from collections.abc import Iterator
 from copy import deepcopy
 from dataclasses import dataclass
 from itertools import cycle
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
 import torch
@@ -188,7 +189,7 @@ def convert_image_input_to_raw(
     raw_input_uint = (cur_input_hwc * 255).astype(np.uint8)
 
     n_channels = raw_input_uint.shape[-1]
-    mode: Optional[str]
+    mode: str | None
     match n_channels:
         case 1:
             mode = "L"
@@ -204,9 +205,9 @@ def convert_image_input_to_raw(
 
 
 def convert_tabular_input_to_raw(
-    data: Dict[str, torch.Tensor], input_transformers: al_label_transformers
-) -> Dict[str, np.ndarray]:
-    all_reversed: Dict[str, np.ndarray] = {}
+    data: dict[str, torch.Tensor], input_transformers: al_label_transformers
+) -> dict[str, np.ndarray]:
+    all_reversed: dict[str, np.ndarray] = {}
     for col_name, tensor_data in data.items():
         transformer = input_transformers[col_name]
         tensor_data_reshaped = tensor_data.numpy().reshape(-1, 1)
@@ -229,7 +230,7 @@ def convert_tabular_input_to_raw(
 
 
 def convert_array_input_to_raw(
-    data: torch.Tensor, normalization_stats: Optional[ArrayNormalizationStats]
+    data: torch.Tensor, normalization_stats: ArrayNormalizationStats | None
 ) -> np.ndarray:
     data_un_normalized = un_normalize_array(
         array=data, normalization_stats=normalization_stats
@@ -262,7 +263,7 @@ def general_pre_process_prepared_inputs(
     )
     batch = state["batch"]
 
-    batch_final = Batch(inputs=batch.inputs, target_labels={}, ids=list())
+    batch_final = Batch(inputs=batch.inputs, target_labels={}, ids=[])
 
     return batch_final
 
@@ -351,10 +352,10 @@ def _streamline_tabular_data_for_transformers(
 
 
 def post_prepare_manual_inputs(
-    prepared_inputs: Dict[str, Any],
+    prepared_inputs: dict[str, Any],
     output_name: str,
     input_objects: "al_input_objects_as_dict",
-) -> Dict[str, torch.Tensor]:
+) -> dict[str, torch.Tensor]:
     prepared_inputs_post = {}
 
     for input_name, prepared_input in prepared_inputs.items():
@@ -396,14 +397,13 @@ def _recursive_unsqueeze(
 ) -> Any:
     if isinstance(data, dict):
         return {k: _recursive_unsqueeze(v, dim=dim) for k, v in data.items()}
-    elif isinstance(data, torch.Tensor):
+    if isinstance(data, torch.Tensor):
         return data.unsqueeze(dim=dim)
-    else:
-        raise NotImplementedError()
+    raise NotImplementedError()
 
 
 def prepare_manual_sample_data(
-    sample_inputs: Dict[str, Any], input_objects: "al_input_objects_as_dict"
+    sample_inputs: dict[str, Any], input_objects: "al_input_objects_as_dict"
 ) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
     prepared_inputs: dict[str, torch.Tensor | dict[str, torch.Tensor]] = {}
     for name, data in sample_inputs.items():
@@ -606,9 +606,9 @@ def prepare_base_input(
 
 
 def get_batch_generator(
-    iterator: Iterator[Tuple[int, Tuple[Any, Any]]],
+    iterator: Iterator[tuple[int, tuple[Any, Any]]],
     batch_size: int,
-) -> Iterator[list[Tuple[int, Tuple[Any, Any]]]]:
+) -> Iterator[list[tuple[int, tuple[Any, Any]]]]:
     batch = []
     for item in iterator:
         batch.append(item)

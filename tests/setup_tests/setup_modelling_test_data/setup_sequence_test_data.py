@@ -1,7 +1,8 @@
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Sequence
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -34,7 +35,7 @@ def create_test_sequence_data(
     test_sequence_random_pool = tuple(get_text_sequence_base())
 
     samples_for_csv = []
-    for cls, snp_row_idx in c.target_classes.items():
+    for cls, _snp_row_idx in c.target_classes.items():
         for sample_idx in range(c.n_per_class):
             sample_outpath = sequence_outfolder / f"{sample_idx}_{cls}.txt"
 
@@ -117,7 +118,7 @@ def _create_test_sequence(
     return seq_test_sample
 
 
-def get_continent_keyword_map() -> Dict[str, Sequence[str]]:
+def get_continent_keyword_map() -> dict[str, Sequence[str]]:
     map_ = {
         "Africa": [
             "giraffe",

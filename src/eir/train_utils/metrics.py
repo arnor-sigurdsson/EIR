@@ -1,4 +1,5 @@
 import csv
+from collections.abc import Callable, Generator, Sequence
 from copy import copy
 from dataclasses import dataclass
 from functools import partial, wraps
@@ -7,14 +8,9 @@ from statistics import mean
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    Generator,
     Literal,
     Optional,
     Protocol,
-    Sequence,
-    Tuple,
     Union,
     cast,
 )
@@ -22,6 +18,7 @@ from typing import (
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 from aislib.misc_utils import ensure_path_exists
 from lifelines.utils import concordance_index
 from scipy.special import softmax
@@ -101,10 +98,12 @@ class AverageMetricFunctionProtocol(Protocol):
     ) -> float: ...
 
 
-al_averaging_functions_dict = Dict[str, AverageMetricFunctionProtocol]
-al_metric_record_dict = Dict[
+al_averaging_functions_dict = dict[str, AverageMetricFunctionProtocol]
+al_metric_record_dict = dict[
     str,
-    Tuple["MetricRecord", ...] | "al_averaging_functions_dict" | "GeneralMetricInfo",
+    Union[
+        tuple["MetricRecord", ...], "al_averaging_functions_dict", "GeneralMetricInfo"
+    ],
 ]
 
 al_cat_metric_choices = Sequence[
@@ -145,7 +144,7 @@ class MetricRecord:
 
 def calculate_batch_metrics(
     outputs_as_dict: "al_output_objects_as_dict",
-    outputs: Dict[str, Dict[str, torch.Tensor]],
+    outputs: dict[str, dict[str, torch.Tensor]],
     labels: "al_training_labels_target",
     mode: str,
     metric_record_dict: al_metric_record_dict,
@@ -175,7 +174,7 @@ def calculate_batch_metrics(
             cur_output_type = cur_output_object.output_config.output_info.output_type
             assert cur_output_type == "tabular"
 
-            al_record = Tuple[MetricRecord, ...]
+            al_record = tuple[MetricRecord, ...]
             cur_records = metric_record_dict[output_target_type]
             assert isinstance(cur_records, tuple)
             cur_metric_records: al_record = cur_records
@@ -196,7 +195,6 @@ def calculate_batch_metrics(
                 cur_labels_np = cur_labels_np.astype(int)
 
             for metric_record in cur_metric_records:
-
                 if metric_record.output_type != "supervised":
                     continue
 
@@ -247,7 +245,6 @@ def calculate_batch_metrics(
             cur_times_np = general_torch_to_numpy(tensor=filtered.times)
 
             for metric_record in cur_metric_records:
-
                 if metric_record.output_type != "survival":
                     continue
 
@@ -276,13 +273,13 @@ def calculate_batch_metrics(
 
 def add_loss_to_metrics(
     outputs_as_dict: "al_output_objects_as_dict",
-    losses: Dict[str, Dict[str, torch.Tensor]],
+    losses: dict[str, dict[str, torch.Tensor]],
     metric_dict: al_step_metric_dict,
 ) -> al_step_metric_dict:
     target_columns_gen = get_output_info_generator(outputs_as_dict=outputs_as_dict)
     metric_dict_copy = copy(metric_dict)
 
-    for output_name, column_type, column_name in target_columns_gen:
+    for output_name, _column_type, column_name in target_columns_gen:
         cur_metric_dict = metric_dict_copy[output_name][column_name]
         cur_key = f"{output_name}_{column_name}_loss"
         cur_metric_dict[cur_key] = losses[output_name][column_name].item()
@@ -341,7 +338,7 @@ def average_performances_across_tasks(
     return average
 
 
-def handle_empty(default_value: float, metric_name: Optional[str] = None):
+def handle_empty(default_value: float, metric_name: str | None = None):
     """
     This can happen when modelling on multiple outputs, which can vary in their
     sparsity, and by chance some outputs are empty in a batch.
@@ -369,7 +366,7 @@ def handle_empty(default_value: float, metric_name: Optional[str] = None):
     return decorator
 
 
-def handle_class_mismatch(default_value: float, metric_name: Optional[str] = None):
+def handle_class_mismatch(default_value: float, metric_name: str | None = None):
     """
     Decorator to handle cases where the number of unique classes in 'labels'
     does not match the number of columns in 'outputs'. This scenario can occur
@@ -384,10 +381,11 @@ def handle_class_mismatch(default_value: float, metric_name: Optional[str] = Non
             nonlocal logged
             unique_classes = np.unique(labels)
             # For binary classification as CE we have this special case
-            if outputs.shape[1] == 2 and len(unique_classes) == 1:
-                pass
-            # For binary classification as BCE we have this special case
-            elif outputs.shape[1] == 1:
+            if (
+                outputs.shape[1] == 2
+                and len(unique_classes) == 1
+                or outputs.shape[1] == 1
+            ):
                 pass
             elif len(unique_classes) != outputs.shape[1]:
                 if not logged:
@@ -429,8 +427,7 @@ def calc_mcc(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
 
     if cov_ypyp * cov_ytyt == 0:
         return 0.0
-    else:
-        return cov_ytyp / np.sqrt(cov_ytyt * cov_ypyp)
+    return cov_ytyp / np.sqrt(cov_ytyt * cov_ypyp)
 
 
 @handle_class_mismatch(default_value=np.nan, metric_name="ROC-AUC")
@@ -557,7 +554,7 @@ def calc_r2(outputs: np.ndarray, labels: np.ndarray, *args, **kwargs) -> float:
 def calc_rmse(
     outputs: np.ndarray,
     labels: np.ndarray,
-    target_transformers: Dict[str, Dict[str, StandardScaler]],
+    target_transformers: dict[str, dict[str, StandardScaler]],
     output_name: str,
     column_name: str,
     *args,
@@ -684,7 +681,7 @@ def calculate_prediction_losses(
     """
     losses_dict: dict[str, dict[str, torch.Tensor]] = {}
 
-    for output_name, target_dict in targets.items():
+    for output_name, _target_dict in targets.items():
         cur_inputs = inputs[output_name]
         cur_targets = targets[output_name]
         cur_criterion = criteria[output_name]
@@ -699,7 +696,7 @@ def calculate_prediction_losses(
 
 def aggregate_losses(losses_dict: dict[str, dict[str, torch.Tensor]]) -> torch.Tensor:
     losses_values = []
-    for output_name, targets_for_output_dict in losses_dict.items():
+    for _output_name, targets_for_output_dict in losses_dict.items():
         for loss in targets_for_output_dict.values():
             losses_values.append(loss)
 
@@ -749,12 +746,12 @@ def get_uncertainty_loss_hook(
 
 
 def hook_add_uncertainty_loss(
-    state: Dict,
-    uncertainty_modules: Dict[str, "UncertaintyMultiTaskLoss"],
+    state: dict,
+    uncertainty_modules: dict[str, "UncertaintyMultiTaskLoss"],
     loss_key: str = "per_target_train_losses",
     *args,
     **kwargs,
-) -> Dict[str, Dict[str, torch.Tensor]]:
+) -> dict[str, dict[str, torch.Tensor]]:
     """
     Note that we only update the relevant losses in the base dict.
     """
@@ -762,7 +759,7 @@ def hook_add_uncertainty_loss(
     base_losses_dict = state[loss_key]
     updated_losses = copy(base_losses_dict)
 
-    for output_name, module in uncertainty_modules.items():
+    for output_name, _module in uncertainty_modules.items():
         cur_module = uncertainty_modules[output_name]
         cur_loss_dict = base_losses_dict[output_name]
         cur_uncertainty_losses = cur_module(losses_dict=cur_loss_dict)
@@ -773,17 +770,11 @@ def hook_add_uncertainty_loss(
     return state_updates
 
 
-from typing import Dict, List
-
-import torch
-import torch.nn as nn
-
-
 class UncertaintyMultiTaskLoss(nn.Module):
     def __init__(
         self,
-        target_cat_columns: List[str],
-        target_con_columns: List[str],
+        target_cat_columns: list[str],
+        target_con_columns: list[str],
         device: str,
     ):
         super().__init__()
@@ -797,7 +788,7 @@ class UncertaintyMultiTaskLoss(nn.Module):
             device=self.device,
         )
 
-    def _construct_params(self, cur_target_columns: List[str], device: str):
+    def _construct_params(self, cur_target_columns: list[str], device: str):
         for column_name in cur_target_columns:
             param = nn.Parameter(torch.zeros(1, device=device), requires_grad=True)
             self.register_parameter(f"log_var_{column_name}", param)
@@ -815,7 +806,7 @@ class UncertaintyMultiTaskLoss(nn.Module):
 
         return loss
 
-    def forward(self, losses_dict: Dict) -> Dict[str, torch.Tensor]:
+    def forward(self, losses_dict: dict) -> dict[str, torch.Tensor]:
         losses_uncertain = {}
 
         for target_column, loss_value_base in losses_dict.items():
@@ -830,11 +821,11 @@ class UncertaintyMultiTaskLoss(nn.Module):
 
 def hook_add_l1_loss(
     experiment: "Experiment",
-    state: Dict,
+    state: dict,
     loss_key: str = "loss",
     *args,
     **kwargs,
-) -> Dict:
+) -> dict:
     """
     TODO: Do the validation outside of the actual hook.
     """
@@ -887,10 +878,9 @@ def persist_metrics(
     metrics_dict: "al_step_metric_dict",
     iteration: int,
     write_header: bool,
-    prefixes: Dict[str, str],
-    writer_funcs: Union[None, Dict[str, Dict[str, Callable]]] = None,
+    prefixes: dict[str, str],
+    writer_funcs: None | dict[str, dict[str, Callable]] = None,
 ) -> None:
-
     hc = handler_config
     exp = handler_config.experiment
     gc = exp.configs.global_config
@@ -925,7 +915,7 @@ def persist_metrics(
 
 
 def get_metrics_files(
-    target_generator: Generator[Tuple[str, str, str], None, None],
+    target_generator: Generator[tuple[str, str, str], None, None],
     run_folder: Path,
     train_or_val_target_prefix: str,
     detail_level: int,
@@ -933,7 +923,7 @@ def get_metrics_files(
     assert train_or_val_target_prefix in ["validation_", "train_"]
 
     path_dict: dict[str, dict[str, Path]] = {}
-    for output_name, column_type, target_column in target_generator:
+    for output_name, _column_type, target_column in target_generator:
         if detail_level <= 1:
             continue
 
@@ -966,8 +956,8 @@ def get_average_history_filepath(
     return metrics_file_path
 
 
-def _ensure_metrics_paths_exists(metrics_files: Dict[str, Dict[str, Path]]) -> None:
-    for output_name, target_and_file_dict in metrics_files.items():
+def _ensure_metrics_paths_exists(metrics_files: dict[str, dict[str, Path]]) -> None:
+    for _output_name, target_and_file_dict in metrics_files.items():
         for path in target_and_file_dict.values():
             ensure_path_exists(path=path)
 
@@ -999,9 +989,9 @@ def get_buffered_metrics_writer(buffer_interval: int):
 
         existing_rows = []
         if filepath.exists():
-            with open(filepath, "r") as f:
+            with open(filepath) as f:
                 reader = csv.DictReader(f)
-                existing_rows = [row for row in reader]
+                existing_rows = list(reader)
 
         all_rows = existing_rows + buffer
 
@@ -1023,7 +1013,7 @@ def read_metrics_history_file(file_path: Path) -> pd.DataFrame:
 
 def get_metrics_dataframes(
     results_dir: Path, target_string: str
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     train_history_path = read_metrics_history_file(
         results_dir / f"train_{target_string}_history.log"
     )
@@ -1034,10 +1024,10 @@ def get_metrics_dataframes(
     return train_history_path, valid_history_path
 
 
-def get_available_supervised_metrics() -> (
-    Tuple[Dict[str, MetricRecord], Dict[str, MetricRecord]]
-):
-    cat_metrics: Dict[str, MetricRecord] = {
+def get_available_supervised_metrics() -> tuple[
+    dict[str, MetricRecord], dict[str, MetricRecord]
+]:
+    cat_metrics: dict[str, MetricRecord] = {
         "mcc": MetricRecord(
             name="mcc",
             function=calc_mcc,
@@ -1072,7 +1062,7 @@ def get_available_supervised_metrics() -> (
         ),
     }
 
-    con_metrics: Dict[str, MetricRecord] = {
+    con_metrics: dict[str, MetricRecord] = {
         "rmse": MetricRecord(
             name="rmse",
             function=partial(calc_rmse, target_transformers=None),
@@ -1126,8 +1116,8 @@ def get_default_metrics(
     target_transformers: dict[str, "al_label_transformers"],
     cat_metrics: al_cat_metric_choices,
     con_metrics: al_con_metric_choices,
-    cat_averaging_metrics: Optional[al_cat_metric_choices],
-    con_averaging_metrics: Optional[al_con_metric_choices],
+    cat_averaging_metrics: al_cat_metric_choices | None,
+    con_averaging_metrics: al_con_metric_choices | None,
     output_configs: Sequence[OutputConfig],
 ) -> "al_metric_record_dict":
     available_cat_metrics, available_con_metrics = get_available_supervised_metrics()
@@ -1238,8 +1228,8 @@ def _build_general_metric_info(
 
 
 def parse_averaging_metrics(
-    cat_averaging_metrics: Optional[al_cat_metric_choices],
-    con_averaging_metrics: Optional[al_con_metric_choices],
+    cat_averaging_metrics: al_cat_metric_choices | None,
+    con_averaging_metrics: al_con_metric_choices | None,
 ) -> tuple[al_cat_metric_choices, al_con_metric_choices]:
     cat_parsed, con_parsed = _get_default_averaging_metrics()
 
@@ -1283,10 +1273,9 @@ def _validate_metrics(
             )
 
 
-def _get_default_averaging_metrics() -> (
-    tuple[al_cat_metric_choices, al_con_metric_choices]
-):
-
+def _get_default_averaging_metrics() -> tuple[
+    al_cat_metric_choices, al_con_metric_choices
+]:
     cat_names: list[Literal["mcc", "roc-auc-macro", "ap-macro", "acc"]]
     con_names: list[Literal["loss", "pcc", "r2"]]
 
@@ -1387,8 +1376,8 @@ def get_performance_averaging_functions(
 class FilteredOutputsAndLabels:
     model_outputs: dict[str, dict[str, torch.Tensor]]
     target_labels: dict[str, dict[str, torch.Tensor]]
-    ids: Optional[dict[str, dict[str, list[str]]]]
-    common_ids: Optional[list[str]]
+    ids: dict[str, dict[str, list[str]]] | None
+    common_ids: list[str] | None
 
 
 def filter_missing_outputs_and_labels(
@@ -1398,7 +1387,6 @@ def filter_missing_outputs_and_labels(
     missing_ids_info: MissingTargetsInfo,
     with_labels: bool = True,
 ) -> FilteredOutputsAndLabels:
-
     if missing_ids_info.all_have_same_set:
         return FilteredOutputsAndLabels(
             model_outputs=model_outputs,

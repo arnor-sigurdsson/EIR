@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -26,7 +25,7 @@ def load_array_output_object(serialized_output_folder: Path) -> ComputedArrayOut
 
     output_config = load_output_config_from_yaml(output_config_path=config_path)
 
-    normalization_stats: Optional[ArrayNormalizationStats] = None
+    normalization_stats: ArrayNormalizationStats | None = None
     if normalization_stats_path.exists():
         normalization_stats = load_dataclass(
             cls=ArrayNormalizationStats,

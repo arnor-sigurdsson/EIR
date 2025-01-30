@@ -1,8 +1,9 @@
 import tempfile
 from argparse import Namespace
+from collections.abc import Generator, Iterable, Sequence
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Generator, Iterable, Literal, Protocol, Sequence, Tuple
+from typing import Literal, Protocol
 
 from eir.predict_modules.predict_config_validation import (
     validate_predict_configs_and_args,
@@ -21,9 +22,9 @@ from eir.setup.config_setup_modules.config_setup_utils import (
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.utils.logging import get_logger
 
-al_named_dict_configs = Dict[
+al_named_dict_configs = dict[
     Literal["global_configs", "fusion_configs", "input_configs", "output_configs"],
-    Iterable[Dict],
+    Iterable[dict],
 ]
 
 
@@ -76,7 +77,7 @@ def get_named_predict_dict_iterators(
 def get_train_predict_matched_config_generator(
     train_configs: Configs,
     named_dict_iterators: dict[str, tuple[dict, ...]],
-) -> Generator[Tuple[str, Dict, Dict], None, None]:
+) -> Generator[tuple[str, dict, dict], None, None]:
     train_keys = set(train_configs.__dict__.keys())
 
     single_configs = {
@@ -96,7 +97,7 @@ def get_train_predict_matched_config_generator(
             predict_dict_iter = []
 
         # If not a sequence we can yield directly
-        if predict_argument_name in single_configs.keys():
+        if predict_argument_name in single_configs:
             train_config = getattr(train_configs, name_in_configs_object)
             train_config_as_dict = object_to_primitives(obj=train_config)
 
@@ -408,7 +409,7 @@ def _check_matching_tabular_output_configs(
 
 
 def overload_train_configs_for_predict(
-    matched_dict_iterator: Generator[Tuple[str, Dict, Dict], None, None],
+    matched_dict_iterator: Generator[tuple[str, dict, dict], None, None],
 ) -> Configs:
     main_overloaded_kwargs: dict = {}
 
@@ -465,7 +466,7 @@ def overload_train_configs_for_predict(
 
 
 def _maybe_warn_about_output_folder_overload_from_predict(
-    name: str, predict_config_dict_to_inject: Dict, train_config_dict: Dict
+    name: str, predict_config_dict_to_inject: dict, train_config_dict: dict
 ) -> None:
     if name == "global_config" and "output_folder" in predict_config_dict_to_inject:
         output_folder_from_predict = predict_config_dict_to_inject["output_folder"]

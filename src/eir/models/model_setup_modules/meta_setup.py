@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Type, Union, cast
+from typing import Any, Literal, Protocol, Union, cast
 
 from torch import nn
 
@@ -73,14 +73,12 @@ from eir.setup.schemas import ImageInputDataConfig, TabularInputDataConfig
 from eir.train_utils.distributed import AttrDelegatedDistributedDataParallel
 from eir.train_utils.optim import AttrDelegatedSWAWrapper
 
-al_meta_model = Union[
-    meta.MetaModel,
-    AttrDelegatedDistributedDataParallel,
-    AttrDelegatedSWAWrapper,
-]
+al_meta_model = (
+    meta.MetaModel | AttrDelegatedDistributedDataParallel | AttrDelegatedSWAWrapper
+)
 
 
-al_data_dimensions = Dict[
+al_data_dimensions = dict[
     str,
     Union[
         DataDimensions,
@@ -114,7 +112,7 @@ class OmicsDataDimensions(DataDimensions):
 
 def get_default_meta_class(
     meta_model_type: str,
-) -> Type[al_meta_model]:
+) -> type[al_meta_model]:
     if meta_model_type == "default":
         return meta.MetaModel
     raise ValueError(f"Unrecognized meta model type: {meta_model_type}.")
@@ -124,7 +122,7 @@ class MetaClassGetterCallable(Protocol):
     def __call__(
         self,
         meta_model_type: str,
-    ) -> Type[al_meta_model]: ...
+    ) -> type[al_meta_model]: ...
 
 
 def get_meta_model_class_and_kwargs_from_configs(
@@ -134,7 +132,7 @@ def get_meta_model_class_and_kwargs_from_configs(
     outputs_as_dict: "al_output_objects_as_dict",
     meta_class_getter: MetaClassGetterCallable = get_default_meta_class,
     strict: bool = True,
-) -> Tuple[Type[al_meta_model], Dict[str, Any]]:
+) -> tuple[type[al_meta_model], dict[str, Any]]:
     meta_model_class = meta_class_getter(meta_model_type="default")
 
     meta_model_kwargs = get_meta_model_kwargs_from_configs(
@@ -154,8 +152,7 @@ def get_meta_model_kwargs_from_configs(
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: "al_output_objects_as_dict",
     strict: bool = True,
-) -> Dict[str, Any]:
-
+) -> dict[str, Any]:
     kwargs: dict[str, Any] = {}
     input_modules = get_input_modules(
         inputs_as_dict=inputs_as_dict,
@@ -243,7 +240,7 @@ def _extract_diffusion_targets(
     return diffusion_targets
 
 
-def _get_maybe_computed_out_dims(fusion_modules: al_fusion_modules) -> Optional[int]:
+def _get_maybe_computed_out_dims(fusion_modules: al_fusion_modules) -> int | None:
     if "computed" in fusion_modules:
         return fusion_modules["computed"].num_out_features
 
@@ -284,14 +281,14 @@ class FeatureExtractorInfo:
     ]
     output_dimension: int
     input_type: str
-    output_shape: Optional[Tuple[int, ...]] = None
+    output_shape: tuple[int, ...] | None = None
     extras: dict = field(default_factory=dict)
 
 
 def get_all_feature_extractor_dimensions_and_types(
     inputs_as_dict: al_input_objects_as_dict,
     input_modules: al_input_modules,
-) -> Dict[str, FeatureExtractorInfo]:
+) -> dict[str, FeatureExtractorInfo]:
     input_dimensionality_and_types = {}
 
     out_feature_per_feature_extractor = _get_feature_extractors_num_output_features(
@@ -304,7 +301,6 @@ def get_all_feature_extractor_dimensions_and_types(
     output_shapes = _maybe_get_feature_extractor_out_shapes(input_modules=input_modules)
 
     for input_name, input_object in inputs_as_dict.items():
-
         cur_output_shape = output_shapes.get(input_name)
 
         extras = {}
@@ -312,7 +308,7 @@ def get_all_feature_extractor_dimensions_and_types(
             case ComputedArrayInputInfo() | ComputedImageInputInfo():
                 cur_config = input_object.input_config.model_config
                 assert isinstance(
-                    cur_config, (schemas.ArrayModelConfig, schemas.ImageModelConfig)
+                    cur_config, schemas.ArrayModelConfig | schemas.ImageModelConfig
                 )
                 mic = cur_config.model_init_config
                 if isinstance(mic, CNNModelConfig):
@@ -420,9 +416,9 @@ def get_output_modules(
     outputs_as_dict: "al_output_objects_as_dict",
     device: str,
     fusion_model_type: str,
-    computed_out_dimensions: Optional[int] = None,
-    feature_dimensions_and_types: Optional[Dict[str, FeatureExtractorInfo]] = None,
-) -> Tuple[al_output_modules, Dict[str, Literal["tabular", "sequence", "array"]]]:
+    computed_out_dimensions: int | None = None,
+    feature_dimensions_and_types: dict[str, FeatureExtractorInfo] | None = None,
+) -> tuple[al_output_modules, dict[str, Literal["tabular", "sequence", "array"]]]:
     output_modules: al_output_modules = cast(al_output_modules, nn.ModuleDict())
     output_types = {}
 
@@ -436,10 +432,8 @@ def get_output_modules(
                 assert computed_out_dimensions is not None
                 assert isinstance(
                     output_model_config,
-                    (
-                        schemas.TabularOutputModuleConfig,
-                        schemas.SurvivalOutputTypeConfig,
-                    ),
+                    schemas.TabularOutputModuleConfig
+                    | schemas.SurvivalOutputTypeConfig,
                 )
                 tabular_output_module = get_tabular_output_module_from_model_config(
                     output_model_config=output_model_config,
@@ -499,7 +493,7 @@ def get_output_modules(
 
 def _get_feature_extractors_num_output_features(
     input_modules: al_input_modules,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     fusion_in_dims = {name: i.num_out_features for name, i in input_modules.items()}
     return fusion_in_dims
 

@@ -1,4 +1,4 @@
-from typing import Dict, List, Sequence
+from collections.abc import Sequence
 
 import pandas as pd
 import pytest
@@ -13,7 +13,7 @@ from tests.test_models.model_testing_utils import (
 )
 
 
-def get_test_internal_image_models_parametrization() -> Sequence[Dict]:
+def get_test_internal_image_models_parametrization() -> Sequence[dict]:
     models = ["ResNet"]
 
     all_parametrizations = []
@@ -94,7 +94,7 @@ def test_internal_image_models(
         check_eir_model(meta_model=model, example_inputs=example_batch.inputs)
 
 
-def get_timm_models_to_test() -> List[str]:
+def get_timm_models_to_test() -> list[str]:
     """
     LeVIT and ConVIT models fail tracing currently, therefore skipped.
     """
@@ -124,24 +124,20 @@ def get_timm_models_to_test() -> List[str]:
     for model_name in models_filtered:
         if any(i in model_name for i in not_allowed):
             continue
-        else:
-            models_manual_filtered.append(model_name)
+        models_manual_filtered.append(model_name)
 
     assert len(models_manual_filtered) > 0
     return models_manual_filtered
 
 
-def get_test_external_image_models_parametrization() -> Sequence[Dict]:
+def get_test_external_image_models_parametrization() -> Sequence[dict]:
     models = get_timm_models_to_test()
 
     all_parametrizations = []
 
     for model_type in models:
         size = get_pretrained_cfg_value(model_name=model_type, cfg_key="input_size")
-        if not size:
-            size = 224
-        else:
-            size = size[-1]
+        size = 224 if not size else size[-1]
 
         num_output_features = 0
         if model_type.startswith("crossvit") or model_type.startswith("coat"):

@@ -1,4 +1,4 @@
-from typing import List, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import torch
@@ -11,7 +11,7 @@ from eir.interpretation.interpretation import SampleAttribution
 
 
 def generate_test_attribution_sequence(
-    n: int, tensor_elements: List[float]
+    n: int, tensor_elements: list[float]
 ) -> Sequence[SampleAttribution]:
     return tuple(
         generate_test_sample_attribution(id_=i, tensor_elements=tensor_elements)
@@ -20,7 +20,7 @@ def generate_test_attribution_sequence(
 
 
 def generate_test_sample_attribution(
-    id_: int, tensor_elements: List[float]
+    id_: int, tensor_elements: list[float]
 ) -> SampleAttribution:
     """
     We enforce two dimensions here, because that's the output dimension of attributions.

@@ -1,5 +1,5 @@
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Dict, Iterable, Sequence, Tuple
 
 import pandas as pd
 import pytest
@@ -15,7 +15,7 @@ from tests.test_modelling.test_modelling_utils import check_performance_result_w
 seed_everything(seed=0)
 
 
-def _get_sequence_test_specific_fusion_configs() -> Dict:
+def _get_sequence_test_specific_fusion_configs() -> dict:
     sequence_fusion_configs = {
         "model_config": {
             "fc_task_dim": 256,
@@ -371,7 +371,7 @@ def _sequence_test_check_wrapper(experiment: train.Experiment, test_config):
                 max_thresholds=thresholds,
             )
 
-            for input_name in experiment.inputs.keys():
+            for input_name in experiment.inputs:
                 cur_attribution_root = attribution_paths[input_name]
                 _check_sequence_attributions_wrapper(
                     attribution_root_folder=cur_attribution_root,
@@ -387,7 +387,7 @@ def _sequence_test_check_wrapper(experiment: train.Experiment, test_config):
             )
 
 
-def get_sequence_test_args(mixing: float) -> Tuple[float, float]:
+def get_sequence_test_args(mixing: float) -> tuple[float, float]:
     thresholds = (0.8, 0.7)
     if mixing:
         thresholds = (0.0, 0.7)
@@ -414,7 +414,7 @@ def _check_sequence_attributions_wrapper(
     cat_class_keyword_map = get_continent_keyword_map()
 
     targets_acts_success = []
-    multi_class = False if len(target_classes) == 2 else True
+    multi_class = len(target_classes) != 2
 
     for target_class, csv_file in seq_csv_gen:
         df_seq_acts = pd.read_csv(filepath_or_buffer=csv_file)

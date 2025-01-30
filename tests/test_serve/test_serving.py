@@ -1,11 +1,12 @@
 import asyncio
 import random
 import time
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from math import isclose
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence, Tuple
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -252,8 +253,8 @@ def get_base_parametrization(compiled: bool = False) -> dict:
     indirect=True,
 )
 def test_multi_serving(
-    create_test_config_init_base: Tuple["TestConfigInits", "TestDataConfig"],
-    prep_modelling_test_configs: Tuple[train.Experiment, "ModelTestConfig"],
+    create_test_config_init_base: tuple["TestConfigInits", "TestDataConfig"],
+    prep_modelling_test_configs: tuple[train.Experiment, "ModelTestConfig"],
 ):
     """
     We have the retries below as sometimes we can get random IDs of samples
@@ -299,7 +300,7 @@ def test_multi_serving(
 
     n_sample_requests = 10
     n_retries_per_request = 10
-    for i in range(n_sample_requests):
+    for _i in range(n_sample_requests):
         n_cur_retries = 0
 
         for _ in range(n_retries_per_request):
@@ -313,8 +314,7 @@ def test_multi_serving(
                 if n_cur_retries < n_retries_per_request:
                     n_cur_retries += 1
                     continue
-                else:
-                    raise e
+                raise e
 
             ids.append(random_id)
             example_requests.append(example_request)
@@ -397,7 +397,7 @@ def _craft_example_request(
             )
 
             if any_na:
-                assert False, f"Missing values for ID: {random_id}"
+                raise AssertionError(f"Missing values for ID: {random_id}")
 
             tabular_data = {}
             for col in all_columns:
@@ -530,7 +530,7 @@ def _validate_tabular_output(
             logger.info("Skipping NA value.")
             continue
 
-        actual_value = actual_output.get(con_col, None).get(con_col, None)
+        actual_value = actual_output.get(con_col).get(con_col, None)
         if actual_value is None or not isclose(
             actual_value,
             expected_value,
@@ -550,10 +550,7 @@ def _validate_sequence_output(actual_output: str, expected_set: set) -> bool:
     intersection = set(content).intersection(expected_set)
     if not intersection:
         return False
-    if len(intersection) < 2:
-        return False
-
-    return True
+    return not len(intersection) < 2
 
 
 def _validate_array_output(
@@ -606,7 +603,6 @@ def _validate_survival_output(
     expected_row: pd.Series,
     output_config: OutputConfig,
 ) -> bool:
-
     actual_output = actual_output["BinaryOrigin"]
 
     if not {"time_points", "survival_probs"}.issubset(actual_output.keys()):
@@ -615,7 +611,7 @@ def _validate_survival_output(
 
     survival_probs = actual_output["survival_probs"]
 
-    if not all(x > y for x, y in zip(survival_probs, survival_probs[1:])):
+    if not all(x > y for x, y in zip(survival_probs, survival_probs[1:], strict=False)):
         logger.error("Survival probabilities are not strictly decreasing")
         return False
 

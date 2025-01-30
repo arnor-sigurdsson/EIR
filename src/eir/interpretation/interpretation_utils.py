@@ -1,19 +1,12 @@
 import logging
 import random
 from collections import defaultdict
+from collections.abc import Callable, Generator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    DefaultDict,
-    Generator,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
 )
 
 import numpy as np
@@ -97,7 +90,7 @@ def get_target_class_name(
 
 
 def get_appropriate_target_transformer(
-    output_object: Union[ComputedTabularOutputInfo, ComputedSurvivalOutputInfo],
+    output_object: ComputedTabularOutputInfo | ComputedSurvivalOutputInfo,
     target_column_name: str,
     target_column_type: str,
 ) -> "al_label_transformers_object":
@@ -128,7 +121,7 @@ def stratify_attributions_by_target_classes(
     target_transformer: "al_label_transformers_object",
     output_name: str,
     target_info: TargetTypeInfo,
-) -> DefaultDict[Any, list["SampleAttribution"]]:
+) -> defaultdict[Any, list["SampleAttribution"]]:
     all_attributions_target_class_stratified = defaultdict(list)
 
     for sample in all_attributions:
@@ -146,7 +139,7 @@ def stratify_attributions_by_target_classes(
 
 def plot_attributions_bar(
     df_attributions: pd.DataFrame,
-    output_path: Union[str, Path],
+    output_path: str | Path,
     top_n: int = 20,
     title: str = "",
     use_bootstrap: bool = True,
@@ -178,7 +171,7 @@ def plot_attributions_bar(
     )
 
     plt.tight_layout()
-    sns_figure: Optional[plt.Figure | plt.SubFigure] = ax.get_figure()
+    sns_figure: plt.Figure | plt.SubFigure | None = ax.get_figure()
     assert isinstance(sns_figure, plt.Figure)
     assert sns_figure is not None
 
@@ -205,7 +198,6 @@ def calculate_token_statistics(
         ]["Attribution"].to_numpy()
 
         if use_bootstrap:
-
             if len(np.unique(feature_attributions)) < 2:
                 log_once_callable(
                     f"Feature '{input_feature}' has less than 2 unique attribution "
@@ -300,8 +292,7 @@ def get_basic_sample_attributions_to_analyse_generator(
             if attribution.sample_info.ids in manual_samples:
                 base.append(attribution)
 
-    for item in base:
-        yield item
+    yield from base
 
 
 class MyIntegratedGradients(IntegratedGradients):
@@ -311,14 +302,14 @@ class MyIntegratedGradients(IntegratedGradients):
 
     def _attribute(
         self,
-        inputs: Tuple[Tensor, ...],
-        baselines: Tuple[Union[Tensor, int, float], ...],
+        inputs: tuple[Tensor, ...],
+        baselines: tuple[Tensor | int | float, ...],
         target: TargetType = None,
         additional_forward_args: Any = None,
         n_steps: int = 50,
         method: str = "gausslegendre",
-        step_sizes_and_alphas: Union[None, Tuple[List[float], List[float]]] = None,
-    ) -> Tuple[Tensor, ...]:
+        step_sizes_and_alphas: None | tuple[list[float], list[float]] = None,
+    ) -> tuple[Tensor, ...]:
         if step_sizes_and_alphas is None:
             # retrieve step size and scaling factor for specified
             # approximation method
@@ -333,7 +324,7 @@ class MyIntegratedGradients(IntegratedGradients):
             torch.cat(
                 [baseline + alpha * (input - baseline) for alpha in alphas], dim=0
             ).requires_grad_()
-            for input, baseline in zip(inputs, baselines)
+            for input, baseline in zip(inputs, baselines, strict=False)
         )
 
         additional_forward_args = _format_additional_forward_args(
@@ -375,7 +366,7 @@ class MyIntegratedGradients(IntegratedGradients):
             _reshape_and_sum(
                 scaled_grad, n_steps, grad.shape[0] // n_steps, grad.shape[1:]
             )
-            for (scaled_grad, grad) in zip(scaled_grads, grads)
+            for (scaled_grad, grad) in zip(scaled_grads, grads, strict=False)
         )
 
         # computes attribution for each tensor in input tuple
@@ -385,7 +376,9 @@ class MyIntegratedGradients(IntegratedGradients):
         else:
             attributions = tuple(
                 total_grad * (input - baseline)
-                for total_grad, input, baseline in zip(total_grads, inputs, baselines)
+                for total_grad, input, baseline in zip(
+                    total_grads, inputs, baselines, strict=False
+                )
             )
         return attributions
 
@@ -403,7 +396,7 @@ def get_long_format_attribution_df(
     for k, v in parsed_attributions.items():
         if not isinstance(v, list):
             raise ValueError(f"Value for key '{k}' must be a list")
-        if not all(isinstance(x, (int, float, np.float32, np.float64)) for x in v):
+        if not all(isinstance(x, int | float | np.float32 | np.float64) for x in v):
             raise ValueError(f"All values in list {v} for key '{k}' must be numbers")
         series_dict[k] = pd.Series(v)
 

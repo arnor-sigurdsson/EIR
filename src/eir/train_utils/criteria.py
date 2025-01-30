@@ -1,6 +1,7 @@
+from collections.abc import Callable
 from enum import Enum
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Literal, Type, Union
+from typing import TYPE_CHECKING, Literal, Union
 
 import torch
 from torch import nn
@@ -52,12 +53,12 @@ al_losses = (
 
 
 al_losses_classes = (
-    Type[nn.CrossEntropyLoss]
-    | Type[nn.MSELoss]
-    | Type[nn.L1Loss]
-    | Type[nn.SmoothL1Loss]
-    | Type[nn.PoissonNLLLoss]
-    | Type[nn.HuberLoss]
+    type[nn.CrossEntropyLoss]
+    | type[nn.MSELoss]
+    | type[nn.L1Loss]
+    | type[nn.SmoothL1Loss]
+    | type[nn.PoissonNLLLoss]
+    | type[nn.HuberLoss]
 )
 
 
@@ -66,10 +67,8 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
     log_empty_once = log_empty_loss_once()
 
     for output_name, output_object in outputs_as_dict.items():
-
         match output_object:
             case ComputedTabularOutputInfo():
-
                 con_loss_name = _parse_loss_name(
                     output_config=output_object.output_config,
                     column_type="con",
@@ -100,7 +99,7 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
                     else vectorized_bce_loss
                 )
                 assert isinstance(
-                    criterion_cat, (nn.CrossEntropyLoss, nn.BCEWithLogitsLoss)
+                    criterion_cat, nn.CrossEntropyLoss | nn.BCEWithLogitsLoss
                 )
 
                 loss_func = partial(
@@ -166,7 +165,6 @@ def _get_extract_and_call_criterion(
     output_name: str,
     loss_callable: Callable,
 ) -> Callable:
-
     def _compute_loss(
         input: dict[str, torch.Tensor], target: dict[str, torch.Tensor]
     ) -> dict[str, torch.Tensor]:
@@ -230,8 +228,11 @@ def tabular_output_loss(
 def vectorized_con_loss(
     predictions: dict[str, torch.Tensor],
     targets: dict[str, torch.Tensor],
-    loss_func: Callable = nn.MSELoss(reduction="none"),
+    loss_func: Callable | None = None,
 ) -> dict[str, torch.Tensor]:
+    if loss_func is None:
+        loss_func = nn.MSELoss(reduction="none")
+
     predictions_stacked = torch.stack(list(predictions.values()), dim=1).squeeze()
     targets_stacked = torch.stack(list(targets.values()), dim=1).squeeze()
 
@@ -247,14 +248,17 @@ def vectorized_con_loss(
     if len(target_means.shape) == 0:
         target_means = target_means.unsqueeze(0)
 
-    return {name: loss for name, loss in zip(predictions.keys(), target_means)}
+    return dict(zip(predictions.keys(), target_means, strict=False))
 
 
 def vectorized_bce_loss(
     predictions: dict[str, torch.Tensor],
     targets: dict[str, torch.Tensor],
-    loss_func: Callable = nn.BCEWithLogitsLoss(reduction="none"),
+    loss_func: Callable | None = None,
 ) -> dict[str, torch.Tensor]:
+    if loss_func is None:
+        loss_func = nn.BCEWithLogitsLoss(reduction="none")
+
     predictions_stacked = torch.stack(list(predictions.values()), dim=1).squeeze()
     targets_stacked = torch.stack(list(targets.values()), dim=1).squeeze().float()
 
@@ -269,14 +273,17 @@ def vectorized_bce_loss(
     if len(target_means.shape) == 0:
         target_means = target_means.unsqueeze(0)
 
-    return {name: loss for name, loss in zip(predictions.keys(), target_means)}
+    return dict(zip(predictions.keys(), target_means, strict=False))
 
 
 def loop_ce_loss(
     predictions: dict[str, torch.Tensor],
     targets: dict[str, torch.Tensor],
-    loss_func: Callable = nn.CrossEntropyLoss(reduction="none"),
+    loss_func: Callable | None = None,
 ) -> dict[str, torch.Tensor]:
+    if loss_func is None:
+        loss_func = nn.CrossEntropyLoss(reduction="none")
+
     target_losses = {}
 
     for name in predictions:
@@ -393,10 +400,9 @@ class NaNHandling(Enum):
 def _calc_con_loss(
     input: torch.Tensor,
     target: torch.Tensor,
-    loss_func: Union[nn.MSELoss, nn.L1Loss, nn.PoissonNLLLoss],
+    loss_func: nn.MSELoss | nn.L1Loss | nn.PoissonNLLLoss,
     nan_handling: NaNHandling = NaNHandling.NONE,
 ) -> torch.Tensor:
-
     if nan_handling != NaNHandling.NONE:
         has_nan = torch.isnan(target).any()
         if has_nan and nan_handling == NaNHandling.RAISE:
@@ -404,7 +410,7 @@ def _calc_con_loss(
                 f"NaN values found in target tensor with NaNHandling.RAISE specified. "
                 f"NaN count: {torch.isnan(target).sum().item()}"
             )
-        elif nan_handling == NaNHandling.MASK:
+        if nan_handling == NaNHandling.MASK:
             mask = ~torch.isnan(target).squeeze()
             input_masked = input.squeeze()[mask]
             target_masked = target.squeeze()[mask]
@@ -449,13 +455,11 @@ def _survival_loss(
     target: torch.Tensor,
     loss_func: Literal["NegativeLogLikelihood", "CoxPHLoss"] = "NegativeLogLikelihood",
 ) -> torch.Tensor:
-
     if loss_func == "NegativeLogLikelihood":
         return _negative_log_likelihood_loss(log_hazards=input, time=time, event=target)
-    elif loss_func == "CoxPHLoss":
+    if loss_func == "CoxPHLoss":
         return _cox_ph_loss(risk_scores=input, time=time, event=target)
-    else:
-        raise ValueError(f"Unsupported loss function: {loss_func}")
+    raise ValueError(f"Unsupported loss function: {loss_func}")
 
 
 def _negative_log_likelihood_loss(
@@ -527,7 +531,7 @@ def _cox_ph_loss(
         loss = loss[sorted_event == 1]
         return -torch.mean(loss)
 
-    elif ties_method == "efron":
+    if ties_method == "efron":
         unique_times = torch.unique(sorted_time)
 
         log_likelihood = torch.tensor(0.0, device=risk_scores.device)
@@ -556,15 +560,13 @@ def _cox_ph_loss(
         n_events_total = torch.sum(masked_event)
         return -log_likelihood / n_events_total
 
-    else:
-        raise ValueError(f"Unsupported ties method: {ties_method}")
+    raise ValueError(f"Unsupported ties method: {ties_method}")
 
 
 def create_survival_criterion(
     loss_name: Literal["NegativeLogLikelihood", "CoxPHLoss"],
     time_column: str,
 ) -> Callable:
-
     def survival_criterion(
         predictions: dict[str, torch.Tensor],
         targets: dict[str, torch.Tensor],

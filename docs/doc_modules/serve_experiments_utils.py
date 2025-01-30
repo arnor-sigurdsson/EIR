@@ -22,7 +22,7 @@ def load_data_for_serve(data: dict[str, Any]) -> dict[str, Any]:
             if data_pointer.endswith(".npy"):
                 loaded_data[key] = _serialize_array_to_base64(file_path=data_pointer)
             elif data_pointer.endswith(".txt"):
-                with open(data_pointer, "r") as f:
+                with open(data_pointer) as f:
                     loaded_data[key] = f.read()
             elif data_pointer.endswith((".png", ".jpg", ".jpeg")):
                 loaded_data[key] = _serialize_image_to_base64(file_path=data_pointer)

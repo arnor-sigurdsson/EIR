@@ -1,7 +1,8 @@
 import json
+from collections.abc import Sequence
 from copy import copy
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from aislib.misc_utils import ensure_path_exists
 
@@ -55,7 +56,7 @@ def load_all_serialized_output_objects(
 ) -> "al_output_objects_as_dict":
     output_objects_as_dict = {}
 
-    output_class: "al_output_classes"
+    output_class: al_output_classes
     for output_config in output_configs:
         output_type = output_config.output_info.output_type
         match output_type:
@@ -122,7 +123,6 @@ def get_output_serialization_path(
     output_type: str,
     output_name: str,
 ) -> Path:
-
     base_path = run_folder / "serializations" / f"{output_type}_output_serializations"
     match output_type:
         case "image" | "sequence" | "array" | "tabular" | "survival":
@@ -137,7 +137,6 @@ def serialize_output_objects(
     output_objects: "al_output_objects_as_dict",
     run_folder: Path,
 ) -> None:
-
     for output_name, output_object in output_objects.items():
         output_type = output_object.output_config.output_info.output_type
         output_path = get_output_serialization_path(
@@ -245,7 +244,7 @@ def _read_serialized_output_object(
     serialized_output_folder: Path,
     run_folder: Path,
 ) -> "al_output_objects":
-    loaded_object: "al_output_objects"
+    loaded_object: al_output_objects
     if output_class is ComputedTabularOutputInfo:
         loaded_object = load_tabular_output_object(
             serialized_output_folder=serialized_output_folder,

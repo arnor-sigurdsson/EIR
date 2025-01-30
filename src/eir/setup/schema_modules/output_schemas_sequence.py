@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Literal, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from eir.setup.schemas import al_max_sequence_length, al_tokenizer_choices
@@ -60,14 +61,14 @@ class SequenceOutputTypeConfig:
         token in the sequence given the previous tokens.
     """
 
-    vocab_file: Union[None, str] = None
+    vocab_file: None | str = None
     max_length: "al_max_sequence_length" = "average"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     min_freq: int = 10
-    split_on: Optional[str] = " "
+    split_on: str | None = " "
     tokenizer: "al_tokenizer_choices" = None  # type: ignore
-    tokenizer_language: Union[str, None] = None
-    adaptive_tokenizer_max_vocab_size: Optional[int] = None
+    tokenizer_language: str | None = None
+    adaptive_tokenizer_max_vocab_size: int | None = None
 
     sequence_operation: al_sequence_operations = "autoregressive"
 
@@ -107,7 +108,7 @@ class SequenceOutputSamplingConfig:
         likely candidates reaches 0.9.
     """
 
-    manual_inputs: Sequence[Dict[str, str]] = tuple()
+    manual_inputs: Sequence[dict[str, str]] = ()
     n_eval_inputs: int = 10
 
     generated_sequence_length: int = 64

@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -24,7 +23,7 @@ def load_array_input_object(serialized_input_folder: Path) -> ComputedArrayInput
 
     input_config = load_input_config_from_yaml(input_config_path=config_path)
 
-    normalization_stats: Optional[ArrayNormalizationStats] = None
+    normalization_stats: ArrayNormalizationStats | None = None
     if normalization_stats_path.exists():
         normalization_stats = load_dataclass(
             cls=ArrayNormalizationStats,

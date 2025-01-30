@@ -1,3 +1,4 @@
+from collections.abc import Callable, Generator, Iterable, Sequence
 from copy import copy, deepcopy
 from dataclasses import dataclass
 from enum import Enum
@@ -5,15 +6,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    Generator,
-    Iterable,
-    List,
     Optional,
-    Sequence,
-    Tuple,
-    Union,
 )
 
 import matplotlib.pyplot as plt
@@ -42,13 +35,13 @@ if TYPE_CHECKING:
     )
 
 # Aliases
-al_dataloader_gathered_predictions = Tuple[
+al_dataloader_gathered_predictions = tuple[
     dict[str, dict[str, torch.Tensor]], Optional["al_training_labels_target"], list[str]
 ]
-al_dataloader_gathered_raw = Tuple[
+al_dataloader_gathered_raw = tuple[
     dict[str, torch.Tensor], "al_training_labels_target", Sequence[str]
 ]
-al_lr_find_results = dict[str, list[Union[float, list[float]]]]
+al_lr_find_results = dict[str, list[float | list[float]]]
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -90,15 +83,14 @@ def recursive_to_device(
 ) -> Any:
     if isinstance(obj, torch.Tensor):
         return obj.to(device=device)
-    elif isinstance(obj, dict):
+    if isinstance(obj, dict):
         return {
             key: recursive_to_device(obj=value, device=device)
             for key, value in obj.items()
         }
-    elif isinstance(obj, list):
+    if isinstance(obj, list):
         return [recursive_to_device(obj=value, device=device) for value in obj]
-    else:
-        return obj
+    return obj
 
 
 def parse_tabular_target_labels(
@@ -247,7 +239,7 @@ def replace_nan_and_cast_to_long(
 def get_prediction_outputs_generator(
     data_loader: DataLoader,
     batch_prep_hook: Iterable[Callable],
-    batch_prep_hook_kwargs: Dict[str, Any],
+    batch_prep_hook_kwargs: dict[str, Any],
     model: Module,
     with_labels: bool = True,
 ) -> Generator[
@@ -270,7 +262,7 @@ def get_prediction_outputs_generator(
 
         outputs = predict_on_batch(model=model, inputs=inputs)
 
-        target_labels_copy: Optional["al_training_labels_target"]
+        target_labels_copy: al_training_labels_target | None
         target_labels_copy = deepcopy(target_labels) if with_labels else None
         ids_copy: list[str] = deepcopy(ids)
 
@@ -280,8 +272,8 @@ def get_prediction_outputs_generator(
 def gather_data_loader_samples(
     data_loader: DataLoader,
     batch_prep_hook: Iterable[Callable],
-    batch_prep_hook_kwargs: Dict[str, Any],
-    n_samples: Union[int, None] = None,
+    batch_prep_hook_kwargs: dict[str, Any],
+    n_samples: int | None = None,
 ) -> al_dataloader_gathered_raw:
     all_input_batches = []
     all_label_batches = []
@@ -295,18 +287,17 @@ def gather_data_loader_samples(
         )
         batch = state["batch"]
 
-        inputs: "al_input_batch" = batch.inputs
-        target_labels: "al_training_labels_target" = batch.target_labels
-        ids: "al_ids" = batch.ids
+        inputs: al_input_batch = batch.inputs
+        target_labels: al_training_labels_target = batch.target_labels
+        ids: al_ids = batch.ids
 
         all_input_batches.append(inputs)
         all_label_batches.append(target_labels)
-        ids_total += [i for i in ids]
+        ids_total += list(ids)
 
-        if n_samples:
-            if len(ids_total) >= n_samples:
-                ids_total = ids_total[:n_samples]
-                break
+        if n_samples and len(ids_total) >= n_samples:
+            ids_total = ids_total[:n_samples]
+            break
 
     all_input_batches_stacked = _stack_list_of_batch_dicts(
         list_of_batch_dicts=all_input_batches
@@ -316,17 +307,17 @@ def gather_data_loader_samples(
     )
 
     if n_samples:
-        inputs_final: "al_input_batch" = {}
-        for input_name in all_input_batches_stacked.keys():
+        inputs_final: al_input_batch = {}
+        for input_name in all_input_batches_stacked:
             input_subset = all_input_batches_stacked[input_name][:n_samples]
             inputs_final[input_name] = input_subset
 
-        target_labels_final: "al_training_labels_target" = {}
-        for output_name in all_target_label_batches_stacked.keys():
+        target_labels_final: al_training_labels_target = {}
+        for output_name in all_target_label_batches_stacked:
             target_labels_final[output_name] = {}
 
             cur_output = all_target_label_batches_stacked[output_name]
-            for target_name in cur_output.keys():
+            for target_name in cur_output:
                 target_subset = cur_output[target_name][:n_samples]
                 target_labels_final[output_name][target_name] = target_subset
 
@@ -340,7 +331,7 @@ def gather_data_loader_samples(
 
 
 def stack_list_of_output_target_dicts(
-    list_of_target_batch_dicts: List["al_training_labels_target"],
+    list_of_target_batch_dicts: list["al_training_labels_target"],
 ) -> "al_training_labels_target":
     """
     Spec:
@@ -359,21 +350,21 @@ def stack_list_of_output_target_dicts(
     }
     for output_name in output_names:
         cur_output_targets = list_of_target_batch_dicts[0][output_name]
-        for target_name in cur_output_targets.keys():
+        for target_name in cur_output_targets:
             aggregated_batches[output_name][target_name] = []
 
     for batch in list_of_target_batch_dicts:
         assert set(batch.keys()) == output_names
 
-        for output_name in batch.keys():
+        for output_name in batch:
             cur_output_batch = batch[output_name]
-            for target_name in cur_output_batch.keys():
+            for target_name in cur_output_batch:
                 cur_column_batch = cur_output_batch[target_name]
-                cur_batch_value = [i for i in cur_column_batch]
+                cur_batch_value = list(cur_column_batch)
 
                 aggregated_batches[output_name][target_name] += cur_batch_value
 
-    stacked_outputs: "al_training_labels_target" = {}
+    stacked_outputs: al_training_labels_target = {}
     for output_name, output_dict in aggregated_batches.items():
         cur_stacked_outputs = {
             key: _do_stack(list_of_elements=list_of_elements)
@@ -385,7 +376,7 @@ def stack_list_of_output_target_dicts(
 
 
 def _stack_list_of_batch_dicts(
-    list_of_batch_dicts: List["al_input_batch"],
+    list_of_batch_dicts: list["al_input_batch"],
 ) -> "al_input_batch":
     """
     Spec:
@@ -404,9 +395,9 @@ def _stack_list_of_batch_dicts(
     for batch in list_of_batch_dicts:
         assert set(batch.keys()) == target_columns
 
-        for column in batch.keys():
+        for column in batch:
             cur_column_batch = batch[column]
-            aggregated_batches[column] += [i for i in cur_column_batch]
+            aggregated_batches[column] += list(cur_column_batch)
 
     stacked_inputs = {
         key: _do_stack(list_of_elements=list_of_elements)
@@ -417,10 +408,10 @@ def _stack_list_of_batch_dicts(
 
 
 def _do_stack(
-    list_of_elements: List[torch.Tensor],
+    list_of_elements: list[torch.Tensor],
 ) -> torch.Tensor:
     # check that they're all the same type
-    list_types = set(type(i) for i in list_of_elements)
+    list_types = {type(i) for i in list_of_elements}
     assert len(list_types) == 1
 
     return torch.stack(list_of_elements)
@@ -428,7 +419,7 @@ def _do_stack(
 
 def add_wd_to_model_params(
     model: nn.Module, wd: float
-) -> List[Dict[str, nn.Parameter | float]]:
+) -> list[dict[str, nn.Parameter | float]]:
     """
     We want to skip adding weight decay to learnable activation parameters so as
     not to bias them towards 0.
@@ -467,9 +458,9 @@ def _check_named_modules(model: nn.Module):
 
     for name, module in model.named_modules():
         if name.startswith("act_"):
-            assert isinstance(module, (Swish, nn.PReLU)), (name, module)
+            assert isinstance(module, Swish | nn.PReLU), (name, module)
 
-        if isinstance(module, (Swish, nn.PReLU)):
+        if isinstance(module, Swish | nn.PReLU):
             assert "act_" in name, name
 
 

@@ -1,6 +1,7 @@
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from aislib.misc_utils import ensure_path_exists
@@ -44,9 +45,9 @@ def load_transformer(
 
 
 def load_transformers(
-    transformers_to_load: Optional[dict[str, list[str]]] = None,
-    output_folder: Optional[str] = None,
-    run_folder: Optional[Path] = None,
+    transformers_to_load: dict[str, list[str]] | None = None,
+    output_folder: str | None = None,
+    run_folder: Path | None = None,
 ) -> dict[str, "al_label_transformers"]:
     if not run_folder and not output_folder:
         raise ValueError("Either 'run_folder' or 'output_folder' must be provided.")
@@ -58,7 +59,7 @@ def load_transformers(
     if not transformers_to_load:
         transformers_to_load = get_transformer_sources(run_folder=run_folder)
 
-    loaded_transformers: dict[str, "al_label_transformers"] = {}
+    loaded_transformers: dict[str, al_label_transformers] = {}
     for source_name, source_transformers_to_load in transformers_to_load.items():
         loaded_transformers[source_name] = {}
         for transformer_name in source_transformers_to_load:

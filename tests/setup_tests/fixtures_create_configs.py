@@ -1,9 +1,9 @@
 import logging
+from collections.abc import Sequence
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import rmtree
-from typing import Sequence, Tuple, Union
 
 import pytest
 from aislib.misc_utils import ensure_path_exists
@@ -34,10 +34,10 @@ class TestConfigInits:
 @pytest.fixture
 def create_test_config_init_base(
     request, create_test_data: "TestDataConfig"
-) -> Tuple[TestConfigInits, "TestDataConfig"]:
+) -> tuple[TestConfigInits, "TestDataConfig"]:
     injections = {}
     if hasattr(request, "param"):
-        assert "injections" in request.param.keys()
+        assert "injections" in request.param
         injections = request.param["injections"]
 
         injections_keys = set(injections.keys())
@@ -99,7 +99,7 @@ def general_sequence_inject(
 
 @pytest.fixture()
 def create_test_config(
-    create_test_config_init_base: Tuple[TestConfigInits, "TestDataConfig"],
+    create_test_config_init_base: tuple[TestConfigInits, "TestDataConfig"],
     keep_outputs: bool,
 ) -> config.Configs:
     test_init, test_data_config = copy(create_test_config_init_base)
@@ -150,7 +150,7 @@ def create_test_config(
 
 def build_test_output_folder(
     test_configs: TestConfigInits, test_data_config: TestDataConfig
-) -> Tuple[TestConfigInits, str]:
+) -> tuple[TestConfigInits, str]:
     """
     This is done after in case tests modify output_folder.
     """
@@ -195,5 +195,5 @@ def teardown_logger():
                     root_logger.removeHandler(handler)
 
 
-def cleanup(run_path: Union[Path, str]) -> None:
+def cleanup(run_path: Path | str) -> None:
     rmtree(path=run_path)

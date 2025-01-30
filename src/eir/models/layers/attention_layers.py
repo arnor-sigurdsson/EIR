@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -41,8 +40,8 @@ class LinearAttention(nn.Module):
         b, c, h, w = x.shape
 
         qkv = self.to_qkv(x).chunk(3, dim=1)
-        q, k, v = map(
-            lambda t: rearrange(t, "b (h c) x y -> b h c (x y)", h=self.heads), qkv
+        q, k, v = (
+            rearrange(t, "b (h c) x y -> b h c (x y)", h=self.heads) for t in qkv
         )
 
         q = q.softmax(dim=-2)
@@ -108,7 +107,7 @@ class TransformerBlock(nn.Module):
         dim_feedforward: int,
         dropout: float = 0.1,
         norm_first: bool = True,
-        block_config: Optional[TransformerBlockConfig] = None,
+        block_config: TransformerBlockConfig | None = None,
     ):
         super().__init__()
 
@@ -166,7 +165,7 @@ class TransformerBlock(nn.Module):
 
         return rotated
 
-    def _attention(self, x: Tensor, attn_mask: Optional[Tensor] = None) -> Tensor:
+    def _attention(self, x: Tensor, attn_mask: Tensor | None = None) -> Tensor:
         batch_size, seq_len, _ = x.shape
 
         # Project to queries, keys, values and reshape
@@ -179,7 +178,7 @@ class TransformerBlock(nn.Module):
         k = self._apply_rope(x=k, seq_len=seq_len)
 
         # Transpose for attention: [batch_size, num_heads, sequence_length, head_dim]
-        q, k, v = [t.transpose(1, 2) for t in (q, k, v)]
+        q, k, v = (t.transpose(1, 2) for t in (q, k, v))
 
         attn_output = F.scaled_dot_product_attention(
             query=q,
@@ -197,7 +196,7 @@ class TransformerBlock(nn.Module):
         )
         return self.dropout(self.out_proj(attn_output))
 
-    def forward(self, x: Tensor, attn_mask: Optional[Tensor] = None) -> Tensor:
+    def forward(self, x: Tensor, attn_mask: Tensor | None = None) -> Tensor:
         if self.norm_first:
             x = x + self._attention(self.norm1(x), attn_mask)
             x = x + self.ffn(self.norm2(x))
@@ -208,7 +207,6 @@ class TransformerBlock(nn.Module):
 
 
 class Transformer(nn.Module):
-
     def __init__(
         self,
         d_model: int,
@@ -233,7 +231,7 @@ class Transformer(nn.Module):
             ]
         )
 
-    def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+    def forward(self, x: Tensor, mask: Tensor | None = None) -> Tensor:
         for layer in self.layers:
             x = layer(x, mask)
         return x

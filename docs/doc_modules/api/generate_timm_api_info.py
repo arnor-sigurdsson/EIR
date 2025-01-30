@@ -70,8 +70,8 @@ def retrieve_configurable_models(
     models_ = []
 
     package_iter = pkgutil.iter_modules(importlib.import_module(package).__path__)
-    for importer, modname, is_pkg in package_iter:
-        if not is_pkg and not modname.startswith("_") and not modname == "registry":
+    for _importer, modname, is_pkg in package_iter:
+        if not is_pkg and not modname.startswith("_") and modname != "registry":
             module = importlib.import_module(f"{package}.{modname}")
 
             if hasattr(module, "__all__"):
@@ -100,7 +100,7 @@ def generate_configurable_model_rst_string(
 ) -> str:
     rst_string = ""
 
-    for full_import_path, docstring, parameters in models:
+    for full_import_path, _docstring, _parameters in models:
         rst_string += f".. autoclass:: {full_import_path}\n"
         rst_string += "   :members:\n"
         rst_string += "   :exclude-members: forward\n\n"

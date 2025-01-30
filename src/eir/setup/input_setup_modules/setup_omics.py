@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ logger = get_logger(name=__name__)
 class ComputedOmicsInputInfo:
     input_config: schemas.InputConfig
     data_dimensions: "DataDimensions"
-    subset_indices: Optional[np.ndarray]
+    subset_indices: np.ndarray | None
 
 
 def set_up_omics_input(
@@ -28,7 +28,6 @@ def set_up_omics_input(
     *args,
     **kwargs,
 ) -> ComputedOmicsInputInfo:
-
     if data_dimensions is None:
         data_dimensions = get_data_dimension_from_data_source(
             data_source=Path(input_config.input_info.input_source),
@@ -68,7 +67,7 @@ def set_up_omics_input(
 
 def _setup_snp_subset_indices(
     df_bim: pd.DataFrame,
-    snps_to_subset: List[str],
+    snps_to_subset: list[str],
     subset_file_name: str = "",
     snp_file_name: str = "",
 ) -> np.ndarray:
@@ -97,8 +96,8 @@ def _setup_snp_subset_indices(
     return np.asarray(df_subset.index)
 
 
-def read_subset_file(subset_snp_file_path: str) -> List[str]:
-    with open(subset_snp_file_path, "r") as infile:
+def read_subset_file(subset_snp_file_path: str) -> list[str]:
+    with open(subset_snp_file_path) as infile:
         snps_to_subset = infile.read().split()
 
     return snps_to_subset
@@ -119,6 +118,6 @@ def read_bim(bim_file_path: str) -> pd.DataFrame:
     return df_bim
 
 
-def _get_bim_headers() -> List[str]:
+def _get_bim_headers() -> list[str]:
     bim_headers = ["CHR_CODE", "VAR_ID", "POS_CM", "BP_COORD", "ALT", "REF"]
     return bim_headers

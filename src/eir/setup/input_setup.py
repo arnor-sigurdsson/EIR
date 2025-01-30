@@ -1,12 +1,9 @@
+from collections.abc import Callable, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
     Optional,
     Protocol,
-    Sequence,
-    Type,
     Union,
 )
 
@@ -51,33 +48,34 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-al_input_objects = Union[
-    ComputedOmicsInputInfo,
-    ComputedTabularInputInfo,
-    ComputedSequenceInputInfo,
-    ComputedBytesInputInfo,
-    ComputedImageInputInfo,
-    ComputedArrayInputInfo,
-    ComputedPredictTabularInputInfo,
-    ComputedServeTabularInputInfo,
-]
-al_input_objects_as_dict = Dict[str, al_input_objects]
+al_input_objects = (
+    ComputedOmicsInputInfo
+    | ComputedTabularInputInfo
+    | ComputedSequenceInputInfo
+    | ComputedBytesInputInfo
+    | ComputedImageInputInfo
+    | ComputedArrayInputInfo
+    | ComputedPredictTabularInputInfo
+    | ComputedServeTabularInputInfo
+)
 
-al_serializable_input_objects = Union[
-    ComputedSequenceInputInfo,
-    ComputedImageInputInfo,
-    ComputedBytesInputInfo,
-    ComputedArrayInputInfo,
-    ComputedOmicsInputInfo,
-]
+al_input_objects_as_dict = dict[str, al_input_objects]
 
-al_serializable_input_classes = Union[
-    Type[ComputedSequenceInputInfo],
-    Type[ComputedImageInputInfo],
-    Type[ComputedBytesInputInfo],
-    Type[ComputedArrayInputInfo],
-    Type[ComputedOmicsInputInfo],
-]
+al_serializable_input_objects = (
+    ComputedSequenceInputInfo
+    | ComputedImageInputInfo
+    | ComputedBytesInputInfo
+    | ComputedArrayInputInfo
+    | ComputedOmicsInputInfo
+)
+
+al_serializable_input_classes = (
+    type[ComputedSequenceInputInfo]
+    | type[ComputedImageInputInfo]
+    | type[ComputedBytesInputInfo]
+    | type[ComputedArrayInputInfo]
+    | type[ComputedOmicsInputInfo]
+)
 
 
 class InputSetupFunction(Protocol):
@@ -97,7 +95,7 @@ def set_up_inputs_general(
     inputs_configs: schemas.al_input_configs,
     hooks: Optional["Hooks"],
     setup_func_getter: InputSetupGetterFunction,
-    setup_func_kwargs: Dict[str, Any],
+    setup_func_kwargs: dict[str, Any],
 ) -> al_input_objects_as_dict:
     all_inputs = {}
 

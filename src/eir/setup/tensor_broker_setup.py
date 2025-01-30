@@ -1,5 +1,3 @@
-from typing import Optional
-
 from eir.setup.schema_modules.tensor_broker_schemas import (
     TensorBrokerConfig,
     TensorMessageConfig,
@@ -8,7 +6,7 @@ from eir.setup.schema_modules.tensor_broker_schemas import (
 
 def set_up_tensor_broker_config(
     tensor_broker_config: dict,
-) -> Optional[TensorBrokerConfig]:
+) -> TensorBrokerConfig | None:
     if not tensor_broker_config:
         return None
 

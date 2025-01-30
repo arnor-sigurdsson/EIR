@@ -16,14 +16,14 @@ OUT_PATH = "docs/acknowledgements.rst"
 IN_PATH = "pyproject.toml"
 
 packages = []
-with open(IN_PATH, "r") as f:
+with open(IN_PATH) as f:
     toml = f.read()
     flag = False
 
     m1 = "[tool.poetry.dependencies]"
     m2 = "[tool.poetry.group.dev.dependencies]"
     for line in toml.splitlines():
-        if line == m1 or line == m2:
+        if line in (m1, m2):
             flag = True
         elif line.startswith("["):
             flag = False

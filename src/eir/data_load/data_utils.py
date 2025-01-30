@@ -1,13 +1,8 @@
+from collections.abc import Generator, Sequence
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    Generator,
-    List,
-    Sequence,
-    Tuple,
-    Union,
     overload,
 )
 
@@ -39,7 +34,7 @@ logger = get_logger(name=__name__)
 
 def get_output_info_generator(
     outputs_as_dict: "al_output_objects_as_dict",
-) -> Generator[Tuple[str, str, str], None, None]:
+) -> Generator[tuple[str, str, str], None, None]:
     for output_name, output_object in outputs_as_dict.items():
         match output_object:
             case ComputedTabularOutputInfo():
@@ -64,9 +59,9 @@ def get_output_info_generator(
 
 @dataclass(frozen=True)
 class Batch:
-    inputs: Dict[str, torch.Tensor]
-    target_labels: Dict[str, Dict[str, torch.Tensor]]
-    ids: List[str]
+    inputs: dict[str, torch.Tensor]
+    target_labels: dict[str, dict[str, torch.Tensor]]
+    ids: list[str]
 
 
 @overload
@@ -79,7 +74,7 @@ def get_train_sampler(
 def get_train_sampler(
     columns_to_sample: Sequence[str],
     train_dataset: "al_local_datasets",
-) -> Union[WeightedRandomSampler, DistributedSampler]: ...
+) -> WeightedRandomSampler | DistributedSampler: ...
 
 
 def get_train_sampler(columns_to_sample, train_dataset):
@@ -88,8 +83,7 @@ def get_train_sampler(columns_to_sample, train_dataset):
     if columns_to_sample is None:
         if in_distributed_run:
             return DistributedSampler(dataset=train_dataset)
-        else:
-            return None
+        return None
 
     if in_distributed_run:
         raise NotImplementedError(
@@ -106,7 +100,7 @@ def get_train_sampler(columns_to_sample, train_dataset):
     if columns_to_sample == ["all"]:
         is_sample_all_cols = True
     else:
-        parsed_columns_to_sample = set(i.split("__", 1)[1] for i in columns_to_sample)
+        parsed_columns_to_sample = {i.split("__", 1)[1] for i in columns_to_sample}
         is_sample_column_loaded = parsed_columns_to_sample.issubset(
             set(loaded_target_columns)
         )
@@ -139,7 +133,7 @@ def _gather_all_loaded_columns(outputs: "al_output_objects_as_dict") -> Sequence
     loaded_cat_columns: list[str] = []
     loaded_con_columns: list[str] = []
 
-    for output_name, output_object in outputs.items():
+    for _output_name, output_object in outputs.items():
         match output_object:
             case ComputedTabularOutputInfo():
                 cur_target_columns = output_object.target_columns

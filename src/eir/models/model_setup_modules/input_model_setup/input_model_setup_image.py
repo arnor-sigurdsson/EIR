@@ -1,5 +1,5 @@
 from copy import copy
-from typing import Any, Dict, Protocol, TypeGuard, Union
+from typing import Any, Protocol, TypeGuard
 
 import timm
 import torch
@@ -151,15 +151,12 @@ def _get_all_timm_models() -> list[str]:
     return all_models
 
 
-def _parse_init_kwargs(model_config: ImageModelConfig) -> Dict[str, Any]:
+def _parse_init_kwargs(model_config: ImageModelConfig) -> dict[str, Any]:
     init_config = copy(model_config.model_init_config)
-    if isinstance(init_config, dict):
-        init_kwargs = init_config
-    else:
-        init_kwargs = init_config.__dict__
+    init_kwargs = init_config if isinstance(init_config, dict) else init_config.__dict__
     assert isinstance(init_kwargs, dict)
 
-    model_config_out_features = getattr(model_config, "num_output_features")
+    model_config_out_features = model_config.num_output_features
     init_kwargs_out_features = init_kwargs.get("num_output_features")
     if model_config_out_features:
         if model_config_out_features != init_kwargs_out_features:
@@ -178,7 +175,7 @@ def _meta_get_image_model_from_scratch(
     model_type: str,
     model_init_config: dict,
     in_chans: int,
-    num_output_features: Union[None, int],
+    num_output_features: None | int,
 ) -> nn.Module:
     """
     A kind of ridiculous way to initialize modules from scratch that are found in timm,

@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import List
 
 import torch
 from torch import nn
@@ -28,7 +27,7 @@ class ResidualMLPConfig:
 
     """
 
-    layers: List[int] = field(default_factory=lambda: [2])
+    layers: list[int] = field(default_factory=lambda: [2])
 
     fc_task_dim: int = 256
 

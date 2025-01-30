@@ -1,6 +1,7 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Sequence, Union
+from typing import TYPE_CHECKING, Union
 
 from eir.data_load.label_setup import (
     Labels,
@@ -78,7 +79,7 @@ def get_tabular_input_file_info(
 
 
 def get_tabular_num_features(
-    label_transformers: Dict, cat_columns: list[str], con_columns: list[str]
+    label_transformers: dict, cat_columns: list[str], con_columns: list[str]
 ) -> int:
     unique_cat_values = get_unique_values_from_transformers(
         transformers=label_transformers,

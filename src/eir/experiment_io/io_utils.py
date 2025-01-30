@@ -1,7 +1,8 @@
 import json
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Callable, Protocol, cast
+from typing import Any, Protocol, cast
 
 import numpy as np
 import torch
@@ -139,7 +140,7 @@ def check_version(run_folder: Path) -> None:
         return
 
     cur_version = __version__
-    with open(version_file, "r") as f:
+    with open(version_file) as f:
         loaded_version = f.read().strip()
 
     if cur_version != loaded_version:
@@ -187,7 +188,6 @@ def replace_dict_values(
     target: dict[str, Any],
     replacements: dict[str, Any],
 ) -> dict[str, Any]:
-
     def recursive_replace(
         d: dict[str, Any],
         path: str = "",

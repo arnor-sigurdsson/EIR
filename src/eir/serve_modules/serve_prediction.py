@@ -65,7 +65,6 @@ def merge_predictions_per_sample(
     array_predictions: dict[str, dict[str, list[np.ndarray]]],
     batch_size: int,
 ) -> al_merged_predictions:
-
     merged_predictions: al_merged_predictions = [{} for _ in range(batch_size)]
 
     for os_key, os_value in one_shot_prediction.items():
@@ -116,9 +115,9 @@ def _run_serve_sequence_generation(
         assert config.sampling_config is not None
 
         if output_type_info.sequence_operation == "autoregressive":
-            assert isinstance(
-                config.sampling_config, SequenceOutputSamplingConfig
-            ), config.sampling_config
+            assert isinstance(config.sampling_config, SequenceOutputSamplingConfig), (
+                config.sampling_config
+            )
 
             eval_samples = _build_sequence_eval_samples_batch(
                 serve_batch=batch,
@@ -147,7 +146,6 @@ def _build_sequence_eval_samples_batch(
     eval_samples = []
 
     for i in range(len(serve_batch.ids)):
-
         prepared_inputs = serve_batch.inputs_split[i]
 
         eval_sample = SequenceOutputEvalSample(
@@ -175,7 +173,7 @@ def _run_serve_array_generation(
         cur_output_name = config.output_info.output_name
         output_type_info = config.output_type_info
         assert isinstance(
-            output_type_info, (ArrayOutputTypeConfig, ImageOutputTypeConfig)
+            output_type_info, ArrayOutputTypeConfig | ImageOutputTypeConfig
         )
 
         assert config.sampling_config is not None

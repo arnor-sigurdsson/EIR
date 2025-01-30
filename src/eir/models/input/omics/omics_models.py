@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Literal, Protocol, Type, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol, Union
 
 from eir.models.input.array.models_cnn import CNNModel, CNNModelConfig
 from eir.models.input.array.models_identity import IdentityModel, IdentityModelConfig
@@ -18,14 +18,13 @@ if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
 
 logger = get_logger(name=__name__)
-
-al_omics_model_classes = Union[
-    Type["CNNModel"],
-    Type["LinearModel"],
-    Type["SimpleLCLModel"],
-    Type["LCLModel"],
-    Type["IdentityModel"],
-]
+al_omics_model_classes = (
+    type["CNNModel"]
+    | type["LinearModel"]
+    | type["SimpleLCLModel"]
+    | type["LCLModel"]
+    | type["IdentityModel"]
+)
 
 al_omics_models = Union[
     "CNNModel", "LinearModel", "SimpleLCLModel", "LCLModel", "IdentityModel"
@@ -39,21 +38,21 @@ al_omics_model_types = Literal[
     "linear",
 ]
 
-al_omics_model_config_classes = Union[
-    Type[CNNModelConfig],
-    Type[LinearModelConfig],
-    Type[SimpleLCLModelConfig],
-    Type[LCLModelConfig],
-    Type[IdentityModelConfig],
-]
+al_omics_model_config_classes = (
+    type[CNNModelConfig]
+    | type[LinearModelConfig]
+    | type[SimpleLCLModelConfig]
+    | type[LCLModelConfig]
+    | type[IdentityModelConfig]
+)
 
-al_omics_model_configs = Union[
-    CNNModelConfig,
-    LinearModelConfig,
-    SimpleLCLModelConfig,
-    LCLModelConfig,
-    IdentityModelConfig,
-]
+al_omics_model_configs = (
+    CNNModelConfig
+    | LinearModelConfig
+    | SimpleLCLModelConfig
+    | LCLModelConfig
+    | IdentityModelConfig
+)
 
 
 @dataclass
@@ -70,7 +69,7 @@ class OmicsModelConfig:
     model_init_config: al_omics_model_configs
 
 
-def get_omics_model_mapping() -> Dict[str, al_omics_model_classes]:
+def get_omics_model_mapping() -> dict[str, al_omics_model_classes]:
     mapping = {
         "cnn": CNNModel,
         "linear": LinearModel,
@@ -88,10 +87,10 @@ def get_omics_model_class(model_type: al_omics_model_types) -> al_omics_model_cl
 
 
 class Dataclass(Protocol):
-    __dataclass_fields__: ClassVar[Dict]
+    __dataclass_fields__: ClassVar[dict]
 
 
-def get_omics_config_dataclass_mapping() -> Dict[str, al_omics_model_config_classes]:
+def get_omics_config_dataclass_mapping() -> dict[str, al_omics_model_config_classes]:
     mapping = {
         "cnn": CNNModelConfig,
         "linear": LinearModelConfig,
@@ -123,9 +122,7 @@ def get_omics_model_init_kwargs(
     to just model_config object).
     """
 
-    kwargs: dict[str, Union["DataDimensions", al_omics_model_configs | FlattenFunc]] = (
-        {}
-    )
+    kwargs: dict[str, DataDimensions | (al_omics_model_configs | FlattenFunc)] = {}
     base_kwargs = model_config.__dict__
     base_kwargs = _enforce_omics_specific_settings(
         base_kwargs=base_kwargs, model_type=model_type
@@ -145,8 +142,8 @@ def get_omics_model_init_kwargs(
 
 
 def _enforce_omics_specific_settings(
-    base_kwargs: Dict[str, Any], model_type: str
-) -> Dict[str, Any]:
+    base_kwargs: dict[str, Any], model_type: str
+) -> dict[str, Any]:
     expected = {
         "cnn": {
             "kernel_height": 1,

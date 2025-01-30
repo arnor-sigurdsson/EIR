@@ -1,5 +1,3 @@
-from typing import Optional
-
 from eir.data_load import datasets
 from eir.data_load.datasets import al_local_datasets
 from eir.data_load.label_setup import al_target_labels
@@ -11,7 +9,7 @@ from eir.target_setup.target_label_setup import MissingTargetsInfo
 
 def set_up_default_dataset(
     configs: Configs,
-    target_labels_df: Optional[al_target_labels],
+    target_labels_df: al_target_labels | None,
     inputs_as_dict: al_input_objects_as_dict,
     outputs_as_dict: al_output_objects_as_dict,
     missing_ids_per_output: MissingTargetsInfo,

@@ -1,5 +1,5 @@
 from functools import partial
-from typing import TYPE_CHECKING, Dict, Optional, Union
+from typing import TYPE_CHECKING
 
 import torch
 
@@ -27,14 +27,13 @@ if TYPE_CHECKING:
 
 al_output_array_model_init_kwargs = dict[
     str,
-    Union[
-        Optional[DataDimensions],
-        LCLOutputModelConfig | CNNUpscaleModelConfig,
-        dict[str, "FeatureExtractorInfo"],
-        FlattenFunc,
-        int,
-        str,
-    ],
+    DataDimensions
+    | None
+    | (LCLOutputModelConfig | CNNUpscaleModelConfig)
+    | dict[str, "FeatureExtractorInfo"]
+    | FlattenFunc
+    | int
+    | str,
 ]
 
 al_output_array_model_configs = LCLOutputModelConfig | CNNUpscaleModelConfig
@@ -44,9 +43,9 @@ logger = get_logger(name=__name__)
 
 def get_array_or_image_output_module_from_model_config(
     output_object: ComputedArrayOutputInfo | ComputedImageOutputInfo,
-    input_dimension: Optional[int],
+    input_dimension: int | None,
     fusion_model_type: str,
-    feature_extractor_infos: Optional[dict[str, "FeatureExtractorInfo"]],
+    feature_extractor_infos: dict[str, "FeatureExtractorInfo"] | None,
     device: str,
 ) -> al_output_modules:
     output_model_config = output_object.output_config.model_config
@@ -100,15 +99,14 @@ def get_array_or_image_output_module_from_model_config(
 
 def get_array_output_feature_extractor(
     model_init_config: al_output_array_model_configs,
-    input_data_dimensions: Optional[DataDimensions],
-    feature_extractor_infos: Optional[dict[str, "FeatureExtractorInfo"]],
+    input_data_dimensions: DataDimensions | None,
+    feature_extractor_infos: dict[str, "FeatureExtractorInfo"] | None,
     model_type: al_array_model_types,
-    output_data_dimensions: Optional[DataDimensions],
+    output_data_dimensions: DataDimensions | None,
     output_name: str,
     use_passthrough: bool,
-    diffusion_time_steps: Optional[int],
+    diffusion_time_steps: int | None,
 ) -> al_output_array_models:
-
     model_type = parse_model_type(
         model_type=model_type,
         use_passthrough=use_passthrough,
@@ -138,7 +136,7 @@ def parse_model_type(
     return model_type
 
 
-def get_array_output_model_mapping() -> Dict[str, al_output_array_model_classes]:
+def get_array_output_model_mapping() -> dict[str, al_output_array_model_classes]:
     mapping = {
         "lcl": LCLModel,
         "cnn": CNNUpscaleModel,
@@ -155,9 +153,9 @@ def get_array_output_model_class(
     return mapping[model_type]
 
 
-def get_array_output_config_dataclass_mapping() -> (
-    Dict[str, al_output_array_model_config_classes]
-):
+def get_array_output_config_dataclass_mapping() -> dict[
+    str, al_output_array_model_config_classes
+]:
     mapping = {
         "lcl": LCLOutputModelConfig,
         "cnn": CNNUpscaleModelConfig,
@@ -177,11 +175,11 @@ def get_array_output_model_config_dataclass(
 def get_array_output_model_init_kwargs(
     model_type: al_array_model_types,
     model_config: al_output_array_model_configs,
-    fused_input_data_dimensions: Optional[DataDimensions],
-    feature_extractor_infos: Optional[dict[str, "FeatureExtractorInfo"]],
-    output_data_dimensions: Optional[DataDimensions],
+    fused_input_data_dimensions: DataDimensions | None,
+    feature_extractor_infos: dict[str, "FeatureExtractorInfo"] | None,
+    output_data_dimensions: DataDimensions | None,
     output_name: str,
-    diffusion_time_steps: Optional[int],
+    diffusion_time_steps: int | None,
 ) -> al_output_array_model_init_kwargs:
     kwargs: al_output_array_model_init_kwargs = {}
 

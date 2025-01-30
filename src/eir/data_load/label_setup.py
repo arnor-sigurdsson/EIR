@@ -1,19 +1,12 @@
 import reprlib
+from collections.abc import Generator, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import (
     Any,
-    Dict,
-    Generator,
-    List,
     Literal,
-    Optional,
     Protocol,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
 )
 
 import numpy as np
@@ -45,12 +38,9 @@ al_sample_labels_raw = dict[str, al_label_values_raw]
 al_label_dict = dict[str, al_sample_labels_raw]
 al_target_labels = pl.DataFrame
 al_target_columns = dict[Literal["con", "cat"], list[str]]
-al_label_transformers_object = Union[
-    StandardScaler,
-    LabelEncoder,
-    KBinsDiscretizer,
-    IdentityTransformer,
-]
+type al_label_transformers_object = (
+    StandardScaler | LabelEncoder | KBinsDiscretizer | IdentityTransformer
+)
 al_label_transformers = dict[str, al_label_transformers_object]
 
 
@@ -70,7 +60,7 @@ class TabularFileInfo:
     file_path: Path
     con_columns: Sequence[str]
     cat_columns: Sequence[str]
-    parsing_chunk_size: Union[None, int] = None
+    parsing_chunk_size: None | int = None
 
 
 def set_up_train_and_valid_tabular_data(
@@ -170,7 +160,7 @@ def _get_fit_label_transformers(
 def _get_transformer(column_type):
     if column_type in ("con", "extra_con"):
         return StandardScaler()
-    elif column_type == "cat":
+    if column_type == "cat":
         return LabelEncoder()
 
     raise ValueError()
@@ -205,7 +195,7 @@ def streamline_values_for_transformers(
     LabelEncoder() expects a 1D array, whereas StandardScaler() expects a 2D one.
     """
 
-    if isinstance(transformer, (StandardScaler, KBinsDiscretizer, IdentityTransformer)):
+    if isinstance(transformer, StandardScaler | KBinsDiscretizer | IdentityTransformer):
         values_reshaped = values.reshape(-1, 1)
         return values_reshaped
 
@@ -267,12 +257,12 @@ class LabelDFParseWrapperProtocol(Protocol):
     def __call__(
         self,
         label_file_tabular_info: TabularFileInfo,
-        ids_to_keep: Union[None, Sequence[str]],
+        ids_to_keep: None | Sequence[str],
     ) -> pl.DataFrame: ...
 
 
 def get_label_parsing_wrapper(
-    label_parsing_chunk_size: Union[None, int],
+    label_parsing_chunk_size: None | int,
 ) -> LabelDFParseWrapperProtocol:
     if label_parsing_chunk_size is None:
         return label_df_parse_wrapper
@@ -296,9 +286,8 @@ def _validate_df(df: pl.DataFrame) -> None:
 
 def label_df_parse_wrapper(
     label_file_tabular_info: TabularFileInfo,
-    ids_to_keep: Union[None, Sequence[str]],
+    ids_to_keep: None | Sequence[str],
 ) -> pl.DataFrame:
-
     all_label_columns, dtypes = _get_all_label_columns_and_dtypes(
         cat_columns=label_file_tabular_info.cat_columns,
         con_columns=label_file_tabular_info.con_columns,
@@ -333,7 +322,7 @@ def label_df_parse_wrapper(
 
 def chunked_label_df_parse_wrapper(
     label_file_tabular_info: TabularFileInfo,
-    ids_to_keep: Union[None, Sequence[str]],
+    ids_to_keep: None | Sequence[str],
 ) -> pl.DataFrame:
     label_columns, dtypes = _get_all_label_columns_and_dtypes(
         cat_columns=label_file_tabular_info.cat_columns,
@@ -353,7 +342,7 @@ def chunked_label_df_parse_wrapper(
 
     supplied_columns = get_passed_in_columns(tabular_info=label_file_tabular_info)
 
-    def process_chunk(chunk: pl.DataFrame) -> Optional[pl.DataFrame]:
+    def process_chunk(chunk: pl.DataFrame) -> pl.DataFrame | None:
         if chunk.height == 0:
             return None
 
@@ -421,7 +410,7 @@ def ensure_categorical_columns_and_format(df: pl.DataFrame) -> pl.DataFrame:
 
 def gather_all_ids_from_all_inputs(
     input_configs: Sequence[InputConfig],
-) -> Tuple[str, ...]:
+) -> tuple[str, ...]:
     ids = set()
     for input_config in input_configs:
         cur_source = Path(input_config.input_info.input_source)
@@ -447,7 +436,7 @@ def gather_all_ids_from_all_inputs(
 def gather_ids_from_data_source(
     data_source: Path,
     validate: bool = True,
-) -> Tuple[str, ...]:
+) -> tuple[str, ...]:
     iterator: Generator[str, None, None] | Generator[Path, None, None]
     if is_deeplake_dataset(data_source=str(data_source)):
         iterator = build_deeplake_available_id_iterator(
@@ -486,8 +475,8 @@ def build_deeplake_available_id_iterator(
         yield id_
 
 
-@lru_cache()
-def gather_ids_from_tabular_file(file_path: Path) -> Tuple[str, ...]:
+@lru_cache
+def gather_ids_from_tabular_file(file_path: Path) -> tuple[str, ...]:
     df = pl.read_csv(file_path, columns=["ID"])
     all_ids = tuple(df.select(pl.col("ID").cast(pl.Utf8)).to_series().to_list())
     return all_ids
@@ -497,21 +486,20 @@ def get_file_path_iterator(
     data_source: Path, validate: bool = True
 ) -> Generator[Path, None, None]:
     def _file_iterator(file_path: Path):
-        with open(str(file_path), "r") as infile:
+        with open(str(file_path)) as infile:
             for line in infile:
                 path = Path(line.strip())
 
-                if validate:
-                    if not path.exists():
-                        raise FileNotFoundError(
-                            f"Could not find array {path} listed in {data_source}."
-                        )
+                if validate and not path.exists():
+                    raise FileNotFoundError(
+                        f"Could not find array {path} listed in {data_source}."
+                    )
 
                 yield path
 
     if data_source.is_dir():
         return data_source.rglob("*")
-    elif data_source.is_file():
+    if data_source.is_file():
         return _file_iterator(file_path=data_source)
 
     if not data_source.exists():
@@ -524,7 +512,7 @@ def get_file_path_iterator(
 def _get_all_label_columns_and_dtypes(
     cat_columns: Sequence[str],
     con_columns: Sequence[str],
-) -> Tuple[Sequence[str], dict[str, Type[pl.Categorical] | Type[pl.Float32]]]:
+) -> tuple[Sequence[str], dict[str, type[pl.Categorical] | type[pl.Float32]]]:
     supplied_label_columns = _get_column_dtypes(
         cat_columns=cat_columns,
         con_columns=con_columns,
@@ -539,8 +527,8 @@ def _get_all_label_columns_and_dtypes(
 
 def _get_column_dtypes(
     cat_columns: Sequence[str], con_columns: Sequence[str]
-) -> dict[str, Type[pl.Categorical] | Type[pl.Float32]]:
-    dtypes: dict[str, Type[pl.Categorical] | Type[pl.Float32]] = {}
+) -> dict[str, type[pl.Categorical] | type[pl.Float32]]:
+    dtypes: dict[str, type[pl.Categorical] | type[pl.Float32]] = {}
 
     for cat_column in cat_columns:
         dtypes[cat_column] = pl.Categorical
@@ -553,7 +541,7 @@ def _get_column_dtypes(
 def _load_label_df(
     label_fpath: Path,
     columns: Sequence[str],
-    dtypes: Optional[dict[str, type[pl.Categorical] | type[pl.Float32]]] = None,
+    dtypes: dict[str, type[pl.Categorical] | type[pl.Float32]] | None = None,
 ) -> pl.DataFrame:
     dtypes = _ensure_id_str_dtype(dtypes=dtypes)
 
@@ -638,10 +626,10 @@ def check_train_valid_df_sync(
             logger.warning(error_message)
 
 
-def _ensure_id_str_dtype(dtypes: Union[dict[str, Any], None]) -> dict[str, Any]:
+def _ensure_id_str_dtype(dtypes: dict[str, Any] | None) -> dict[str, Any]:
     if dtypes is None:
         dtypes = {"ID": pl.Utf8}
-    elif "ID" not in dtypes.keys():
+    elif "ID" not in dtypes:
         dtypes["ID"] = pl.Utf8
 
     return dtypes
@@ -649,8 +637,8 @@ def _ensure_id_str_dtype(dtypes: Union[dict[str, Any], None]) -> dict[str, Any]:
 
 def _get_currently_available_columns(
     label_fpath: Path,
-    requested_columns: List[str],
-) -> List[str]:
+    requested_columns: list[str],
+) -> list[str]:
     label_file_columns_set = set(pl.read_csv(source=label_fpath, n_rows=0).columns)
 
     requested_columns_set = set(requested_columns)
@@ -666,7 +654,7 @@ def _get_currently_available_columns(
 
 def _filter_ids_from_label_df(
     df_labels: pl.DataFrame,
-    ids_to_keep: Union[None, Sequence[str]] = None,
+    ids_to_keep: None | Sequence[str] = None,
 ) -> pl.DataFrame:
     if not ids_to_keep:
         return df_labels
@@ -748,7 +736,7 @@ def get_passed_in_columns(tabular_info: TabularFileInfo) -> Sequence[str]:
 def _drop_not_needed_label_columns(
     df: pl.DataFrame, needed_label_columns: Sequence[str]
 ) -> pl.DataFrame:
-    needed_columns = ["ID"] + [col for col in needed_label_columns]
+    needed_columns = ["ID"] + list(needed_label_columns)
     return df.select(needed_columns)
 
 
@@ -771,9 +759,9 @@ def _split_df_by_ids(
 
 def split_ids(
     ids: Sequence[str],
-    valid_size: Union[int, float],
-    manual_valid_ids: Union[None, Sequence[str]] = None,
-) -> Tuple[Sequence[str], Sequence[str]]:
+    valid_size: int | float,
+    manual_valid_ids: None | Sequence[str] = None,
+) -> tuple[Sequence[str], Sequence[str]]:
     """
     We sort here to ensure that we get the same splits every time.
     """
@@ -789,7 +777,7 @@ def split_ids(
 
     else:
         seed, _ = get_seed()
-        ids_sorted = sorted(list(ids))
+        ids_sorted = sorted(ids)
         train_ids, valid_ids = train_test_split(
             ids_sorted, test_size=valid_size, random_state=seed
         )
@@ -802,7 +790,7 @@ def split_ids(
 
 def _split_ids_manual(
     ids: Sequence[str], manual_valid_ids: Sequence[str]
-) -> Tuple[Sequence[str], Sequence[str]]:
+) -> tuple[Sequence[str], Sequence[str]]:
     ids_set = set(ids)
     not_found = tuple(i for i in manual_valid_ids if i not in ids_set)
     if not_found:
@@ -824,7 +812,7 @@ def _process_train_and_label_dfs(
     df_labels_train: pl.DataFrame,
     df_labels_valid: pl.DataFrame,
     impute_missing: bool,
-) -> Tuple[pl.DataFrame, pl.DataFrame, al_label_transformers]:
+) -> tuple[pl.DataFrame, pl.DataFrame, al_label_transformers]:
     train_con_means = _get_con_manual_vals_dict(
         df=df_labels_train,
         con_columns=tabular_info.con_columns,
@@ -886,7 +874,7 @@ def _get_con_manual_vals_dict(
         column_mean = (
             df.get_column(column).drop_nans().drop_nulls().cast(pl.Float32).mean()
         )
-        if isinstance(column_mean, (int, float)):
+        if isinstance(column_mean, int | float):
             con_means_dict[column] = float(column_mean)
         else:
             con_means_dict[column] = 0.0
@@ -899,7 +887,7 @@ def handle_missing_label_values_in_df(
     cat_label_columns: Sequence[str],
     con_label_columns: Sequence[str],
     impute_missing: bool,
-    con_manual_values: Optional[dict[str, float]] = None,
+    con_manual_values: dict[str, float] | None = None,
     name: str = "df",
 ) -> pl.DataFrame:
     df_filled_cat = _fill_categorical_nans(
@@ -935,8 +923,7 @@ def _fill_categorical_nans(
         return df
 
     logger.debug(
-        "Replacing NaNs in categorical columns %s (counts: %s) "
-        "in %s with '__NULL__'.",
+        "Replacing NaNs in categorical columns %s (counts: %s) in %s with '__NULL__'.",
         column_names,
         missing_stats,
         name,
@@ -959,7 +946,7 @@ def _fill_categorical_nans(
 def _fill_continuous_nans(
     df: pl.DataFrame,
     column_names: Sequence[str],
-    con_means_dict: Dict[str, float],
+    con_means_dict: dict[str, float],
     impute_missing: bool,
     name: str = "df",
 ) -> pl.DataFrame:
@@ -994,7 +981,7 @@ def _fill_continuous_nans(
 
 def _get_missing_stats_string(
     df: pl.DataFrame, columns_to_check: Sequence[str]
-) -> Dict[str, int]:
+) -> dict[str, int]:
     missing_count_dict = {
         col: int(df.get_column(col).is_null().sum()) for col in columns_to_check
     }
@@ -1002,7 +989,7 @@ def _get_missing_stats_string(
 
 
 def merge_target_columns(
-    target_con_columns: List[str], target_cat_columns: List[str]
+    target_con_columns: list[str], target_cat_columns: list[str]
 ) -> al_target_columns:
     if len(target_con_columns + target_cat_columns) == 0:
         raise ValueError("Expected at least 1 label column")

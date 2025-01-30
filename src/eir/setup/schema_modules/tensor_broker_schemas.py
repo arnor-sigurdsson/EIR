@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Optional, Sequence
+from typing import Literal
 
 al_broker_projection_types = Literal[
     "lcl",
@@ -63,7 +64,7 @@ class TensorMessageConfig:
     layer_path: str
     cache_tensor: bool = False
     layer_cache_target: Literal["input", "output"] = "output"
-    use_from_cache: Optional[list[str]] = None
+    use_from_cache: list[str] | None = None
     cache_fusion_type: al_broker_fusion_types = "cat+conv"
     projection_type: al_broker_projection_types = "lcl"
 

@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
@@ -56,36 +57,36 @@ al_input_type_info = Union[
 
 al_optimizers = tuple(Literal[i] for i in get_all_optimizer_names())
 
-al_feature_extractor_configs = Union[
-    OmicsModelConfig,
-    TabularModelConfig,
-    ImageModelConfig,
-    SequenceModelConfig,
-    ArrayModelConfig,
-]
+al_feature_extractor_configs = (
+    OmicsModelConfig
+    | TabularModelConfig
+    | ImageModelConfig
+    | SequenceModelConfig
+    | ArrayModelConfig
+)
 
-al_feature_extractor_configs_classes = Union[
-    Type[OmicsModelConfig],
-    Type[TabularModelConfig],
-    Type[ImageModelConfig],
-    Type[SequenceModelConfig],
-    Type[ArrayModelConfig],
-]
+al_feature_extractor_configs_classes = (
+    type[OmicsModelConfig]
+    | type[TabularModelConfig]
+    | type[ImageModelConfig]
+    | type[SequenceModelConfig]
+    | type[ArrayModelConfig]
+)
 
-al_models_classes = Union[
-    Type[CNNModel],
-    Type[LinearModel],
-    Type[LCLModel],
-    Type[SimpleLCLModel],
-    Type[SimpleTabularModel],
-    Type[IdentityModel],
-]
+al_models_classes = (
+    type[CNNModel]
+    | type[LinearModel]
+    | type[LCLModel]
+    | type[SimpleLCLModel]
+    | type[SimpleTabularModel]
+    | type[IdentityModel]
+)
 
 
 al_output_module_configs_classes = (
-    Type[TabularOutputModuleConfig]
-    | Type[SequenceOutputModuleConfig]
-    | Type[ArrayOutputModuleConfig]
+    type[TabularOutputModuleConfig]
+    | type[SequenceOutputModuleConfig]
+    | type[ArrayOutputModuleConfig]
 )
 
 al_output_type_configs = (
@@ -102,19 +103,17 @@ al_output_module_configs = (
 
 
 al_tokenizer_choices = (
-    Union[
-        Literal["basic_english"],
-        Literal["spacy"],
-        Literal["moses"],
-        Literal["toktok"],
-        Literal["revtok"],
-        Literal["subword"],
-        Literal["bpe"],
-        None,
-    ],
+    Literal["basic_english"]
+    | Literal["spacy"]
+    | Literal["moses"]
+    | Literal["toktok"]
+    | Literal["revtok"]
+    | Literal["subword"]
+    | Literal["bpe"]
+    | None
 )
 
-al_max_sequence_length = Union[int, Literal["max", "average"]]
+al_max_sequence_length = int | Literal["max", "average"]
 
 
 @dataclass
@@ -151,8 +150,8 @@ class BasicExperimentConfig:
     output_folder: str
     n_epochs: int = 10
     batch_size: int = 64
-    valid_size: Union[float, int] = 0.1
-    manual_valid_ids_file: Union[str, None] = None
+    valid_size: float | int = 0.1
+    manual_valid_ids_file: str | None = None
     dataloader_workers: int = 0
     device: str = "cpu"
     memory_dataset: bool = False
@@ -183,9 +182,9 @@ class GlobalModelConfig:
     """
 
     compile_model: bool = False
-    n_iter_before_swa: Union[None, int] = None
+    n_iter_before_swa: None | int = None
     amp: bool = False
-    pretrained_checkpoint: Union[None, str] = None
+    pretrained_checkpoint: None | str = None
     strict_pretrained_loading: bool = True
 
 
@@ -227,7 +226,7 @@ class OptimizationConfig:
     b2: float = 0.999
     wd: float = 1e-04
     gradient_clipping: float = 1.0
-    gradient_accumulation_steps: Union[None, int] = None
+    gradient_accumulation_steps: None | int = None
     gradient_noise: float = 0.0
 
 
@@ -262,7 +261,7 @@ class LRScheduleConfig:
     lr_schedule: Literal["cycle", "plateau", "same", "cosine"] = "plateau"
     lr_plateau_patience: int = 10
     lr_plateau_factor: float = 0.2
-    warmup_steps: Union[Literal["auto"], int] = "auto"
+    warmup_steps: Literal["auto"] | int = "auto"
     plot_lr_schedule: bool = False
 
 
@@ -288,8 +287,8 @@ class TrainingControlConfig:
     """
 
     early_stopping_patience: int = 10
-    early_stopping_buffer: Union[None, int] = None
-    weighted_sampling_columns: Union[None, Sequence[str]] = None
+    early_stopping_buffer: None | int = None
+    weighted_sampling_columns: None | Sequence[str] = None
     mixing_alpha: float = 0.0
 
 
@@ -321,7 +320,7 @@ class EvaluationCheckpointConfig:
 
     sample_interval: int = 200
     saved_result_detail_level: int = 5
-    checkpoint_interval: Union[None, int] = None
+    checkpoint_interval: None | int = None
     n_saved_models: int = 1
 
 
@@ -351,7 +350,7 @@ class AttributionAnalysisConfig:
     """
 
     compute_attributions: bool = False
-    max_attributions_per_class: Union[None, int] = None
+    max_attributions_per_class: None | int = None
     attributions_every_sample_factor: int = 1
     attribution_background_samples: int = 256
 
@@ -416,7 +415,7 @@ class GlobalConfig:
     attribution_analysis: AttributionAnalysisConfig
     metrics: SupervisedMetricsConfig
     visualization_logging: VisualizationLoggingConfig
-    latent_sampling: Optional[LatentSamplingConfig] = None
+    latent_sampling: LatentSamplingConfig | None = None
 
     be: BasicExperimentConfig = field(init=False, repr=False)
     m: GlobalModelConfig = field(init=False, repr=False)
@@ -427,7 +426,7 @@ class GlobalConfig:
     aa: AttributionAnalysisConfig = field(init=False, repr=False)
     met: SupervisedMetricsConfig = field(init=False, repr=False)
     vl: VisualizationLoggingConfig = field(init=False, repr=False)
-    ls: Optional[LatentSamplingConfig] = field(init=False, repr=False)
+    ls: LatentSamplingConfig | None = field(init=False, repr=False)
 
     def __post_init__(self):
         self.be = self.basic_experiment
@@ -479,7 +478,7 @@ class InputConfig:
     model_config: al_feature_extractor_configs
     pretrained_config: Union[None, "BasicPretrainedConfig"] = None
     interpretation_config: Union[None, "BasicInterpretationConfig"] = None
-    tensor_broker_config: Union[None, TensorBrokerConfig] = None
+    tensor_broker_config: None | TensorBrokerConfig = None
 
 
 @dataclass
@@ -502,7 +501,7 @@ class InputDataConfig:
     input_source: str
     input_name: str
     input_type: Literal["omics", "tabular", "sequence", "image", "bytes", "array"]
-    input_inner_key: Union[None, str] = None
+    input_inner_key: None | str = None
 
 
 @dataclass
@@ -587,14 +586,14 @@ class OmicsInputDataConfig:
         this modality will be dropped out during training.
     """
 
-    snp_file: Optional[str] = None
-    subset_snps_file: Optional[str] = None
+    snp_file: str | None = None
+    subset_snps_file: str | None = None
     na_augment_alpha: float = 1.0
     na_augment_beta: float = 5.0
     shuffle_augment_alpha: float = 0.0
     shuffle_augment_beta: float = 0.0
     omics_format: Literal["one-hot"] = "one-hot"
-    mixing_subtype: Union[Literal["mixup", "cutmix-block", "cutmix-uniform"]] = "mixup"
+    mixing_subtype: Literal["mixup", "cutmix-block", "cutmix-uniform"] = "mixup"
     modality_dropout_rate: float = 0.0
 
 
@@ -624,7 +623,7 @@ class TabularInputDataConfig:
 
     input_cat_columns: Sequence[str] = field(default_factory=list)
     input_con_columns: Sequence[str] = field(default_factory=list)
-    label_parsing_chunk_size: Union[None, int] = None
+    label_parsing_chunk_size: None | int = None
     mixing_subtype: Literal["mixup"] = "mixup"
     modality_dropout_rate: float = 0.0
 
@@ -683,14 +682,14 @@ class SequenceInputDataConfig:
         this modality will be dropped out during training.
     """
 
-    vocab_file: Union[None, str] = None
+    vocab_file: None | str = None
     max_length: al_max_sequence_length = "average"
     sampling_strategy_if_longer: Literal["from_start", "uniform"] = "uniform"
     min_freq: int = 10
-    split_on: Optional[str] = " "
+    split_on: str | None = " "
     tokenizer: al_tokenizer_choices = None  # type: ignore
-    tokenizer_language: Union[str, None] = None
-    adaptive_tokenizer_max_vocab_size: Optional[int] = None
+    tokenizer_language: str | None = None
+    adaptive_tokenizer_max_vocab_size: int | None = None
     mixing_subtype: Literal["mixup"] = "mixup"
     modality_dropout_rate: float = 0.0
 
@@ -735,7 +734,7 @@ class BasicInterpretationConfig:
 
     interpretation_sampling_strategy: Literal["first_n", "random_sample"] = "first_n"
     num_samples_to_interpret: int = 10
-    manual_samples_to_interpret: Union[Sequence[str], None] = None
+    manual_samples_to_interpret: Sequence[str] | None = None
 
 
 @dataclass
@@ -838,13 +837,13 @@ class ImageInputDataConfig:
 
     auto_augment: bool = True
     size: Sequence[int] = (64,)
-    resize_approach: Union[Literal["resize", "randomcrop", "centercrop"]] = "resize"
-    adaptive_normalization_max_samples: Optional[int] = None
-    mean_normalization_values: Union[None, Sequence[float]] = None
-    stds_normalization_values: Union[None, Sequence[float]] = None
-    mode: Optional[Literal["RGB", "L", "RGBA"]] = None
-    num_channels: Optional[int] = None
-    mixing_subtype: Union[Literal["mixup"], Literal["cutmix"]] = "mixup"
+    resize_approach: Literal["resize", "randomcrop", "centercrop"] = "resize"
+    adaptive_normalization_max_samples: int | None = None
+    mean_normalization_values: None | Sequence[float] = None
+    stds_normalization_values: None | Sequence[float] = None
+    mode: Literal["RGB", "L", "RGBA"] | None = None
+    num_channels: int | None = None
+    mixing_subtype: Literal["mixup"] | Literal["cutmix"] = "mixup"
     modality_dropout_rate: float = 0.0
 
 
@@ -872,10 +871,10 @@ class ArrayInputDataConfig:
         If None, will use all samples.
     """
 
-    mixing_subtype: Union[Literal["mixup"]] = "mixup"
+    mixing_subtype: Literal["mixup"] = "mixup"
     modality_dropout_rate: float = 0.0
-    normalization: Optional[Literal["element", "channel"]] = "channel"
-    adaptive_normalization_max_samples: Optional[int] = None
+    normalization: Literal["element", "channel"] | None = "channel"
+    adaptive_normalization_max_samples: int | None = None
 
 
 @dataclass
@@ -889,8 +888,8 @@ class FusionConfig:
     """
 
     model_type: Literal["mlp-residual", "identity", "mgmoe", "pass-through"]
-    model_config: Union[ResidualMLPConfig, IdentityConfig, MGMoEModelConfig]
-    tensor_broker_config: Union[None, TensorBrokerConfig] = None
+    model_config: ResidualMLPConfig | IdentityConfig | MGMoEModelConfig
+    tensor_broker_config: None | TensorBrokerConfig = None
 
 
 @dataclass
@@ -909,7 +908,7 @@ class OutputInfoConfig:
     output_source: str
     output_name: str
     output_type: Literal["tabular", "sequence", "array"]
-    output_inner_key: Optional[str] = None
+    output_inner_key: str | None = None
 
 
 @dataclass
@@ -942,10 +941,11 @@ class OutputConfig:
         TabularOutputModuleConfig | SequenceOutputModuleConfig | ArrayOutputModuleConfig
     )
 
-    sampling_config: Optional[
+    sampling_config: (
         SequenceOutputSamplingConfig
         | ArrayOutputSamplingConfig
         | ImageOutputSamplingConfig
         | dict
-    ] = None
-    tensor_broker_config: Union[None, TensorBrokerConfig] = None
+        | None
+    ) = None
+    tensor_broker_config: None | TensorBrokerConfig = None

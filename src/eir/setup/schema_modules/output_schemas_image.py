@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Optional, Sequence, Union
+from typing import Literal
 
 
 @dataclass
@@ -56,14 +57,14 @@ class ImageOutputTypeConfig:
     """
 
     size: Sequence[int] = (64,)
-    resize_approach: Union[Literal["resize", "randomcrop", "centercrop"]] = "resize"
-    adaptive_normalization_max_samples: Optional[int] = None
-    mean_normalization_values: Union[None, Sequence[float]] = None
-    stds_normalization_values: Union[None, Sequence[float]] = None
-    mode: Optional[Literal["RGB", "L", "RGBA"]] = None
-    num_channels: Optional[int] = None
+    resize_approach: Literal["resize", "randomcrop", "centercrop"] = "resize"
+    adaptive_normalization_max_samples: int | None = None
+    mean_normalization_values: None | Sequence[float] = None
+    stds_normalization_values: None | Sequence[float] = None
+    mode: Literal["RGB", "L", "RGBA"] | None = None
+    num_channels: int | None = None
     loss: Literal["mse", "diffusion"] = "mse"
-    diffusion_time_steps: Optional[int] = 1000
+    diffusion_time_steps: int | None = 1000
 
 
 @dataclass
@@ -88,5 +89,5 @@ class ImageOutputSamplingConfig:
         sequence generation.
     """
 
-    manual_inputs: Sequence[dict[str, str]] = tuple()
+    manual_inputs: Sequence[dict[str, str]] = ()
     n_eval_inputs: int = 10

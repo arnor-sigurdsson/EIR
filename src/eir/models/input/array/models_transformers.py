@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Union
+from typing import TYPE_CHECKING, Literal
 
 from torch import Tensor, nn
 
@@ -53,7 +53,7 @@ class ArrayTransformerConfig:
 
     num_heads: int = 8
     num_layers: int = 2
-    dim_feedforward: Union[int, Literal["auto"]] = "auto"
+    dim_feedforward: int | Literal["auto"] = "auto"
     dropout: float = 0.10
 
     position: Literal["encode", "embed"] = "encode"

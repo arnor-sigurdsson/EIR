@@ -80,10 +80,10 @@ def main() -> None:
     except subprocess.CalledProcessError as e:
         print(f"Error executing command: {e.cmd}")
         print(f"Output: {e.output}")
-        raise SystemExit(1)
+        raise
     except Exception as e:
         print(f"Error: {e}")
-        raise SystemExit(1)
+        raise
 
 
 if __name__ == "__main__":

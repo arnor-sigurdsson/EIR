@@ -1,6 +1,6 @@
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
-from typing import Sequence
 
 from aislib.misc_utils import ensure_path_exists
 
@@ -219,8 +219,7 @@ def get_sequence_gen_02_imdb_generation_serve() -> AutoDocServingInfo:
 
     add_model_path = partial(
         add_model_path_to_command,
-        run_path="eir_tutorials/tutorial_runs/c_sequence_output/"
-        "01_sequence_generation",
+        run_path="eir_tutorials/tutorial_runs/c_sequence_output/01_sequence_generation",
     )
 
     example_request_module_python = build_request_example_module_from_function(

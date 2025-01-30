@@ -1,5 +1,4 @@
 from itertools import combinations
-from typing import List
 from unittest.mock import patch
 
 import numpy as np
@@ -99,12 +98,12 @@ def test_mixup_tensor(input_length: int, input_height: int, lambda_: float) -> N
     ).map(lambda x: sorted(x))
 )
 @settings(deadline=500)
-def test_block_cutmix_omics_input(patched_indices: List[int]) -> None:
+def test_block_cutmix_omics_input(patched_indices: list[int]) -> None:
     """
     We need it to be sorted here to avoid indexing with e.g. [521:3]
     """
     test_arrays = []
-    for i in range(2):
+    for _i in range(2):
         test_array, *_ = _set_up_base_test_omics_array(n_snps=1000)
         test_array = torch.tensor(test_array).unsqueeze(0)
         test_arrays.append(test_array)
@@ -176,7 +175,7 @@ def test_get_block_cutmix_indices(input_length: int, lambda_: float):
     )
 )
 @settings(deadline=500)
-def test_uniform_cutmix_omics_input(patched_indices: List[int]):
+def test_uniform_cutmix_omics_input(patched_indices: list[int]):
     """
     Here we explicitly cut from 1 --> 0 and vice versa.
 
@@ -184,7 +183,7 @@ def test_uniform_cutmix_omics_input(patched_indices: List[int]):
     expect all the arrays themselves to be different.
     """
     test_arrays = []
-    for i in range(2):
+    for _i in range(2):
         test_array, *_ = _set_up_base_test_omics_array(n_snps=1000)
         test_array = torch.tensor(test_array).unsqueeze(0)
         test_arrays.append(test_array)
@@ -300,43 +299,43 @@ def test_mixup_targets(test_targets):
 def _get_mixed_loss_test_cases_for_parametrization():
     return [  # Case 1: All correct, mixed 50%
         (
-            dict(
-                outputs=torch.ones(5),
-                targets=torch.ones(5),
-                targets_permuted=torch.ones(5),
-                lambda_=0.5,
-            ),
+            {
+                "outputs": torch.ones(5),
+                "targets": torch.ones(5),
+                "targets_permuted": torch.ones(5),
+                "lambda_": 0.5,
+            },
             0.0,
         ),
         # Case 2: Only base fully correct, but lambda 1.0 (base is 100%)
         (
-            dict(
-                outputs=torch.ones(5),
-                targets=torch.ones(5),
-                targets_permuted=torch.zeros(5),
-                lambda_=1.0,
-            ),
+            {
+                "outputs": torch.ones(5),
+                "targets": torch.ones(5),
+                "targets_permuted": torch.zeros(5),
+                "lambda_": 1.0,
+            },
             0.0,
         ),
         # Case 3: All wrong, lambda 0.0 (permuted is 100%)
         (
-            dict(
-                outputs=torch.ones(5),
-                targets=torch.ones(5),
-                targets_permuted=torch.zeros(5),
-                lambda_=0.0,
-            ),
+            {
+                "outputs": torch.ones(5),
+                "targets": torch.ones(5),
+                "targets_permuted": torch.zeros(5),
+                "lambda_": 0.0,
+            },
             1.0,
         ),
         # Case 4: 50% mix of correct and incorrect, weighted equally, meaning we
         # have a mean of 0.5 loss, weighted down by 0.5 = 0.25
         (
-            dict(
-                outputs=torch.ones(6),
-                targets=torch.ones(6),
-                targets_permuted=torch.tensor([0, 0, 0, 1, 1, 1]),
-                lambda_=0.5,
-            ),
+            {
+                "outputs": torch.ones(6),
+                "targets": torch.ones(6),
+                "targets_permuted": torch.tensor([0, 0, 0, 1, 1, 1]),
+                "lambda_": 0.5,
+            },
             0.25,
         ),
     ]
@@ -458,9 +457,9 @@ def test_make_random_snps_missing_maximal():
 
     missing_percentage = (array[:, 3, :].sum() / 1000).item()
 
-    assert (
-        missing_percentage > 0.925
-    ), "Expected a high percentage of SNPs to be set to missing."
+    assert missing_percentage > 0.925, (
+        "Expected a high percentage of SNPs to be set to missing."
+    )
 
 
 def test_make_random_snps_missing_minimal():

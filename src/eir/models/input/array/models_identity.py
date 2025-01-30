@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Literal
+from typing import TYPE_CHECKING, Literal
 
 import torch
 from torch import nn
@@ -64,5 +65,4 @@ def get_identity_reshape_func(
 
     if flatten_shape == "fortran":
         return flatten_h_w_fortran
-    else:
-        return lambda x: x.view(x.shape[0], -1)
+    return lambda x: x.view(x.shape[0], -1)

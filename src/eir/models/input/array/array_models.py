@@ -2,11 +2,8 @@ from dataclasses import dataclass
 from functools import partial
 from typing import (
     TYPE_CHECKING,
-    Dict,
     Literal,
-    Optional,
     Protocol,
-    Type,
     TypeGuard,
     Union,
 )
@@ -30,15 +27,15 @@ if TYPE_CHECKING:
 
 al_array_model_types = Literal["cnn", "lcl", "transformer"]
 
-al_array_model_classes = Type[CNNModel] | Type[LCLModel] | Type[ArrayTransformer]
+al_array_model_classes = type[CNNModel] | type[LCLModel] | type[ArrayTransformer]
 al_array_models = CNNModel | LCLModel | ArrayTransformer
 
 al_array_model_config_classes = (
-    Type[CNNModelConfig] | Type[LCLModelConfig] | Type[ArrayTransformerConfig]
+    type[CNNModelConfig] | type[LCLModelConfig] | type[ArrayTransformerConfig]
 )
 al_array_model_configs = CNNModelConfig | LCLModelConfig | ArrayTransformerConfig
 
-al_pre_normalization = Optional[Literal["instancenorm", "layernorm"]]
+al_pre_normalization = Literal["instancenorm", "layernorm"] | None
 
 al_array_model_init_kwargs = dict[
     str,
@@ -52,7 +49,7 @@ al_array_model_init_kwargs = dict[
 ]
 
 
-def get_array_model_mapping() -> Dict[str, al_array_model_classes]:
+def get_array_model_mapping() -> dict[str, al_array_model_classes]:
     mapping = {
         "cnn": CNNModel,
         "lcl": LCLModel,
@@ -67,7 +64,7 @@ def get_array_model_class(model_type: al_array_model_types) -> al_array_model_cl
     return mapping[model_type]
 
 
-def get_array_config_dataclass_mapping() -> Dict[str, al_array_model_config_classes]:
+def get_array_config_dataclass_mapping() -> dict[str, al_array_model_config_classes]:
     mapping = {
         "cnn": CNNModelConfig,
         "lcl": LCLModelConfig,
@@ -100,7 +97,7 @@ def get_array_model_init_kwargs(
             assert isinstance(model_config, LCLModelConfig)
 
             if model_config.patch_size is not None:
-                assert isinstance(model_config.patch_size, (tuple, list))
+                assert isinstance(model_config.patch_size, tuple | list)
                 assert len(model_config.patch_size) == 3, model_config.patch_size
                 kwargs["flatten_fn"] = partial(
                     patchify_and_flatten,
@@ -121,10 +118,10 @@ def get_array_model_init_kwargs(
 
 
 def check_patch_and_input_size_compatibility(
-    patch_size: Union[tuple[int, int, int], list[int]],
+    patch_size: tuple[int, int, int] | list[int],
     data_dimensions: "DataDimensions",
 ) -> None:
-    assert isinstance(patch_size, (tuple, list))
+    assert isinstance(patch_size, tuple | list)
     assert len(patch_size) == 3, patch_size
 
     channels, height, width = patch_size
@@ -246,7 +243,7 @@ class ArrayWrapperModel(nn.Module):
 def get_pre_normalization_layer(
     normalization: al_pre_normalization,
     data_dimensions: "DataDimensions",
-) -> Union[nn.InstanceNorm2d, nn.RMSNorm, nn.Identity]:
+) -> nn.InstanceNorm2d | nn.RMSNorm | nn.Identity:
     channels = data_dimensions.channels
     height = data_dimensions.height
     width = data_dimensions.width

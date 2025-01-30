@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 import torch
 from torch import nn
@@ -49,7 +49,7 @@ class SharedResidualMLPOutputModule(nn.Module):
 
         self.total_outputs = sum(self.num_outputs_per_target.values())
         sorted_targets = sorted(num_outputs_per_target.items())
-        target_names, target_sizes = zip(*sorted_targets)
+        target_names, target_sizes = zip(*sorted_targets, strict=False)
 
         self.target_names = target_names
         self.target_sizes = list(target_sizes)
@@ -83,12 +83,9 @@ class SharedResidualMLPOutputModule(nn.Module):
 
         self.shared_branch = nn.Sequential(shared_branch_module, final_block)
 
-    def forward(self, inputs: torch.Tensor) -> Dict[str, torch.Tensor]:
-
+    def forward(self, inputs: torch.Tensor) -> dict[str, torch.Tensor]:
         shared_out_tensor = self.shared_branch(inputs)
 
         split_outputs = torch.split(shared_out_tensor, self.target_sizes, dim=1)
 
-        return {
-            target: output for target, output in zip(self.target_names, split_outputs)
-        }
+        return dict(zip(self.target_names, split_outputs, strict=False))

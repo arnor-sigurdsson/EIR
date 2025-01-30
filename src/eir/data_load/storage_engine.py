@@ -1,7 +1,7 @@
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional, Type
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -30,21 +30,21 @@ class ColumnInfo:
     dtype: ColumnType
     original_dtype: str
     index: int
-    array_shape: Optional[tuple[int, ...]] = None
-    inner_dtype: Optional[str] = None
-    torch_dtype: Optional[torch.dtype] = None
-    np_dtype: Optional[DTypeLike] = None
+    array_shape: tuple[int, ...] | None = None
+    inner_dtype: str | None = None
+    torch_dtype: torch.dtype | None = None
+    np_dtype: DTypeLike | None = None
 
 
 class HybridStorage:
     def __init__(self):
-        self.numeric_float_data: Optional[torch.Tensor] = None
-        self.numeric_int_data: Optional[torch.Tensor] = None
-        self.string_data: Optional[np.ndarray] = None
-        self.path_data: Optional[np.ndarray] = None
-        self.fixed_array_data: Optional[list[torch.Tensor]] = None
-        self.var_array_data: Optional[list[np.ndarray]] = None
-        self.object_data: Optional[dict[str, list[object]]] = None
+        self.numeric_float_data: torch.Tensor | None = None
+        self.numeric_int_data: torch.Tensor | None = None
+        self.string_data: np.ndarray | None = None
+        self.path_data: np.ndarray | None = None
+        self.fixed_array_data: list[torch.Tensor] | None = None
+        self.var_array_data: list[np.ndarray] | None = None
+        self.object_data: dict[str, list[object]] | None = None
 
         self.numeric_float_columns: list[ColumnInfo] = []
         self.numeric_int_columns: list[ColumnInfo] = []
@@ -437,7 +437,7 @@ class HybridStorage:
                 result[col_info.name] = self.path_data[i, idx].item()
 
         if self.object_data is not None:
-            for i, col_info in enumerate(self.object_columns):
+            for _, col_info in enumerate(self.object_columns):
                 result[col_info.name] = self.object_data[col_info.name][idx]
 
         return result
@@ -448,7 +448,7 @@ def check_empty_str_arr(data: np.ndarray) -> bool:
     return (str_arr == "") | (str_arr == "nan")
 
 
-def _recursive_find_primitive_dtype(dtype: pl.DataType) -> Type[pl.DataType]:
+def _recursive_find_primitive_dtype(dtype: pl.DataType) -> type[pl.DataType]:
     if hasattr(dtype, "inner"):
         return _recursive_find_primitive_dtype(dtype=dtype.inner)
     return type(dtype)
@@ -460,8 +460,8 @@ def _is_numeric_dtype(dtype: pl.DataType) -> bool:
 
 def _is_fixed_array(
     dtype: pl.DataType,
-) -> tuple[bool, Optional[str], Optional[tuple]]:
-    if not dtype == pl.Array:
+) -> tuple[bool, str | None, tuple | None]:
+    if dtype != pl.Array:
         return False, None, None
 
     assert isinstance(dtype, pl.Array)
@@ -476,8 +476,8 @@ def _is_fixed_array(
     return True, inner_dtype_str, shape
 
 
-def _is_var_array(dtype: pl.DataType) -> tuple[bool, Optional[str]]:
-    if not dtype == pl.List:
+def _is_var_array(dtype: pl.DataType) -> tuple[bool, str | None]:
+    if dtype != pl.List:
         return False, None
 
     assert isinstance(dtype, pl.List)
@@ -500,7 +500,7 @@ def _is_string_dtype(dtype: pl.DataType) -> bool:
 
 def check_two_storages(
     input_storage: HybridStorage,
-    target_storage: Optional[HybridStorage],
+    target_storage: HybridStorage | None,
 ) -> None:
     if target_storage is None or target_storage._num_rows == 0:
         return
@@ -602,7 +602,7 @@ def is_null_value(value: Any) -> bool:
     return False
 
 
-def polars_dtype_to_str_dtype(polars_dtype: Type[pl.DataType]) -> str:
+def polars_dtype_to_str_dtype(polars_dtype: type[pl.DataType]) -> str:
     dtype_map = {
         pl.Float64: "float64",
         pl.Float32: "float32",
@@ -624,8 +624,8 @@ def polars_dtype_to_str_dtype(polars_dtype: Type[pl.DataType]) -> str:
 
 
 def get_numeric_memory(
-    float_data: Optional[torch.Tensor] = None,
-    int_data: Optional[torch.Tensor] = None,
+    float_data: torch.Tensor | None = None,
+    int_data: torch.Tensor | None = None,
 ) -> int:
     total = 0
     if float_data is not None:
@@ -635,14 +635,14 @@ def get_numeric_memory(
     return total
 
 
-def get_fixed_array_memory(data: Optional[list[torch.Tensor]]) -> int:
+def get_fixed_array_memory(data: list[torch.Tensor] | None) -> int:
     if data is None:
         return 0
     return sum(t.element_size() * t.nelement() for t in data)
 
 
 def get_array_memory(
-    data: Optional[np.ndarray],
+    data: np.ndarray | None,
 ) -> int:
     memory_usage = 0
     if data is not None:
@@ -650,19 +650,19 @@ def get_array_memory(
     return memory_usage
 
 
-def get_path_memory(data: Optional[np.ndarray]) -> int:
+def get_path_memory(data: np.ndarray | None) -> int:
     if data is None:
         return 0
     return data.nbytes
 
 
-def get_var_array_memory(data: Optional[list[np.ndarray]]) -> int:
+def get_var_array_memory(data: list[np.ndarray] | None) -> int:
     if data is None:
         return 0
     return sum(arr.nbytes for arr in data)
 
 
-def get_object_memory(data: Optional[dict[str, list[object]]]) -> int:
+def get_object_memory(data: dict[str, list[object]] | None) -> int:
     if data is None:
         return 0
     return sum(sum(sys.getsizeof(obj) for obj in values) for values in data.values())
@@ -676,13 +676,13 @@ def format_memory_size(bytes_size: int) -> tuple[float, str]:
 
 
 def get_total_memory(
-    numeric_float_data: Optional[torch.Tensor] = None,
-    numeric_int_data: Optional[torch.Tensor] = None,
-    string_data: Optional[np.ndarray] = None,
-    path_data: Optional[np.ndarray] = None,
-    fixed_array_data: Optional[list[torch.Tensor]] = None,
-    var_array_data: Optional[list[np.ndarray]] = None,
-    object_data: Optional[dict[str, list[object]]] = None,
+    numeric_float_data: torch.Tensor | None = None,
+    numeric_int_data: torch.Tensor | None = None,
+    string_data: np.ndarray | None = None,
+    path_data: np.ndarray | None = None,
+    fixed_array_data: list[torch.Tensor] | None = None,
+    var_array_data: list[np.ndarray] | None = None,
+    object_data: dict[str, list[object]] | None = None,
 ) -> int:
     return sum(
         [

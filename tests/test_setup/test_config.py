@@ -2,10 +2,11 @@ import argparse
 import os
 import tempfile
 from argparse import Namespace
+from collections.abc import Mapping
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Mapping
+from typing import Any
 
 import pytest
 import yaml
@@ -24,11 +25,11 @@ from tests.setup_tests.fixtures_create_configs import TestConfigInits
 @pytest.fixture()
 def create_cl_args_config_files(
     create_test_config_init_base: TestConfigInits, tmp_path
-) -> Dict[str, List[str]]:
+) -> dict[str, list[str]]:
     test_init_base = create_test_config_init_base[0]
 
     config_file_paths = {}
-    for config_name in test_init_base.__dataclass_fields__.keys():
+    for config_name in test_init_base.__dataclass_fields__:
         cur_paths = []
         for idx, cur_config in enumerate(getattr(test_init_base, config_name)):
             cur_outpath = tmp_path / f"{config_name.split('_')[0]}_{idx}.yaml"
@@ -75,7 +76,7 @@ def create_cl_args_config_files(
     indirect=True,
 )
 def test_generate_aggregated_config_basic(
-    create_cl_args_config_files: Dict[str, List[str]],
+    create_cl_args_config_files: dict[str, list[str]],
 ):
     test_cl_args = Namespace(**create_cl_args_config_files)
 
@@ -129,10 +130,10 @@ def test_generate_aggregated_config_basic(
     indirect=True,
 )
 def test_generate_aggregated_config_fail(
-    create_cl_args_config_files: Dict[str, List[str]],
+    create_cl_args_config_files: dict[str, list[str]],
 ):
     input_file = create_cl_args_config_files["input_configs"][0]
-    with open(input_file, "r") as infile:
+    with open(input_file) as infile:
         original_config = yaml.load(stream=infile, Loader=yaml.FullLoader)
 
     original_config["input_info"]["input_name"] = "test_output_tabular"
@@ -261,7 +262,7 @@ def test_get_output_folder_and_log_level_from_cl_args():
         yaml.safe_dump(test_config, f)
 
     main_cl_args = argparse.Namespace(global_configs=[temp_file.name])
-    extra_cl_args: List[str] = []
+    extra_cl_args: list[str] = []
 
     output_folder, log_level = config.get_output_folder_and_log_level_from_cl_args(
         main_cl_args=main_cl_args,
@@ -310,7 +311,7 @@ def test_recursive_search(dict_: Mapping, target: Any):
         )
     )
 
-    for path, value in paths_and_values:
+    for path, _value in paths_and_values:
         dict_copy = copy(dict_)
         for key in path:
             dict_copy = dict_copy[key]

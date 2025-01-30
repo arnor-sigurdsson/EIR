@@ -572,15 +572,15 @@ def test_no_missing_data(setup_data):
         missing_ids_info=missing_ids_info,
         with_labels=True,
     )
-    assert isinstance(
-        result, metrics.FilteredOutputsAndLabels
-    ), "Result should be an instance of FilteredOutputsAndLabels"
-    assert (
-        "output1" in result.model_outputs
-    ), "Output1 should be present in the filtered outputs"
-    assert (
-        "inner1" in result.model_outputs["output1"]
-    ), "Inner1 should be present in the filtered outputs of output1"
+    assert isinstance(result, metrics.FilteredOutputsAndLabels), (
+        "Result should be an instance of FilteredOutputsAndLabels"
+    )
+    assert "output1" in result.model_outputs, (
+        "Output1 should be present in the filtered outputs"
+    )
+    assert "inner1" in result.model_outputs["output1"], (
+        "Inner1 should be present in the filtered outputs of output1"
+    )
     assert torch.equal(
         result.model_outputs["output1"]["inner1"], model_outputs["output1"]["inner1"]
     ), "Filtered output tensor should match the original"
@@ -603,15 +603,15 @@ def test_all_ids_missing(setup_data):
         with_labels=True,
     )
 
-    assert (
-        len(result.model_outputs["output1"]["inner1"]) == 0
-    ), "Should return an empty tensor for outputs when all IDs are missing"
-    assert (
-        len(result.target_labels["output1"]["inner1"]) == 0
-    ), "Should return an empty tensor for labels when all IDs are missing"
-    assert (
-        len(result.model_outputs["output1"]["inner2"]) == 0
-    ), "Should return an empty tensor for outputs when all IDs are missing"
-    assert (
-        len(result.target_labels["output1"]["inner2"]) == 0
-    ), "Should return an empty tensor for labels when all IDs are missing"
+    assert len(result.model_outputs["output1"]["inner1"]) == 0, (
+        "Should return an empty tensor for outputs when all IDs are missing"
+    )
+    assert len(result.target_labels["output1"]["inner1"]) == 0, (
+        "Should return an empty tensor for labels when all IDs are missing"
+    )
+    assert len(result.model_outputs["output1"]["inner2"]) == 0, (
+        "Should return an empty tensor for outputs when all IDs are missing"
+    )
+    assert len(result.target_labels["output1"]["inner2"]) == 0, (
+        "Should return an empty tensor for labels when all IDs are missing"
+    )

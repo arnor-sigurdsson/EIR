@@ -5,10 +5,11 @@ import subprocess
 import textwrap
 import threading
 import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any
 
 import black
 import requests
@@ -34,8 +35,8 @@ class AutoDocServingInfo:
     base_path: Path
     server_command: list[str]
     example_requests: list[list[dict[str, Any]]]
-    pre_run_command_modifications: Sequence[Callable[[List[str]], List[str]]] = ()
-    post_run_functions: Sequence[Tuple[Callable, Dict]] = ()
+    pre_run_command_modifications: Sequence[Callable[[list[str]], list[str]]] = ()
+    post_run_functions: Sequence[tuple[Callable, dict]] = ()
     data_loading_function: Callable = None
     url: str = "http://localhost:8000/predict"
     request_example_modules: Sequence[RequestExampleModule] = ()
@@ -45,9 +46,8 @@ def build_request_example_module_from_function(
     function: Callable,
     name: str,
     language: str,
-    custom_body: Optional[str] = None,
+    custom_body: str | None = None,
 ) -> RequestExampleModule:
-
     if language == "python":
         function_body = extract_function_body(func=function)
         function_body = black.format_str(function_body, mode=black.FileMode())
@@ -146,12 +146,12 @@ def make_serving_tutorial_data(
 
 
 def run_serve_experiment_from_command(
-    command: List[str],
+    command: list[str],
     url: str,
     example_requests: list[list[dict[str, Any]]],
     data_loading_function: Callable[[dict[str, Any]], dict[str, Any]],
-    base_path: Optional[Path] = None,
-    request_example_modules: Optional[Sequence[RequestExampleModule]] = None,
+    base_path: Path | None = None,
+    request_example_modules: Sequence[RequestExampleModule] | None = None,
 ) -> list[dict[str, Any]]:
     _run_server, process_storage = server_run_factory()
 
@@ -180,7 +180,6 @@ def run_serve_experiment_from_command(
     responses = []
     for request in example_requests:
         if data_loading_function:
-
             loaded_items = []
             for sample in request:
                 loaded_items.append(data_loading_function(sample))
@@ -222,9 +221,9 @@ def _terminate_process(process: subprocess.Popen) -> None:
         process.wait()
 
 
-def server_run_factory() -> (
-    tuple[Callable[[list[str]], None], dict[str, subprocess.Popen]]
-):
+def server_run_factory() -> tuple[
+    Callable[[list[str]], None], dict[str, subprocess.Popen]
+]:
     cached = {}
 
     def _run_server(command: list[str]) -> None:

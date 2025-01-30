@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, Type
+from typing import TYPE_CHECKING
 
 import torch
 
@@ -7,7 +7,7 @@ from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
 )
 
-al_sequence_module_classes = Type[SequenceOutputModule]
+al_sequence_module_classes = type[SequenceOutputModule]
 
 if TYPE_CHECKING:
     from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 def get_sequence_output_module_from_model_config(
     output_object: ComputedSequenceOutputInfo,
-    feature_dimensionalities_and_types: Dict[str, "FeatureExtractorInfo"],
+    feature_dimensionalities_and_types: dict[str, "FeatureExtractorInfo"],
     device: str,
 ) -> SequenceOutputModule:
     output_model_config = output_object.output_config.model_config
@@ -36,9 +36,9 @@ def get_sequence_output_module_from_model_config(
     return output_module
 
 
-def _get_sequence_output_module_type_class_map() -> (
-    dict[str, al_sequence_module_classes]
-):
+def _get_sequence_output_module_type_class_map() -> dict[
+    str, al_sequence_module_classes
+]:
     mapping = {
         "sequence": SequenceOutputModule,
     }

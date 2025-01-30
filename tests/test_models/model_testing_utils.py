@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 import torch
 from torch.utils.data._utils.collate import default_collate
@@ -16,7 +16,7 @@ from eir.train_utils.step_logic import prepare_base_batch_default
 
 
 def check_eir_model(
-    meta_model: "al_meta_model", example_inputs: Dict[str, Any]
+    meta_model: "al_meta_model", example_inputs: dict[str, Any]
 ) -> None:
     with torch.inference_mode():
         meta_model(inputs=example_inputs)
@@ -36,7 +36,7 @@ def prepare_example_test_batch(
         inputs_values={}, inputs_objects=inputs_as_dict
     )
 
-    loader_batch = (imputed_inputs, {}, list())
+    loader_batch = (imputed_inputs, {}, [])
     batch_as_list = [loader_batch] * batch_size
     loader_batch_collated = default_collate(batch=batch_as_list)
 

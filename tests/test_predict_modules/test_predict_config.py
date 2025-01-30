@@ -1,7 +1,7 @@
 from argparse import Namespace
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from pathlib import Path
-from typing import Mapping, Sequence, Union
 
 import pytest
 import yaml
@@ -20,12 +20,12 @@ from eir.setup.config_setup_modules.config_setup_utils import (
     recursive_dict_inject,
 )
 
-al_config_instances = Union[
-    schemas.GlobalConfig,
-    schemas.InputConfig,
-    schemas.OutputConfig,
-    schemas.TabularOutputModuleConfig,
-]
+al_config_instances = (
+    schemas.GlobalConfig
+    | schemas.InputConfig
+    | schemas.OutputConfig
+    | schemas.TabularOutputModuleConfig
+)
 
 
 def test_get_named_predict_dict_iterators(tmp_path: Path) -> None:
@@ -170,9 +170,8 @@ def _recursive_dict_str_value_replace(dict_: dict, old: str, new: str):
     for key, value in dict_.items():
         if isinstance(value, dict):
             _recursive_dict_str_value_replace(dict_=value, old=old, new=new)
-        elif isinstance(value, str):
-            if old in value:
-                dict_[key] = value.replace(old, new)
+        elif isinstance(value, str) and old in value:
+            dict_[key] = value.replace(old, new)
 
     return dict_
 

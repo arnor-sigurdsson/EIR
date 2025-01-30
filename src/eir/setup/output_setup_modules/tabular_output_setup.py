@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Dict
 
 from sklearn.preprocessing import StandardScaler
 
@@ -30,11 +29,10 @@ class ComputedTabularOutputInfo:
 
 def set_up_tabular_output(
     output_config: schemas.OutputConfig,
-    target_transformers: Dict[str, al_label_transformers],
+    target_transformers: dict[str, al_label_transformers],
     *args,
     **kwargs,
 ) -> ComputedTabularOutputInfo:
-
     output_type_info = output_config.output_type_info
     assert isinstance(output_type_info, TabularOutputTypeConfig)
 

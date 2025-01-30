@@ -1,7 +1,6 @@
 from collections import Counter
 from math import isclose
 from statistics import mean
-from typing import List
 
 import numpy as np
 import polars as pl
@@ -248,7 +247,7 @@ def _gather_dataloader_target_label_distributions(
 ):
     total_counts = {}  # above step function
 
-    for epoch in range(num_epochs):
+    for _epoch in range(num_epochs):
         for batch in dataloader:
             _, labels, _ = batch
 
@@ -291,7 +290,7 @@ def test_gather_column_sampling_weights(test_labels):
 
 
 def generate_test_data(
-    test_labels: List[int], target_columns: List[str], output_name: str
+    test_labels: list[int], target_columns: list[str], output_name: str
 ) -> tuple[HybridStorage, HybridStorage]:
     input_df = pl.DataFrame(
         {

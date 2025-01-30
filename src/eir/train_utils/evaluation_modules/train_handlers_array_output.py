@@ -1,16 +1,11 @@
 import json
+from collections.abc import Generator, Iterator, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    Generator,
-    Iterator,
-    Optional,
-    Sequence,
-    Tuple,
     Union,
 )
 
@@ -62,14 +57,14 @@ logger = get_logger(name=__name__)
 
 @dataclass
 class ArrayOutputEvalSamples:
-    auto_samples: Dict[str, list["ArrayOutputEvalSample"]]
-    manual_samples: Dict[str, list["ArrayOutputEvalSample"]]
+    auto_samples: dict[str, list["ArrayOutputEvalSample"]]
+    manual_samples: dict[str, list["ArrayOutputEvalSample"]]
 
 
 @dataclass()
 class ArrayOutputEvalSample:
-    inputs_to_model: Dict[str, Any]
-    target_labels: Dict[str, Any]
+    inputs_to_model: dict[str, Any]
+    target_labels: dict[str, Any]
     sample_id: str
 
 
@@ -125,7 +120,7 @@ def array_out_single_sample_evaluation_wrapper(
 
         output_type_info = config.output_type_info
         assert isinstance(
-            output_type_info, (ArrayOutputTypeConfig, ImageOutputTypeConfig)
+            output_type_info, ArrayOutputTypeConfig | ImageOutputTypeConfig
         )
 
         assert config.sampling_config is not None
@@ -142,8 +137,8 @@ def array_out_single_sample_evaluation_wrapper(
         meta = {}
 
         for batch in batch_generator:
-            batch_indices, batch_eval_data = zip(*batch)
-            batch_eval_types, batch_eval_samples = zip(*batch_eval_data)
+            batch_indices, batch_eval_data = zip(*batch, strict=False)
+            batch_eval_types, batch_eval_samples = zip(*batch_eval_data, strict=False)
 
             if output_type_info.loss == "diffusion":
                 time_steps = output_type_info.diffusion_time_steps
@@ -168,8 +163,8 @@ def array_out_single_sample_evaluation_wrapper(
                 batch_indices,
                 batch_eval_samples,
                 batch_generated_arrays,
+                strict=False,
             ):
-
                 cur_output_path = (
                     cur_sample_output_folder / eval_type / f"{idx}_generated.npy"
                 )
@@ -222,7 +217,7 @@ def one_shot_array_generation(
 ) -> list[np.ndarray]:
     output_object = experiment.outputs[array_output_name]
 
-    assert isinstance(output_object, (ComputedArrayOutputInfo, ComputedImageOutputInfo))
+    assert isinstance(output_object, ComputedArrayOutputInfo | ComputedImageOutputInfo)
 
     array_sampling_batch = prepare_array_sampling_batch(
         eval_samples=eval_samples, array_output_name=array_output_name
@@ -278,7 +273,7 @@ def reverse_diffusion_array_generation(
           states as this might blow up memory usage in some cases.
     """
     output_object = experiment.outputs[array_output_name]
-    assert isinstance(output_object, (ComputedArrayOutputInfo, ComputedImageOutputInfo))
+    assert isinstance(output_object, ComputedArrayOutputInfo | ComputedImageOutputInfo)
 
     dimensions = output_object.data_dimensions
     batch_size = len(eval_samples)
@@ -365,7 +360,6 @@ def un_normalize_wrapper(
     array: torch.Tensor,
     normalization_stats: ArrayNormalizationStats | ImageNormalizationStats,
 ) -> torch.Tensor:
-
     match normalization_stats:
         case ArrayNormalizationStats():
             un_normalized = un_normalize_array(
@@ -398,7 +392,7 @@ def save_image_output(array: np.ndarray, output_path: Path | str) -> None:
     array_uint8 = (array_hwc * 255).astype(np.uint8)
 
     n_channels = array_uint8.shape[-1]
-    mode: Optional[str]
+    mode: str | None
     match n_channels:
         case 1:
             mode = "L"
@@ -417,17 +411,17 @@ def save_image_output(array: np.ndarray, output_path: Path | str) -> None:
 def get_array_output_manual_input_samples(
     output_configs: Sequence[OutputConfig],
     input_objects: "al_input_objects_as_dict",
-) -> Dict[str, list[ArrayOutputEvalSample]]:
+) -> dict[str, list[ArrayOutputEvalSample]]:
     prepared_samples: dict[str, list[ArrayOutputEvalSample]] = {}
 
-    for config_idx, config in enumerate(output_configs):
+    for _config_idx, config in enumerate(output_configs):
         array_or_image = config.output_info.output_type in ("array", "image")
         if not config.sampling_config or not array_or_image:
             continue
 
         assert isinstance(
             config.sampling_config,
-            (ArrayOutputSamplingConfig, ImageOutputSamplingConfig),
+            ArrayOutputSamplingConfig | ImageOutputSamplingConfig,
         )
 
         sample_data_from_yaml = config.sampling_config.manual_inputs
@@ -460,10 +454,10 @@ def get_array_output_manual_input_samples(
 def get_array_output_auto_validation_samples(
     output_configs: Sequence[OutputConfig],
     eval_sample_iterator: Iterator[al_getitem_return],
-) -> Dict[str, list[ArrayOutputEvalSample]]:
+) -> dict[str, list[ArrayOutputEvalSample]]:
     prepared_eval_samples: dict[str, list[ArrayOutputEvalSample]] = {}
 
-    for config_idx, config in enumerate(output_configs):
+    for _config_idx, config in enumerate(output_configs):
         array_or_image = config.output_info.output_type in ("array", "image")
         if not config.sampling_config or not array_or_image:
             continue
@@ -474,9 +468,9 @@ def get_array_output_auto_validation_samples(
 
         assert isinstance(
             config.sampling_config,
-            (ArrayOutputSamplingConfig, ImageOutputSamplingConfig),
+            ArrayOutputSamplingConfig | ImageOutputSamplingConfig,
         )
-        for i in range(config.sampling_config.n_eval_inputs):
+        for _i in range(config.sampling_config.n_eval_inputs):
             input_to_model, target_labels, cur_id = next(eval_sample_iterator)
 
             cur_eval_sample = ArrayOutputEvalSample(
@@ -492,7 +486,7 @@ def get_array_output_auto_validation_samples(
 
 def _get_eval_sample_generator(
     eval_samples: ArrayOutputEvalSamples, output_name: str
-) -> Generator[Tuple[str, ArrayOutputEvalSample], None, None]:
+) -> Generator[tuple[str, ArrayOutputEvalSample], None, None]:
     cur_config_auto_samples = eval_samples.auto_samples[output_name]
     cur_config_manual_samples = eval_samples.manual_samples[output_name]
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Type
+from typing import TYPE_CHECKING, Literal
 
 import torch
 from torch import nn
@@ -18,11 +18,11 @@ if TYPE_CHECKING:
 
 al_array_model_types = Literal["lcl", "cnn", "cnn-passthrough"]
 al_output_array_model_classes = (
-    Type[LCLModel] | Type[CNNUpscaleModel] | Type[CNNPassThroughUpscaleModel]
+    type[LCLModel] | type[CNNUpscaleModel] | type[CNNPassThroughUpscaleModel]
 )
 al_output_array_models = LCLModel | CNNUpscaleModel | CNNPassThroughUpscaleModel
 al_output_array_model_config_classes = (
-    Type["LCLOutputModelConfig"] | Type[CNNUpscaleModelConfig]
+    type["LCLOutputModelConfig"] | type[CNNUpscaleModelConfig]
 )
 
 

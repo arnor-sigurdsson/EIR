@@ -1,6 +1,7 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Sequence, Set, Type
+from typing import Any
 
 import polars as pl
 from sklearn.preprocessing import KBinsDiscretizer, StandardScaler
@@ -42,7 +43,7 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 @dataclass
 class PredictTargetLabels:
     predict_labels: pl.DataFrame
-    label_transformers: Dict[str, al_label_transformers]
+    label_transformers: dict[str, al_label_transformers]
 
     @property
     def all_labels(self) -> pl.DataFrame:
@@ -119,7 +120,6 @@ def parse_labels_for_predict(
     df_labels_test: pl.DataFrame,
     label_transformers: al_label_transformers,
 ) -> pl.DataFrame:
-
     all_con_transformers = _extract_target_con_transformers(
         label_transformers=label_transformers,
         con_columns=con_columns,
@@ -158,7 +158,7 @@ def parse_labels_for_predict(
 def _extract_target_con_transformers(
     label_transformers: al_label_transformers,
     con_columns: Sequence[str],
-) -> Dict[str, StandardScaler | KBinsDiscretizer | IdentityTransformer]:
+) -> dict[str, StandardScaler | KBinsDiscretizer | IdentityTransformer]:
     con_transformers = {}
 
     for target_column, transformer_object in label_transformers.items():
@@ -167,7 +167,7 @@ def _extract_target_con_transformers(
 
         assert target_column not in con_transformers
         assert isinstance(
-            transformer_object, (StandardScaler, KBinsDiscretizer, IdentityTransformer)
+            transformer_object, StandardScaler | KBinsDiscretizer | IdentityTransformer
         )
 
         con_transformers[target_column] = transformer_object
@@ -264,7 +264,7 @@ def process_tabular_output_for_testing(
     tabular_target_files_info: dict[str, Any],
     output_folder: str,
     ids: Sequence[str],
-    all_ids: Set[str],
+    all_ids: set[str],
     label_transformers: dict[str, Any],
     per_modality_missing_ids: dict[str, set[str]],
     test_labels_df: pl.DataFrame,
@@ -295,7 +295,7 @@ def process_tabular_output_for_testing(
 def process_sequence_output_for_testing(
     output_name: str,
     ids: Sequence[str],
-    per_modality_missing_ids: Dict[str, Set[str]],
+    per_modality_missing_ids: dict[str, set[str]],
     test_labels_df: pl.DataFrame,
 ) -> pl.DataFrame:
     cur_labels = set_up_delayed_predict_target_labels(
@@ -324,7 +324,7 @@ def process_array_or_image_output_for_testing(
     ids: Sequence[str],
     output_config: Any,
     output_source: str,
-    per_modality_missing_ids: Dict[str, Set[str]],
+    per_modality_missing_ids: dict[str, set[str]],
     test_labels_df: pl.DataFrame,
 ) -> pl.DataFrame:
     cur_labels = _set_up_predict_file_target_labels(
@@ -341,11 +341,8 @@ def process_array_or_image_output_for_testing(
     is_deeplake = is_deeplake_dataset(data_source=output_source)
     col_name = f"{output_name}__{output_name}"
 
-    polars_dtype: Type[pl.Int64] | Type[pl.Utf8]
-    if is_deeplake:
-        polars_dtype = pl.Int64
-    else:
-        polars_dtype = pl.Utf8
+    polars_dtype: type[pl.Int64] | type[pl.Utf8]
+    polars_dtype = pl.Int64 if is_deeplake else pl.Utf8
 
     test_labels_df = update_labels_df(
         master_df=test_labels_df,
@@ -358,12 +355,12 @@ def process_array_or_image_output_for_testing(
 
 def process_survival_output_for_testing(
     output_name: str,
-    tabular_target_files_info: Dict[str, Any],
+    tabular_target_files_info: dict[str, Any],
     output_folder: str,
     ids: Sequence[str],
-    all_ids: Set[str],
-    label_transformers: Dict[str, Any],
-    per_modality_missing_ids: Dict[str, Set[str]],
+    all_ids: set[str],
+    label_transformers: dict[str, Any],
+    per_modality_missing_ids: dict[str, set[str]],
     test_labels_df: pl.DataFrame,
 ) -> pl.DataFrame:
     """

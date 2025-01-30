@@ -1,9 +1,10 @@
 import logging
 import os
 import random
+from collections.abc import Callable, Iterable, Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Sequence, Tuple, Union
+from typing import Any
 
 import numpy as np
 import torch
@@ -123,8 +124,8 @@ class MissingHandlerDependencyError(Exception):
 
 def call_hooks_stage_iterable(
     hook_iterable: Iterable[Callable],
-    common_kwargs: Dict,
-    state: Union[None, Dict[str, Any]],
+    common_kwargs: dict,
+    state: None | dict[str, Any],
 ):
     for hook in hook_iterable:
         _, state = state_registered_hook_call(
@@ -136,14 +137,14 @@ def call_hooks_stage_iterable(
 
 def state_registered_hook_call(
     hook_func: Callable,
-    state: Union[Dict[str, Any], None],
+    state: dict[str, Any] | None,
     *args,
     **kwargs,
-) -> Tuple[Any, Dict[str, Any]]:
+) -> tuple[Any, dict[str, Any]]:
     if state is None:
         state = {}
 
-    state_updates = hook_func(state=state, *args, **kwargs)
+    state_updates = hook_func(*args, state=state, **kwargs)
 
     state = {**state, **state_updates}
 
@@ -162,7 +163,7 @@ def seed_everything(seed: int = 0) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-def get_seed(default_seed: int = 0) -> Tuple[int, bool]:
+def get_seed(default_seed: int = 0) -> tuple[int, bool]:
     os_seed = os.environ.get("EIR_SEED", None)
 
     if os_seed:

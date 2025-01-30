@@ -1,4 +1,5 @@
-from typing import Any, Sequence, Type
+from collections.abc import Sequence
+from typing import Any
 
 from pydantic import BaseModel, create_model
 
@@ -9,13 +10,13 @@ def create_tabular_model(
     name: str,
     cat_columns: Sequence[str],
     con_columns: Sequence[str],
-) -> Type[BaseModel]:
+) -> type[BaseModel]:
     fields: dict[str, Any] = {col: (str, ...) for col in cat_columns}
     fields.update({col: (float, ...) for col in con_columns})
     return create_model(name, **fields)
 
 
-def create_input_model(configs: Sequence[InputConfig]) -> Type[BaseModel]:
+def create_input_model(configs: Sequence[InputConfig]) -> type[BaseModel]:
     fields: dict[str, Any] = {}
 
     for config in configs:
