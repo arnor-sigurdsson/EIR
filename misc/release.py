@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+import tomlkit
+
 
 @dataclass
 class VersionInfo:
@@ -16,10 +18,44 @@ def run_command(cmd: list[str], check: bool = True) -> subprocess.CompletedProce
     return subprocess.run(cmd, check=check, capture_output=True, text=True)
 
 
-def get_new_version(bump_type: Literal["patch", "minor", "major"]) -> VersionInfo:
-    result = run_command(cmd=["poetry", "version", bump_type])
-    version = result.stdout.strip().split()[-1]
-    return VersionInfo(version=version, bump_type=bump_type)
+def parse_version(version: str) -> tuple[int, int, int]:
+    major, minor, patch = map(int, version.split("."))
+    return major, minor, patch
+
+
+def bump_version(
+    current_version: str, bump_type: Literal["patch", "minor", "major"]
+) -> str:
+    major, minor, patch = parse_version(current_version)
+
+    if bump_type == "major":
+        major += 1
+        minor = 0
+        patch = 0
+    elif bump_type == "minor":
+        minor += 1
+        patch = 0
+    else:
+        patch += 1
+
+    return f"{major}.{minor}.{patch}"
+
+
+def get_new_version(
+    bump_type: Literal["patch", "minor", "major"], pyproject_path: Path
+) -> VersionInfo:
+    with open(pyproject_path, encoding="utf-8") as f:
+        pyproject_data = tomlkit.load(f)
+
+    current_version = str(pyproject_data["project"]["version"])
+    new_version = bump_version(current_version, bump_type)
+
+    pyproject_data["project"]["version"] = new_version
+
+    with open(pyproject_path, "w", encoding="utf-8") as f:
+        f.write(tomlkit.dumps(pyproject_data))
+
+    return VersionInfo(version=new_version, bump_type=bump_type)
 
 
 def update_init_file(version: str, init_path: Path) -> None:
@@ -32,17 +68,14 @@ def update_init_file(version: str, init_path: Path) -> None:
     init_path.write_text(new_content)
 
 
-def git_commands(version: str) -> None:
+def git_commands(version: str, pyproject_path: Path, init_path: Path) -> None:
     commands = [
-        ["git", "add", "pyproject.toml", "eir/__init__.py"],
+        ["git", "add", str(pyproject_path), str(init_path)],
         ["git", "commit", "-m", f"Bump version to {version}"],
         ["git", "tag", version],
+        ["git", "push"],
+        ["git", "push", "origin", "--tags"],
     ]
-
-    push_command = ["git", "push"]
-    commands.append(push_command)
-
-    commands.append(["git", "push", "origin", "--tags"])
 
     for cmd in commands:
         run_command(cmd=cmd)
@@ -58,20 +91,33 @@ def main() -> None:
     parser.add_argument(
         "--init-path",
         type=Path,
-        default=Path("eir/__init__.py"),
+        default=Path("src/eir/__init__.py"),
         help="Path to __init__.py file",
+    )
+    parser.add_argument(
+        "--pyproject-path",
+        type=Path,
+        default=Path("pyproject.toml"),
+        help="Path to pyproject.toml file",
     )
 
     args = parser.parse_args()
 
     try:
-        version_info = get_new_version(bump_type=args.bump_type)
+        version_info = get_new_version(
+            bump_type=args.bump_type,
+            pyproject_path=args.pyproject_path,
+        )
         print(f"Bumping version to: {version_info.version}")
 
         update_init_file(version=version_info.version, init_path=args.init_path)
         print(f"Updated version in {args.init_path}")
 
-        git_commands(version=version_info.version)
+        git_commands(
+            version=version_info.version,
+            pyproject_path=args.pyproject_path,
+            init_path=args.init_path,
+        )
         print("Successfully completed all git commands")
 
         print("\nRelease workflow completed successfully!")
