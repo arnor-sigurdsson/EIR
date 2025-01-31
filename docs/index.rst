@@ -30,10 +30,10 @@ Installing EIR via pip
     $ pip install eir-dl
 
 .. important::
-    The latest version of EIR supports `Python 3.12 <https://www.python.org/downloads/>`_.
+    The latest version of EIR supports `Python 3.13 <https://www.python.org/downloads/>`_.
     Using an older version of Python will install an outdated version of EIR,
     which is likely to be incompatible with the current documentation
-    and may contain bugs. Please make sure that you are installing EIR in a Python 3.12 environment.
+    and may contain bugs. Please make sure that you are installing EIR in a Python 3.13 environment.
 
 Installing EIR via Container Engine
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -19,7 +19,7 @@ logger = get_logger(name=__name__)
 
 def get_yaml_iterator_with_injections(
     yaml_config_files: Iterable[str], extra_cl_args: list[str] | None
-) -> Generator[dict, None, None]:
+) -> Generator[dict]:
     if not extra_cl_args:
         yield from get_yaml_to_dict_iterator(yaml_config_files=yaml_config_files)
         return
@@ -68,7 +68,7 @@ def convert_cl_str_to_dict(str_: str) -> dict:
 
 def get_yaml_to_dict_iterator(
     yaml_config_files: Iterable[str],
-) -> Generator[dict, None, None]:
+) -> Generator[dict]:
     for yaml_config in yaml_config_files:
         yield load_yaml_config(config_path=yaml_config)
 

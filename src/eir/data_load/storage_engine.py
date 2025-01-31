@@ -341,7 +341,7 @@ class HybridStorage:
             for arr_data in self.var_array_data:
                 cur_mask: list[bool] = []
                 for arr in arr_data:
-                    cur_mask.append(arr is None or len(arr) == 0)
+                    cur_mask.append(arr is None)
                 var_masks.append(np.array(cur_mask))
 
             var_array_mask = np.all(var_masks, axis=0)
@@ -547,7 +547,7 @@ def check_two_storages(
         for arr_data in target_storage.var_array_data:
             cur_mask: list[bool] = []
             for arr in arr_data:
-                cur_mask.append(arr is None or len(arr) == 0)
+                cur_mask.append(arr is None)
             var_masks.append(np.array(cur_mask))
 
         var_array_mask = np.all(var_masks, axis=0)

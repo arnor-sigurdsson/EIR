@@ -201,10 +201,10 @@ class SplitModelOutputs:
 
 def get_split_output_generator(
     output_generator: Generator[
-        model_training_utils.al_dataloader_gathered_predictions, None, None
+        model_training_utils.al_dataloader_gathered_predictions
     ],
     output_objects: al_output_objects_as_dict,
-) -> Generator[SplitModelOutputs, None, None]:
+) -> Generator[SplitModelOutputs]:
     output_objects_by_type = split_output_objects_by_eval_type(
         output_objects=output_objects
     )
@@ -258,7 +258,7 @@ class EvaluationResults:
 
 def run_split_evaluation(
     output_generator: Generator[
-        model_training_utils.al_dataloader_gathered_predictions, None, None
+        model_training_utils.al_dataloader_gathered_predictions
     ],
     output_objects: al_output_objects_as_dict,
     experiment_metrics: metrics.al_metric_record_dict,

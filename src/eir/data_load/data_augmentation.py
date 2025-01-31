@@ -155,7 +155,7 @@ def get_mixing_info(
     mixing_alpha: float,
     batch_size: int,
     target_labels: "al_training_labels_target",
-    target_columns_gen: Generator[tuple[str, str, str], None, None],
+    target_columns_gen: Generator[tuple[str, str, str]],
 ) -> MixingObject:
     lambda_ = _sample_lambda(mixing_alpha=mixing_alpha)
 
@@ -292,7 +292,7 @@ def get_uniform_cutmix_indices(input_length: int, lambda_: float) -> torch.Tenso
 def mixup_all_targets(
     targets: "al_training_labels_target",
     permuted_indices_for_mixing: torch.Tensor,
-    target_columns_gen: Generator[tuple[str, str, str], None, None],
+    target_columns_gen: Generator[tuple[str, str, str]],
 ) -> "al_training_labels_target":
     targets_permuted: al_training_labels_target = {}
 

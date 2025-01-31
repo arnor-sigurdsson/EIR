@@ -273,7 +273,7 @@ def calculate_top_n_tokens(
 def get_basic_sample_attributions_to_analyse_generator(
     interpretation_config: schemas.BasicInterpretationConfig,
     all_attributions: Sequence["SampleAttribution"],
-) -> Generator["SampleAttribution", None, None]:
+) -> Generator["SampleAttribution"]:
     strategy = interpretation_config.interpretation_sampling_strategy
     n_samples = interpretation_config.num_samples_to_interpret
 

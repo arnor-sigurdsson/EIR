@@ -685,9 +685,7 @@ def gather_data_pointers_from_data_source(
     Disk: ID -> file path
     Deeplake: ID -> integer index
     """
-    iterator: (
-        Generator[tuple[str, str], None, None] | Generator[tuple[str, int], None, None]
-    )
+    iterator: Generator[tuple[str, str]] | Generator[tuple[str, int]]
     if is_deeplake_dataset(data_source=str(data_source)):
         assert output_inner_key is not None
         iterator = build_deeplake_available_pointer_iterator(
@@ -714,7 +712,7 @@ def gather_data_pointers_from_data_source(
 
 def build_deeplake_available_pointer_iterator(
     data_source: Path, inner_key: str
-) -> Generator[tuple[str, int], None, None]:
+) -> Generator[tuple[str, int]]:
     deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
     columns = {col.name for col in deeplake_ds.schema.columns}
     existence_col = f"{inner_key}_exists"

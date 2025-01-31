@@ -715,12 +715,12 @@ def _get_consumer_from_input_type(
 
 
 def get_sample_attribution_producer(
-    data_producer: Generator[tuple[Batch, dict[str, Any]], None, None],
+    data_producer: Generator[tuple[Batch, dict[str, Any]]],
     act_func: Callable,
     target_column_name: str,
     output_name: str,
     missing_ids_per_output: MissingTargetsInfo,
-) -> Generator["SampleAttribution", None, None]:
+) -> Generator["SampleAttribution"]:
     missing_for_modality = missing_ids_per_output.missing_ids_per_modality
     cur_missing_ids = missing_for_modality[output_name]
 
@@ -765,7 +765,7 @@ def get_basic_consumer() -> BasicConsumerCallable:
 
 
 def process_attributions_for_all_modalities(
-    attribution_producer: Generator["SampleAttribution", None, None],
+    attribution_producer: Generator["SampleAttribution"],
     attribution_consumers: dict[str, Callable],
 ) -> dict[
     str, Sequence["SampleAttribution"] | dict[str, np.ndarray] | ParsedOmicsAttributions
@@ -903,7 +903,7 @@ def _get_interpretation_data_producer(
     column_type: str,
     output_name: str,
     dataset: al_local_datasets,
-) -> Generator[tuple[Batch, dict[str, Any]], None, None]:
+) -> Generator[tuple[Batch, dict[str, Any]]]:
     output_object = experiment.outputs[output_name]
     assert isinstance(
         output_object, ComputedTabularOutputInfo | ComputedSurvivalOutputInfo

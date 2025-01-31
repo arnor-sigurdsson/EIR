@@ -166,7 +166,7 @@ def get_main_parser(
 
 def _recursive_search(
     dict_: Mapping, target: Any, path=None
-) -> Generator[tuple[str, Any], None, None]:
+) -> Generator[tuple[str, Any]]:
     if not path:
         path = []
 

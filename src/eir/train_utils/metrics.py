@@ -915,7 +915,7 @@ def persist_metrics(
 
 
 def get_metrics_files(
-    target_generator: Generator[tuple[str, str, str], None, None],
+    target_generator: Generator[tuple[str, str, str]],
     run_folder: Path,
     train_or_val_target_prefix: str,
     detail_level: int,

@@ -486,7 +486,7 @@ def get_array_output_auto_validation_samples(
 
 def _get_eval_sample_generator(
     eval_samples: ArrayOutputEvalSamples, output_name: str
-) -> Generator[tuple[str, ArrayOutputEvalSample], None, None]:
+) -> Generator[tuple[str, ArrayOutputEvalSample]]:
     cur_config_auto_samples = eval_samples.auto_samples[output_name]
     cur_config_manual_samples = eval_samples.manual_samples[output_name]
 

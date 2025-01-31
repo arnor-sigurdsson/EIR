@@ -6,7 +6,7 @@ license = { text = "AGPLv3" }
 authors = [
     { name = "Arnor Sigurdsson" }
 ]
-requires-python = ">=3.12.0,<3.13"
+requires-python = ">=3.13.0,<3.14"
 dependencies = [
     "pandas>=2.2.2",
     "numpy~=2.1.0",
@@ -94,7 +94,7 @@ dev = [
 [tool.ruff]
 line-length = 88
 indent-width = 4
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = [

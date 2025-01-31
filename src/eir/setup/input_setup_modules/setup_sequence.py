@@ -616,7 +616,7 @@ def get_tokenized_vocab_iterator(
     vocab_iterator: Iterator[Sequence[str] | str],
     tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
     is_from_file: bool,
-) -> Generator[Sequence[str], None, None]:
+) -> Generator[Sequence[str]]:
     @overload
     def _do_tokenize(list_of_words_: str) -> Sequence[str]: ...
 
@@ -639,7 +639,7 @@ def get_vocab_iterator(
     gathered_stats: "GatheredSequenceStats",
     vocab_file: str | None = None,
     deeplake_inner_key: str | None = None,
-) -> Generator[Sequence[str], None, None]:
+) -> Generator[Sequence[str]]:
     """
     Note: When using a vocabulary file, we explicitly expect one token per line,
     therefore we do not split on any character.
@@ -676,7 +676,7 @@ def get_vocab_iterator(
 def get_vocab_file_iterator(
     vocab_file: Path,
     gathered_stats: "GatheredSequenceStats",
-) -> Generator[str, None, None]:
+) -> Generator[str]:
     try:
         with vocab_file.open("r") as f:
             vocab_dict = json.load(f)
@@ -746,7 +746,7 @@ def yield_tokens_from_deeplake_dataset(
     split_on: str | None,
     gathered_stats: GatheredSequenceStats,
     inner_key: str,
-) -> Generator[Sequence[str], None, None]:
+) -> Generator[Sequence[str]]:
     deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
     deeplake_iter = get_deeplake_input_source_iterable(
         deeplake_dataset=deeplake_ds,
@@ -773,7 +773,7 @@ def yield_tokens_from_file(
     split_on: str | None,
     gathered_stats: GatheredSequenceStats,
     preserve_full_content: bool = False,
-) -> Generator[Sequence[str], None, None]:
+) -> Generator[Sequence[str]]:
     gathered_stats.total_files += 1
 
     if preserve_full_content:
@@ -808,7 +808,7 @@ def yield_tokens_from_file(
 
 def yield_tokens_from_csv(
     file_path: str, split_on: str | None, gathered_stats: GatheredSequenceStats
-) -> Generator[Sequence[str], None, None]:
+) -> Generator[Sequence[str]]:
     split_func = get_sequence_split_function(split_on=split_on)
 
     df = pd.read_csv(filepath_or_buffer=file_path, index_col="ID", dtype={"ID": str})

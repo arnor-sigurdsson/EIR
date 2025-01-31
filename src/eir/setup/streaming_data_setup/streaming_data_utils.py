@@ -39,7 +39,7 @@ def connect_to_server(
     websocket_url: str,
     protocol_version: str,
     max_size: int = 10_000_000,
-) -> Generator[websocket.WebSocket, None, None]:
+) -> Generator[websocket.WebSocket]:
     logger.debug(f"Attempting WebSocket connection to: {websocket_url}")
 
     try:

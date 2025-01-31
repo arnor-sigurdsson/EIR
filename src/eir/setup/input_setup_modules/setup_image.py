@@ -345,8 +345,8 @@ def get_image_normalization_values(
 
 
 def _get_maybe_truncated_tensor_iterator(
-    tensor_iterator: Generator[torch.Tensor, None, None], max_samples: int | None
-) -> Generator[torch.Tensor, None, None]:
+    tensor_iterator: Generator[torch.Tensor], max_samples: int | None
+) -> Generator[torch.Tensor]:
     if max_samples is not None:
         tensor_iterator = (
             t for _, t in zip(range(max_samples), tensor_iterator, strict=False)
