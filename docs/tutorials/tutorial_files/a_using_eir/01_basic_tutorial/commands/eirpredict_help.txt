@@ -1,9 +1,10 @@
-09:35:45 - INFO - eir.train_utils.utils - Global random seed set to 0.
+15:55:37 - INFO - eir.train_utils.utils - Global random seed set to 0.
 usage: eirpredict [-h] [--global_configs [GLOBAL_CONFIGS ...]]
                   [--input_configs [INPUT_CONFIGS ...]]
                   [--fusion_configs [FUSION_CONFIGS ...]]
-                  [--output_configs [OUTPUT_CONFIGS ...]] --model_path
-                  MODEL_PATH [--evaluate] --output_folder OUTPUT_FOLDER
+                  [--output_configs [OUTPUT_CONFIGS ...]]
+                  --model_path MODEL_PATH [--evaluate]
+                  --output_folder OUTPUT_FOLDER
                   [--attribution_background_source {train,predict}]
 
 options:

@@ -4,5 +4,5 @@ eirtrain \
 --fusion_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/cifar/cifar_fusion.yaml \
 --output_configs eir_tutorials/e_pretraining/02_mini_foundation/conf/cifar/cifar_output.yaml \
 --cifar_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/e_pretraining/02_mini_foundation_cifar_from_pretrained \
---cifar_input.pretrained_config.model_path=eir_tutorials/e_pretraining/02_mini_foundation/data/02_mini_foundation/saved_models/02_mini_foundation_model_15500_perf-average=0.2694.pt \
+--cifar_input.pretrained_config.model_path=eir_tutorials/e_pretraining/02_mini_foundation/data/02_mini_foundation/saved_models/02_mini_foundation_model_17500_perf-average=0.1737.pt \
 --cifar_input.pretrained_config.load_module_name=image_input

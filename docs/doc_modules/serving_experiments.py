@@ -11,7 +11,6 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
-import black
 import requests
 
 from docs.doc_modules.experiments import save_command_as_text
@@ -50,7 +49,17 @@ def build_request_example_module_from_function(
 ) -> RequestExampleModule:
     if language == "python":
         function_body = extract_function_body(func=function)
-        function_body = black.format_str(function_body, mode=black.FileMode())
+        process = subprocess.run(
+            ["ruff", "format", "-"],
+            input=function_body,
+            capture_output=True,
+            text=True,
+        )
+        if process.returncode != 0:
+            logger.warning(f"Ruff formatting failed: {process.stderr}")
+            function_body = function_body
+        else:
+            function_body = process.stdout
     elif language == "shell":
         assert custom_body is not None
         function_body = custom_body
