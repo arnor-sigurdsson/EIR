@@ -1,6 +1,6 @@
 [project]
 name = "eir-dl"
-version = "0.13.9"
+version = "0.14.0"
 description = "Deep learning framework for genomics and multi-modal data"
 license = { text = "AGPLv3" }
 authors = [
