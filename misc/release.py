@@ -15,7 +15,19 @@ class VersionInfo:
 
 
 def run_command(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, check=check, capture_output=True, text=True)
+    try:
+        return subprocess.run(
+            cmd,
+            check=check,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Command '{' '.join(cmd)}' failed")
+        print(f"Exit code: {e.returncode}")
+        print(f"stdout: {e.stdout}")
+        print(f"stderr: {e.stderr}")
+        raise
 
 
 def parse_version(version: str) -> tuple[int, int, int]:
@@ -68,16 +80,43 @@ def update_init_file(version: str, init_path: Path) -> None:
     init_path.write_text(new_content)
 
 
+def git_commit_with_retry(files: list[Path], version: str) -> None:
+    add_cmd = ["git", "add"] + [str(f) for f in files]
+    commit_cmd = ["git", "commit", "-m", f"Bump version to {version}"]
+
+    print(f"Executing: {' '.join(add_cmd)}")
+    run_command(add_cmd)
+
+    try:
+        print(f"Executing: {' '.join(commit_cmd)}")
+        run_command(commit_cmd)
+    except subprocess.CalledProcessError as e:
+        if "uv-lock" in e.stderr:
+            print("uv.lock was modified, adding it and retrying commit")
+            uv_lock = Path("uv.lock")
+            if uv_lock.exists():
+                print("Executing: git add uv.lock")
+                run_command(["git", "add", "uv.lock"])
+                print(f"Executing: {' '.join(commit_cmd)}")
+                run_command(commit_cmd)
+            else:
+                raise
+
+
 def git_commands(version: str, pyproject_path: Path, init_path: Path) -> None:
+    git_commit_with_retry(
+        files=[pyproject_path, init_path],
+        version=version,
+    )
+
     commands = [
-        ["git", "add", str(pyproject_path), str(init_path)],
-        ["git", "commit", "-m", f"Bump version to {version}"],
         ["git", "tag", version],
         ["git", "push"],
         ["git", "push", "origin", "--tags"],
     ]
 
     for cmd in commands:
+        print(f"Executing: {' '.join(cmd)}")
         run_command(cmd=cmd)
 
 
@@ -104,6 +143,13 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
+        if not args.pyproject_path.exists():
+            raise FileNotFoundError(
+                f"pyproject.toml not found at {args.pyproject_path}"
+            )
+        if not args.init_path.exists():
+            raise FileNotFoundError(f"__init__.py not found at {args.init_path}")
+
         version_info = get_new_version(
             bump_type=args.bump_type,
             pyproject_path=args.pyproject_path,
@@ -126,6 +172,7 @@ def main() -> None:
     except subprocess.CalledProcessError as e:
         print(f"Error executing command: {e.cmd}")
         print(f"Output: {e.output}")
+        print(f"Error output: {e.stderr}")
         raise
     except Exception as e:
         print(f"Error: {e}")
