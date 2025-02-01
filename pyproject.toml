@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "eir-dl"
 version = "0.14.0"
@@ -45,16 +49,6 @@ dependencies = [
     "polars>=1.19.0",
 ]
 
-[tool.uv]
-package = true
-
-[tool.setuptools]
-packages = ["eir"]
-package-dir = {"" = "src"}
-
-[tool.setuptools.package-data]
-eir = ["*"]
-
 [project.scripts]
 eirtrain = "eir.train:main"
 eirpredict = "eir.predict:main"
@@ -62,6 +56,12 @@ eirserve = "eir.serve:main"
 
 [project.urls]
 repository = "https://github.com/arnor-sigurdsson/EIR"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eir"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [dependency-groups]
 dev = [
