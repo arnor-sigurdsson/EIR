@@ -1282,8 +1282,8 @@ def get_available_supervised_metrics() -> tuple[
 
 def get_available_survival_metrics(
     target_transformers: dict[str, "al_label_transformers"],
-) -> tuple[MetricRecord]:
-    survival_metrics: tuple[MetricRecord] = (
+) -> tuple[MetricRecord, ...]:
+    survival_metrics: tuple[MetricRecord, ...] = (
         MetricRecord(
             name="c-index",
             function=partial(
