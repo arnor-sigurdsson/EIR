@@ -28,5 +28,33 @@ eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run/
 │           ├── training_curve_MCC.pdf
 │           └── training_curve_ROC-AUC-MACRO.pdf
 ├── saved_models
+├── test_predictions
+│   ├── known_outputs
+│   │   ├── ancestry_output
+│   │   │   └── Origin
+│   │   │       ├── attributions
+│   │   │       │   └── genotype
+│   │   │       │       ├── manhattan
+│   │   │       │       │   ├── Aggregated_manhattan.png
+│   │   │       │       │   ├── Asia_manhattan.png
+│   │   │       │       │   ├── Eastern_Asia_manhattan.png
+│   │   │       │       │   ├── Europe_manhattan.png
+│   │   │       │       │   ├── Latin_America_and_the_Caribbean_manhattan.png
+│   │   │       │       │   ├── Middle_East_manhattan.png
+│   │   │       │       │   └── Sub-Saharan_Africa_manhattan.png
+│   │   │       │       ├── snp_attributions.csv
+│   │   │       │       ├── top_acts.npy
+│   │   │       │       ├── top_acts_masked.npy
+│   │   │       │       ├── top_snps.pdf
+│   │   │       │       └── top_snps_masked.pdf
+│   │   │       ├── confusion_matrix.pdf
+│   │   │       ├── mc_pr_curve.pdf
+│   │   │       ├── mc_roc_curve.pdf
+│   │   │       └── predictions.csv
+│   │   └── calculated_metrics.json
+│   └── unknown_outputs
+│       └── ancestry_output
+│           └── Origin
+│               └── predictions.csv
 ├── training_curve_LOSS-AVERAGE.pdf
 └── training_curve_PERF-AVERAGE.pdf

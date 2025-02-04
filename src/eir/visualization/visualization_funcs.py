@@ -147,8 +147,13 @@ def _get_min_or_max_funcs(
     """
 
     func: SeriesMinMaxProtocol = pd.Series.idxmax  # type: ignore
-    metric = _parse_metrics_colname(str(column_name))
-    if metric in ["LOSS", "RMSE", "LOSS-AVERAGE"]:
+    metric = _parse_metrics_colname(column_name=str(column_name))
+    if metric in [
+        "LOSS",
+        "RMSE",
+        "IBS",
+        "LOSS-AVERAGE",
+    ]:
         return pd.Series.idxmin  # type: ignore
 
     return func

@@ -232,15 +232,19 @@ def predict_survival_wrapper_no_labels(
             hazards = torch.sigmoid(model_outputs).cpu().numpy()
             survival_probs = np.cumprod(1 - hazards, 1)
 
-            df = pd.DataFrame(
+            base_df = pd.DataFrame(
                 {
                     "ID": ids,
                     "Predicted_Risk": hazards[:, -1],
                 }
             )
 
-            for i, _t in enumerate(time_bins_except_last):
-                df[f"Surv_Prob_t{i}"] = survival_probs[:, i]
+            surv_prob_columns = {
+                f"Surv_Prob_t{i}": survival_probs[:, i]
+                for i, _t in enumerate(time_bins_except_last)
+            }
+            surv_prob_df = pd.DataFrame(surv_prob_columns)
+            df = pd.concat([base_df, surv_prob_df], axis=1)
 
             plot_discrete_individual_survival_curves(
                 df=df,

@@ -35,7 +35,11 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.preprocessing import KBinsDiscretizer, StandardScaler, label_binarize
-from sksurv.metrics import integrated_brier_score
+from sksurv.metrics import (
+    concordance_index_ipcw,
+    cumulative_dynamic_auc,
+    integrated_brier_score,
+)
 from sksurv.util import Surv
 from torch.linalg import vector_norm
 
@@ -132,7 +136,14 @@ al_con_metric_choices = Sequence[
     ]
 ]
 
-all_survival_metric_choices = Sequence[Literal["c-index"]]
+all_survival_metric_choices = Sequence[
+    Literal[
+        "c-index",
+        "ibs",
+        "td-cindex",
+        "td-auc",
+    ]
+]
 
 
 @dataclass()
@@ -638,9 +649,9 @@ def calc_survival_c_index(
     # higher survival score = longer predicted survival time
     if model_type == "discrete":
         hazards = sigmoid(outputs)
-        survival_scores = -hazards[:, -1]
+        survival_scores = np.cumprod(1 - hazards, axis=1)[:, -1]
     else:
-        survival_scores = -outputs
+        survival_scores = -outputs.flatten()
 
     c_index = concordance_index(
         event_times=times,
@@ -683,7 +694,7 @@ def calc_survival_ibs(
         time_grid = target_transformer.bin_edges_[0][:-1]
         valid_mask = (time_grid >= min_time) & (time_grid <= max_time)
         time_points = time_grid[valid_mask]
-        valid_preds = survival_probs[:, valid_mask]
+        valid_survival_preds = survival_probs[:, valid_mask]
     else:
         risk_scores = outputs.flatten()
         # ibs calculation complains if the last time point is the max time,
@@ -697,7 +708,7 @@ def calc_survival_ibs(
         )
         baseline_survival = np.exp(-np.cumsum(baseline_hazard))
 
-        valid_preds = np.zeros((len(times), len(time_points)))
+        valid_survival_preds = np.zeros((len(times), len(time_points)))
         for i, risk_score in enumerate(risk_scores):
             interp_baseline = np.interp(
                 time_points,
@@ -705,7 +716,7 @@ def calc_survival_ibs(
                 baseline_survival,
                 right=baseline_survival[-1],
             )
-            valid_preds[i] = interp_baseline ** np.exp(risk_score)
+            valid_survival_preds[i] = interp_baseline ** np.exp(risk_score)
 
     y = Surv.from_arrays(events.astype(bool), times)
 
@@ -713,10 +724,12 @@ def calc_survival_ibs(
         return np.nan
 
     try:
+        # note that here estimate is the survival probability at each time point
+        # not e.g. risk like in some other functions
         ibs = integrated_brier_score(
             survival_train=y,
             survival_test=y,
-            estimate=valid_preds,
+            estimate=valid_survival_preds,
             times=time_points,
         )
     except Exception as e:
@@ -738,11 +751,24 @@ def calc_survival_td_cindex(
     *args,
     **kwargs,
 ) -> float:
-    from sksurv.metrics import concordance_index_ipcw
-    from sksurv.util import Surv
+    """
+    See: https://scikit-survival.readthedocs.io/en/stable/user_guide/
+    evaluating-survival-models.html#Time-dependent-Area-under-the-ROC
+
+    for discussion on 80th percentile for choosing tau.
+    """
 
     def sigmoid(x: np.ndarray) -> np.ndarray:
         return 1 / (1 + np.exp(-x))
+
+    def select_tau(event_indicators: np.ndarray, time_values: np.ndarray) -> float:
+        event_times = time_values[event_indicators.astype(bool)]
+
+        tau_ = np.percentile(event_times, 80)
+
+        tau_ = min(tau_, time_values.max())
+
+        return float(tau_)
 
     target_transformer = target_transformers[output_name][time_name]
     model_type = "discrete"
@@ -751,7 +777,8 @@ def calc_survival_td_cindex(
 
     events = labels
     times = target_transformer.inverse_transform(times.reshape(-1, 1)).flatten()
-    max_time = times.max()
+
+    tau = select_tau(event_indicators=events, time_values=times)
 
     if model_type == "discrete":
         hazards = sigmoid(outputs)
@@ -768,7 +795,7 @@ def calc_survival_td_cindex(
             survival_train=y,
             survival_test=y,
             estimate=risk_scores,
-            tau=max_time,
+            tau=tau,
         )[0]
     except Exception as e:
         logger.error(f"Time-dependent C-index calculation failed: {str(e)}")
@@ -789,8 +816,13 @@ def calc_survival_td_auc(
     *args,
     **kwargs,
 ) -> float:
-    from sksurv.metrics import cumulative_dynamic_auc
-    from sksurv.util import Surv
+    """
+    See
+    https://scikit-survival.readthedocs.io/en/stable/user_guide/
+    evaluating-survival-models.html
+
+    for more information on how percentile filtering and why it is needed.
+    """
 
     def sigmoid(x: np.ndarray) -> np.ndarray:
         return 1 / (1 + np.exp(-x))
@@ -803,27 +835,44 @@ def calc_survival_td_auc(
     events = labels
     times = target_transformer.inverse_transform(times.reshape(-1, 1)).flatten()
 
-    # 10 points between 10th and 90th percentile
-    eval_times = np.percentile(
-        times[events.astype(bool)],
-        np.linspace(10, 90, 10),
-    )
-
     if model_type == "discrete":
         hazards = sigmoid(outputs)
-        survival_probs = np.cumprod(1 - hazards, axis=1)
-        risk_scores = -survival_probs[:, -1]
-    else:
-        risk_scores = outputs.flatten()
+        time_grid = target_transformer.bin_edges_[0][:-1]
 
-    y = Surv.from_arrays(events.astype(bool), times)
+        # Find and remove individuals with events at max/min time
+        # see: https://github.com/sebp/scikit-survival/discussions/292
+        max_time = times.max()
+        min_time = times.min()
+        problematic_mask = ~(
+            ((times == min_time) | (times == max_time)) & events.astype(bool)
+        )
+
+        y_filtered = Surv.from_arrays(
+            events.astype(bool)[problematic_mask], times[problematic_mask]
+        )
+        hazards_filtered = hazards[problematic_mask]
+
+        eval_min_time = np.percentile(times[problematic_mask], 10)
+        eval_max_time = np.percentile(times[problematic_mask], 90)
+
+        time_mask = (time_grid > eval_min_time) & (time_grid < eval_max_time)
+
+        time_points = time_grid[time_mask]
+        valid_risk_scores = hazards_filtered[:, time_mask]
+    else:
+        time_points = np.percentile(
+            times[events.astype(bool)],
+            np.linspace(10, 90, 10),
+        )
+        valid_risk_scores = outputs.flatten()
+        y_filtered = Surv.from_arrays(events.astype(bool), times)
 
     try:
         auc, mean_auc = cumulative_dynamic_auc(
-            survival_train=y,
-            survival_test=y,
-            estimate=risk_scores,
-            times=eval_times,
+            survival_train=y_filtered,
+            survival_test=y_filtered,
+            estimate=valid_risk_scores,
+            times=time_points,
         )
         td_auc = mean_auc
 
