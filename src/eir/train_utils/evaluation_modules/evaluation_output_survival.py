@@ -7,8 +7,7 @@ import torch
 from lifelines import KaplanMeierFitter
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import KBinsDiscretizer
-from sksurv.metrics import cumulative_dynamic_auc
-from sksurv.util import Surv
+from torchsurv.metrics.auc import Auc
 
 from eir.experiment_io.output_object_io import get_output_serialization_path
 from eir.setup.output_setup_modules.survival_output_setup import (
@@ -580,13 +579,6 @@ def plot_td_auc_curve(
     output_folder: Path,
     target_transformer: KBinsDiscretizer | IdentityTransformer,
 ) -> None:
-    """
-    See
-    https://scikit-survival.readthedocs.io/en/stable/user_guide/
-    evaluating-survival-models.html
-
-    for more information on how percentile filtering and why it is needed.
-    """
     model_type = "discrete"
     if isinstance(target_transformer, IdentityTransformer):
         model_type = "cox"
@@ -595,43 +587,34 @@ def plot_td_auc_curve(
         hazards = risk_scores
         time_grid = target_transformer.bin_edges_[0][:-1]
 
-        # Find and remove individuals with events at max/min time
-        # see: https://github.com/sebp/scikit-survival/discussions/292
-        max_time = times.max()
-        min_time = times.min()
-        problematic_mask = ~(
-            ((times == min_time) | (times == max_time)) & events.astype(bool)
-        )
-
-        y_filtered = Surv.from_arrays(
-            events.astype(bool)[problematic_mask], times[problematic_mask]
-        )
-        hazards_filtered = hazards[problematic_mask]
-
-        eval_min_time = np.percentile(times[problematic_mask], 10)
-        eval_max_time = np.percentile(times[problematic_mask], 90)
-
-        time_mask = (time_grid > eval_min_time) & (time_grid < eval_max_time)
-
+        # Filter time points to be within observed time range
+        # otherwise AUC calculation fails
+        time_mask = (time_grid >= times.min()) & (time_grid <= times.max())
         time_points = time_grid[time_mask]
-        valid_risk_scores = hazards_filtered[:, time_mask]
+        risk_scores_filtered = hazards[:, time_mask]
     else:
-        time_points = np.percentile(
-            times[events.astype(bool)],
-            np.linspace(10, 90, 10),
-        )
-        valid_risk_scores = risk_scores.flatten()
-        y_filtered = Surv.from_arrays(events.astype(bool), times)
+        time_points = np.linspace(times.min(), times.max() * 0.99, 100)
+        risk_scores_filtered = risk_scores.flatten()[:, np.newaxis]
 
-    auc, mean_auc = cumulative_dynamic_auc(
-        survival_train=y_filtered,
-        survival_test=y_filtered,
-        estimate=valid_risk_scores,
-        times=time_points,
+    events_torch = torch.tensor(events, dtype=torch.bool)
+    times_torch = torch.tensor(times, dtype=torch.float32)
+    time_points_torch = torch.tensor(time_points, dtype=torch.float32)
+    risk_scores_torch = torch.tensor(risk_scores_filtered, dtype=torch.float32)
+
+    auc = Auc()
+
+    aucs = auc(
+        estimate=risk_scores_torch,
+        event=events_torch,
+        time=times_torch,
+        auc_type="cumulative",
+        new_time=time_points_torch,
     )
 
+    mean_auc = float(auc.integral())
+
     plt.figure(figsize=(10, 6))
-    plt.plot(time_points, auc, marker="o")
+    plt.plot(time_points, aucs.numpy(), marker="o")
     plt.axhline(mean_auc, color="r", linestyle="--", label=f"Mean AUC: {mean_auc:.3f}")
     plt.xlabel("Time")
     plt.ylabel("Time-dependent AUC")

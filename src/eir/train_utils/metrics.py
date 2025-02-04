@@ -20,7 +20,6 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from aislib.misc_utils import ensure_path_exists
-from lifelines.utils import concordance_index
 from scipy.special import softmax
 from scipy.stats import pearsonr
 from sklearn.metrics import (
@@ -35,13 +34,11 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.preprocessing import KBinsDiscretizer, StandardScaler, label_binarize
-from sksurv.metrics import (
-    concordance_index_ipcw,
-    cumulative_dynamic_auc,
-    integrated_brier_score,
-)
-from sksurv.util import Surv
 from torch.linalg import vector_norm
+from torchsurv.metrics.auc import Auc
+from torchsurv.metrics.brier_score import BrierScore
+from torchsurv.metrics.cindex import ConcordanceIndex
+from torchsurv.stats.ipcw import get_ipcw
 
 from eir.data_load.data_utils import get_output_info_generator
 from eir.setup.schemas import (
@@ -625,14 +622,7 @@ def calc_survival_c_index(
     *args,
     **kwargs,
 ) -> float:
-    """
-    Note that for CoxPH models we just have the output being a single value quantifying
-    risk predicted by the model for each sample. Whereas for discrete survival models
-    we take the last bin (i.e., last time point) as the overall risk predicted by the
-    model.
-    """
-
-    def sigmoid(x):
+    def sigmoid(x: np.ndarray) -> np.ndarray:
         return 1 / (1 + np.exp(-x))
 
     target_transformer = target_transformers[output_name][time_name]
@@ -641,25 +631,38 @@ def calc_survival_c_index(
         model_type = "cox"
 
     events = labels
+    times = target_transformer.inverse_transform(times.reshape(-1, 1)).flatten()
 
-    times = target_transformer.inverse_transform(times.reshape(-1, 1))
-    times = times.flatten()
-
-    # Convert model outputs (risk) to survival scores
-    # higher survival score = longer predicted survival time
+    # Convert model outputs to risk scores
+    # Note: Unlike TD C-index, here we want risk scores (higher = more risk)
     if model_type == "discrete":
         hazards = sigmoid(outputs)
-        survival_scores = np.cumprod(1 - hazards, axis=1)[:, -1]
+        survival_probs = np.cumprod(1 - hazards, axis=1)
+        # Negative of survival prob = risk
+        risk_scores = -survival_probs[:, -1]
     else:
-        survival_scores = -outputs.flatten()
+        # Cox already outputs risk scores
+        risk_scores = outputs.flatten()
 
-    c_index = concordance_index(
-        event_times=times,
-        predicted_scores=survival_scores,
-        event_observed=events,
-    )
+    events_torch = torch.tensor(events, dtype=torch.bool)
+    times_torch = torch.tensor(times, dtype=torch.float32)
+    risk_scores_torch = torch.tensor(risk_scores, dtype=torch.float32)
 
-    return c_index
+    try:
+        c_index = ConcordanceIndex()
+        c_index_value = float(
+            c_index(
+                estimate=risk_scores_torch,
+                event=events_torch,
+                time=times_torch,
+            )
+        )
+
+    except Exception as e:
+        logger.error(f"C-index calculation failed: {str(e)}")
+        c_index_value = np.nan
+
+    return c_index_value
 
 
 @handle_empty(default_value=np.nan, metric_name="IBS")
@@ -685,22 +688,17 @@ def calc_survival_ibs(
     events = labels
     times = target_transformer.inverse_transform(times.reshape(-1, 1)).flatten()
 
-    min_time = times.min()
-    max_time = times.max()
-
+    # Note: Unlike the C-index calculations, here we want survival probabilities
     if model_type == "discrete":
         hazards = sigmoid(outputs)
         survival_probs = np.cumprod(1 - hazards, axis=1)
         time_grid = target_transformer.bin_edges_[0][:-1]
-        valid_mask = (time_grid >= min_time) & (time_grid <= max_time)
-        time_points = time_grid[valid_mask]
-        valid_survival_preds = survival_probs[:, valid_mask]
+        time_points = time_grid
+        survival_preds = survival_probs
     else:
         risk_scores = outputs.flatten()
-        # ibs calculation complains if the last time point is the max time,
-        # hence max_time * 0.99
-        time_points = np.linspace(min_time, max_time * 0.99, 100)
-
+        # TODO: Maybe deprecate / remove * 0.99
+        time_points = np.linspace(times.min(), times.max() * 0.99, 100)
         unique_times, baseline_hazard = estimate_baseline_hazard(
             times=times,
             events=events,
@@ -708,7 +706,7 @@ def calc_survival_ibs(
         )
         baseline_survival = np.exp(-np.cumsum(baseline_hazard))
 
-        valid_survival_preds = np.zeros((len(times), len(time_points)))
+        survival_preds = np.zeros((len(times), len(time_points)))
         for i, risk_score in enumerate(risk_scores):
             interp_baseline = np.interp(
                 time_points,
@@ -716,27 +714,26 @@ def calc_survival_ibs(
                 baseline_survival,
                 right=baseline_survival[-1],
             )
-            valid_survival_preds[i] = interp_baseline ** np.exp(risk_score)
+            survival_preds[i] = interp_baseline ** np.exp(risk_score)
 
-    y = Surv.from_arrays(events.astype(bool), times)
+    events_torch = torch.tensor(events, dtype=torch.bool)
+    times_torch = torch.tensor(times, dtype=torch.float32)
+    time_points_torch = torch.tensor(time_points, dtype=torch.float32)
+    survival_probs_torch = torch.tensor(survival_preds, dtype=torch.float32)
 
-    if len(time_points) < 2:
-        return np.nan
-
+    brier_score = BrierScore()
     try:
-        # note that here estimate is the survival probability at each time point
-        # not e.g. risk like in some other functions
-        ibs = integrated_brier_score(
-            survival_train=y,
-            survival_test=y,
-            estimate=valid_survival_preds,
-            times=time_points,
+        brier_score(
+            estimate=survival_probs_torch,
+            event=events_torch,
+            time=times_torch,
+            new_time=time_points_torch,
         )
+        brier_integral_score = brier_score.integral()
+        return float(brier_integral_score)
     except Exception as e:
         logger.error(f"IBS calculation failed: {str(e)}")
-        ibs = np.nan
-
-    return ibs
+        return np.nan
 
 
 @handle_empty(default_value=np.nan, metric_name="TD-CINDEX")
@@ -751,24 +748,13 @@ def calc_survival_td_cindex(
     *args,
     **kwargs,
 ) -> float:
-    """
-    See: https://scikit-survival.readthedocs.io/en/stable/user_guide/
-    evaluating-survival-models.html#Time-dependent-Area-under-the-ROC
-
-    for discussion on 80th percentile for choosing tau.
-    """
-
     def sigmoid(x: np.ndarray) -> np.ndarray:
         return 1 / (1 + np.exp(-x))
 
     def select_tau(event_indicators: np.ndarray, time_values: np.ndarray) -> float:
         event_times = time_values[event_indicators.astype(bool)]
-
         tau_ = np.percentile(event_times, 80)
-
-        tau_ = min(tau_, time_values.max())
-
-        return float(tau_)
+        return float(min(tau_, time_values.max()))
 
     target_transformer = target_transformers[output_name][time_name]
     model_type = "discrete"
@@ -778,8 +764,6 @@ def calc_survival_td_cindex(
     events = labels
     times = target_transformer.inverse_transform(times.reshape(-1, 1)).flatten()
 
-    tau = select_tau(event_indicators=events, time_values=times)
-
     if model_type == "discrete":
         hazards = sigmoid(outputs)
         survival_probs = np.cumprod(1 - hazards, axis=1)
@@ -788,20 +772,31 @@ def calc_survival_td_cindex(
     else:
         risk_scores = outputs.flatten()
 
-    y = Surv.from_arrays(events.astype(bool), times)
+    events_torch = torch.tensor(events, dtype=torch.bool)
+    times_torch = torch.tensor(times, dtype=torch.float32)
+    risk_scores_torch = torch.tensor(risk_scores, dtype=torch.float32)
 
     try:
-        td_cindex = concordance_index_ipcw(
-            survival_train=y,
-            survival_test=y,
-            estimate=risk_scores,
-            tau=tau,
-        )[0]
+        tau = select_tau(event_indicators=events, time_values=times)
+        tau_torch = torch.tensor(tau, dtype=torch.float32)
+
+        c_index = ConcordanceIndex()
+        ipcw = get_ipcw(event=events_torch, time=times_torch)
+        td_c_index = float(
+            c_index(
+                estimate=risk_scores_torch,
+                event=events_torch,
+                time=times_torch,
+                tmax=tau_torch,
+                weight=ipcw,
+            )
+        )
+
     except Exception as e:
         logger.error(f"Time-dependent C-index calculation failed: {str(e)}")
-        td_cindex = np.nan
+        td_c_index = np.nan
 
-    return td_cindex
+    return td_c_index
 
 
 @handle_empty(default_value=np.nan, metric_name="TD-AUC")
@@ -816,14 +811,6 @@ def calc_survival_td_auc(
     *args,
     **kwargs,
 ) -> float:
-    """
-    See
-    https://scikit-survival.readthedocs.io/en/stable/user_guide/
-    evaluating-survival-models.html
-
-    for more information on how percentile filtering and why it is needed.
-    """
-
     def sigmoid(x: np.ndarray) -> np.ndarray:
         return 1 / (1 + np.exp(-x))
 
@@ -839,42 +826,31 @@ def calc_survival_td_auc(
         hazards = sigmoid(outputs)
         time_grid = target_transformer.bin_edges_[0][:-1]
 
-        # Find and remove individuals with events at max/min time
-        # see: https://github.com/sebp/scikit-survival/discussions/292
-        max_time = times.max()
-        min_time = times.min()
-        problematic_mask = ~(
-            ((times == min_time) | (times == max_time)) & events.astype(bool)
-        )
-
-        y_filtered = Surv.from_arrays(
-            events.astype(bool)[problematic_mask], times[problematic_mask]
-        )
-        hazards_filtered = hazards[problematic_mask]
-
-        eval_min_time = np.percentile(times[problematic_mask], 10)
-        eval_max_time = np.percentile(times[problematic_mask], 90)
-
-        time_mask = (time_grid > eval_min_time) & (time_grid < eval_max_time)
-
+        # Filter time points to be within observed time range,
+        # otherwise AUC calculation fails
+        time_mask = (time_grid >= times.min()) & (time_grid <= times.max())
         time_points = time_grid[time_mask]
-        valid_risk_scores = hazards_filtered[:, time_mask]
+        risk_scores = hazards[:, time_mask]
     else:
-        time_points = np.percentile(
-            times[events.astype(bool)],
-            np.linspace(10, 90, 10),
-        )
-        valid_risk_scores = outputs.flatten()
-        y_filtered = Surv.from_arrays(events.astype(bool), times)
+        risk_scores = outputs.flatten()
+        time_points = np.linspace(times.min(), times.max() * 0.99, 100)
+
+    # Convert to torch tensors
+    events_torch = torch.tensor(events, dtype=torch.bool)
+    times_torch = torch.tensor(times, dtype=torch.float32)
+    time_points_torch = torch.tensor(time_points, dtype=torch.float32)
+    risk_scores_torch = torch.tensor(risk_scores, dtype=torch.float32)
 
     try:
-        auc, mean_auc = cumulative_dynamic_auc(
-            survival_train=y_filtered,
-            survival_test=y_filtered,
-            estimate=valid_risk_scores,
-            times=time_points,
+        auc = Auc()
+        auc(
+            estimate=risk_scores_torch,
+            event=events_torch,
+            time=times_torch,
+            auc_type="cumulative",
+            new_time=time_points_torch,
         )
-        td_auc = mean_auc
+        td_auc = float(auc.integral())
 
     except Exception as e:
         logger.error(f"Time-dependent AUC calculation failed: {str(e)}")
