@@ -14,6 +14,7 @@ from eir.setup.output_setup_modules.survival_output_setup import (
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
     al_step_metric_dict,
+    estimate_baseline_hazard,
     filter_survival_missing_targets,
     general_torch_to_numpy,
 )
@@ -117,6 +118,7 @@ def save_survival_evaluation_results_wrapper(
             )
 
         else:
+            # note: model outputs are log hazard ratios
             risk_scores = model_outputs.cpu().numpy()
 
             unique_times, baseline_hazard = estimate_baseline_hazard(
@@ -233,34 +235,6 @@ def check_is_current_iter_best(
 
     best_performance = df["perf-average"].max()
     return cur_performance >= best_performance
-
-
-def estimate_baseline_hazard(
-    times: np.ndarray,
-    events: np.ndarray,
-    risk_scores: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    sort_idx = np.argsort(times)
-    times = times[sort_idx]
-    events = events[sort_idx]
-    risk_scores = risk_scores[sort_idx]
-
-    unique_times = np.unique(times[events == 1])
-    baseline_hazard = np.zeros_like(unique_times)
-
-    risk_scores_exp = np.exp(risk_scores)
-
-    for i, t in enumerate(unique_times):
-        events_at_t = events[times == t]
-        n_events = np.sum(events_at_t)
-
-        at_risk = times >= t
-        risk_set_sum = np.sum(risk_scores_exp[at_risk])
-
-        if risk_set_sum > 0:
-            baseline_hazard[i] = n_events / risk_set_sum
-
-    return unique_times, baseline_hazard
 
 
 def calculate_cox_survival_probs(

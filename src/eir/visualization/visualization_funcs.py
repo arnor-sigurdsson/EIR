@@ -79,7 +79,9 @@ def add_series_to_axis(
 
 
 def generate_validation_curve_from_series(
-    series: pd.Series, title_extra: str = "", skiprows: int = 200
+    series: pd.Series,
+    title_extra: str = "",
+    skiprows: int = 200,
 ) -> tuple[plt.Figure | None, plt.Axes | None]:
     fig, ax = plt.subplots()
 

@@ -132,6 +132,7 @@ def predict_survival_wrapper_with_labels(
             )
 
         else:
+            # note: model outputs are log hazard ratios
             risk_scores = model_outputs.cpu().numpy()
 
             baseline_hazard = output_object.baseline_hazard
@@ -249,6 +250,7 @@ def predict_survival_wrapper_no_labels(
             )
 
         else:
+            # note: model outputs are log hazard ratios
             risk_scores = model_outputs.cpu().numpy()
 
             baseline_hazard = output_object.baseline_hazard
