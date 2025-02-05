@@ -20,7 +20,6 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from aislib.misc_utils import ensure_path_exists
-from lifelines.utils import concordance_index
 from scipy.special import softmax
 from scipy.stats import pearsonr
 from sklearn.metrics import (
@@ -36,6 +35,10 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import KBinsDiscretizer, StandardScaler, label_binarize
 from torch.linalg import vector_norm
+from torchsurv.metrics.auc import Auc
+from torchsurv.metrics.brier_score import BrierScore
+from torchsurv.metrics.cindex import ConcordanceIndex
+from torchsurv.stats.ipcw import get_ipcw
 
 from eir.data_load.data_utils import get_output_info_generator
 from eir.setup.schemas import (
@@ -130,7 +133,14 @@ al_con_metric_choices = Sequence[
     ]
 ]
 
-all_survival_metric_choices = Sequence[Literal["c-index"]]
+all_survival_metric_choices = Sequence[
+    Literal[
+        "c-index",
+        "ibs",
+        "td-cindex",
+        "td-auc",
+    ]
+]
 
 
 @dataclass()
@@ -612,14 +622,7 @@ def calc_survival_c_index(
     *args,
     **kwargs,
 ) -> float:
-    """
-    Note that for CoxPH models we just have the output being a single value quantifying
-    risk predicted by the model for each sample. Whereas for discrete survival models
-    we take the last bin (i.e., last time point) as the overall risk predicted by the
-    model.
-    """
-
-    def sigmoid(x):
+    def sigmoid(x: np.ndarray) -> np.ndarray:
         return 1 / (1 + np.exp(-x))
 
     target_transformer = target_transformers[output_name][time_name]
@@ -628,25 +631,232 @@ def calc_survival_c_index(
         model_type = "cox"
 
     events = labels
+    times = target_transformer.inverse_transform(times.reshape(-1, 1)).flatten()
 
-    times = target_transformer.inverse_transform(times.reshape(-1, 1))
-    times = times.flatten()
-
-    # # Convert model outputs (risk) to survival scores
-    # higher survival score = longer predicted survival time
+    # Convert model outputs to risk scores
+    # Note: Unlike TD C-index, here we want risk scores (higher = more risk)
     if model_type == "discrete":
         hazards = sigmoid(outputs)
-        survival_scores = -hazards[:, -1]
+        survival_probs = np.cumprod(1 - hazards, axis=1)
+        # Negative of survival prob = risk
+        risk_scores = -survival_probs[:, -1]
     else:
-        survival_scores = -outputs
+        # Cox already outputs risk scores
+        risk_scores = outputs.flatten()
 
-    c_index = concordance_index(
-        event_times=times,
-        predicted_scores=survival_scores,
-        event_observed=events,
-    )
+    events_torch = torch.tensor(events, dtype=torch.bool)
+    times_torch = torch.tensor(times, dtype=torch.float32)
+    risk_scores_torch = torch.tensor(risk_scores, dtype=torch.float32)
 
-    return c_index
+    try:
+        c_index = ConcordanceIndex()
+        c_index_value = float(
+            c_index(
+                estimate=risk_scores_torch,
+                event=events_torch,
+                time=times_torch,
+            )
+        )
+
+    except Exception as e:
+        logger.error(f"C-index calculation failed: {str(e)}")
+        c_index_value = np.nan
+
+    return c_index_value
+
+
+@handle_empty(default_value=np.nan, metric_name="IBS")
+def calc_survival_ibs(
+    outputs: np.ndarray,
+    labels: np.ndarray,
+    times: np.ndarray,
+    target_transformers: dict[str, dict[str, KBinsDiscretizer | IdentityTransformer]],
+    output_name: str,
+    event_name: str,
+    time_name: str,
+    *args,
+    **kwargs,
+) -> float:
+    def sigmoid(x: np.ndarray) -> np.ndarray:
+        return 1 / (1 + np.exp(-x))
+
+    target_transformer = target_transformers[output_name][time_name]
+    model_type = "discrete"
+    if isinstance(target_transformer, IdentityTransformer):
+        model_type = "cox"
+
+    events = labels
+    times = target_transformer.inverse_transform(times.reshape(-1, 1)).flatten()
+
+    # Note: Unlike the C-index calculations, here we want survival probabilities
+    if model_type == "discrete":
+        hazards = sigmoid(outputs)
+        survival_probs = np.cumprod(1 - hazards, axis=1)
+        time_grid = target_transformer.bin_edges_[0][:-1]
+        time_points = time_grid
+        survival_preds = survival_probs
+    else:
+        risk_scores = outputs.flatten()
+        # TODO: Maybe deprecate / remove * 0.99
+        time_points = np.linspace(times.min(), times.max() * 0.99, 100)
+        unique_times, baseline_hazard = estimate_baseline_hazard(
+            times=times,
+            events=events,
+            risk_scores=risk_scores,
+        )
+        baseline_survival = np.exp(-np.cumsum(baseline_hazard))
+
+        survival_preds = np.zeros((len(times), len(time_points)))
+        for i, risk_score in enumerate(risk_scores):
+            interp_baseline = np.interp(
+                time_points,
+                unique_times,
+                baseline_survival,
+                right=baseline_survival[-1],
+            )
+            survival_preds[i] = interp_baseline ** np.exp(risk_score)
+
+    events_torch = torch.tensor(events, dtype=torch.bool)
+    times_torch = torch.tensor(times, dtype=torch.float32)
+    time_points_torch = torch.tensor(time_points, dtype=torch.float32)
+    survival_probs_torch = torch.tensor(survival_preds, dtype=torch.float32)
+
+    brier_score = BrierScore()
+    try:
+        brier_score(
+            estimate=survival_probs_torch,
+            event=events_torch,
+            time=times_torch,
+            new_time=time_points_torch,
+        )
+        brier_integral_score = brier_score.integral()
+        return float(brier_integral_score)
+    except Exception as e:
+        logger.error(f"IBS calculation failed: {str(e)}")
+        return np.nan
+
+
+@handle_empty(default_value=np.nan, metric_name="TD-CINDEX")
+def calc_survival_td_cindex(
+    outputs: np.ndarray,
+    labels: np.ndarray,
+    times: np.ndarray,
+    target_transformers: dict[str, dict[str, KBinsDiscretizer | IdentityTransformer]],
+    output_name: str,
+    event_name: str,
+    time_name: str,
+    *args,
+    **kwargs,
+) -> float:
+    def sigmoid(x: np.ndarray) -> np.ndarray:
+        return 1 / (1 + np.exp(-x))
+
+    def select_tau(event_indicators: np.ndarray, time_values: np.ndarray) -> float:
+        event_times = time_values[event_indicators.astype(bool)]
+        tau_ = np.percentile(event_times, 80)
+        return float(min(tau_, time_values.max()))
+
+    target_transformer = target_transformers[output_name][time_name]
+    model_type = "discrete"
+    if isinstance(target_transformer, IdentityTransformer):
+        model_type = "cox"
+
+    events = labels
+    times = target_transformer.inverse_transform(times.reshape(-1, 1)).flatten()
+
+    if model_type == "discrete":
+        hazards = sigmoid(outputs)
+        survival_probs = np.cumprod(1 - hazards, axis=1)
+        # Negative since higher survival = lower risk
+        risk_scores = -survival_probs[:, -1]
+    else:
+        risk_scores = outputs.flatten()
+
+    events_torch = torch.tensor(events, dtype=torch.bool)
+    times_torch = torch.tensor(times, dtype=torch.float32)
+    risk_scores_torch = torch.tensor(risk_scores, dtype=torch.float32)
+
+    try:
+        tau = select_tau(event_indicators=events, time_values=times)
+        tau_torch = torch.tensor(tau, dtype=torch.float32)
+
+        c_index = ConcordanceIndex()
+        ipcw = get_ipcw(event=events_torch, time=times_torch)
+        td_c_index = float(
+            c_index(
+                estimate=risk_scores_torch,
+                event=events_torch,
+                time=times_torch,
+                tmax=tau_torch,
+                weight=ipcw,
+            )
+        )
+
+    except Exception as e:
+        logger.error(f"Time-dependent C-index calculation failed: {str(e)}")
+        td_c_index = np.nan
+
+    return td_c_index
+
+
+@handle_empty(default_value=np.nan, metric_name="TD-AUC")
+def calc_survival_td_auc(
+    outputs: np.ndarray,
+    labels: np.ndarray,
+    times: np.ndarray,
+    target_transformers: dict[str, dict[str, KBinsDiscretizer | IdentityTransformer]],
+    output_name: str,
+    event_name: str,
+    time_name: str,
+    *args,
+    **kwargs,
+) -> float:
+    def sigmoid(x: np.ndarray) -> np.ndarray:
+        return 1 / (1 + np.exp(-x))
+
+    target_transformer = target_transformers[output_name][time_name]
+    model_type = "discrete"
+    if isinstance(target_transformer, IdentityTransformer):
+        model_type = "cox"
+
+    events = labels
+    times = target_transformer.inverse_transform(times.reshape(-1, 1)).flatten()
+
+    if model_type == "discrete":
+        hazards = sigmoid(outputs)
+        time_grid = target_transformer.bin_edges_[0][:-1]
+
+        # Filter time points to be within observed time range,
+        # otherwise AUC calculation fails
+        time_mask = (time_grid >= times.min()) & (time_grid <= times.max())
+        time_points = time_grid[time_mask]
+        risk_scores = hazards[:, time_mask]
+    else:
+        risk_scores = outputs.flatten()
+        time_points = np.linspace(times.min(), times.max() * 0.99, 100)
+
+    # Convert to torch tensors
+    events_torch = torch.tensor(events, dtype=torch.bool)
+    times_torch = torch.tensor(times, dtype=torch.float32)
+    time_points_torch = torch.tensor(time_points, dtype=torch.float32)
+    risk_scores_torch = torch.tensor(risk_scores, dtype=torch.float32)
+
+    try:
+        auc = Auc()
+        auc(
+            estimate=risk_scores_torch,
+            event=events_torch,
+            time=times_torch,
+            auc_type="cumulative",
+            new_time=time_points_torch,
+        )
+        td_auc = float(auc.integral())
+
+    except Exception as e:
+        logger.error(f"Time-dependent AUC calculation failed: {str(e)}")
+        td_auc = np.nan
+
+    return td_auc
 
 
 class LogEmptyLossProtocol(Protocol):
@@ -1097,12 +1307,36 @@ def get_available_supervised_metrics() -> tuple[
 
 def get_available_survival_metrics(
     target_transformers: dict[str, "al_label_transformers"],
-) -> tuple[MetricRecord]:
-    survival_metrics: tuple[MetricRecord] = (
+) -> tuple[MetricRecord, ...]:
+    survival_metrics: tuple[MetricRecord, ...] = (
         MetricRecord(
             name="c-index",
             function=partial(
                 calc_survival_c_index, target_transformers=target_transformers
+            ),
+            output_type="survival",
+            minimize_goal=False,
+        ),
+        MetricRecord(
+            name="ibs",
+            function=partial(
+                calc_survival_ibs, target_transformers=target_transformers
+            ),
+            output_type="survival",
+            minimize_goal=True,
+        ),
+        MetricRecord(
+            name="td-cindex",
+            function=partial(
+                calc_survival_td_cindex, target_transformers=target_transformers
+            ),
+            output_type="survival",
+            minimize_goal=False,
+        ),
+        MetricRecord(
+            name="td-auc",
+            function=partial(
+                calc_survival_td_auc, target_transformers=target_transformers
             ),
             output_type="survival",
             minimize_goal=False,
@@ -1518,3 +1752,32 @@ def filter_survival_missing_targets(
 def general_torch_to_numpy(tensor: torch.Tensor) -> np.ndarray:
     array = tensor.cpu().to(dtype=torch.float32).detach().numpy()
     return array
+
+
+def estimate_baseline_hazard(
+    times: np.ndarray,
+    events: np.ndarray,
+    risk_scores: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    sort_idx = np.argsort(times)
+    times = times[sort_idx]
+    events = events[sort_idx]
+    risk_scores = risk_scores[sort_idx]
+
+    unique_times = np.unique(times[events == 1])
+    baseline_hazard = np.zeros_like(unique_times)
+
+    # convert back to risk scores from log-hazard ratios
+    risk_scores_exp = np.exp(risk_scores)
+
+    for i, t in enumerate(unique_times):
+        events_at_t = events[times == t]
+        n_events = np.sum(events_at_t)
+
+        at_risk = times >= t
+        risk_set_sum = np.sum(risk_scores_exp[at_risk])
+
+        if risk_set_sum > 0:
+            baseline_hazard[i] = n_events / risk_set_sum
+
+    return unique_times, baseline_hazard

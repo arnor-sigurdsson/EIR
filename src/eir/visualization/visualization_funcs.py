@@ -79,7 +79,9 @@ def add_series_to_axis(
 
 
 def generate_validation_curve_from_series(
-    series: pd.Series, title_extra: str = "", skiprows: int = 200
+    series: pd.Series,
+    title_extra: str = "",
+    skiprows: int = 200,
 ) -> tuple[plt.Figure | None, plt.Axes | None]:
     fig, ax = plt.subplots()
 
@@ -145,8 +147,13 @@ def _get_min_or_max_funcs(
     """
 
     func: SeriesMinMaxProtocol = pd.Series.idxmax  # type: ignore
-    metric = _parse_metrics_colname(str(column_name))
-    if metric in ["LOSS", "RMSE", "LOSS-AVERAGE"]:
+    metric = _parse_metrics_colname(column_name=str(column_name))
+    if metric in [
+        "LOSS",
+        "RMSE",
+        "IBS",
+        "LOSS-AVERAGE",
+    ]:
         return pd.Series.idxmin  # type: ignore
 
     return func

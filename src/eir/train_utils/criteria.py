@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Callable
 from enum import Enum
 from functools import partial
@@ -5,6 +6,7 @@ from typing import TYPE_CHECKING, Literal, Union
 
 import torch
 from torch import nn
+from torchsurv.loss.cox import neg_partial_log_likelihood
 
 from eir.setup import schemas
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
@@ -510,57 +512,28 @@ def _cox_ph_loss(
 ) -> torch.Tensor:
     valid_mask = (time != -1) & (event != -1)
 
-    # Early returns if no valid samples
     if not valid_mask.any():
         return risk_scores.new_zeros((), requires_grad=True)
 
     masked_risk_scores = risk_scores[valid_mask]
     masked_time = time[valid_mask]
-    masked_event = event[valid_mask]
+    masked_event = event[valid_mask].bool()
 
     if torch.sum(masked_event) == 0:
         return risk_scores.new_zeros((), requires_grad=True)
 
-    sorted_time, indices = torch.sort(masked_time)
-    sorted_risk_scores = masked_risk_scores[indices]
-    sorted_event = masked_event[indices]
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Ties in event time detected*")
+        loss = neg_partial_log_likelihood(
+            log_hz=masked_risk_scores,
+            event=masked_event,
+            time=masked_time,
+            ties_method=ties_method,
+            reduction="mean",
+            checks=True,
+        )
 
-    if ties_method == "breslow":
-        log_risk = torch.logcumsumexp(sorted_risk_scores.flip(0), dim=0).flip(0)
-        loss = sorted_risk_scores - log_risk
-        loss = loss[sorted_event == 1]
-        return -torch.mean(loss)
-
-    if ties_method == "efron":
-        unique_times = torch.unique(sorted_time)
-
-        log_likelihood = torch.tensor(0.0, device=risk_scores.device)
-
-        for t in unique_times:
-            events_at_t = (sorted_time == t) & (sorted_event == 1)
-            if not torch.any(events_at_t):
-                continue
-
-            # Risk set (samples still at risk at time t)
-            risk_set = sorted_time >= t
-
-            # Calculate Efron's correction for ties
-            n_events = events_at_t.sum()
-            tied_scores = sorted_risk_scores[events_at_t]
-            risk_scores_exp = torch.exp(sorted_risk_scores)
-            risk_set_scores = risk_scores_exp[risk_set]
-            tied_scores_exp = risk_scores_exp[events_at_t]
-
-            for j in range(n_events):
-                factor = j / n_events
-                log_likelihood += tied_scores[j].squeeze() - torch.log(
-                    torch.sum(risk_set_scores) - factor * torch.sum(tied_scores_exp)
-                )
-
-        n_events_total = torch.sum(masked_event)
-        return -log_likelihood / n_events_total
-
-    raise ValueError(f"Unsupported ties method: {ties_method}")
+    return loss
 
 
 def create_survival_criterion(

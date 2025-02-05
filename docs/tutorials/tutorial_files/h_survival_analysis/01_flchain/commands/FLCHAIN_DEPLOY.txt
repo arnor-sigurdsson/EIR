@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/h_survival_analysis/01_flchain/saved_models/01_flchain_model_1100_perf-average=0.7816.pt
+--model-path eir_tutorials/tutorial_runs/h_survival_analysis/01_flchain/saved_models/01_flchain_model_3500_perf-average=0.8149.pt

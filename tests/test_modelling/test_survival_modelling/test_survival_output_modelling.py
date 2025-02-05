@@ -18,6 +18,8 @@ def _get_survival_output_configs(type_: str) -> Sequence[dict]:
                 "output_type_info": {
                     "event_column": "BinaryOrigin",
                     "time_column": "Time",
+                    "num_durations": 10,
+                    "loss_function": "NegativeLogLikelihood",
                 },
             },
         ]

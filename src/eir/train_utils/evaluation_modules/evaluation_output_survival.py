@@ -6,14 +6,18 @@ import pandas as pd
 import torch
 from lifelines import KaplanMeierFitter
 from matplotlib import pyplot as plt
+from sklearn.preprocessing import KBinsDiscretizer
+from torchsurv.metrics.auc import Auc
 
 from eir.experiment_io.output_object_io import get_output_serialization_path
 from eir.setup.output_setup_modules.survival_output_setup import (
     ComputedSurvivalOutputInfo,
 )
+from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.train_utils import utils
 from eir.train_utils.metrics import (
     al_step_metric_dict,
+    estimate_baseline_hazard,
     filter_survival_missing_targets,
     general_torch_to_numpy,
 )
@@ -78,7 +82,7 @@ def save_survival_evaluation_results_wrapper(
             times = it_func(times_binned.reshape(-1, 1)).flatten()
 
             hazards = torch.sigmoid(model_outputs).cpu().numpy()
-            survival_probs = np.cumprod(1 - hazards, 1)
+            survival_probs = np.cumprod(1 - hazards, axis=1)
             time_bins_except_last = time_bins[:-1]
 
             plot_discrete_survival_curves(
@@ -97,7 +101,7 @@ def save_survival_evaluation_results_wrapper(
                 output_folder=cur_sample_output_folder,
             )
 
-            df = pd.DataFrame(
+            base_df = pd.DataFrame(
                 {
                     "ID": ids,
                     time_name: times,
@@ -106,8 +110,13 @@ def save_survival_evaluation_results_wrapper(
                 }
             )
 
-            for i, _t in enumerate(time_bins_except_last):
-                df[f"Surv_Prob_t{i}"] = survival_probs[:, i]
+            surv_prob_columns = {
+                f"Surv_Prob_t{i}": survival_probs[:, i]
+                for i, _t in enumerate(time_bins_except_last)
+            }
+            surv_prob_df = pd.DataFrame(surv_prob_columns)
+
+            df = pd.concat([base_df, surv_prob_df], axis=1)
 
             plot_discrete_individual_survival_curves(
                 df=df,
@@ -116,7 +125,25 @@ def save_survival_evaluation_results_wrapper(
                 n_samples=5,
             )
 
+            plot_td_auc_curve(
+                times=times,
+                events=events,
+                risk_scores=hazards,
+                output_folder=cur_sample_output_folder,
+                target_transformer=time_kbins_transformer,
+            )
+
+            plot_calibration_curves(
+                times=times,
+                events=events,
+                survival_probs=survival_probs,
+                time_points=time_bins_except_last,
+                output_folder=cur_sample_output_folder,
+                n_groups=10,
+            )
+
         else:
+            # note: model outputs are log hazard ratios
             risk_scores = model_outputs.cpu().numpy()
 
             unique_times, baseline_hazard = estimate_baseline_hazard(
@@ -195,6 +222,23 @@ def save_survival_evaluation_results_wrapper(
                 n_samples=5,
             )
 
+            plot_td_auc_curve(
+                times=times,
+                events=events,
+                risk_scores=risk_scores,
+                output_folder=cur_sample_output_folder,
+                target_transformer=IdentityTransformer(),
+            )
+
+            plot_calibration_curves(
+                times=times,
+                events=events,
+                survival_probs=survival_probs,
+                time_points=time_points,
+                output_folder=cur_sample_output_folder,
+                n_groups=10,
+            )
+
         csv_path = f"{cur_sample_output_folder}/survival_predictions.csv"
         df.to_csv(csv_path, index=False)
 
@@ -233,34 +277,6 @@ def check_is_current_iter_best(
 
     best_performance = df["perf-average"].max()
     return cur_performance >= best_performance
-
-
-def estimate_baseline_hazard(
-    times: np.ndarray,
-    events: np.ndarray,
-    risk_scores: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    sort_idx = np.argsort(times)
-    times = times[sort_idx]
-    events = events[sort_idx]
-    risk_scores = risk_scores[sort_idx]
-
-    unique_times = np.unique(times[events == 1])
-    baseline_hazard = np.zeros_like(unique_times)
-
-    risk_scores_exp = np.exp(risk_scores)
-
-    for i, t in enumerate(unique_times):
-        events_at_t = events[times == t]
-        n_events = np.sum(events_at_t)
-
-        at_risk = times >= t
-        risk_set_sum = np.sum(risk_scores_exp[at_risk])
-
-        if risk_set_sum > 0:
-            baseline_hazard[i] = n_events / risk_set_sum
-
-    return unique_times, baseline_hazard
 
 
 def calculate_cox_survival_probs(
@@ -553,4 +569,103 @@ def plot_discrete_individual_survival_curves(
     plt.grid(True, alpha=0.3)
 
     plt.savefig(f"{output_folder}/individual_survival_curves.pdf")
+    plt.close()
+
+
+def plot_td_auc_curve(
+    times: np.ndarray,
+    events: np.ndarray,
+    risk_scores: np.ndarray,
+    output_folder: Path,
+    target_transformer: KBinsDiscretizer | IdentityTransformer,
+) -> None:
+    model_type = "discrete"
+    if isinstance(target_transformer, IdentityTransformer):
+        model_type = "cox"
+
+    if model_type == "discrete":
+        hazards = risk_scores
+        time_grid = target_transformer.bin_edges_[0][:-1]
+
+        # Filter time points to be within observed time range
+        # otherwise AUC calculation fails
+        time_mask = (time_grid >= times.min()) & (time_grid <= times.max())
+        time_points = time_grid[time_mask]
+        risk_scores_filtered = hazards[:, time_mask]
+    else:
+        time_points = np.linspace(times.min(), times.max() * 0.99, 100)
+        risk_scores_filtered = risk_scores.flatten()[:, np.newaxis]
+
+    events_torch = torch.tensor(events, dtype=torch.bool)
+    times_torch = torch.tensor(times, dtype=torch.float32)
+    time_points_torch = torch.tensor(time_points, dtype=torch.float32)
+    risk_scores_torch = torch.tensor(risk_scores_filtered, dtype=torch.float32)
+
+    auc = Auc()
+
+    aucs = auc(
+        estimate=risk_scores_torch,
+        event=events_torch,
+        time=times_torch,
+        auc_type="cumulative",
+        new_time=time_points_torch,
+    )
+
+    mean_auc = float(auc.integral())
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(time_points, aucs.numpy(), marker="o")
+    plt.axhline(mean_auc, color="r", linestyle="--", label=f"Mean AUC: {mean_auc:.3f}")
+    plt.xlabel("Time")
+    plt.ylabel("Time-dependent AUC")
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(f"{output_folder}/td_auc_curve.pdf")
+    plt.close()
+
+
+def plot_calibration_curves(
+    times: np.ndarray,
+    events: np.ndarray,
+    survival_probs: np.ndarray,
+    time_points: np.ndarray,
+    output_folder: Path,
+    n_groups: int = 10,
+) -> None:
+    plot_times = np.percentile(time_points, q=[25, 50, 75])
+
+    plt.figure(figsize=(12, 8))
+    for t_idx, t in enumerate(plot_times):
+        t_idx = np.abs(time_points - t).argmin()
+        preds_t = survival_probs[:, t_idx]
+
+        groups = pd.qcut(preds_t, n_groups, labels=False)
+        observed_probs = []
+        mean_predicted_probs = []
+
+        for g in range(n_groups):
+            mask = groups == g
+            mean_pred = preds_t[mask].mean()
+
+            kmf = KaplanMeierFitter()
+            kmf.fit(times[mask], events[mask], timeline=[t])
+            observed = kmf.survival_function_.iloc[0]
+
+            observed_probs.append(observed)
+            mean_predicted_probs.append(mean_pred)
+
+        plt.plot(
+            mean_predicted_probs,
+            observed_probs,
+            marker="o",
+            label=f"Time = {t:.1f}",
+        )
+
+    plt.plot([0, 1], [0, 1], "k--")
+    plt.xlabel("Predicted Probability")
+    plt.ylabel("Observed Probability")
+    plt.title("Calibration Curves at Different Time Points")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f"{output_folder}/calibration_curves.pdf")
     plt.close()
