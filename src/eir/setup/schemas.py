@@ -104,6 +104,7 @@ al_output_module_configs = (
 
 al_tokenizer_choices = (
     Literal["basic_english"]
+    | Literal["basic"]
     | Literal["spacy"]
     | Literal["moses"]
     | Literal["toktok"]

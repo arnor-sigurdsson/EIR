@@ -141,7 +141,12 @@ def analyze_sequence_input_attributions(
         )
         viz_records.append(viz_record)
 
-    html_string = get_sequence_html(data_records=viz_records)
+    is_bce = target_info.cat_is_bce
+    include_true_label_in_html = not is_bce
+    html_string = get_sequence_html(
+        data_records=viz_records,
+        include_true_label=include_true_label_in_html,
+    )
     outpath = attribution_outfolder / "single_samples.html"
     ensure_path_exists(path=outpath)
     save_html(out_path=outpath, html_string=html_string)
@@ -319,33 +324,38 @@ def get_sequence_token_importance(
 
 
 def get_sequence_html(
-    data_records: Iterable[SequenceVisualizationDataRecord], legend: bool = True
+    data_records: Iterable[SequenceVisualizationDataRecord],
+    legend: bool = True,
+    include_true_label: bool = True,
 ) -> str:
     dom = [
         "<table width: 100%; border: 2px solid black; border-collapse: collapse;>",
         '<table class="table" style="text-align: center;">',
     ]
-    rows = [
-        "<tr><th>ID</th>"
-        "<th>True Label</th>"
-        "<th>Attribution Score</th>"
-        "<th>Token Importance</th>"
-    ]
+
+    header = ["<tr><th>ID</th>"]
+    if include_true_label:
+        header.append("<th>True Label</th>")
+    header.extend(["<th>Attribution Score</th>", "<th>Token Importance</th>"])
+    rows = ["".join(header)]
+
     for record in data_records:
-        rows.append(
-            "".join(
-                [
-                    "<tr>",
-                    format_classname(record.sample_id),
-                    format_classname(record.label_name),
-                    format_classname(f"{record.attribution_score:.2f}"),
-                    format_word_importances(
-                        record.raw_input_tokens, record.token_attributions
-                    ),
-                    "<tr>",
-                ]
-            )
+        row_elements = [
+            "<tr>",
+            format_classname(record.sample_id),
+        ]
+        if include_true_label:
+            row_elements.append(format_classname(record.label_name))
+        row_elements.extend(
+            [
+                format_classname(f"{record.attribution_score:.2f}"),
+                format_word_importances(
+                    record.raw_input_tokens, record.token_attributions
+                ),
+                "<tr>",
+            ]
         )
+        rows.append("".join(row_elements))
 
     if legend:
         dom.append(

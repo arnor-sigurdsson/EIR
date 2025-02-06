@@ -366,7 +366,8 @@ def _get_hf_tokenizer(hf_model_name: str) -> PreTrainedTokenizer:
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     hf_tokenizer = AutoTokenizer.from_pretrained(
-        pretrained_model_name_or_path=hf_model_name, add_prefix_space=True
+        pretrained_model_name_or_path=hf_model_name,
+        add_prefix_space=True,
     )
 
     hf_tokenizer = _add_specials_to_hf_tokenizer(hf_tokenizer=hf_tokenizer)
@@ -544,14 +545,16 @@ def get_basic_tokenizer(
         return cast(TokenizerProtocolPreSplit, identity_tokenize)
 
     _validate_pytorch_tokenizer_args(
-        tokenizer_name=tokenizer_name, tokenizer_language=tokenizer_language
+        tokenizer_name=tokenizer_name,
+        tokenizer_language=tokenizer_language,
     )
     logger.debug(
         "Using tokenizer '%s' with language '%s'.", tokenizer_name, tokenizer_language
     )
 
     base_tokenizer = get_pytorch_tokenizer(
-        tokenizer=tokenizer_name, language=tokenizer_language
+        tokenizer=tokenizer_name,
+        language=tokenizer_language,
     )
 
     return cast(TokenizerProtocolPreSplit, make_join_tokenizer(base_tokenizer))

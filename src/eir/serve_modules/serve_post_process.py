@@ -226,9 +226,12 @@ def _post_process_tabular_output(
 
 
 def _normalize_categorical_outputs(outputs: torch.Tensor) -> tuple[float]:
-    cur_outputs_normalized = softmax(outputs).squeeze().tolist()
+    if outputs.size(-1) == 1:
+        normalized = torch.sigmoid(outputs).squeeze().tolist()
+    else:
+        normalized = softmax(outputs).squeeze().tolist()
 
-    return tuple(cur_outputs_normalized)
+    return ([normalized]) if isinstance(normalized, float) else tuple(normalized)
 
 
 def _normalize_continuous_outputs(

@@ -46,7 +46,7 @@ _patterns_dict = [
 ]
 
 
-def _basic_english_normalize(line):
+def _basic_normalize(line):
     r"""
     Basic normalization for a line of text.
     Normalization includes
@@ -100,10 +100,13 @@ def get_tokenizer(tokenizer, language="en"):
     if tokenizer is None:
         return _split_tokenizer
 
+    if tokenizer == "basic":
+        return _basic_normalize
+
     if tokenizer == "basic_english":
         if language != "en":
-            raise ValueError("Basic normalization is only available for Enlish(en)")
-        return _basic_english_normalize
+            raise ValueError("Basic normalization is only available for English(en)")
+        return _basic_normalize
 
     # simply return if a function is passed
     if callable(tokenizer):
