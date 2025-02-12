@@ -196,7 +196,6 @@ async def websocket_endpoint(websocket: WebSocket):
                         },
                         websocket=websocket,
                     )
-                    break
 
                 current_iteration += 1
                 batch_size = payload.get("batch_size", 64)
@@ -223,6 +222,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
 
             elif message_type == "reset":
+                current_iteration = 0
+                manager.reset()
                 await manager.broadcast(
                     message={
                         "type": "reset",
@@ -252,6 +253,17 @@ async def websocket_endpoint(websocket: WebSocket):
                     message={
                         "type": "status",
                         "payload": status_data,
+                    },
+                    websocket=websocket,
+                )
+
+            elif message_type == "heartbeat":
+                await manager.send_personal_message(
+                    message={
+                        "type": "heartbeat",
+                        "payload": {
+                            "message": "Received heartbeat",
+                        },
                     },
                     websocket=websocket,
                 )

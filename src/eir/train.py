@@ -110,12 +110,15 @@ def get_default_experiment(
     output_folder = gc.be.output_folder
     run_folder = _prepare_run_folder(output_folder=output_folder)
 
+    streaming_batch_size = (
+        gc.dp.streaming_batch_size if gc.dp.streaming_batch_size else gc.be.batch_size
+    )
+
     streaming_data = setup_and_gather_streaming_data(
         configs=configs,
         output_folder=output_folder,
-        batch_size=gc.be.batch_size,
-        # TODO: Make this configurable
-        max_samples=5000,
+        batch_size=streaming_batch_size,
+        max_samples=gc.dp.streaming_setup_samples,
     )
 
     if streaming_data is not None:

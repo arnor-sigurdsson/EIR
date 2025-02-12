@@ -46,6 +46,7 @@ def connect_to_server(
         ws = websocket.create_connection(
             url=websocket_url,
             max_size=max_size,
+            skip_utf8_validation=True,
         )
     except WebSocketBadStatusException as e:
         logger.error(f"Failed to establish WebSocket connection: {str(e)}")
@@ -91,8 +92,8 @@ def connect_to_server(
 def receive_with_timeout(websocket: websocket.WebSocket, timeout: int = 30):
     websocket.settimeout(timeout=timeout)
     try:
-        raw_message = websocket.recv()
-        message_parsed = json.loads(raw_message)
+        opcode, data = websocket.recv_data()
+        message_parsed = json.loads(data)
         handle_server_message(message=message_parsed)
         return message_parsed
     except WebSocketTimeoutException:

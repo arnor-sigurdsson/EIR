@@ -33,6 +33,7 @@ from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeCon
 from eir.setup.schemas import (
     AttributionAnalysisConfig,
     BasicExperimentConfig,
+    DataPreparationConfig,
     EvaluationCheckpointConfig,
     GlobalConfig,
     GlobalModelConfig,
@@ -255,6 +256,9 @@ def get_global_config(global_configs: Iterable[dict]) -> GlobalConfig:
         **combined_config.get("attribution_analysis", {})
     )
     metrics_config = SupervisedMetricsConfig(**combined_config.get("metrics", {}))
+    data_prep_config = DataPreparationConfig(
+        **combined_config.get("data_preparation", {})
+    )
     visualization_logging_config = VisualizationLoggingConfig(
         **combined_config.get("visualization_logging", {})
     )
@@ -275,6 +279,7 @@ def get_global_config(global_configs: Iterable[dict]) -> GlobalConfig:
         attribution_analysis=attribution_analysis_config,
         metrics=metrics_config,
         visualization_logging=visualization_logging_config,
+        data_preparation=data_prep_config,
         latent_sampling=latent_sampling,
     )
 

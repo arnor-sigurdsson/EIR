@@ -6,3 +6,5 @@ basic_experiment:
 evaluation_checkpoint:
   sample_interval: 100
   checkpoint_interval: 100
+data_preparation:
+  streaming_setup_samples: 5000

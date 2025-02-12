@@ -402,6 +402,22 @@ class VisualizationLoggingConfig:
 
 
 @dataclass
+class DataPreparationConfig:
+    """
+    :param streaming_setup_samples:
+        Number of samples to use during streaming setup (e.g., for training tokenizers).
+        If None, will use all available samples.
+
+    :param streaming_batch_size:
+        Batch size to use during streaming setup. If None, will use the training
+        batch size.
+    """
+
+    streaming_setup_samples: int = 10000
+    streaming_batch_size: int | None = None
+
+
+@dataclass
 class GlobalConfig:
     """
     Global configurations that are common / relevant for the whole experiment to run.
@@ -416,6 +432,7 @@ class GlobalConfig:
     attribution_analysis: AttributionAnalysisConfig
     metrics: SupervisedMetricsConfig
     visualization_logging: VisualizationLoggingConfig
+    data_preparation: DataPreparationConfig
     latent_sampling: LatentSamplingConfig | None = None
 
     be: BasicExperimentConfig = field(init=False, repr=False)
@@ -427,6 +444,7 @@ class GlobalConfig:
     aa: AttributionAnalysisConfig = field(init=False, repr=False)
     met: SupervisedMetricsConfig = field(init=False, repr=False)
     vl: VisualizationLoggingConfig = field(init=False, repr=False)
+    dp: DataPreparationConfig = field(init=False, repr=False)
     ls: LatentSamplingConfig | None = field(init=False, repr=False)
 
     def __post_init__(self):
@@ -439,6 +457,7 @@ class GlobalConfig:
         self.aa = self.attribution_analysis
         self.met = self.metrics
         self.vl = self.visualization_logging
+        self.dp = self.data_preparation
         self.ls = self.latent_sampling
 
 
