@@ -83,12 +83,14 @@ class StreamDataGatherer:
             self.get_dataset_info(ws=ws)
 
             total_samples = 0
+            terminated = False
             pbar = tqdm(
                 total=self.max_samples,
                 desc="Gathering samples information and statistics",
                 unit=" sample",
             )
-            while total_samples < self.max_samples:
+
+            while total_samples < self.max_samples and not terminated:
                 ws.send(
                     json.dumps(
                         {
@@ -108,6 +110,14 @@ class StreamDataGatherer:
 
                 assert self.dataset_info is not None
                 for sample in samples:
+                    if sample == "terminate":
+                        logger.info(
+                            "Received termination signal, "
+                            "stopping streaming data collection."
+                        )
+                        terminated = True
+                        break
+
                     processed_input = process_inputs(
                         sample_input=sample["inputs"],
                         dataset_info=self.dataset_info,
@@ -135,6 +145,10 @@ class StreamDataGatherer:
                     total_samples += 1
                     pbar.update(1)
                     if total_samples >= self.max_samples:
+                        logger.info(
+                            f"Reached maximum number of samples: {self.max_samples}. "
+                            f"Stopping data collection."
+                        )
                         break
 
             pbar.close()
@@ -247,7 +261,6 @@ def process_inputs(
                 info=input_info,
             )
         else:
-            logger.warning(f"No info found for input {input_name}")
             processed_inputs[input_name] = input_data
     return processed_inputs
 
@@ -269,7 +282,6 @@ def process_outputs(
                 info=output_info,
             )
         else:
-            logger.warning(f"No info found for output {output_name}")
             processed_outputs[output_name] = output_data
     return processed_outputs
 
@@ -317,7 +329,6 @@ def save_inputs(
         input_data = processed_input.get(input_name)
 
         if input_data is None:
-            logger.warning(f"No data for input {input_name} in sample {sample_id}")
             continue
 
         save_path = base_path / "input" / input_name

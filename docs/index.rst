@@ -55,6 +55,7 @@ To get started, please read :ref:`01-genotype-tutorial`.
     :maxdepth: 2
 
     tutorials/tutorial_index
+    user_guides/user_guides_index
     api/api_index
     license
     acknowledgements

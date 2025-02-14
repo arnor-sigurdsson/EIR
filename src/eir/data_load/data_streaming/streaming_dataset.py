@@ -2,7 +2,7 @@ import atexit
 import json
 import threading
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -156,6 +156,10 @@ class StreamingDataset(IterableDataset):
                 if batch_msg["type"] == "heartbeat":
                     continue
 
+                if batch_msg["type"] == "error":
+                    logger.error(f"Error message received: {batch_msg['payload']}")
+                    continue
+
                 if batch_msg["type"] != "data":
                     logger.warning(f"Unexpected message type: {batch_msg['type']}")
                     continue
@@ -185,6 +189,8 @@ class StreamingDataset(IterableDataset):
                 else:
                     logger.error(f"Unexpected OSError: {e}")
                     raise
+            except StopIteration:
+                raise
             except Exception as e:
                 logger.error(f"Error fetching batch: {e}")
                 raise
@@ -361,11 +367,9 @@ def prepare_outputs_for_in_memory_processing(
 
         match output_object:
             case ComputedSequenceOutputInfo():
-                value = cur_target[name]
-                assert isinstance(value, Sequence), value
-
-                cur_target = output_object.encode_func(value)
-                targets_prepared_for_memory[name] = {name: cur_target}
+                # This is set up on the fly in the batch step logic
+                # for sequence outputs from the linked input data
+                targets_prepared_for_memory[name] = {name: "DELAYED"}
 
             case _:
                 targets_prepared_for_memory[name] = cur_target

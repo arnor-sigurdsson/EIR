@@ -32,6 +32,7 @@ from docs.doc_modules.f_image_outputs import (
 )
 from docs.doc_modules.g_time_series import a_time_series_power, b_time_series_stocks
 from docs.doc_modules.h_survival_analysis import a_flchain, b_flchain_cox
+from docs.doc_modules.i_scaling import a_streaming_data
 from docs.doc_modules.serving_experiments import (
     AutoDocServingInfo,
     make_serving_tutorial_data,
@@ -132,6 +133,14 @@ def get_h_survival_analysis_experiments() -> Iterable[AutoDocExperimentInfo]:
     )
 
 
+def get_i_scaling_experiments() -> Iterable[AutoDocExperimentInfo]:
+    a_experiments = a_streaming_data.get_experiments()
+
+    return chain(
+        a_experiments,
+    )
+
+
 if __name__ == "__main__":
     a_using_eir_experiments = _get_a_using_eir_experiments()
     c_sequence_outputs_experiments = _get_c_sequence_outputs_experiments()
@@ -141,6 +150,7 @@ if __name__ == "__main__":
     f_image_outputs_experiments = _get_f_image_outputs_experiments()
     g_time_series_experiments = get_g_time_series_experiments()
     h_survival_analysis_experiments = get_h_survival_analysis_experiments()
+    i_scaling_experiments = get_i_scaling_experiments()
 
     experiment_iter = chain.from_iterable(
         [
@@ -152,6 +162,7 @@ if __name__ == "__main__":
             f_image_outputs_experiments,
             g_time_series_experiments,
             h_survival_analysis_experiments,
+            i_scaling_experiments,
         ]
     )
     for experiment in experiment_iter:

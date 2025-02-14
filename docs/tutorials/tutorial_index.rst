@@ -73,6 +73,14 @@ Pretraining
     e_pretraining/01_checkpointing.rst
     e_pretraining/02_mini_foundation.rst
 
+Scaling
+=======
+
+.. toctree::
+    :maxdepth: 2
+
+    i_scaling/01_streaming.rst
+
 
 Customizing EIR
 ===============
