@@ -67,7 +67,7 @@ Please refer to the [Documentation](https://eir.readthedocs.io/en/stable/index.h
 
 EIR allows for training and evaluating various deep-learning models directly from the command line. This can be useful for:
 
-- Quick prototyping and iteration when doing supervised modelling or sequence generation on new datasets.
+- Quick prototyping and iteration when modelling on new datasets.
 - Establishing baselines to compare against other methods.
 - Fitting on data sources such as large-scale genomics, where DL implementations are not commonly available.
 
