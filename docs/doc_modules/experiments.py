@@ -19,8 +19,8 @@ logger = get_logger(name=__name__)
 @dataclass
 class AutoDocExperimentInfo:
     name: str
-    data_url: str
-    data_output_path: Path
+    data_url: str | None
+    data_output_path: Path | None
     conf_output_path: Path
     base_path: Path
     command: list[str]
@@ -28,6 +28,7 @@ class AutoDocExperimentInfo:
     pre_run_command_modifications: Sequence[Callable[[list[str]], list[str]]] = ()
     post_run_functions: Sequence[tuple[Callable, dict]] = ()
     force_run_command: bool = False
+    run_command_wrapper: Callable[[list[str]], Path] | None = None
 
 
 def make_training_or_predict_tutorial_data(
@@ -35,17 +36,22 @@ def make_training_or_predict_tutorial_data(
 ) -> None:
     ade = auto_doc_experiment_info
 
-    get_data(url=ade.data_url, output_path=ade.data_output_path)
+    if ade.data_url and ade.data_output_path:
+        get_data(url=ade.data_url, output_path=ade.data_output_path)
 
     set_up_conf_files(base_path=ade.base_path, conf_output_path=ade.conf_output_path)
 
     command = ade.command
     for command_modification in ade.pre_run_command_modifications:
-        command = command_modification(ade.command)
+        command = command_modification(command)
 
-    run_folder = run_experiment_from_command(
-        command=command, force_run=ade.force_run_command
-    )
+    if ade.run_command_wrapper is not None:
+        run_folder = ade.run_command_wrapper(command)
+    else:
+        run_folder = run_experiment_from_command(
+            command=command,
+            force_run=ade.force_run_command,
+        )
 
     save_command_as_text(
         command=command,

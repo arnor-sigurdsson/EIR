@@ -1,0 +1,4 @@
+eir_tutorials/i_scaling/01_streaming_data
+├── fusion.yaml
+├── globals.yaml
+└── output.yaml
