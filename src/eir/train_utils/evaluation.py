@@ -10,7 +10,6 @@ from typing import (
 import numpy as np
 import pandas as pd
 import torch
-from ignite.engine import Engine
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from eir.data_load.label_setup import al_label_transformers_object
@@ -35,6 +34,7 @@ from eir.train_utils.evaluation_modules.train_handlers_array_output import (
 from eir.train_utils.evaluation_modules.train_handlers_sequence_output import (
     sequence_out_single_sample_evaluation_wrapper,
 )
+from eir.train_utils.ignite_port.engine import Engine
 from eir.train_utils.latent_analysis import (
     LatentHookOutput,
     latent_analysis_wrapper,

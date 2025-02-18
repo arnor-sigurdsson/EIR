@@ -415,6 +415,7 @@ class DataPreparationConfig:
 
     streaming_setup_samples: int = 10000
     streaming_batch_size: int | None = None
+    streaming_steps_per_epoch: int = 10000
 
 
 @dataclass

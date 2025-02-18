@@ -26,7 +26,11 @@ from eir.train_utils.distributed import in_distributed_env
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.data_load.datasets import al_local_datasets, al_sample_label_dict_target
+    from eir.data_load.datasets import (
+        StreamingDataset,
+        al_local_datasets,
+        al_sample_label_dict_target,
+    )
     from eir.setup.output_setup import al_output_objects_as_dict
 
 logger = get_logger(name=__name__)
@@ -65,19 +69,19 @@ class Batch:
 
 
 @overload
-def get_train_sampler(
+def get_finite_train_sampler(
     columns_to_sample: None, train_dataset: "al_local_datasets"
 ) -> None: ...
 
 
 @overload
-def get_train_sampler(
+def get_finite_train_sampler(
     columns_to_sample: Sequence[str],
     train_dataset: "al_local_datasets",
 ) -> WeightedRandomSampler | DistributedSampler: ...
 
 
-def get_train_sampler(columns_to_sample, train_dataset):
+def get_finite_train_sampler(columns_to_sample, train_dataset):
     in_distributed_run = in_distributed_env()
 
     if columns_to_sample is None:
@@ -154,3 +158,43 @@ class Sample:
     sample_id: str
     inputs: dict[str, Any]
     target_labels: "al_sample_label_dict_target"
+
+
+class StreamingDistributedSampler:
+    def __init__(
+        self,
+        steps_per_epoch,
+        num_replicas: int | None = None,
+        rank: int | None = None,
+    ):
+        if num_replicas is None:
+            num_replicas = torch.distributed.get_world_size()
+        if rank is None:
+            rank = torch.distributed.get_rank()
+
+        self.steps_per_epoch = steps_per_epoch
+        self.rank = rank
+        self.num_replicas = num_replicas
+        self.epoch = 0
+
+    def __iter__(self):
+        for _ in range(self.steps_per_epoch):
+            yield None
+
+    def __len__(self):
+        return self.steps_per_epoch
+
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = epoch
+
+
+def get_streaming_sampler(
+    train_dataset: "StreamingDataset",
+    steps_per_epoch: int,
+) -> StreamingDistributedSampler | None:
+    in_distributed_run = in_distributed_env()
+
+    if not in_distributed_run:
+        return None
+
+    return StreamingDistributedSampler(steps_per_epoch=steps_per_epoch)

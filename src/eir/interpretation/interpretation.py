@@ -26,7 +26,6 @@ import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
 from captum.attr import NoiseTunnel
-from ignite.engine import Engine
 from torch import nn
 from torch.cuda import OutOfMemoryError
 from torch.utils.data import DataLoader, Subset
@@ -65,6 +64,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
 from eir.setup.schemas import InputConfig, OutputConfig, SurvivalOutputTypeConfig
 from eir.target_setup.target_label_setup import MissingTargetsInfo
 from eir.train_utils.evaluation import validation_handler
+from eir.train_utils.ignite_port.engine import Engine
 from eir.train_utils.utils import (
     call_hooks_stage_iterable,
     prepare_sample_output_folder,

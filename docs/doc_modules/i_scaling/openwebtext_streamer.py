@@ -33,6 +33,8 @@ class ConnectionManager:
         self.sequence_length = 256
         self.validation_ids: set[str] = set()
 
+        self.load_dataset()
+
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         handshake_message = await websocket.receive_json()
@@ -69,10 +71,13 @@ class ConnectionManager:
 
     def load_dataset(self):
         if self.dataset is None:
-            self.dataset = load_dataset("Skylion007/openwebtext", split="train")
+            self.dataset = load_dataset(
+                "Skylion007/openwebtext",
+                split="train",
+                trust_remote_code=True,
+            )
 
     def get_sequence_batch(self, batch_size: int) -> list[dict[str, Any]]:
-        self.load_dataset()
         batch = []
 
         while len(batch) < batch_size and self.current_position < self.max_sequences:

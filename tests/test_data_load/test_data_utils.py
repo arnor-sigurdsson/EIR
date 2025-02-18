@@ -1,7 +1,7 @@
 import pytest
 from torch.utils.data import WeightedRandomSampler
 
-from eir.data_load.data_utils import get_train_sampler
+from eir.data_load.data_utils import get_finite_train_sampler
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)
@@ -41,14 +41,14 @@ def test_get_train_sampler(create_test_data, create_test_datasets, create_test_c
     train_dataset, *_ = create_test_datasets
     gc.weighted_sampling_columns = ["test_output_tabular__Origin"]
 
-    test_sampler = get_train_sampler(
+    test_sampler = get_finite_train_sampler(
         columns_to_sample=gc.weighted_sampling_columns,
         train_dataset=train_dataset,
     )
     assert isinstance(test_sampler, WeightedRandomSampler)
 
     gc.weighted_sampling_columns = None
-    test_sampler = get_train_sampler(
+    test_sampler = get_finite_train_sampler(
         columns_to_sample=gc.weighted_sampling_columns,
         train_dataset=train_dataset,
     )

@@ -9,7 +9,6 @@ from typing import (
 )
 
 import torch
-from ignite.engine import Engine
 from torch import autocast, nn
 from torch.cuda.amp import GradScaler
 from torch.nn.utils import clip_grad_norm_
@@ -35,6 +34,7 @@ from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
 from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
+from eir.train_utils.ignite_port.engine import Engine
 from eir.train_utils.metrics import (
     add_loss_to_metrics,
     add_multi_task_average_metrics,

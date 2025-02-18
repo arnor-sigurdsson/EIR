@@ -10,22 +10,21 @@ import torch.multiprocessing
 multiprocessing.set_start_method("spawn", force=True)
 
 torch.multiprocessing.set_sharing_strategy("file_system")
+import torch.distributed as dist
 from aislib.misc_utils import ensure_path_exists
-from ignite.engine import Engine
 from torch import nn
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler, WeightedRandomSampler
 
 from eir import __version__
 from eir.data_load import datasets
-from eir.data_load.data_utils import get_train_sampler
+from eir.data_load.data_utils import get_finite_train_sampler
 from eir.data_load.label_setup import split_ids
 from eir.experiment_io.experiment_io import get_version_file
 from eir.experiment_io.input_object_io import serialize_chosen_input_objects
 from eir.experiment_io.output_object_io import serialize_output_objects
 from eir.models.model_setup import get_model
 from eir.models.model_setup_modules.meta_setup import al_meta_model
-from eir.models.model_training_utils import run_lr_find
 from eir.setup.config import Configs, get_configs
 from eir.setup.input_setup import al_input_objects_as_dict, set_up_inputs_for_training
 from eir.setup.input_setup_modules.setup_tabular import serialize_all_input_transformers
@@ -48,6 +47,7 @@ from eir.target_setup.target_label_setup import (
 )
 from eir.train_utils import distributed, utils
 from eir.train_utils.criteria import al_criteria_dict, get_criteria, get_loss_callable
+from eir.train_utils.ignite_port.engine import Engine
 from eir.train_utils.metrics import get_average_history_filepath, get_default_metrics
 from eir.train_utils.optim import get_optimizer, maybe_wrap_model_with_swa
 from eir.train_utils.step_logic import (
@@ -72,9 +72,8 @@ def main():
 
     configs = get_configs()
 
-    configs, local_rank = distributed.maybe_initialize_distributed_environment(
-        configs=configs
-    )
+    maybe_init_dist = distributed.maybe_initialize_distributed_environment
+    configs, local_rank = maybe_init_dist(configs=configs)
 
     default_hooks = get_default_hooks(configs=configs)
     default_experiment = get_default_experiment(
@@ -188,10 +187,12 @@ def get_default_experiment(
 
     train_sampler = None
     if isinstance(train_dataset, datasets.DiskDataset | datasets.MemoryDataset):
-        train_sampler = get_train_sampler(
+        train_sampler = get_finite_train_sampler(
             columns_to_sample=gc.tc.weighted_sampling_columns,
             train_dataset=train_dataset,
         )
+    elif isinstance(train_dataset, datasets.StreamingDataset):
+        train_sampler = None
 
     train_dataloader, valid_dataloader = get_dataloaders(
         train_dataset=train_dataset,
@@ -258,6 +259,9 @@ def get_default_experiment(
         metrics=metrics,
         hooks=hooks,
     )
+
+    if distributed.in_distributed_env():
+        dist.barrier()
 
     return experiment
 
@@ -429,19 +433,12 @@ def train(experiment: Experiment) -> None:
 
     trainer = get_base_trainer(experiment=experiment)
 
-    if gc.lr.find_lr:
-        logger.info("Running LR find and exiting.")
-        run_lr_find(
-            trainer_engine=trainer,
-            train_dataloader=exp.train_loader,
-            model=exp.model,
-            optimizer=exp.optimizer,
-            output_folder=utils.get_run_folder(output_folder=gc.be.output_folder),
-        )
-        return
+    in_dist = distributed.in_distributed_env()
+    in_master = distributed.in_master_node()
+    if not in_dist or (in_dist and in_master):
+        trainer = configure_trainer(trainer=trainer, experiment=experiment)
 
-    trainer = configure_trainer(trainer=trainer, experiment=experiment)
-
+    logger.info("Starting training.")
     trainer.run(data=exp.train_loader, max_epochs=gc.be.n_epochs)
 
 

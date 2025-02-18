@@ -1,22 +1,16 @@
 from collections.abc import Callable, Generator, Iterable, Sequence
 from copy import copy, deepcopy
-from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     Optional,
 )
 
-import matplotlib.pyplot as plt
 import torch
 from aislib.pytorch_modules import Swish
-from ignite.engine import Engine
-from ignite.handlers.lr_finder import FastaiLRFinder
 from torch import nn
 from torch.nn import Module
-from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
 from eir.setup.output_setup import ComputedSurvivalOutputInfo, ComputedTabularOutputInfo
@@ -458,115 +452,3 @@ def _check_named_modules(model: nn.Module):
 
         if isinstance(module, Swish | nn.PReLU):
             assert "act_" in name, name
-
-
-def run_lr_find(
-    trainer_engine: Engine,
-    train_dataloader: torch.utils.data.DataLoader,
-    model: nn.Module,
-    optimizer: Optimizer,
-    output_folder: Path,
-):
-    lr_find_results = get_lr_range_results(
-        trainer_engine=trainer_engine,
-        train_dataloader=train_dataloader,
-        model=model,
-        optimizer=optimizer,
-    )
-
-    plot_lr_find_results(
-        lr_values=lr_find_results.lr_history,
-        loss_values=lr_find_results.loss_history,
-        lr_suggestion=lr_find_results.lr_suggestion,
-        output_folder=output_folder,
-    )
-
-
-@dataclass
-class LRFindResults:
-    lr_history_groups: list[list[float]]
-    lr_history: list[float]
-    loss_history: list[float]
-    lr_suggestion: float
-
-
-def get_lr_range_results(
-    trainer_engine: Engine,
-    train_dataloader: torch.utils.data.DataLoader,
-    model: nn.Module,
-    optimizer: Optimizer,
-    num_iter: int = 500,
-) -> LRFindResults:
-    """
-    We do a little hack with max_epochs and epoch_length because we don't pass that
-    to the original trainer when running a normal training instance, which uses the
-    default of max_epochs = 1. This is normally not a problem, as 1 epoch is
-    generally more than for example 300 iterations, which should be enough for the LR
-    test.
-
-    However, in the cases where we have a small epoch length, the LR find will not
-    run to completion as it only runs for one epoch. Hence, we need to patch the
-    max_epochs here for the test.
-    """
-    lr_finder = FastaiLRFinder()
-
-    def _extract_loss(x: dict[str, dict[str, dict[str, float]]]) -> float:
-        return x["average"]["average"]["loss-average"]
-
-    to_save = {"optimizer": optimizer, "model": model}
-    with lr_finder.attach(
-        trainer_engine,
-        to_save=to_save,
-        output_transform=_extract_loss,
-        num_iter=num_iter,
-        start_lr=1e-7,
-    ) as trainer_with_lr_finder:
-        logger.info("Running LR range test for max %d iterations.", num_iter)
-
-        default_max_epochs = trainer_with_lr_finder.state.max_epochs
-        trainer_with_lr_finder.state.max_epochs = 100
-        trainer_with_lr_finder.state.epoch_length = len(train_dataloader)
-
-        assert (
-            trainer_with_lr_finder.state.max_epochs
-            * trainer_with_lr_finder.state.epoch_length
-        ) >= num_iter
-
-        trainer_with_lr_finder.run(train_dataloader)
-        trainer_with_lr_finder.state.max_epochs = default_max_epochs
-
-        lr_results = deepcopy(lr_finder.get_results())
-        lr_suggestions_all_groups = deepcopy(lr_finder.lr_suggestion())
-        lr_suggestion_single = lr_suggestions_all_groups[0]
-
-        logger.info(
-            "LR Find: The model has %d parameter groups which can have different "
-            "learning rates depending on implementation. For the LR find, "
-            "we are using the LR defined in group 0, so make sure that is taken "
-            "into consideration when analysing LR find results, the supplied LR "
-            "for training might have to be scaled accordingly.",
-            len(lr_results["lr"][0]),
-        )
-
-        return LRFindResults(
-            lr_history_groups=lr_results["lr"],
-            lr_history=[i[0] for i in lr_results["lr"]],
-            loss_history=lr_results["loss"],
-            lr_suggestion=lr_suggestion_single,
-        )
-
-
-def plot_lr_find_results(
-    lr_values: list[float],
-    loss_values: list[float],
-    lr_suggestion: float,
-    output_folder: Path,
-) -> None:
-    plt.plot(lr_values, loss_values)
-    plt.xscale("log")
-    plt.title(f"Learning Rate Search\nLR Suggestion: {lr_suggestion:.2e}")
-    plt.xlabel("Learning Rate")
-    plt.ylabel("Loss")
-    plt.axvline(x=lr_suggestion, color="red", linewidth=1)
-
-    plt.savefig(str(output_folder / "lr_search.pdf"))

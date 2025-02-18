@@ -4,18 +4,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
 import numpy as np
-from ignite.contrib.handlers import (
-    ConcatScheduler,
-    CosineAnnealingScheduler,
-    create_lr_scheduler_with_warmup,
-)
-from ignite.engine import Engine, Events
 from matplotlib import pyplot as plt
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim.optimizer import Optimizer
 
 from eir.setup.schemas import GlobalConfig
 from eir.train_utils.evaluation import validation_handler
+from eir.train_utils.ignite_port.contrib_handlers.param_scheduler import (
+    ConcatScheduler,
+    CosineAnnealingScheduler,
+    create_lr_scheduler_with_warmup,
+)
+from eir.train_utils.ignite_port.engine import Engine, Events
 from eir.train_utils.metrics import (
     get_average_history_filepath,
     read_metrics_history_file,
