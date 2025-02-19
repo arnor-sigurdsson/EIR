@@ -2,7 +2,9 @@ import torch
 from lightning import Fabric
 
 from eir.setup.config import Configs
-from eir.train import logger
+from eir.utils.logging import get_logger
+
+logger = get_logger(name=__name__)
 
 
 def setup_accelerator(configs: Configs) -> Fabric:
