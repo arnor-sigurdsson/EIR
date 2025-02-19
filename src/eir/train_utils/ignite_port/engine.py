@@ -457,9 +457,6 @@ class Engine(Serializable):
             **event_kwargs: optional keyword args to be passed to all handlers.
 
         """
-        self.logger.debug(
-            f"{self.state.epoch} | {self.state.iteration}, Firing handlers for event {event_name}"
-        )
         self.last_event_name = event_name
         for func, args, kwargs in self._event_handlers[event_name]:
             kwargs.update(event_kwargs)

@@ -60,6 +60,7 @@ def load_experiment_for_serve(
     train_configs = loaded_train_experiment.configs
 
     loaded_train_experiment.configs.gc.be.device = device
+    loaded_train_experiment.configs.gc.ac.hardware = device
 
     inputs = set_up_inputs_for_serve(
         test_inputs_configs=train_configs.input_configs,

@@ -414,7 +414,8 @@ def get_default_predict_experiment(
     model = fabric.setup(model)
 
     test_dataloader = fabric.setup_dataloaders(test_dataloader_base)
-    assert isinstance(test_dataloader, DataLoader)
+    if isinstance(test_dataloader, list):
+        raise ValueError("Expected a single DataLoader, got a list")
 
     model.eval()
 
