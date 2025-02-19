@@ -722,6 +722,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "ipython" },
     { name = "lifelines" },
+    { name = "lightning" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
@@ -790,6 +791,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.4" },
     { name = "ipython", specifier = ">=8.29.0" },
     { name = "lifelines", specifier = ">=0.30.0" },
+    { name = "lightning", specifier = ">=2.5.0.post0" },
     { name = "matplotlib", specifier = ">=3.9.0" },
     { name = "numpy", specifier = "~=2.1.0" },
     { name = "pandas", specifier = ">=2.2.2" },
@@ -1564,6 +1566,26 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ea/4f/f0b363278d40baf7d7a03217bee839cb880946c62109f243391c8754bb09/lifelines-0.30.0.tar.gz", hash = "sha256:f7f6f6275fcb167fe0f5b1ef98f868993f9c074cb74b1dd6e92736efa854be18", size = 383221 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/f7/379e185a75ac8166ac70756d0ba68d9a2b02b555c7fde4983246752396bd/lifelines-0.30.0-py3-none-any.whl", hash = "sha256:ac7c602c8aceced9770d3977817c9d99c250ed8cd86f2567fa0d23e4e8014bf9", size = 349319 },
+]
+
+[[package]]
+name = "lightning"
+version = "2.5.0.post0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fsspec", extra = ["http"] },
+    { name = "lightning-utilities" },
+    { name = "packaging" },
+    { name = "pytorch-lightning" },
+    { name = "pyyaml" },
+    { name = "torch" },
+    { name = "torchmetrics" },
+    { name = "tqdm" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e6/6d/d9d209d9ab3d270ee89afb8f71a3d84d48d41a1880e89d8215d26e8018b7/lightning-2.5.0.post0.tar.gz", hash = "sha256:f720fe4f6d03a7f15f9aef3112c5a0d1eafd8d27b903f4a1354b609685b2ec70", size = 628132 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d4/54/2de887e964a561776ac49c5e715ca8a56138ea7e2b95325e0a79aa46a070/lightning-2.5.0.post0-py3-none-any.whl", hash = "sha256:b08463326e6fb39cb3e4db8ff2660a80ce3372a0688c80e3370c091346ea220c", size = 815241 },
 ]
 
 [[package]]
@@ -2463,6 +2485,25 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e3/c4/358cd13daa1d912ef795010897a483ab2f0b41c9ea1b35235a8b2f7d15a7/python_json_logger-3.2.1.tar.gz", hash = "sha256:8eb0554ea17cb75b05d2848bc14fb02fbdbd9d6972120781b974380bfa162008", size = 16287 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/72/2f30cf26664fcfa0bd8ec5ee62ec90c03bd485e4a294d92aabc76c5203a5/python_json_logger-3.2.1-py3-none-any.whl", hash = "sha256:cdc17047eb5374bd311e748b42f99d71223f3b0e186f4206cc5d52aefe85b090", size = 14924 },
+]
+
+[[package]]
+name = "pytorch-lightning"
+version = "2.5.0.post0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fsspec", extra = ["http"] },
+    { name = "lightning-utilities" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "torch" },
+    { name = "torchmetrics" },
+    { name = "tqdm" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6d/b1/3c1d08db3feb1dfcd5be1b9f2406455f3740f7525d7ea1b9244f67b11cb5/pytorch_lightning-2.5.0.post0.tar.gz", hash = "sha256:347235bf8573b4ebcf507a0dd755fcb9ce58c420c77220a9756a6edca0418532", size = 631450 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/02/df/0c7e4582b74264fe2179e78fcdeb9313f680d40ffe1dd4b078da5a2cbf82/pytorch_lightning-2.5.0.post0-py3-none-any.whl", hash = "sha256:c86bf4fded58b386f312f75337696a9b2d57077b858b3b9524400a03a0179b3a", size = 819282 },
 ]
 
 [[package]]

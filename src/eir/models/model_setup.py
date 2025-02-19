@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import torch
+from lightning.fabric.wrappers import _capture_compile_kwargs
 from torch import nn
 from torch.nn import functional as F
 
@@ -23,7 +24,6 @@ from eir.models.model_setup_modules.pretrained_setup import (
 from eir.setup import schemas
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
-from eir.train_utils.distributed import maybe_make_model_distributed
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -81,17 +81,17 @@ def get_model(
     meta_kwargs["input_modules"] = input_modules
 
     meta_model = meta_class(**meta_kwargs)
-    device = torch.device(device=global_config.be.device)
-    meta_model = meta_model.to(device=device)
-
-    meta_model = maybe_make_model_distributed(
-        device=global_config.be.device,
-        model=meta_model,
-    )
 
     compiled_model: al_meta_model
     if global_config.m.compile_model:
-        compiled_model = cast(al_meta_model, torch.compile(model=meta_model))
+        logger.info("Compiling model.")
+        compile_fn = _capture_compile_kwargs(compile_fn=torch.compile)
+        compiled_model = cast(al_meta_model, compile_fn(model=meta_model))
+        # needed for Fabric to properly capture the compiled kwargs,
+        # otherwise raises an error due to checking for None,
+        # but it does not properly initialize the attribute
+        # in some cases (e.g. when there are no args passed to the compile function)
+        compiled_model._compile_kwargs = {}  # type: ignore
     else:
         compiled_model = meta_model
 

@@ -271,7 +271,7 @@ def get_tensor_broker(
         fusion_modules=fusion_modules,
         output_modules=output_modules,
     )
-    module_storage = module_storage.to(device=device)
+    module_storage = module_storage
 
     example_batch = prepare_example_test_batch(
         input_objects=input_objects,
@@ -375,7 +375,7 @@ def get_tensor_broker(
                         tensor_cache_key=from_path,
                     )
 
-    tensor_broker_modules = tensor_broker_modules.to(device=device)
+    tensor_broker_modules = tensor_broker_modules
     return tensor_broker_modules
 
 

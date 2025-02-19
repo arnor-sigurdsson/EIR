@@ -1041,7 +1041,9 @@ def hook_add_l1_loss(
     """
     model_configs = experiment.inputs
 
-    l1_loss = torch.tensor(0.0, device=experiment.configs.gc.be.device)
+    current_device = state[loss_key].device
+
+    l1_loss = torch.tensor(0.0, device=current_device)
     for input_name, input_module in experiment.model.input_modules.items():
         cur_model_config = model_configs[input_name].input_config.model_config
         cur_model_init_config = cur_model_config.model_init_config
@@ -1060,10 +1062,10 @@ def hook_add_l1_loss(
             cur_l1_loss = get_model_l1_loss(
                 model=input_module_with_l1, l1_weight=current_l1
             )
+            cur_l1_loss = cur_l1_loss.to(device=current_device)
             l1_loss += cur_l1_loss
 
     updated_loss = state[loss_key] + l1_loss
-
     state_updates = {loss_key: updated_loss}
 
     return state_updates

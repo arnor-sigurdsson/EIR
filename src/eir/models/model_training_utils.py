@@ -41,13 +41,18 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def predict_on_batch(
-    model: Module, inputs: dict[str, torch.Tensor]
+    model: Module,
+    inputs: dict[str, torch.Tensor],
 ) -> dict[str, dict[str, torch.Tensor]]:
-    assert not model.training
-    with torch.no_grad():
-        val_outputs = model(inputs=inputs)
+    model_device = next(model.parameters()).device
+    device_as_str = str(model_device)
+    inputs = recursive_to_device(obj=inputs, device=device_as_str)
 
-    return val_outputs
+    assert not model.training
+    with torch.inference_mode():
+        batch_outputs = model(inputs=inputs)
+
+    return batch_outputs
 
 
 class ColumnType(Enum):
@@ -65,8 +70,6 @@ def prepare_all_targets(
         device=device,
         labels=labels,
     )
-
-    labels_prepared = recursive_to_device(obj=labels_prepared, device=device)
 
     return labels_prepared
 
@@ -109,16 +112,13 @@ def parse_tabular_target_labels(
                 if column_type == ColumnType.CON.value:
                     labels_casted[output_name_][column_name] = cur_labels.to(
                         dtype=torch.float,
-                        device=device,
                     )
                 elif column_type == ColumnType.CAT.value:
                     cur_labels = replace_nan_and_cast_to_long(
                         cur_labels=cur_labels.to(dtype=torch.float),
-                        device=device,
                     )
                     labels_casted[output_name_][column_name] = cur_labels.to(
                         dtype=torch.long,
-                        device=device,
                     )
 
     def handle_survival_object(
@@ -143,24 +143,22 @@ def parse_tabular_target_labels(
 
         if model_type == "cox":
             labels_casted[output_name_][time_column] = cur_labels_time.to(
-                dtype=torch.float, device=device
+                dtype=torch.float,
             )
         else:
             cur_labels_time = replace_nan_and_cast_to_long(
                 cur_labels=cur_labels_time.to(dtype=torch.float),
-                device=device,
             )
             labels_casted[output_name_][time_column] = cur_labels_time.to(
-                dtype=torch.float, device=device
+                dtype=torch.float,
             )
 
         cur_label_event = labels[output_name_][event_column]
         cur_label_event = replace_nan_and_cast_to_long(
             cur_labels=cur_label_event.to(dtype=torch.float),
-            device=device,
         )
         labels_casted[output_name_][event_column] = cur_label_event.to(
-            dtype=torch.long, device=device
+            dtype=torch.long,
         )
 
     for output_name, output_object in output_objects.items():
@@ -181,7 +179,6 @@ def parse_tabular_target_labels(
 
 def replace_nan_and_cast_to_long(
     cur_labels: torch.Tensor,
-    device: str,
     replacement_value: int = -1,
 ) -> torch.Tensor:
     """
@@ -221,10 +218,9 @@ def replace_nan_and_cast_to_long(
     replacement_tensor = torch.tensor(
         replacement_value,
         dtype=torch.float32,
-        device=device,
     )
 
-    cur_labels = cur_labels.to(device=device)
+    cur_labels = cur_labels
 
     cur_labels = cur_labels.where(~cur_labels.isnan(), replacement_tensor)
     return cur_labels.to(dtype=torch.long)

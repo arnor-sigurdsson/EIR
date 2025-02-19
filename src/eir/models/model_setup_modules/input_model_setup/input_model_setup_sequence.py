@@ -4,7 +4,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-import torch
 from torch import nn
 from transformers import AutoConfig, AutoModel, PreTrainedModel
 
@@ -58,7 +57,6 @@ def get_sequence_model(
         pool=sequence_model_config.pool,
     )
 
-    device_torch = torch.device(device)
     sequence_model = TransformerWrapperModel(
         feature_extractor=objects_for_wrapper.feature_extractor,
         external_feature_extractor=objects_for_wrapper.external,
@@ -69,7 +67,7 @@ def get_sequence_model(
         embeddings=objects_for_wrapper.embeddings,
         device=device,
         pre_computed_num_out_features=objects_for_wrapper.known_out_features,
-    ).to(device=device_torch)
+    )
 
     return sequence_model
 

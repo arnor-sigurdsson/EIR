@@ -4,11 +4,13 @@ from functools import partial
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Any,
     overload,
 )
 
 import numpy as np
 import torch
+from lightning import fabric
 from torch import nn
 
 from eir.data_load.data_utils import get_output_info_generator
@@ -559,6 +561,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             checkpoint_interval=gc.ec.checkpoint_interval,
             sample_interval=gc.ec.sample_interval,
             model=exp.model,
+            fabric_object=exp.fabric,
         )
 
     metric_writing_funcs = _get_metric_writing_funcs(
@@ -610,6 +613,7 @@ def _add_checkpoint_handler_wrapper(
     checkpoint_interval: int,
     sample_interval: int,
     model: nn.Module,
+    fabric_object: fabric.Fabric,
 ) -> Engine:
     checkpoint_score_function, score_name = None, None
     if n_to_save is not None:
@@ -640,6 +644,7 @@ def _add_checkpoint_handler_wrapper(
     checkpoint_handler = _get_checkpoint_handler(
         run_folder=run_folder,
         output_folder=output_folder,
+        fabric_object=fabric_object,
         n_to_save=n_to_save,
         score_function=checkpoint_score_function,
         score_name=score_name,
@@ -689,6 +694,7 @@ class SimpleModelCheckpoint:
         self,
         save_dir: Path,
         filename_prefix: str,
+        fabric_object: fabric.Fabric,
         n_saved: int | None = 1,
         score_function: Callable[[Engine], float] | None = None,
         score_name: str | None = None,
@@ -697,6 +703,7 @@ class SimpleModelCheckpoint:
         self.save_dir = Path(save_dir)
         self.filename_prefix = filename_prefix
         self.n_saved = n_saved
+        self.fabric_object = fabric_object
         self.score_function = score_function
         self.score_name = score_name
         self.global_step_transform = global_step_transform
@@ -707,8 +714,11 @@ class SimpleModelCheckpoint:
     def __call__(
         self,
         engine: Engine,
-        to_save: dict[str, nn.Module],
+        to_save: dict[str, Any],
     ) -> None:
+        """
+        TODO: Potentially use the Fabric save/load functionality here and when loading.
+        """
         score = None
         if self.score_function is not None:
             score = self.score_function(engine)
@@ -731,8 +741,12 @@ class SimpleModelCheckpoint:
 
         save_path = self.save_dir / filename
 
-        model_to_save = to_save["model"]
-        state_dict = model_to_save.state_dict()
+        fabric_model = to_save["model"]
+        module_to_save = fabric_model.module
+        if isinstance(module_to_save, AttrDelegatedSWAWrapper):
+            module_to_save = module_to_save.module
+
+        state_dict = module_to_save.state_dict()
 
         torch.save(
             obj=state_dict,
@@ -767,6 +781,7 @@ def _get_checkpoint_handler(
     run_folder: Path,
     output_folder: Path,
     n_to_save: int,
+    fabric_object: fabric.Fabric,
     score_function: Callable | None = None,
     score_name: str | None = None,
 ) -> SimpleModelCheckpoint:
@@ -777,6 +792,7 @@ def _get_checkpoint_handler(
         save_dir=Path(run_folder, "saved_models"),
         filename_prefix=output_folder.name,
         n_saved=n_to_save,
+        fabric_object=fabric_object,
         score_function=score_function,
         score_name=score_name,
         global_step_transform=_default_global_step_transform,

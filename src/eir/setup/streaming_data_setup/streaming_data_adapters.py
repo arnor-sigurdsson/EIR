@@ -12,7 +12,6 @@ import pandas as pd
 import websocket
 from aislib.misc_utils import ensure_path_exists
 from PIL import Image
-from torch import distributed as dist
 from tqdm import tqdm
 
 from eir.serve_modules.serve_network_utils import deserialize_array, deserialize_image
@@ -457,8 +456,6 @@ def gather_streaming_data_for_setup(
             gatherer.get_status()
 
             base_path = gatherer.base_path
-
-        dist.barrier()
 
     else:
         gatherer = StreamDataGatherer(

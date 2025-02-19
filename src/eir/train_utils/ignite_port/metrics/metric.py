@@ -465,7 +465,7 @@ class Metric(Serializable, metaclass=ABCMeta):
             for o1, o2 in zip(output[0], output[1], strict=False):
                 # o1 and o2 are list of tensors or numbers
                 tensor_o1 = _to_batched_tensor(o1)
-                tensor_o2 = _to_batched_tensor(o2, device=tensor_o1.device)
+                tensor_o2 = _to_batched_tensor(o2)
                 self.update((tensor_o1, tensor_o2))
         else:
             self.update(output)
@@ -817,4 +817,4 @@ def _is_list_of_tensors_or_numbers(x: Sequence[torch.Tensor | float]) -> bool:
 def _to_batched_tensor(x: torch.Tensor | float, device: torch.device | None = None) -> torch.Tensor:
     if isinstance(x, torch.Tensor):
         return x.unsqueeze(dim=0)
-    return torch.tensor([x], device=device)
+    return torch.tensor([x])

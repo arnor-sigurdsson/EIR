@@ -36,7 +36,7 @@ from eir.data_load.data_preparation_modules.prepare_sequence import (
 from eir.data_load.data_streaming.streaming_dataset_utils import (
     streamline_sequence_manual_data,
 )
-from eir.data_load.data_utils import Batch
+from eir.data_load.data_utils import Batch, consistent_nan_collate
 from eir.data_load.datasets import al_getitem_return
 from eir.data_load.label_setup import (
     al_label_transformers,
@@ -403,7 +403,8 @@ def _recursive_unsqueeze(
 
 
 def prepare_manual_sample_data(
-    sample_inputs: dict[str, Any], input_objects: "al_input_objects_as_dict"
+    sample_inputs: dict[str, Any],
+    input_objects: "al_input_objects_as_dict",
 ) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
     prepared_inputs: dict[str, torch.Tensor | dict[str, torch.Tensor]] = {}
     for name, data in sample_inputs.items():
@@ -562,9 +563,23 @@ def get_dataset_loader_single_sample_generator(
 ) -> Iterator[al_getitem_return]:
     loader: Iterator[al_getitem_return]
     if infinite:
-        loader = cycle(DataLoader(dataset=dataset, batch_size=1, shuffle=True))
+        loader = cycle(
+            DataLoader(
+                dataset=dataset,
+                batch_size=1,
+                shuffle=True,
+                collate_fn=consistent_nan_collate,
+            )
+        )
     else:
-        loader = iter(DataLoader(dataset=dataset, batch_size=1, shuffle=True))
+        loader = iter(
+            DataLoader(
+                dataset=dataset,
+                batch_size=1,
+                shuffle=True,
+                collate_fn=consistent_nan_collate,
+            )
+        )
 
     for input_to_model, _, cur_ids in loader:
         inputs_squeezed = _recursive_batch_dimension_squeeze(inputs=input_to_model)

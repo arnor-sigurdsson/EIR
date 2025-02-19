@@ -220,7 +220,8 @@ def one_shot_array_generation(
     assert isinstance(output_object, ComputedArrayOutputInfo | ComputedImageOutputInfo)
 
     array_sampling_batch = prepare_array_sampling_batch(
-        eval_samples=eval_samples, array_output_name=array_output_name
+        eval_samples=eval_samples,
+        array_output_name=array_output_name,
     )
     prepared_sample_inputs = array_sampling_batch.prepared_inputs
     prepared_targets = array_sampling_batch.prepared_targets

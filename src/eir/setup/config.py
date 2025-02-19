@@ -31,6 +31,7 @@ from eir.setup.config_validation import validate_train_configs
 from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.setup.schemas import (
+    AcceleratorConfig,
     AttributionAnalysisConfig,
     BasicExperimentConfig,
     DataPreparationConfig,
@@ -263,6 +264,8 @@ def get_global_config(global_configs: Iterable[dict]) -> GlobalConfig:
         **combined_config.get("visualization_logging", {})
     )
 
+    accelerator_config = AcceleratorConfig(**combined_config.get("accelerator", {}))
+
     latent_sampling = None
     if "latent_sampling" in combined_config and isinstance(
         combined_config["latent_sampling"], dict
@@ -281,6 +284,7 @@ def get_global_config(global_configs: Iterable[dict]) -> GlobalConfig:
         visualization_logging=visualization_logging_config,
         data_preparation=data_prep_config,
         latent_sampling=latent_sampling,
+        accelerator=accelerator_config,
     )
 
     return modify_global_config(global_config)

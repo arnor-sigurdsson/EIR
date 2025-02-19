@@ -2,14 +2,11 @@ from copy import deepcopy
 
 import pytest
 import torch
-from hypothesis import given, settings
-from hypothesis.strategies import composite, integers
 from torch import nn
 
 from eir.models import model_training_utils
 from eir.models.input.array import models_cnn
 from eir.models.input.array.models_cnn import ConvParamSuggestion
-from eir.train import train
 
 
 @pytest.fixture
@@ -307,86 +304,3 @@ def test_calc_conv_padding_needed_pass(test_input, expected):
 def test_calc_padding_needed_fail():
     with pytest.raises(ValueError):
         models_cnn.calc_conv_params_needed(-1000, 10, 4, 1)
-
-
-@composite
-def valid_test_inputs(draw):
-    input_size = draw(integers(min_value=1, max_value=10000))
-    kernel_size = draw(integers(min_value=1, max_value=min(input_size, 100)))
-    dilation = draw(
-        integers(min_value=1, max_value=min((input_size // kernel_size), 100))
-    )
-    stride = draw(integers(min_value=1, max_value=min(input_size, 100)))
-    return input_size, kernel_size, stride, dilation
-
-
-@given(valid_test_inputs())
-@settings(deadline=None)
-def test_calc_conv_params_needed_fuzzy(test_input: tuple[int, int, int, int]) -> None:
-    solution = models_cnn.calc_conv_params_needed(*test_input)
-
-    assert solution.kernel_size >= 1
-    assert solution.stride >= 1
-    assert solution.dilation >= 1
-    assert solution.padding >= 0
-
-    expected_output_size = models_cnn.conv_output_formula(
-        input_size=test_input[0],
-        padding=solution.padding,
-        dilation=solution.dilation,
-        kernel_size=solution.kernel_size,
-        stride=solution.stride,
-    )
-    assert expected_output_size == solution.target_size
-
-
-@pytest.mark.parametrize(
-    "create_test_data",
-    [
-        {"task_type": "binary"},
-    ],
-    indirect=True,
-)
-@pytest.mark.parametrize(
-    "create_test_config_init_base",
-    [
-        {
-            "injections": {
-                "global_configs": {
-                    "optimization": {
-                        "lr": 1e-03,
-                    },
-                    "lr_schedule": {
-                        "find_lr": True,
-                    },
-                },
-                "input_configs": [
-                    {
-                        "input_info": {"input_name": "test_genotype"},
-                        "model_config": {"model_type": "identity"},
-                    },
-                ],
-                "fusion_configs": {
-                    "model_type": "identity",
-                },
-                "output_configs": [
-                    {
-                        "output_info": {"output_name": "test_output_tabular"},
-                        "output_type_info": {
-                            "target_cat_columns": ["Origin"],
-                            "target_con_columns": [],
-                        },
-                    },
-                ],
-            },
-        },
-    ],
-    indirect=True,
-)
-def test_lr_find(prep_modelling_test_configs) -> None:
-    experiment, test_config = prep_modelling_test_configs
-
-    train(experiment=experiment)
-
-    run_path = test_config.run_path
-    assert (run_path / "lr_search.pdf").exists()

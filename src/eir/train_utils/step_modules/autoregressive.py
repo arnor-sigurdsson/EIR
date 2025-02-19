@@ -29,9 +29,9 @@ def prepare_sequence_input_for_sequence_output(
     assert cur_seq.dim() == 2
     assert cur_seq.shape[1] == input_object.computed_max_length
 
-    cur_seq = cur_seq.to(device=device)
+    cur_seq = cur_seq
 
-    cur_target_dict = {input_name: cur_target.to(device=device)}
+    cur_target_dict = {input_name: cur_target}
 
     return cur_seq, cur_target_dict
 

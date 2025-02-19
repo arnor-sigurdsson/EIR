@@ -170,7 +170,7 @@ def get_tabular_inputs(
         )
 
         if not input_con_columns:
-            return extra_embeddings.to(device=device)
+            return extra_embeddings
 
     extra_continuous = None
     if input_con_columns:
@@ -179,11 +179,11 @@ def get_tabular_inputs(
         )
 
         if not input_cat_columns:
-            return extra_continuous.to(device=device)
+            return extra_continuous
 
     if extra_continuous is not None and extra_embeddings is not None:
         concat_emb_and_con = torch.cat((extra_embeddings, extra_continuous), dim=1)
-        return concat_emb_and_con.to(device=device)
+        return concat_emb_and_con
 
     return None
 

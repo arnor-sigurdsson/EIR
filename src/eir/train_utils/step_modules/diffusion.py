@@ -53,7 +53,6 @@ def prepare_diffusion_batch(
         low=0,
         high=num_steps,
         size=(batch_size,),
-        device=inputs.device,
         dtype=torch.long,
     )
 
@@ -111,9 +110,7 @@ def p_sample_loop(
     output_shape: tuple,
     time_steps: int,
 ) -> np.ndarray:
-    device = next(model.parameters()).device
-
-    current_state: torch.Tensor = torch.randn(output_shape, device=device)
+    current_state: torch.Tensor = torch.randn(output_shape)
     batch_inputs[output_name] = current_state
 
     batch_size = output_shape[0]
@@ -122,7 +119,6 @@ def p_sample_loop(
         t = torch.full(
             size=(batch_size,),
             fill_value=i,
-            device=device,
             dtype=torch.long,
         )
 

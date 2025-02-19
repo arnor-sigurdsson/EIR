@@ -48,6 +48,7 @@ dependencies = [
     "polars>=1.19.0",
     "torchsurv>=0.1.4",
     "datasets>=3.2.0",
+    "lightning>=2.5.0.post0",
 ]
 
 [project.scripts]

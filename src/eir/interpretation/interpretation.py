@@ -31,7 +31,11 @@ from torch.cuda import OutOfMemoryError
 from torch.utils.data import DataLoader, Subset
 from torch.utils.hooks import RemovableHandle
 
-from eir.data_load.data_utils import Batch, get_output_info_generator
+from eir.data_load.data_utils import (
+    Batch,
+    consistent_nan_collate,
+    get_output_info_generator,
+)
 from eir.data_load.datasets import al_local_datasets
 from eir.interpretation.interpret_array import (
     ArrayConsumerCallable,
@@ -222,6 +226,7 @@ def get_background_loader(experiment: "Experiment") -> torch.utils.data.DataLoad
     background_loader = torch.utils.data.DataLoader(
         dataset=original_loader.dataset,
         batch_size=original_loader.batch_size,
+        collate_fn=consistent_nan_collate,
         shuffle=shuffle,
         num_workers=original_loader.num_workers,
         pin_memory=original_loader.pin_memory,
@@ -999,7 +1004,12 @@ def _get_attributions_dataloader(
     target_classes_numerical: Sequence[int],
 ) -> DataLoader:
     if max_attributions_per_class is None:
-        data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+        data_loader = DataLoader(
+            dataset=dataset,
+            batch_size=1,
+            shuffle=False,
+            collate_fn=consistent_nan_collate,
+        )
         return data_loader
 
     indices_func = _get_categorical_sample_indices_for_attributions
@@ -1014,7 +1024,12 @@ def _get_attributions_dataloader(
         target_classes_numerical=target_classes_numerical,
     )
     subset_dataset = _subsample_dataset(dataset=dataset, indices=subset_indices)
-    data_loader = DataLoader(dataset=subset_dataset, batch_size=1, shuffle=False)
+    data_loader = DataLoader(
+        dataset=subset_dataset,
+        batch_size=1,
+        shuffle=False,
+        collate_fn=consistent_nan_collate,
+    )
     return data_loader
 
 

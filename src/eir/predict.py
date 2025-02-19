@@ -9,10 +9,13 @@ from typing import Literal
 import numpy as np
 import polars as pl
 from aislib.misc_utils import ensure_path_exists
+from lightning.fabric import Fabric
 from torch.utils.data import DataLoader
 
+import eir.train_utils.accelerator
 from eir import train
 from eir.data_load import datasets, label_setup
+from eir.data_load.data_utils import consistent_nan_collate
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
@@ -297,6 +300,7 @@ class PredictExperiment:
     model: al_meta_model
     hooks: "PredictHooks"
     metrics: al_metric_record_dict
+    fabric: Fabric
 
 
 @dataclass
@@ -373,9 +377,10 @@ def get_default_predict_experiment(
         batch_size=predict_batch_size,
         name="Test",
     )
-    test_dataloader = DataLoader(
+    test_dataloader_base = DataLoader(
         dataset=test_dataset,
         batch_size=predict_batch_size,
+        collate_fn=consistent_nan_collate,
         shuffle=False,
         num_workers=configs_overloaded_for_predict.gc.be.dataloader_workers,
     )
@@ -403,6 +408,16 @@ def get_default_predict_experiment(
         all_predict_cl_args=predict_cl_args
     )
 
+    fabric = eir.train_utils.accelerator.setup_accelerator(
+        configs=configs_overloaded_for_predict
+    )
+    model = fabric.setup(model)
+
+    test_dataloader = fabric.setup_dataloaders(test_dataloader_base)
+    assert isinstance(test_dataloader, DataLoader)
+
+    model.eval()
+
     default_predict_hooks = _get_default_predict_hooks(train_hooks=default_train_hooks)
     predict_experiment = PredictExperiment(
         configs=configs_overloaded_for_predict,
@@ -414,6 +429,7 @@ def get_default_predict_experiment(
         model=model,
         hooks=default_predict_hooks,
         metrics=loaded_train_experiment.metrics,
+        fabric=fabric,
     )
 
     return predict_experiment

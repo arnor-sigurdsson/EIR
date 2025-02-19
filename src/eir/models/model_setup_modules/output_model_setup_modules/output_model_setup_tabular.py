@@ -1,5 +1,3 @@
-import torch
-
 from eir.models.model_setup_modules.output_model_setup_modules import al_output_modules
 from eir.models.output.tabular.linear import (
     LinearOutputModule,
@@ -53,8 +51,5 @@ def get_tabular_output_module_from_model_config(
             )
         case _:
             raise ValueError(f"Invalid output module type: {output_module_type}")
-
-    torch_device = torch.device(device=device)
-    output_module = output_module.to(device=torch_device)
 
     return output_module

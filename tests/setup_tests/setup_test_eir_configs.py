@@ -49,6 +49,9 @@ def get_test_base_global_init(
             "lr_schedule": {
                 "warmup_steps": 100,
             },
+            "accelerator": {
+                "hardware": "cpu",
+            },
         }
     ]
     return global_inits

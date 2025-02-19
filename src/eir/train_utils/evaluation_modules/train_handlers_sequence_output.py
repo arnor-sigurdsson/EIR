@@ -14,7 +14,7 @@ from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_modalities_wrapper,
 )
 from eir.data_load.datasets import al_getitem_return
-from eir.models.model_training_utils import predict_on_batch
+from eir.models.model_training_utils import predict_on_batch, recursive_to_device
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
 from eir.setup.output_setup_modules.sequence_output_setup import (
@@ -365,10 +365,12 @@ def autoregressive_sequence_generation(
         vocab=output_object.vocab,
     )
 
+    device = str(experiment.fabric.device)
     autoregressive_pre_batch = prepare_autoregressive_sampling_batch(
         eval_samples=eval_samples,
         seq_output_name=seq_output_name,
         special_tokens=st,
+        device=device,
     )
     prepared_sample_inputs = autoregressive_pre_batch.prepared_inputs
     prepared_targets = autoregressive_pre_batch.prepared_targets
@@ -388,6 +390,10 @@ def autoregressive_sequence_generation(
                 seq_output_name=seq_output_name,
                 max_length=output_object.computed_max_length,
                 pad_idx=st.pad_idx,
+            )
+            cur_prepared_sample_inputs = recursive_to_device(
+                obj=cur_prepared_sample_inputs,
+                device=device,
             )
 
             cur_target_index = _compute_target_index(
@@ -453,6 +459,7 @@ def prepare_autoregressive_sampling_batch(
     eval_samples: Sequence[SequenceOutputEvalSample],
     seq_output_name: str,
     special_tokens: SpecialTokens,
+    device: str,
 ) -> AutoRegressiveSamplingBatch:
     prepared_sample_inputs = []
     prepared_targets = []
@@ -477,6 +484,16 @@ def prepare_autoregressive_sampling_batch(
 
         generated_tokens.append(cur_generated_tokens)
         indices.append(len(cur_generated_tokens))
+
+    prepared_sample_inputs = recursive_to_device(
+        obj=prepared_sample_inputs,
+        device=device,
+    )
+
+    prepared_targets = recursive_to_device(
+        obj=prepared_targets,
+        device=device,
+    )
 
     return AutoRegressiveSamplingBatch(
         prepared_inputs=prepared_sample_inputs,

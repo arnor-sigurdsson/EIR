@@ -533,7 +533,7 @@ def test_get_model_l1_loss(get_l1_test_model):
 def test_hook_add_l1_loss(prep_modelling_test_configs):
     experiment, *_ = prep_modelling_test_configs
 
-    test_state = {"loss": 0.0}
+    test_state = {"loss": torch.tensor(0.0)}
     state_update = metrics.hook_add_l1_loss(experiment=experiment, state=test_state)
 
     l1_loss = state_update["loss"]

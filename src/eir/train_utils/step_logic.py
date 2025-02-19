@@ -1,16 +1,13 @@
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
-from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
 )
 
 import torch
 from torch import autocast, nn
-from torch.cuda.amp import GradScaler
 from torch.nn.utils import clip_grad_norm_
 from torch.optim.optimizer import Optimizer
 
@@ -146,14 +143,6 @@ def _get_default_step_function_hooks_init_kwargs(
         )
     init_kwargs["loss"].append(get_hook_iteration_counter())
 
-    do_amp = configs.gc.m.amp
-    if do_amp:
-        logger.debug("Setting up AMP training.")
-        model_forward_with_amp_objects = [
-            get_hook_amp_objects(device=configs.gc.be.device)
-        ] + init_kwargs["model_forward"]
-        init_kwargs["model_forward"] = model_forward_with_amp_objects
-
     return init_kwargs, extra_state
 
 
@@ -274,14 +263,14 @@ def _prepare_inputs_for_model(
             case ComputedOmicsInputInfo():
                 cur_tensor = batch_inputs[input_name]
                 cur_tensor = cur_tensor.to(dtype=torch.float32)
-                cur_tensor = cur_tensor.to(device=device)
+                cur_tensor = cur_tensor
 
                 inputs_prepared[input_name] = cur_tensor
 
             case ComputedArrayInputInfo() | ComputedImageInputInfo():
                 cur_tensor = batch_inputs[input_name]
                 cur_tensor = cur_tensor.to(dtype=torch.float32)
-                cur_tensor = cur_tensor.to(device=device)
+                cur_tensor = cur_tensor
 
                 if input_name in (i for i in output_objects):
                     matching_output = output_objects[input_name]
@@ -325,7 +314,7 @@ def _prepare_inputs_for_model(
                     if torch.is_floating_point(input=tensor):
                         tensor = tensor.to(dtype=torch.float32)
 
-                    cur_tensor = tensor.to(device=device)
+                    cur_tensor = tensor
                     tabular_source_input[tabular_name] = cur_tensor
 
                 tabular_input_type_info = input_object.input_config.input_type_info
@@ -386,7 +375,7 @@ def _prepare_sequence_input_base(
     input_name: str,
     device: str,
 ) -> torch.Tensor:
-    cur_seq = cur_seq.to(device=device)
+    cur_seq = cur_seq
     cur_module = getattr(model.input_modules, input_name)
     cur_module_embedding = cur_module.embedding
     cur_embedding = cur_module_embedding(input=cur_seq)
@@ -425,15 +414,9 @@ def hook_default_optimizer_backward(
         grad_acc_steps=gc.opt.gradient_accumulation_steps,
     )
 
-    amp_scaler = state.get("amp_scaler")
-    loss = maybe_scale_loss_with_amp_scaler(
-        do_amp=gc.m.amp,
-        loss=loss,
-        amp_scaler=amp_scaler,
-        device=gc.be.device,
-    )
+    state.get("amp_scaler")
 
-    loss.backward(**optimizer_backward_kwargs)
+    experiment.fabric.backward(loss, **optimizer_backward_kwargs)
 
     maybe_apply_gradient_noise_to_model(
         model=experiment.model,
@@ -445,10 +428,7 @@ def hook_default_optimizer_backward(
     )
 
     step_func = get_optimizer_step_func(
-        do_amp=gc.m.amp,
         optimizer=experiment.optimizer,
-        amp_scaler=amp_scaler,
-        device=gc.be.device,
     )
 
     if should_perform_optimizer_step(
@@ -456,10 +436,6 @@ def hook_default_optimizer_backward(
         grad_acc_steps=gc.opt.gradient_accumulation_steps,
     ):
         step_func()
-
-    if gc.m.amp and gc.be.device != "cpu":
-        assert amp_scaler is not None
-        amp_scaler.update()
 
     maybe_update_model_parameters_with_swa(
         n_iter_before_swa=gc.m.n_iter_before_swa,
@@ -469,15 +445,6 @@ def hook_default_optimizer_backward(
     )
 
     return {}
-
-
-def maybe_scale_loss_with_amp_scaler(
-    do_amp: bool, loss: torch.Tensor, amp_scaler: Optional["GradScaler"], device: str
-) -> torch.Tensor:
-    if do_amp and device != "cpu":
-        assert amp_scaler is not None
-        return amp_scaler.scale(loss)
-    return loss
 
 
 def maybe_scale_loss_with_grad_accumulation_steps(
@@ -510,14 +477,8 @@ def maybe_apply_gradient_clipping_to_model(
 
 
 def get_optimizer_step_func(
-    do_amp: bool,
     optimizer: Optimizer,
-    amp_scaler: Optional["GradScaler"],
-    device: str,
 ) -> Callable:
-    if do_amp and device != "cpu":
-        assert amp_scaler is not None
-        return partial(amp_scaler.step, optimizer=optimizer)
     return optimizer.step
 
 
@@ -537,10 +498,12 @@ def maybe_update_model_parameters_with_swa(
     if should_not_be_called_ever:
         return
 
-    assert isinstance(model, AttrDelegatedSWAWrapper)
+    assert isinstance(model.module, AttrDelegatedSWAWrapper)
     assert n_iter_before_swa is not None
     if iteration >= n_iter_before_swa and iteration % sample_interval == 0:
-        model.update_parameters(model.module)
+        swa_module = model.module
+        module_wrapped_by_swa = swa_module.module
+        swa_module.update_parameters(module_wrapped_by_swa)
 
 
 def hook_default_compute_metrics(
@@ -641,28 +604,3 @@ def get_hook_iteration_counter() -> Callable:
         return state_updates
 
     return _counter_iterator
-
-
-def get_hook_amp_objects(device: str) -> Callable[..., dict[str, Any]]:
-    device_type = "cpu" if device == "cpu" else "cuda"
-
-    if device == "cpu":
-        logger.warning("Using AMP is on a CPU, speedups will most likely be minimal.")
-
-    scaler = None
-    if device != "cpu":
-        scaler = GradScaler()
-
-    amp_context_manager = get_amp_context_manager(device_type=device_type)
-
-    def _get_objects(*args, **kwargs) -> dict[str, GradScaler | autocast]:
-        state_updates: dict[str, autocast | GradScaler] = {
-            "amp_context_manager": amp_context_manager,
-        }
-        if device != "cpu":
-            assert scaler is not None
-            state_updates["amp_scaler"] = scaler
-
-        return state_updates
-
-    return _get_objects

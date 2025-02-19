@@ -85,8 +85,6 @@ def get_finite_train_sampler(columns_to_sample, train_dataset):
     in_distributed_run = in_distributed_env()
 
     if columns_to_sample is None:
-        if in_distributed_run:
-            return DistributedSampler(dataset=train_dataset)
         return None
 
     if in_distributed_run:
@@ -198,3 +196,30 @@ def get_streaming_sampler(
         return None
 
     return StreamingDistributedSampler(steps_per_epoch=steps_per_epoch)
+
+
+def consistent_nan_collate(batch):
+    """
+    Sometimes, if we have a mixed batch with NaN and float32 values, it can
+    happen that the first element is NaN. Then, PyTorch default_collate uses
+    that to determine the dtype, and the full thing will be cast to float64.
+    Generally, this is OK, but e.g. on MPS devices, this will raise an error
+    as float64 is not supported on MPS.
+
+    Hence, we enforce a float64 -> float32 conversion.
+    """
+
+    result = torch.utils.data.default_collate(batch)
+
+    def ensure_float32(obj):
+        if isinstance(obj, torch.Tensor) and obj.dtype == torch.float64:
+            return obj.to(torch.float32)
+        elif isinstance(obj, dict):
+            return {k: ensure_float32(v) for k, v in obj.items()}
+        elif isinstance(obj, list | tuple):
+            return type(obj)(ensure_float32(x) for x in obj)
+        return obj
+
+    final = ensure_float32(result)
+
+    return final

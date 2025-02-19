@@ -11,6 +11,7 @@ from aislib.misc_utils import ensure_path_exists
 from torch.utils.data import DataLoader
 
 from eir.data_load import label_setup
+from eir.data_load.data_utils import consistent_nan_collate
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
@@ -229,6 +230,7 @@ def _get_predict_background_loader(
     )
     background_loader = DataLoader(
         dataset=background_dataset,
+        collate_fn=consistent_nan_collate,
         batch_size=batch_size,
         shuffle=False,
         num_workers=dataloader_workers,

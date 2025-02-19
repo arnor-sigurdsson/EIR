@@ -159,7 +159,6 @@ class BaseOutputHandler(BaseHandler):
             else:
                 for name in self.metric_names:
                     if name not in engine.state.metrics:
-                        breakpoint()
                         warnings.warn(
                             f"Provided metric name '{name}' is missing "
                             f"in engine's state metrics: {list(engine.state.metrics.keys())}"

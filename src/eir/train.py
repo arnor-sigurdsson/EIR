@@ -7,18 +7,20 @@ from typing import TYPE_CHECKING
 import torch
 import torch.multiprocessing
 
+from eir.train_utils.accelerator import setup_accelerator
+
 multiprocessing.set_start_method("spawn", force=True)
 
 torch.multiprocessing.set_sharing_strategy("file_system")
-import torch.distributed as dist
 from aislib.misc_utils import ensure_path_exists
+from lightning.fabric import Fabric
 from torch import nn
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler, WeightedRandomSampler
 
 from eir import __version__
 from eir.data_load import datasets
-from eir.data_load.data_utils import get_finite_train_sampler
+from eir.data_load.data_utils import consistent_nan_collate, get_finite_train_sampler
 from eir.data_load.label_setup import split_ids
 from eir.experiment_io.experiment_io import get_version_file
 from eir.experiment_io.input_object_io import serialize_chosen_input_objects
@@ -72,9 +74,6 @@ def main():
 
     configs = get_configs()
 
-    maybe_init_dist = distributed.maybe_initialize_distributed_environment
-    configs, local_rank = maybe_init_dist(configs=configs)
-
     default_hooks = get_default_hooks(configs=configs)
     default_experiment = get_default_experiment(
         configs=configs,
@@ -98,6 +97,7 @@ class Experiment:
     loss_function: Callable
     metrics: "al_metric_record_dict"
     hooks: Hooks
+    fabric: Fabric
 
 
 def get_default_experiment(
@@ -245,6 +245,16 @@ def get_default_experiment(
         output_configs=configs.output_configs,
     )
 
+    fabric = setup_accelerator(configs=configs)
+    model, optimizer = fabric.setup(model, optimizer)
+
+    train_dataloader, valid_dataloader = fabric.setup_dataloaders(
+        train_dataloader,
+        valid_dataloader,
+    )
+
+    configs.gc.be.device = str(fabric.device)
+
     experiment = Experiment(
         configs=configs,
         inputs=inputs_as_dict,
@@ -258,10 +268,8 @@ def get_default_experiment(
         loss_function=loss_func,
         metrics=metrics,
         hooks=hooks,
+        fabric=fabric,
     )
-
-    if distributed.in_distributed_env():
-        dist.barrier()
 
     return experiment
 
@@ -337,6 +345,7 @@ def get_dataloaders(
     train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=batch_size,
+        collate_fn=consistent_nan_collate,
         sampler=train_sampler,
         shuffle=shuffle,
         num_workers=train_num_workers,
@@ -348,6 +357,7 @@ def get_dataloaders(
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
         batch_size=batch_size,
+        collate_fn=consistent_nan_collate,
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,

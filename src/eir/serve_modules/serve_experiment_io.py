@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
+from lightning.fabric import Fabric
+
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
@@ -11,6 +13,7 @@ from eir.models.meta.meta import MetaModel
 from eir.serve_modules.serve_input_setup import set_up_inputs_for_serve
 from eir.setup.config import Configs
 from eir.setup.input_setup import al_input_objects_as_dict
+from eir.train_utils.accelerator import setup_accelerator
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -29,6 +32,7 @@ class ServeExperiment:
     inputs: al_input_objects_as_dict
     outputs: "al_output_objects_as_dict"
     model: MetaModel
+    fabric: Fabric
 
 
 def load_experiment_for_serve(
@@ -72,11 +76,13 @@ def load_experiment_for_serve(
         device=device,
     )
 
+    fabric = setup_accelerator(configs=loaded_train_experiment.configs)
+
     assert not model.training
 
     loaded_train_experiment_as_dict = loaded_train_experiment.__dict__
     serve_experiment_kwargs = {
-        **{"model": model, "inputs": inputs},
+        **{"model": model, "inputs": inputs, "fabric": fabric},
         **loaded_train_experiment_as_dict,
     }
 
