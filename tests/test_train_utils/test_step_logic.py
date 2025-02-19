@@ -2,6 +2,7 @@ from unittest.mock import ANY, MagicMock, call, create_autospec, patch
 
 import pytest
 import torch
+from lightning.fabric import Fabric
 from torch import nn
 
 from eir.train_utils import step_logic
@@ -197,8 +198,13 @@ def test_maybe_update_model_parameters_with_swa_basics():
 
 
 def test_maybe_update_model_parameters_with_swa_multiple_iterations():
-    model = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
-    model.module = MagicMock()
+    model = create_autospec(spec=Fabric, instance=True)
+
+    swa_module = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
+    model.module = swa_module
+
+    inner_model = MagicMock()
+    model.module.module = inner_model
 
     n_iter_before_swa = 10
     sample_interval = 5
@@ -217,8 +223,8 @@ def test_maybe_update_model_parameters_with_swa_multiple_iterations():
         if iteration >= n_iter_before_swa and iteration % sample_interval == 0:
             update_parameters_call_count += 1
 
-    model.update_parameters.assert_has_calls(
-        [call(model.module)] * update_parameters_call_count
+    swa_module.update_parameters.assert_has_calls(
+        [call(swa_module.module)] * update_parameters_call_count
     )
 
 
