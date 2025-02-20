@@ -158,8 +158,13 @@ def test_maybe_apply_gradient_clipping_to_model():
 
 
 def test_maybe_update_model_parameters_with_swa_basics():
-    model = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
-    model.module = MagicMock()
+    model = create_autospec(spec=Fabric, instance=True)
+
+    swa_module = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
+    model.module = swa_module
+
+    inner_model = MagicMock()
+    model.module.module = inner_model
 
     n_iter_before_swa = 10
     sample_interval = 5
@@ -170,7 +175,7 @@ def test_maybe_update_model_parameters_with_swa_basics():
         iteration=12,
         sample_interval=sample_interval,
     )
-    model.update_parameters.assert_not_called()
+    swa_module.update_parameters.assert_not_called()
 
     step_logic.maybe_update_model_parameters_with_swa(
         n_iter_before_swa=n_iter_before_swa,
@@ -178,7 +183,7 @@ def test_maybe_update_model_parameters_with_swa_basics():
         iteration=8,
         sample_interval=sample_interval,
     )
-    model.update_parameters.assert_not_called()
+    swa_module.update_parameters.assert_not_called()
 
     step_logic.maybe_update_model_parameters_with_swa(
         n_iter_before_swa=n_iter_before_swa,
@@ -186,7 +191,7 @@ def test_maybe_update_model_parameters_with_swa_basics():
         iteration=11,
         sample_interval=sample_interval,
     )
-    model.update_parameters.assert_not_called()
+    swa_module.update_parameters.assert_not_called()
 
     step_logic.maybe_update_model_parameters_with_swa(
         n_iter_before_swa=n_iter_before_swa,
@@ -194,7 +199,7 @@ def test_maybe_update_model_parameters_with_swa_basics():
         iteration=15,
         sample_interval=sample_interval,
     )
-    model.update_parameters.assert_called_once_with(model.module)
+    swa_module.update_parameters.assert_called_once_with(swa_module.module)
 
 
 def test_maybe_update_model_parameters_with_swa_multiple_iterations():
