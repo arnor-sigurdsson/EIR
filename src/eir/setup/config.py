@@ -122,7 +122,8 @@ def get_main_parser(
     global_nargs: Literal["+", "*"] = "+", output_nargs: Literal["+", "*"] = "+"
 ) -> configargparse.ArgumentParser:
     parser_ = configargparse.ArgumentParser(
-        config_file_parser_class=configargparse.YAMLConfigFileParser
+        config_file_parser_class=configargparse.YAMLConfigFileParser,
+        allow_abbrev=False,
     )
 
     global_required = global_nargs == "+"
