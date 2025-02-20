@@ -135,7 +135,7 @@ def convert_model_inputs_to_raw(
 
             case ComputedOmicsInputInfo() | ComputedBytesInputInfo():
                 assert isinstance(data, torch.Tensor)
-                raw_input = data.numpy().squeeze()
+                raw_input = data.cpu().numpy().squeeze()
 
             case ComputedSequenceInputInfo():
                 assert isinstance(data, torch.Tensor)
@@ -143,7 +143,7 @@ def convert_model_inputs_to_raw(
                 assert isinstance(input_type_info, SequenceInputDataConfig)
                 assert input_object.tokenizer is not None
                 raw_input = decode_tokens(
-                    tokens=data.numpy().tolist(),
+                    tokens=data.cpu().numpy().tolist(),
                     vocab=input_object.vocab,
                     split_on=input_type_info.split_on,
                 )
@@ -176,9 +176,10 @@ def convert_model_inputs_to_raw(
 
 
 def convert_image_input_to_raw(
-    data: torch.Tensor, normalization_stats: ImageNormalizationStats
+    data: torch.Tensor,
+    normalization_stats: ImageNormalizationStats,
 ) -> Image.Image:
-    data_np: np.ndarray = data.numpy()
+    data_np: np.ndarray = data.cpu().numpy()
     assert data_np.ndim == 3, "Input should be 3D"
 
     cur_input = un_normalize_image(
@@ -234,10 +235,11 @@ def convert_array_input_to_raw(
     data: torch.Tensor, normalization_stats: ArrayNormalizationStats | None
 ) -> np.ndarray:
     data_un_normalized = un_normalize_array(
-        array=data, normalization_stats=normalization_stats
+        array=data,
+        normalization_stats=normalization_stats,
     )
 
-    data_un_normalized_numpy = data_un_normalized.numpy()
+    data_un_normalized_numpy = data_un_normalized.cpu().numpy()
 
     return data_un_normalized_numpy
 

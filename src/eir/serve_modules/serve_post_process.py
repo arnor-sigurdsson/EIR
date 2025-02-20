@@ -305,7 +305,7 @@ def _process_discrete_survival_prediction(
     time_bins_except_last = time_bins[:-1]
 
     hazards_logits = cur_model_outputs[event_name]
-    hazards = torch.sigmoid(hazards_logits).numpy()
+    hazards = torch.sigmoid(hazards_logits).cpu().numpy()
     survival_probs = np.cumprod(1 - hazards, 0)
 
     processed_outputs["time_points"] = time_bins_except_last.tolist()
@@ -325,7 +325,7 @@ def _process_cox_survival_prediction(
 
     event_name = output_type_info.event_column
 
-    risk_scores = cur_model_outputs[event_name].numpy()
+    risk_scores = cur_model_outputs[event_name].cpu().numpy()
 
     msg_1 = "Baseline hazard not found. Make sure it was computed during validation."
     assert output_object.baseline_hazard is not None, msg_1

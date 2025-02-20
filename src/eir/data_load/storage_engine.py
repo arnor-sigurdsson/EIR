@@ -307,11 +307,11 @@ class HybridStorage:
         masks = []
 
         if self.numeric_float_data is not None:
-            numeric_mask = torch.isnan(self.numeric_float_data).all(dim=0).numpy()
+            numeric_mask = torch.isnan(self.numeric_float_data).all(dim=0).cpu().numpy()
             masks.append(numeric_mask)
 
         if self.numeric_int_data is not None:
-            numeric_mask = torch.isnan(self.numeric_int_data).all(dim=0).numpy()
+            numeric_mask = torch.isnan(self.numeric_int_data).all(dim=0).cpu().numpy()
             masks.append(numeric_mask)
 
         if self.string_data is not None:
@@ -331,7 +331,9 @@ class HybridStorage:
             for col_data in self.fixed_array_data:
                 nan_mask = torch.isnan(input=col_data)
                 other_dims = tuple(range(1, len(nan_mask.shape)))
-                fixed_array_mask = torch.all(input=nan_mask, dim=other_dims).numpy()
+                fixed_array_mask = (
+                    torch.all(input=nan_mask, dim=other_dims).cpu().numpy()
+                )
                 fixed_array_masks.append(fixed_array_mask)
 
             masks.append(np.all(fixed_array_masks, axis=0))
@@ -422,7 +424,7 @@ class HybridStorage:
 
         if self.fixed_array_data is not None:
             for i, col_info in enumerate(self.fixed_array_columns):
-                result[col_info.name] = self.fixed_array_data[i][idx].numpy()
+                result[col_info.name] = self.fixed_array_data[i][idx].cpu().numpy()
 
         if self.var_array_data is not None:
             for i, col_info in enumerate(self.var_array_columns):
@@ -508,11 +510,15 @@ def check_two_storages(
     masks = []
 
     if target_storage.numeric_float_data is not None:
-        numeric_mask = torch.isnan(target_storage.numeric_float_data).all(dim=0).numpy()
+        numeric_mask = (
+            torch.isnan(target_storage.numeric_float_data).all(dim=0).cpu().numpy()
+        )
         masks.append(numeric_mask)
 
     if target_storage.numeric_int_data is not None:
-        numeric_mask = torch.isnan(target_storage.numeric_int_data).all(dim=0).numpy()
+        numeric_mask = (
+            torch.isnan(target_storage.numeric_int_data).all(dim=0).cpu().numpy()
+        )
         masks.append(numeric_mask)
 
     if target_storage.string_data is not None:
@@ -537,7 +543,7 @@ def check_two_storages(
         for col_data in target_storage.fixed_array_data:
             nan_mask = torch.isnan(input=col_data)
             other_dims = tuple(range(1, len(nan_mask.shape)))
-            fixed_array_mask = torch.all(input=nan_mask, dim=other_dims).numpy()
+            fixed_array_mask = torch.all(input=nan_mask, dim=other_dims).cpu().numpy()
             fixed_array_masks.append(fixed_array_mask)
 
         masks.append(np.all(fixed_array_masks, axis=0))
