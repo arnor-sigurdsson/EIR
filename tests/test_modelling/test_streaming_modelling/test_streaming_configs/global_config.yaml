@@ -8,3 +8,5 @@ evaluation_checkpoint:
   checkpoint_interval: 100
 data_preparation:
   streaming_setup_samples: 5000
+accelerator:
+  hardware: cpu
