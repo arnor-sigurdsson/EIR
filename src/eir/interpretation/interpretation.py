@@ -198,7 +198,13 @@ def attribution_analysis_handler(
         iteration=iteration,
     )
 
-    background_loader = get_background_loader(experiment=exp)
+    fabric = exp.fabric
+    background_loader_base = get_background_loader(experiment=exp)
+    background_loader = fabric.setup_dataloaders(background_loader_base)
+    if isinstance(background_loader, list):
+        raise ValueError(
+            "Expected background_loader to be a single DataLoader, but got a list."
+        )
 
     tabular_attribution_analysis_wrapper(
         model=exp.model,
@@ -922,7 +928,7 @@ def _get_interpretation_data_producer(
         column_type=column_type,
     )
 
-    attributions_data_loader = _get_attributions_dataloader(
+    attributions_data_loader_base = _get_attributions_dataloader(
         dataset=dataset,
         max_attributions_per_class=gc.aa.max_attributions_per_class,
         output_name=output_name,
@@ -930,6 +936,10 @@ def _get_interpretation_data_producer(
         column_type=column_type,
         target_classes_numerical=target_classes_numerical,
     )
+    fabric = experiment.fabric
+    attributions_data_loader = fabric.setup_dataloaders(attributions_data_loader_base)
+    if isinstance(attributions_data_loader, list):
+        raise ValueError("Got a list of dataloaders, but expected a single dataloader.")
 
     for loader_batch in attributions_data_loader:
         state = call_hooks_stage_iterable(

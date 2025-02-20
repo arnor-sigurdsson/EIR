@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Literal, Union
 
 import polars as pl
 from aislib.misc_utils import ensure_path_exists
+from lightning.fabric import Fabric
 from torch.utils.data import DataLoader
 
 from eir.data_load import label_setup
@@ -142,6 +143,7 @@ def get_background_source_config(
 class LoadedTrainExperimentMixedWithPredict(LoadedTrainExperiment):
     model: al_meta_model
     inputs: al_input_objects_as_dict
+    fabric: Fabric
 
 
 def _overload_train_experiment_for_predict_attributions(
@@ -160,6 +162,7 @@ def _overload_train_experiment_for_predict_attributions(
     mixed_experiment_kwargs["model"] = predict_config.model
     mixed_experiment_kwargs["configs"] = predict_config.configs
     mixed_experiment_kwargs["inputs"] = predict_config.inputs
+    mixed_experiment_kwargs["fabric"] = predict_config.fabric
 
     mixed_experiment = LoadedTrainExperimentMixedWithPredict(**mixed_experiment_kwargs)
 
