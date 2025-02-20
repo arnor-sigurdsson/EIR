@@ -87,7 +87,8 @@ def sequence_out_single_sample_evaluation_wrapper(
     )
 
     auto_validation_generator = get_dataset_loader_single_sample_generator(
-        dataset=auto_dataset_to_load_from
+        dataset=auto_dataset_to_load_from,
+        fabric=experiment.fabric,
     )
     auto_samples = get_sequence_output_auto_validation_samples(
         output_configs=output_configs,

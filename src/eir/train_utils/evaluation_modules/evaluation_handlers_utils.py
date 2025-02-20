@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Union
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists, get_logger
+from lightning.fabric import Fabric
 from PIL import Image
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader, Dataset
@@ -210,7 +211,7 @@ def convert_tabular_input_to_raw(
     all_reversed: dict[str, np.ndarray] = {}
     for col_name, tensor_data in data.items():
         transformer = input_transformers[col_name]
-        tensor_data_reshaped = tensor_data.numpy().reshape(-1, 1)
+        tensor_data_reshaped = tensor_data.cpu().numpy().reshape(-1, 1)
         assert tensor_data_reshaped.shape[0] > 0, "Empty tensor"
 
         it = transformer.inverse_transform
@@ -559,27 +560,22 @@ def serialize_raw_inputs(
 
 def get_dataset_loader_single_sample_generator(
     dataset: Dataset,
+    fabric: Fabric,
     infinite: bool = True,
 ) -> Iterator[al_getitem_return]:
-    loader: Iterator[al_getitem_return]
-    if infinite:
-        loader = cycle(
-            DataLoader(
-                dataset=dataset,
-                batch_size=1,
-                shuffle=True,
-                collate_fn=consistent_nan_collate,
-            )
-        )
-    else:
-        loader = iter(
-            DataLoader(
-                dataset=dataset,
-                batch_size=1,
-                shuffle=True,
-                collate_fn=consistent_nan_collate,
-            )
-        )
+    dataloader_base = DataLoader(
+        dataset=dataset,
+        batch_size=1,
+        shuffle=True,
+        collate_fn=consistent_nan_collate,
+    )
+    dataloader = fabric.setup_dataloaders(dataloader_base)
+    if isinstance(dataloader, list):
+        raise ValueError("Dataloader is a list, expected a single DataLoader.")
+
+    loader: cycle[Any] | DataLoader[Any]
+
+    loader = cycle(dataloader) if infinite else dataloader
 
     for input_to_model, _, cur_ids in loader:
         inputs_squeezed = _recursive_batch_dimension_squeeze(inputs=input_to_model)
