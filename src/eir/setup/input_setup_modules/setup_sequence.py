@@ -261,12 +261,16 @@ def _init_min_freq(
 def extract_tokenizer_object_from_function(
     tokenizer_callable: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
 ) -> Tokenizer | PreTrainedTokenizer:
-    closure = tokenizer_callable.__closure__
-    assert closure is not None
-    assert len(closure) == 1
+    assert isinstance(tokenizer_callable, TokenizerWrapper), (
+        f"Expected TokenizerWrapper instance, got {type(tokenizer_callable).__name__}"
+    )
 
-    tokenizer_object = closure[0].cell_contents
-    assert isinstance(tokenizer_object, Tokenizer | PreTrainedTokenizer)
+    tokenizer_object = tokenizer_callable.tokenizer
+    assert isinstance(tokenizer_object, Tokenizer | PreTrainedTokenizer), (
+        f"Expected Tokenizer or PreTrainedTokenizer, got "
+        f"{type(tokenizer_object).__name__}"
+    )
+
     return tokenizer_object
 
 
@@ -391,6 +395,19 @@ def _add_specials_to_hf_tokenizer(
     return hf_tokenizer_copy
 
 
+class TokenizerWrapper:
+    def __init__(self, tokenizer, is_pretokenized: bool):
+        self.tokenizer = tokenizer
+        self.is_pretokenized = is_pretokenized
+
+    def __call__(self, input_text: str | Sequence[str]) -> Sequence[str]:
+        tokens = self.tokenizer.encode(
+            sequence=input_text,
+            is_pretokenized=self.is_pretokenized,
+        ).tokens
+        return tokens
+
+
 def get_bpe_tokenizer(
     vocab_iterator: Iterator | None,
     vocab_file: str | None,
@@ -403,23 +420,21 @@ def get_bpe_tokenizer(
         vocab_size=vocab_size,
     )
 
-    def _tokenize_raw(raw_input: str) -> Sequence[str]:
-        tokens = tokenizer.encode(
-            sequence=raw_input,
-            is_pretokenized=False,
-        ).tokens
-        return tokens
-
-    def _tokenize_pre_split(raw_input_split: Sequence[str]) -> Sequence[str]:
-        tokens = tokenizer.encode(
-            sequence=raw_input_split,
-            is_pretokenized=True,
-        ).tokens
-        return tokens
-
     if split_on is None:
-        return cast(TokenizerProtocolRaw, _tokenize_raw)
-    return cast(TokenizerProtocolPreSplit, _tokenize_pre_split)
+        return cast(
+            TokenizerProtocolRaw,
+            TokenizerWrapper(
+                tokenizer=tokenizer,
+                is_pretokenized=False,
+            ),
+        )
+    return cast(
+        TokenizerProtocolPreSplit,
+        TokenizerWrapper(
+            tokenizer=tokenizer,
+            is_pretokenized=True,
+        ),
+    )
 
 
 class TokenizerVocabSizeError(Exception):
