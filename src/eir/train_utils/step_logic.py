@@ -201,7 +201,7 @@ def hook_default_prepare_batch(
         input_objects=experiment.inputs,
         output_objects=experiment.outputs,
         model=experiment.model,
-        device=experiment.configs.gc.be.device,
+        device=str(experiment.fabric.device),
     )
 
     state_updates = {"batch": batch}
@@ -295,6 +295,7 @@ def _prepare_inputs_for_model(
                             inputs=cur_tensor,
                             batch_size=cur_tensor.shape[0],
                             num_steps=num_steps,
+                            device=device,
                         )
                         cur_targets = {input_name: cur_target}
                         targets_prepared[input_name] = cur_targets

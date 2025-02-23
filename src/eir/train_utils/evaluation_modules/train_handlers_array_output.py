@@ -316,6 +316,7 @@ def reverse_diffusion_array_generation(
         model=experiment.model,
         output_shape=shape,
         time_steps=num_steps,
+        device=device,
     )
 
     assert output_object.normalization_stats is not None
