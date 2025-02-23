@@ -1,5 +1,6 @@
 import json
 from collections.abc import Iterator
+from contextlib import _GeneratorContextManager
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -8,6 +9,7 @@ import websocket
 from PIL import Image
 from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 from torch.utils.data import IterableDataset
+from websocket import WebSocket
 
 from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_modalities_wrapper,
@@ -87,9 +89,9 @@ class StreamingDataset(IterableDataset):
         self.max_consecutive_timeouts = max_consecutive_timeouts
         self.heartbeat_interval = heartbeat_interval
 
-        self.ws = None
-        self.connection_context = None
-        self.current_batch = None
+        self.ws: WebSocket | None = None
+        self.connection_context: _GeneratorContextManager[WebSocket] | None = None
+        self.current_batch: list | None = None
         self._is_closed = False
 
     def __iter__(self) -> Iterator[Any]:
@@ -142,7 +144,7 @@ class StreamingDataset(IterableDataset):
                     )
                 )
 
-                batch_msg = receive_with_timeout(websocket=self.ws)
+                batch_msg = receive_with_timeout(websocket_=self.ws)
 
                 if batch_msg["type"] == "heartbeat":
                     continue
@@ -193,14 +195,14 @@ class StreamingDataset(IterableDataset):
         raise StopIteration
 
     def _reconnect(self):
-        if self.ws:
+        if self.ws and self.connection_context:
             self.connection_context.__exit__(None, None, None)
         self._connect()
 
     def close(self):
         if not self._is_closed:
             self._is_closed = True
-            if self.ws:
+            if self.ws and self.connection_context:
                 self.connection_context.__exit__(None, None, None)
 
     def _process_sample(self, sample: Sample) -> "al_getitem_return":

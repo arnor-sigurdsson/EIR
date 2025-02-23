@@ -72,7 +72,7 @@ class StreamDataGatherer:
     def get_dataset_info(self, ws: websocket.WebSocket):
         ws.send(json.dumps({"type": "getInfo"}))
 
-        info_data = receive_with_timeout(websocket=ws)
+        info_data = receive_with_timeout(websocket_=ws)
 
         if info_data["type"] != "info":
             raise ValueError(f"Unexpected response type: {info_data['type']}")
@@ -108,7 +108,7 @@ class StreamDataGatherer:
                     )
                 )
 
-                batch_data = receive_with_timeout(websocket=ws)
+                batch_data = receive_with_timeout(websocket_=ws)
 
                 if batch_data["type"] != "data":
                     logger.error(f"Unexpected response type: {batch_data['type']}")
@@ -188,7 +188,7 @@ class StreamDataGatherer:
             )
 
             for _ in range(2):
-                reset_message = receive_with_timeout(websocket=ws)
+                reset_message = receive_with_timeout(websocket_=ws)
 
                 if reset_message["type"] == "reset":
                     logger.info(
@@ -216,7 +216,7 @@ class StreamDataGatherer:
                 )
             )
 
-            status_data = receive_with_timeout(websocket=ws)
+            status_data = receive_with_timeout(websocket_=ws)
 
             if status_data["type"] == "status":
                 logger.info(f"Current status: {status_data['payload']}")
