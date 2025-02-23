@@ -1,7 +1,4 @@
-import atexit
 import json
-import threading
-import time
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -80,6 +77,7 @@ class StreamingDataset(IterableDataset):
         max_consecutive_timeouts: int = 3,
         heartbeat_interval: float = 30.0,
     ):
+        super().__init__()
         self.websocket_url = websocket_url
         self.inputs = inputs
         self.outputs = outputs
@@ -88,60 +86,53 @@ class StreamingDataset(IterableDataset):
         self.fetch_timeout = fetch_timeout
         self.max_consecutive_timeouts = max_consecutive_timeouts
         self.heartbeat_interval = heartbeat_interval
-        self.ws: websocket.WebSocket | None = None
-        self.current_batch: list[dict] = []
-        self.heartbeat_thread: threading.Thread | None = None
-        self.stop_event = threading.Event()
+
+        self.ws = None
+        self.connection_context = None
+        self.current_batch = None
         self._is_closed = False
 
-        atexit.register(self.close)
-
     def __iter__(self) -> Iterator[Any]:
+        self.ws = None
+        self.current_batch = []
+        self._is_closed = False
         self._connect()
+
         return self
+
+    def _connect(self):
+        self.connection_context = connect_to_server(
+            websocket_url=self.websocket_url,
+            protocol_version=PROTOCOL_VERSION,
+        )
+        self.ws = self.connection_context.__enter__()
+
+        if self.ws:
+            try:
+                self.ws.send(json.dumps({"type": "heartbeat"}))
+            except Exception as e:
+                logger.error(f"Error sending initial heartbeat: {e}")
 
     def __next__(self) -> Any:
         if not self.current_batch:
             self._fetch_batch()
 
         if not self.current_batch:
+            self.close()
             raise StopIteration
 
         sample_dict = self.current_batch.pop(0)
         sample = Sample(**sample_dict)
         return self._process_sample(sample)
 
-    def _connect(self):
-        if self.heartbeat_thread and self.heartbeat_thread.is_alive():
-            self.stop_event.set()
-            self.heartbeat_thread.join(timeout=5)
-
-        self.connection_context = connect_to_server(
-            websocket_url=self.websocket_url,
-            protocol_version=PROTOCOL_VERSION,
-        )
-        self.ws = self.connection_context.__enter__()
-        self.stop_event.clear()
-        self.heartbeat_thread = threading.Thread(
-            target=self._send_heartbeats,
-            daemon=True,
-        )
-        self.heartbeat_thread.start()
-
-    def _send_heartbeats(self):
-        while not self.stop_event.is_set():
-            if self.ws:
-                try:
-                    self.ws.send(json.dumps({"type": "heartbeat"}))
-                except Exception as e:
-                    logger.error(f"Error sending heartbeat: {e}")
-            time.sleep(self.heartbeat_interval)
-
     def _fetch_batch(self):
         consecutive_timeouts = 0
         assert self.ws is not None
+
         while consecutive_timeouts < self.max_consecutive_timeouts:
             try:
+                self.ws.send(json.dumps({"type": "heartbeat"}))
+
                 self.ws.send(
                     json.dumps(
                         {
@@ -209,10 +200,8 @@ class StreamingDataset(IterableDataset):
     def close(self):
         if not self._is_closed:
             self._is_closed = True
-            self.stop_event.set()
             if self.ws:
                 self.connection_context.__exit__(None, None, None)
-            atexit.unregister(self.close)
 
     def _process_sample(self, sample: Sample) -> "al_getitem_return":
         inputs = sample.inputs
