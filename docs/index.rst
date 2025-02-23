@@ -59,3 +59,9 @@ To get started, please read :ref:`01-genotype-tutorial`.
     api/api_index
     license
     acknowledgements
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   paper_tutorials/01_survival_genotypes
