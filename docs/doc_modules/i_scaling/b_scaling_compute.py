@@ -88,7 +88,7 @@ def get_streaming_generation_experiment() -> AutoDocExperimentInfo:
             "figures/auto_generated_iter_45000.txt",
         ),
         (
-            "samples/40000/manual/1_generated.txt",
+            "samples/45000/manual/1_generated.txt",
             "figures/manual_generated_iter_45000.txt",
         ),
     ]
