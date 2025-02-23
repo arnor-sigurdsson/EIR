@@ -118,16 +118,16 @@ gibberish:
     :language: console
     :caption: Manually sequence at iteration 500 with custom prompt
 
-However, at iteration 9500, we can see that the model is starting to
+However, at iteration 6000, we can see that the model is starting to
 generate more meaningful sequences:
 
-.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/auto_generated_iter_9500.txt
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/auto_generated_iter_6000.txt
     :language: console
-    :caption: Auto-generated sequence at iteration 9500
+    :caption: Auto-generated sequence at iteration 6000
 
-.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/manual_generated_iter_9500.txt
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/manual_generated_iter_6000.txt
     :language: console
-    :caption: Manually sequence at iteration 9500 with custom prompt
+    :caption: Manually sequence at iteration 6000 with custom prompt
 
 
 C - Prediction: Creating new sequences with a trained model
@@ -225,16 +225,16 @@ Here are the auto-generated and manually generated sequences at iteration 500:
     :language: console
     :caption: Manually sequence at iteration 500 with custom prompt
 
-And as before, at iteration 9500, we can see that the model is starting to
+And as before, at iteration 6000, we can see that the model is starting to
 generate more meaningful sequences:
 
-.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/auto_generated_iter_9500_bpe.txt
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/auto_generated_iter_6000_bpe.txt
     :language: console
-    :caption: Auto-generated sequence at iteration 9500
+    :caption: Auto-generated sequence at iteration 6000
 
-.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/manual_generated_iter_9500_bpe.txt
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/manual_generated_iter_6000_bpe.txt
     :language: console
-    :caption: Manually sequence at iteration 9500 with custom prompt
+    :caption: Manually sequence at iteration 6000 with custom prompt
 
 Hopefully this tutorial has given you a good overview of how to use
 the sequence generation functionality in ``EIR``. Thank you for reading!

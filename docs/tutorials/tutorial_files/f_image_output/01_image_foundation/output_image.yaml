@@ -1,10 +1,11 @@
 output_info:
-  output_source: /Users/txb777/Projects/phd/EIR-tutorial-data/data/processed/image_coco/images
+  output_source: eir_tutorials/f_image_output/01_image_foundation/data/images
   output_name: image
   output_type: image
 
 output_type_info:
   adaptive_normalization_max_samples: 10000
+  mode: "RGB"
   loss: "mse"
   size:
     - 128

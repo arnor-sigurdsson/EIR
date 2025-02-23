@@ -1,5 +1,5 @@
 input_info:
-  input_source: /Users/txb777/Projects/phd/EIR-tutorial-data/data/processed/image_coco/images
+  input_source: eir_tutorials/f_image_output/01_image_foundation/data/images
   input_name: image
   input_type: image
 

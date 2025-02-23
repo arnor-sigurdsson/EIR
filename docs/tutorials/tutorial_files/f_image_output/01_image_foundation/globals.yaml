@@ -1,7 +1,6 @@
 basic_experiment:
   batch_size: 64
   dataloader_workers: 8
-  device: mps
   memory_dataset: false
   n_epochs: 20
   output_folder: eir_tutorials/tutorial_runs/f_image_output/01_image_foundation

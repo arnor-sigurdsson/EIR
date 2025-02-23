@@ -1,6 +1,5 @@
 basic_experiment:
   batch_size: 64
-  device: mps
   memory_dataset: false
   n_epochs: 3
   output_folder: eir_tutorials/tutorial_runs/c_sequence_output/03_image_captioning

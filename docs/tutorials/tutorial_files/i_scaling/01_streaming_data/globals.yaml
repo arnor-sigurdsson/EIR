@@ -1,6 +1,5 @@
 basic_experiment:
   batch_size: 256
-  device: mps
   memory_dataset: true
   n_epochs: 100
   output_folder: eir_tutorials/tutorial_runs/i_scaling/01_streaming

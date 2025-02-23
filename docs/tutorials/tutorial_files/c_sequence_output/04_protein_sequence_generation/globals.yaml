@@ -1,6 +1,5 @@
 basic_experiment:
   batch_size: 256
-  device: mps
   memory_dataset: false
   n_epochs: 20
   output_folder: eir_tutorials/tutorial_runs/c_sequence_output/04_protein_sequences

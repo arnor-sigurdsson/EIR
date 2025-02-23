@@ -1,3 +1,4 @@
+import os
 import subprocess
 import time
 from collections.abc import Sequence
@@ -26,10 +27,23 @@ def run_with_server(command: list[str]) -> Path:
     if run_folder.exists():
         return run_folder
 
+    env = os.environ.copy()
+    env.update(
+        {
+            "MAX_SEQUENCES": "8000000",
+            "SEQUENCE_LENGTH": "256",
+            "DATASET_NAME": "Skylion007/openwebtext",
+            "DATASET_SPLIT": "train",
+        }
+    )
+
+    server_args = [
+        "python",
+        server_path,
+    ]
+
     server_process = subprocess.Popen(
-        ["python", server_path],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        server_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
     )
 
     try:
@@ -70,12 +84,12 @@ def get_streaming_generation_experiment() -> AutoDocExperimentInfo:
             "figures/manual_generated_iter_500.txt",
         ),
         (
-            "samples/2500/auto/0_generated.txt",
-            "figures/auto_generated_iter_2500.txt",
+            "samples/45000/auto/0_generated.txt",
+            "figures/auto_generated_iter_45000.txt",
         ),
         (
-            "samples/2500/manual/1_generated.txt",
-            "figures/manual_generated_iter_2500.txt",
+            "samples/40000/manual/1_generated.txt",
+            "figures/manual_generated_iter_45000.txt",
         ),
     ]
 

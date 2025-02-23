@@ -4,20 +4,20 @@ output_info:
   output_type: sequence
 
 output_type_info:
-  max_length: 64
+  max_length: 256
   split_on: null
   tokenizer: "bpe"
-  adaptive_tokenizer_max_vocab_size: 8192
+  adaptive_tokenizer_max_vocab_size: 32768
   sampling_strategy_if_longer: "uniform"
   min_freq: 1
 
 model_config:
-  embedding_dim: 128
+  embedding_dim: 512
   model_init_config:
-    num_layers: 2
+    num_layers: 4
 
 sampling_config:
-  generated_sequence_length: 64
+  generated_sequence_length: 512
   n_eval_inputs: 1
 
   manual_inputs:

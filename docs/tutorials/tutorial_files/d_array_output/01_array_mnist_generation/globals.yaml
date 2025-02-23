@@ -1,6 +1,5 @@
 basic_experiment:
   batch_size: 64
-  device: mps
   memory_dataset: true
   n_epochs: 10
   output_folder: eir_tutorials/tutorial_runs/d_array_output/01_array_mnist_generation

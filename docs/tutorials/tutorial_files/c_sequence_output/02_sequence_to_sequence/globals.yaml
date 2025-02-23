@@ -1,6 +1,5 @@
 basic_experiment:
   batch_size: 256
-  device: mps
   memory_dataset: true
   n_epochs: 10
   output_folder: eir_tutorials/tutorial_runs/c_sequence_output/02_seq_to_seq

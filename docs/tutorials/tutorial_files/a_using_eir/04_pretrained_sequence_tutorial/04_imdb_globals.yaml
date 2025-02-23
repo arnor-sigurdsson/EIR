@@ -1,6 +1,5 @@
 basic_experiment:
   dataloader_workers: 0
-  device: mps
   memory_dataset: true
   n_epochs: 25
   output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_04_imdb_run

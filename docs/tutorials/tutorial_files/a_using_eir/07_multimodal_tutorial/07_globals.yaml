@@ -3,7 +3,6 @@ attribution_analysis:
   compute_attributions: false
   max_attributions_per_class: 512
 basic_experiment:
-  device: mps
   memory_dataset: true
   n_epochs: 25
   output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_07_multimodal_run
