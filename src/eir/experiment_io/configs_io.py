@@ -170,6 +170,7 @@ def save_yaml_configs(
                 "metrics",
                 "visualization_logging",
                 "latent_sampling",
+                "data_preparation",
                 "accelerator",
             ]
             config_dict = {k: getattr(config_object, k) for k in main_keys}
