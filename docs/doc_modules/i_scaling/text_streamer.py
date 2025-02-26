@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 from threading import Lock
 from typing import Any
@@ -36,7 +35,7 @@ class ConnectionManager:
         self,
         max_sequences: int = 200_000,
         sequence_length: int = 256,
-        dataset_name: str = "Skylion007/openwebtext",
+        dataset_name: str = "HuggingFaceFW/fineweb",
         dataset_split: str = "train",
     ):
         self.active_connections: dict[WebSocket, dict] = {}
@@ -49,6 +48,8 @@ class ConnectionManager:
         self.dataset_name = dataset_name
         self.dataset_split = dataset_split
         self.validation_ids: set[str] = set()
+
+        self.dataset_iterator = None
 
         self.load_dataset()
 
@@ -98,42 +99,47 @@ class ConnectionManager:
             await connection.send_json(message)
 
     def reset(self):
-        self.current_position = 0
+        if self.dataset is not None:
+            self.dataset_iterator = iter(self.dataset)
+        self.global_position = 0
 
     def load_dataset(self):
         if self.dataset is None:
             self.dataset = load_dataset(
-                "Skylion007/openwebtext",
+                "HuggingFaceFW/fineweb",
+                name="sample-10BT",
                 split="train",
+                streaming=True,
                 trust_remote_code=True,
             )
+            self.dataset_iterator = iter(self.dataset)
 
-    def get_sequence_batch(
-        self,
-        batch_size: int,
-    ) -> list[dict[str, Any]]:
+    def get_sequence_batch(self, batch_size: int) -> list[dict[str, Any]]:
         batch = []
         min_words = 20
 
         with self._position_lock:
-            start_position = self.global_position
-
-            while len(batch) < batch_size and start_position < self.max_sequences:
+            items_processed = 0
+            while len(batch) < batch_size and items_processed < self.max_sequences:
                 try:
-                    text = self.dataset[start_position]["text"].strip()
+                    sample = next(self.dataset_iterator)
+                    text = sample["text"].strip()
+
                     words = text.split()
-
                     word_count = len(words)
-                    ranges = list(range(0, word_count, self.sequence_length))
 
-                    base_sample_id = f"sample_{start_position}_"
+                    if word_count < min_words:
+                        items_processed += 1
+                        continue
+
+                    ranges = list(range(0, word_count, self.sequence_length))
+                    base_sample_id = f"sample_{self.global_position}_"
 
                     for chunk_idx, i in enumerate(ranges):
                         if len(batch) >= batch_size:
                             break
 
                         chunk_words = words[i : i + self.sequence_length]
-
                         if len(chunk_words) >= min_words:
                             chunk = " ".join(chunk_words)
                             sample_id = base_sample_id + str(chunk_idx)
@@ -149,21 +155,20 @@ class ConnectionManager:
                                     }
                                 )
 
-                    start_position += 1
+                    self.global_position += 1
+                    items_processed += 1
 
-                except IndexError:
-                    start_position = 0
-                    break
-
-            self.global_position = start_position
+                except StopIteration:
+                    logger.info("Reached end of dataset stream, restarting iterator")
+                    self.dataset_iterator = iter(self.dataset)
 
         return batch
 
 
 def create_manager():
     max_sequences = int(os.getenv("MAX_SEQUENCES", "8000000"))
-    sequence_length = int(os.getenv("SEQUENCE_LENGTH", "256"))
-    dataset_name = os.getenv("DATASET_NAME", "Skylion007/openwebtext")
+    sequence_length = int(os.getenv("SEQUENCE_LENGTH", "1024"))
+    dataset_name = os.getenv("DATASET_NAME", "HuggingFaceFW/fineweb")
     dataset_split = os.getenv("DATASET_SPLIT", "train")
 
     logger.info(
@@ -189,100 +194,85 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            try:
-                data = await websocket.receive_json()
-                message_type = data.get("type")
+            data = await websocket.receive_json()
+            message_type = data.get("type")
 
-                if message_type == "getInfo":
-                    dataset_info = DatasetInfo(
-                        inputs={},
-                        outputs={
-                            "text_output": OutputInfo(type="sequence"),
+            if message_type == "getInfo":
+                dataset_info = DatasetInfo(
+                    inputs={},
+                    outputs={
+                        "text_output": OutputInfo(type="sequence"),
+                    },
+                )
+
+                await manager.send_personal_message(
+                    message={"type": "info", "payload": dataset_info.model_dump()},
+                    websocket=websocket,
+                )
+
+            elif message_type == "getData":
+                batch_size = data.get("payload", {}).get("batch_size", 32)
+                batch = manager.get_sequence_batch(batch_size=batch_size)
+
+                if not batch:
+                    await manager.send_personal_message(
+                        message={"type": "data", "payload": ["terminate"]},
+                        websocket=websocket,
+                    )
+                    break
+
+                await manager.send_personal_message(
+                    message={"type": "data", "payload": batch}, websocket=websocket
+                )
+
+            elif message_type == "setValidationIds":
+                validation_ids = data.get("payload", {}).get("validation_ids", [])
+                manager.validation_ids = set(validation_ids)
+
+                await manager.send_personal_message(
+                    message={
+                        "type": "validationIdsConfirmation",
+                        "payload": {
+                            "message": f"Received {len(validation_ids)} validation IDs"
                         },
-                    )
+                    },
+                    websocket=websocket,
+                )
 
-                    await manager.send_personal_message(
-                        message={"type": "info", "payload": dataset_info.model_dump()},
-                        websocket=websocket,
-                    )
-
-                elif message_type == "getData":
-                    batch_size = data.get("payload", {}).get("batch_size", 32)
-                    batch = manager.get_sequence_batch(
-                        batch_size=batch_size,
-                    )
-
-                    if not batch:
-                        await manager.send_personal_message(
-                            message={"type": "data", "payload": ["terminate"]},
-                            websocket=websocket,
-                        )
-                        break
-
-                    await manager.send_personal_message(
-                        message={"type": "data", "payload": batch},
-                        websocket=websocket,
-                    )
-
-                elif message_type == "setValidationIds":
-                    validation_ids = data.get("payload", {}).get("validation_ids", [])
-                    manager.validation_ids = set(validation_ids)
-
-                    await manager.send_personal_message(
-                        message={
-                            "type": "validationIdsConfirmation",
-                            "payload": {
-                                "message": f"Received {len(validation_ids)} "
-                                f"validation IDs"
-                            },
-                        },
-                        websocket=websocket,
-                    )
-
-                elif message_type == "reset":
-                    manager.reset()
-                    await manager.send_personal_message(
-                        message={
-                            "type": "resetConfirmation",
-                            "payload": {"message": "Reset successful"},
-                        },
-                        websocket=websocket,
-                    )
-                    await manager.broadcast(
-                        message={
-                            "type": "reset",
-                            "payload": {"message": "Reset command received"},
-                        }
-                    )
-
-                elif message_type == "status":
-                    status_data = {
-                        "active_connections": len(manager.active_connections),
-                        "global_position": manager.global_position,
-                        "validation_ids_count": len(manager.validation_ids),
+            elif message_type == "reset":
+                manager.reset()
+                await manager.send_personal_message(
+                    message={
+                        "type": "resetConfirmation",
+                        "payload": {"message": "Reset successful"},
+                    },
+                    websocket=websocket,
+                )
+                await manager.broadcast(
+                    message={
+                        "type": "reset",
+                        "payload": {"message": "Reset command received"},
                     }
+                )
 
-                    await manager.send_personal_message(
-                        message={"type": "status", "payload": status_data},
-                        websocket=websocket,
-                    )
+            elif message_type == "status":
+                status_data = {
+                    "active_connections": len(manager.active_connections),
+                    "current_position": manager.global_position,
+                    "validation_ids_count": len(manager.validation_ids),
+                }
 
-                elif message_type == "heartbeat":
-                    await manager.send_personal_message(
-                        message={"type": "heartbeat"}, websocket=websocket
-                    )
-            except json.JSONDecodeError:
-                logger.error("Invalid JSON received")
-                continue
-            except Exception as e:
-                logger.error(f"Error processing message: {e}")
-                continue
+                await manager.send_personal_message(
+                    message={"type": "status", "payload": status_data},
+                    websocket=websocket,
+                )
+
+            elif message_type == "heartbeat":
+                await manager.send_personal_message(
+                    message={"type": "heartbeat"}, websocket=websocket
+                )
 
     except WebSocketDisconnect:
-        logger.info("Client disconnected normally")
-        manager.disconnect(websocket)
-    except Exception as e:
-        logger.error(f"Error in websocket connection: {e}")
         manager.disconnect(websocket)
     finally:
         manager.disconnect(websocket)

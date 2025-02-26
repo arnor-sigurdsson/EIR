@@ -82,10 +82,12 @@ class SwiGLU(nn.Module):
             bias=bias,
         )
 
+        self._init_weights()
+
     def _init_weights(self):
         torch.nn.init.normal_(self.w1.weight, mean=0.0, std=0.02)
-        torch.nn.init.normal_(self.w1.weight, mean=0.0, std=0.02)
-        torch.nn.init.normal_(self.w1.weight, mean=0.0, std=0.02)
+        torch.nn.init.normal_(self.w2.weight, mean=0.0, std=0.02)
+        torch.nn.init.normal_(self.w3.weight, mean=0.0, std=0.02)
 
     def forward(self, x: Tensor) -> Tensor:
         hidden = self.w1(x)
@@ -111,7 +113,7 @@ class TransformerBlock(nn.Module):
     ):
         super().__init__()
 
-        msg = "d_model ({d_model}) must be divisible by n_head ({n_head})"
+        msg = f"d_model ({d_model}) must be divisible by n_head ({n_head})"
         assert d_model % n_head == 0, msg
 
         self.d_model = d_model
