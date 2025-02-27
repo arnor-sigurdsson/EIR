@@ -14,6 +14,7 @@ from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
     prepare_inputs_memory,
 )
 from eir.experiment_io.label_transformer_io import load_transformers
+from eir.models.model_training_utils import recursive_to_device
 from eir.predict_modules.predict_input_setup import (
     get_input_setup_function_map_for_predict,
 )
@@ -101,7 +102,8 @@ def general_pre_process(
     )
 
     inputs_final = default_collate(inputs_prepared)
-    inputs_final = inputs_final
+    device = str(exp.fabric.device)
+    inputs_final = recursive_to_device(obj=inputs_final, device=device)
 
     loader_batch = (inputs_final, None, None)
 

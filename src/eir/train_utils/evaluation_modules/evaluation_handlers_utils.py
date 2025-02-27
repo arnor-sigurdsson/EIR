@@ -1,7 +1,6 @@
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from copy import deepcopy
-from dataclasses import dataclass
 from itertools import cycle
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
@@ -60,8 +59,9 @@ from eir.setup.input_setup_modules.setup_image import (
 from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
-    TokenizerProtocolPreSplit,
-    TokenizerProtocolRaw,
+    HFTokenizerWrapper,
+    SpecialTokens,
+    get_special_tokens,
 )
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
@@ -86,7 +86,8 @@ logger = get_logger(name=__name__)
 
 
 def remove_special_tokens_from_string(
-    string: str, special_tokens: "SpecialTokens"
+    string: str,
+    special_tokens: SpecialTokens,
 ) -> str:
     """
     TODO:   Deprecate in favor of `remove_special_tokens`, due to not being guaranteed
@@ -102,7 +103,8 @@ def remove_special_tokens_from_string(
 
 
 def remove_special_tokens(
-    tokens: list[int], special_tokens: "SpecialTokens"
+    tokens: list[int],
+    special_tokens: SpecialTokens,
 ) -> list[int]:
     token_names = ["mask_idx", "pad_idx", "eos_idx", "bos_idx", "unk_idx"]
     for token in token_names:
@@ -146,6 +148,7 @@ def convert_model_inputs_to_raw(
                     tokens=data.cpu().numpy().tolist(),
                     vocab=input_object.vocab,
                     split_on=input_type_info.split_on,
+                    tokenizer=input_object.tokenizer,
                 )
                 special_tokens = get_special_tokens(
                     tokenizer=input_object.tokenizer, vocab=input_object.vocab
@@ -271,65 +274,38 @@ def general_pre_process_prepared_inputs(
     return batch_final
 
 
-@dataclass
-class SpecialTokens:
-    mask_idx: int
-    pad_idx: int
-    eos_idx: int
-    bos_idx: int
-    unk_idx: int
-
-    mask_token: str
-    pad_token: str
-    eos_token: str
-    bos_token: str
-    unk_token: str
-
-
-def get_special_tokens(
-    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit, vocab: Vocab
-) -> SpecialTokens:
-    keys_and_defaults = (
-        ("mask_token", "<mask>"),
-        ("pad_token", "<pad>"),
-        ("bos_token", "<bos>"),
-        ("eos_token", "<eos>"),
-        ("unk_token", "<unk>"),
-    )
-
-    token_values = {}
-    index_values = {}
-
-    for key, default in keys_and_defaults:
-        cur_token = getattr(tokenizer, key, default)
-        token_values[key] = cur_token
-
-        cur_index = vocab[cur_token]
-        idx_kwarg_key = key.replace("_token", "_idx")
-        index_values[idx_kwarg_key] = cur_index
-
-    special_tokens = SpecialTokens(
-        mask_idx=index_values["mask_idx"],
-        pad_idx=index_values["pad_idx"],
-        eos_idx=index_values["eos_idx"],
-        bos_idx=index_values["bos_idx"],
-        unk_idx=index_values["unk_idx"],
-        mask_token=token_values["mask_token"],
-        pad_token=token_values["pad_token"],
-        eos_token=token_values["eos_token"],
-        bos_token=token_values["bos_token"],
-        unk_token=token_values["unk_token"],
-    )
-
-    return special_tokens
-
-
 def decode_tokens(
     tokens: list[int],
     vocab: Vocab,
-    split_on: str | None,
+    tokenizer: Callable | None = None,
+    split_on: str | None = None,
+    token_cleaning_map: dict | None = None,
 ) -> str:
+    if tokenizer is not None:
+        if isinstance(tokenizer, HFTokenizerWrapper):
+            inner = tokenizer.tokenizer
+            return inner.decode(tokens)
+
     tokens_decoded = vocab.lookup_tokens(indices=tokens)
+
+    if token_cleaning_map is not None:
+        cleaned_tokens = []
+        for token in tokens_decoded:
+            for special_char, replacement in token_cleaning_map.items():
+                token = token.replace(special_char, replacement)
+            cleaned_tokens.append(token)
+        tokens_decoded = cleaned_tokens
+
+    elif any(
+        token.startswith("Ġ") for token in tokens_decoded if isinstance(token, str)
+    ):
+        for i, token in enumerate(tokens_decoded):
+            if isinstance(token, str) and token.startswith("Ġ"):
+                if i > 0:
+                    tokens_decoded[i] = " " + token[1:]
+                else:
+                    tokens_decoded[i] = token[1:]
+
     if split_on is not None:
         generated_sample = split_on.join(tokens_decoded)
     else:
@@ -374,7 +350,8 @@ def post_prepare_manual_inputs(
         assert input_object.tokenizer is not None
 
         specials = get_special_tokens(
-            tokenizer=input_object.tokenizer, vocab=input_object.vocab
+            tokenizer=input_object.tokenizer,
+            vocab=input_object.vocab,
         )
         pad_idx = specials.pad_idx
 

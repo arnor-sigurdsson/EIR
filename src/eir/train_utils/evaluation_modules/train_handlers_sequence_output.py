@@ -15,7 +15,11 @@ from eir.data_load.data_preparation_modules.imputation import (
 )
 from eir.data_load.datasets import al_getitem_return
 from eir.models.model_training_utils import predict_on_batch, recursive_to_device
-from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.input_setup_modules.setup_sequence import (
+    ComputedSequenceInputInfo,
+    SpecialTokens,
+    get_special_tokens,
+)
 from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
@@ -26,14 +30,12 @@ from eir.setup.schema_modules.output_schemas_sequence import (
 from eir.setup.schemas import OutputConfig, SequenceOutputTypeConfig
 from eir.train_utils import utils
 from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
-    SpecialTokens,
     convert_model_inputs_to_raw,
     decode_tokens,
     extract_input_types,
     general_pre_process_prepared_inputs,
     get_batch_generator,
     get_dataset_loader_single_sample_generator,
-    get_special_tokens,
     post_prepare_manual_inputs,
     prepare_base_input,
     prepare_manual_sample_data,
@@ -169,6 +171,7 @@ def sequence_out_single_sample_evaluation_wrapper(
                         tokens=generated_tokens,
                         vocab=cur_input_object.vocab,
                         split_on=output_type_info.split_on,
+                        tokenizer=cur_input_object.tokenizer,
                     )
                     special_tokens = get_special_tokens(
                         tokenizer=cur_input_object.tokenizer,
@@ -378,8 +381,11 @@ def autoregressive_sequence_generation(
     generated_tokens = autoregressive_pre_batch.generated_tokens
     indices = autoregressive_pre_batch.indices
 
-    indices_has_finished = {}
+    indices_has_finished: dict[int, bool] = {}
     for _i in range(0, sampling_config.generated_sequence_length):
+        if len(indices_has_finished) == len(eval_samples):
+            break
+
         target_indices = []
         for sample_index, _ in enumerate(eval_samples):
             cur_generated_tokens = generated_tokens[sample_index]

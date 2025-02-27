@@ -415,8 +415,6 @@ def hook_default_optimizer_backward(
         grad_acc_steps=gc.opt.gradient_accumulation_steps,
     )
 
-    state.get("amp_scaler")
-
     experiment.fabric.backward(loss, **optimizer_backward_kwargs)
 
     maybe_apply_gradient_noise_to_model(

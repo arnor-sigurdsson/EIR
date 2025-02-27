@@ -309,7 +309,7 @@ def get_dataloaders(
         if num_workers > 0:
             logger.warning(
                 "When using a streaming dataset with multiple "
-                " workers (num_workers > 0), "
+                "workers (num_workers > 0), "
                 "each worker will create its own "
                 "connection to the data server. This can "
                 "potentially lead to duplicate data "

@@ -111,6 +111,7 @@ al_tokenizer_choices = (
     | Literal["revtok"]
     | Literal["subword"]
     | Literal["bpe"]
+    | str
     | None
 )
 

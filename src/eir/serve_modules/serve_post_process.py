@@ -25,7 +25,10 @@ from eir.models.output.sequence.sequence_output_modules import (
 from eir.setup import schemas
 from eir.setup.config_setup_modules.config_setup_utils import object_to_primitives
 from eir.setup.input_setup import al_input_objects_as_dict
-from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.input_setup_modules.setup_sequence import (
+    ComputedSequenceInputInfo,
+    get_special_tokens,
+)
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
 from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
@@ -43,7 +46,6 @@ from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
 )
 from eir.train_utils.evaluation_modules.train_handlers_sequence_output import (
     decode_tokens,
-    get_special_tokens,
     remove_special_tokens_from_string,
 )
 from eir.utils.logging import get_logger
@@ -121,6 +123,7 @@ def general_post_process(
                     tokens=generated_tokens,
                     vocab=cur_input_object.vocab,
                     split_on=output_type_info.split_on,
+                    tokenizer=cur_input_object.tokenizer,
                 )
 
                 generated_sample = remove_special_tokens_from_string(

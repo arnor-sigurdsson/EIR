@@ -21,6 +21,7 @@ class ComputedSequenceOutputInfo:
     vocab: Vocab
     embedding_dim: int
     computed_max_length: int
+    special_tokens: setup_sequence.SpecialTokens
     encode_func: setup_sequence.al_encode_funcs
     tokenizer: setup_sequence.al_tokenizers | None
 
@@ -62,11 +63,17 @@ def set_up_sequence_output(
         gathered_stats=gathered_stats,
     )
 
+    special_tokens = setup_sequence.get_special_tokens(
+        tokenizer=tokenizer,
+        vocab=vocab,
+    )
+
     sequence_output = ComputedSequenceOutputInfo(
         output_config=output_config,
         vocab=vocab,
         embedding_dim=embedding_dim,
         computed_max_length=computed_max_length,
+        special_tokens=special_tokens,
         encode_func=encode_callable,
         tokenizer=tokenizer,
     )
@@ -98,10 +105,18 @@ def get_sequence_input_objects_from_output(
         tokenizer=tokenizer,
     )
 
-    encode_func = setup_sequence.get_tokenizer_encode_func(
-        tokenizer=tokenizer,
-        pytorch_vocab=vocab,
-    )
+    encode_func: setup_sequence.EncodeFuncProtocol
+    tokenizer_name = output_type_info.tokenizer
+    is_pretrained_tokenizer = tokenizer_name in setup_sequence.TOKENIZER_MAPPING_NAMES
+    if is_pretrained_tokenizer:
+        # here we delegate to the __call__ logic of HFTokenizerWrapper
+        assert isinstance(tokenizer, setup_sequence.HFTokenizerWrapper)
+        encode_func = tokenizer
+    else:
+        encode_func = setup_sequence.get_tokenizer_encode_func(
+            tokenizer=tokenizer,
+            pytorch_vocab=vocab,
+        )
 
     return vocab, gathered_stats, tokenizer, encode_func
 

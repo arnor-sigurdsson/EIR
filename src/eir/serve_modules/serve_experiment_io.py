@@ -77,10 +77,11 @@ def load_experiment_for_serve(
         inputs=inputs,
         device=device,
     )
+    assert not model.training
 
     fabric = setup_accelerator(configs=loaded_train_experiment.configs)
-
-    assert not model.training
+    model = fabric.setup(model)
+    model.eval()
 
     loaded_train_experiment_as_dict = loaded_train_experiment.__dict__
     serve_experiment_kwargs = {

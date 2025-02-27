@@ -412,12 +412,11 @@ def get_default_predict_experiment(
         configs=configs_overloaded_for_predict
     )
     model = fabric.setup(model)
+    model.eval()
 
     test_dataloader = fabric.setup_dataloaders(test_dataloader_base)
     if isinstance(test_dataloader, list):
         raise ValueError("Expected a single DataLoader, got a list")
-
-    model.eval()
 
     default_predict_hooks = _get_default_predict_hooks(train_hooks=default_train_hooks)
     predict_experiment = PredictExperiment(
