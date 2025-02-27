@@ -12,7 +12,7 @@ TUTORIAL_NAME = "02_scaling_compute"
 
 
 def run_with_server(command: list[str]) -> Path:
-    server_path = f"docs/doc_modules/{CONTENT_ROOT}/openwebtext_streamer.py"
+    server_path = f"docs/doc_modules/{CONTENT_ROOT}/text_streamer.py"
 
     globals_file = next(i for i in command if "globals" in i)
     globals_dict = load_yaml_config(config_path=globals_file)
@@ -31,8 +31,8 @@ def run_with_server(command: list[str]) -> Path:
     env.update(
         {
             "MAX_SEQUENCES": "8000000",
-            "SEQUENCE_LENGTH": "256",
-            "DATASET_NAME": "Skylion007/openwebtext",
+            "SEQUENCE_LENGTH": "1024",
+            "DATASET_NAME": "HuggingFaceFW/fineweb",
             "DATASET_SPLIT": "train",
         }
     )

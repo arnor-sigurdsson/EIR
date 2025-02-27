@@ -11,7 +11,7 @@ TUTORIAL_NAME = "01_streaming_data"
 
 
 def run_with_server(command: list[str]) -> Path:
-    server_path = f"docs/doc_modules/{CONTENT_ROOT}/openwebtext_streamer.py"
+    server_path = f"docs/doc_modules/{CONTENT_ROOT}/text_streamer.py"
 
     globals_file = next(i for i in command if "globals" in i)
     globals_dict = load_yaml_config(config_path=globals_file)

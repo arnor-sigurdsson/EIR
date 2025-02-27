@@ -49,6 +49,12 @@ class ConnectionManager:
         self.dataset_split = dataset_split
         self.validation_ids: set[str] = set()
 
+        logger.info(f"Loading dataset {dataset_name} with split {dataset_split}")
+        logger.info(
+            f"Using max_sequences={self.max_sequences} and "
+            f"sequence_length={self.sequence_length}"
+        )
+
         self.dataset_iterator = None
 
         self.load_dataset()
@@ -118,6 +124,9 @@ class ConnectionManager:
         batch = []
         min_words = 20
 
+        accumulated_text = []
+        accumulated_words = 0
+
         with self._position_lock:
             items_processed = 0
             while len(batch) < batch_size and items_processed < self.max_sequences:
@@ -132,35 +141,57 @@ class ConnectionManager:
                         items_processed += 1
                         continue
 
-                    ranges = list(range(0, word_count, self.sequence_length))
-                    base_sample_id = f"sample_{self.global_position}_"
+                    if accumulated_words > 0:
+                        accumulated_text.append("<|endoftext|>")
 
-                    for chunk_idx, i in enumerate(ranges):
+                    accumulated_text.extend(words)
+                    accumulated_words += word_count
+
+                    while accumulated_words >= self.sequence_length:
+                        chunk_words = accumulated_text[: self.sequence_length]
+                        chunk = " ".join(chunk_words)
+
+                        sample_id = f"sample_{self.global_position}"
+
+                        if sample_id not in self.validation_ids:
+                            batch.append(
+                                {
+                                    "inputs": {"text_output": chunk},
+                                    "target_labels": {
+                                        "text_output": {"text_output": chunk}
+                                    },
+                                    "sample_id": sample_id,
+                                }
+                            )
+
+                        accumulated_text = accumulated_text[self.sequence_length :]
+                        accumulated_words -= self.sequence_length
+
+                        self.global_position += 1
+
                         if len(batch) >= batch_size:
                             break
 
-                        chunk_words = words[i : i + self.sequence_length]
-                        if len(chunk_words) >= min_words:
-                            chunk = " ".join(chunk_words)
-                            sample_id = base_sample_id + str(chunk_idx)
-
-                            if sample_id not in self.validation_ids:
-                                batch.append(
-                                    {
-                                        "inputs": {"text_output": chunk},
-                                        "target_labels": {
-                                            "text_output": {"text_output": chunk}
-                                        },
-                                        "sample_id": sample_id,
-                                    }
-                                )
-
-                    self.global_position += 1
                     items_processed += 1
 
                 except StopIteration:
                     logger.info("Reached end of dataset stream, restarting iterator")
                     self.dataset_iterator = iter(self.dataset)
+
+            if accumulated_words >= min_words and len(batch) < batch_size:
+                chunk = " ".join(accumulated_text)
+                sample_id = f"sample_{self.global_position}"
+
+                if sample_id not in self.validation_ids:
+                    batch.append(
+                        {
+                            "inputs": {"text_output": chunk},
+                            "target_labels": {"text_output": {"text_output": chunk}},
+                            "sample_id": sample_id,
+                        }
+                    )
+
+                self.global_position += 1
 
         return batch
 
