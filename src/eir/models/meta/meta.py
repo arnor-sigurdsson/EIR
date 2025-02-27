@@ -57,6 +57,9 @@ def apply_scaled_residual_init(model: MetaModel, base_std: float = 0.02) -> None
     """
     num_layers = sum(1 for m in model.modules() if isinstance(m, TransformerBlock))
 
+    if num_layers == 0:
+        return
+
     scale_factor = math.sqrt(2 * num_layers)
     scaled_std = base_std / scale_factor
 
