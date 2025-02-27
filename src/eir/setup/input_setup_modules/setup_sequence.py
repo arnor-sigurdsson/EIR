@@ -1017,8 +1017,8 @@ def get_special_tokens(
     has_inner = hasattr(tokenizer, "tokenizer")
     has_specials_map = False
     if has_inner:
-        assert isinstance(tokenizer, HFTokenizerWrapper)
-        has_specials_map = hasattr(tokenizer.tokenizer, "special_tokens_map")
+        if isinstance(tokenizer, HFTokenizerWrapper):
+            has_specials_map = hasattr(tokenizer.tokenizer, "special_tokens_map")
 
     for key, default in keys_and_defaults:
         if has_inner and has_specials_map:
