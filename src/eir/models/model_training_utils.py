@@ -5,10 +5,10 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Optional,
+    TypedDict,
 )
 
 import torch
-from aislib.pytorch_modules import Swish
 from torch import nn
 from torch.nn import Module
 from torch.utils.data import DataLoader
@@ -403,48 +403,45 @@ def _do_stack(
     return torch.stack(list_of_elements)
 
 
-def add_wd_to_model_params(
-    model: nn.Module, wd: float
-) -> list[dict[str, nn.Parameter | float]]:
+class ParamGroup(TypedDict):
+    params: list[nn.Parameter]
+    weight_decay: float
+
+
+def add_wd_to_model_params(model: nn.Module, wd: float) -> list[ParamGroup]:
     """
     We want to skip adding weight decay to learnable activation parameters so as
     not to bias them towards 0.
 
-    TODO:   Split this function in two, one to get the parameters and one to add the
-            WD to them. Possibly we have to do it in-place here, not copy as we have
-            tensors.
-
-    Note: Since we are adding the weight decay manually here, the optimizer does not
-    touch the parameter group weight decay at initialization.
+    Parameters with dimensionality >= 2 (weight matrices, embeddings) will have
+    weight decay applied, while parameters with dimensionality < 2 (biases,
+    normalization parameters) will not.
     """
-    _check_named_modules(model=model)
+    param_dict = {pn: p for pn, p in model.named_parameters() if p.requires_grad}
 
-    param_list = []
-    for name, param in model.named_parameters():
-        cur_dict: dict[str, nn.Parameter | float]
-        cur_dict = {"params": param}
+    decay_params = []
+    no_decay_params = []
 
-        if "act_" in name:
-            cur_dict["weight_decay"] = 0.0
+    for _name, param in param_dict.items():
+        if param.dim() >= 2:
+            decay_params.append(param)
         else:
-            cur_dict["weight_decay"] = wd
+            no_decay_params.append(param)
 
-        param_list.append(cur_dict)
+    param_list = [
+        ParamGroup(params=decay_params, weight_decay=wd),
+        ParamGroup(params=no_decay_params, weight_decay=0.0),
+    ]
+
+    num_decay_params = sum(p.numel() for p in decay_params)
+    num_no_decay_params = sum(p.numel() for p in no_decay_params)
+    logger.debug(
+        f"Number of weight-decayed parameters: {num_decay_params:,} "
+        f"({len(decay_params)} tensors)"
+    )
+    logger.debug(
+        f"Number of non-decayed parameters: {num_no_decay_params:,} "
+        f"({len(no_decay_params)} tensors)"
+    )
 
     return param_list
-
-
-def _check_named_modules(model: nn.Module):
-    """
-    We have this function as a safeguard to check that activations that have learnable
-    parameters are named correctly (so that WD is not applied to them). Also, we want
-    to make sure we don't have modules that are named 'incorrectly' and have the WD
-    skipped when they should have it.
-    """
-
-    for name, module in model.named_modules():
-        if name.startswith("act_"):
-            assert isinstance(module, Swish | nn.PReLU), (name, module)
-
-        if isinstance(module, Swish | nn.PReLU):
-            assert "act_" in name, name
