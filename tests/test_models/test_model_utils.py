@@ -159,18 +159,20 @@ def test_get_model_params(create_test_util_model):
 
     weight_decay = 0.05
     model_params = model_training_utils.add_wd_to_model_params(
-        model=test_model, wd=weight_decay
+        model=test_model,
+        wd=weight_decay,
     )
 
-    # BN has weight and bias, hence 6 [w] + 2 [b] + 2 = 10 parameter groups
-    assert len(model_params) == 10
+    model_params_with_decay = model_params[0]
+    model_params_no_decay = model_params[1]
 
-    for param_group in model_params:
-        cur_params: nn.Parameter = param_group["params"]
-        if cur_params.shape[0] == 1:
-            assert param_group["weight_decay"] == 0.00
-        else:
-            assert param_group["weight_decay"] == 0.05
+    # the 2 linear layers
+    assert len(model_params_with_decay["params"]) == 2
+    assert model_params_with_decay["weight_decay"] == weight_decay
+
+    # 2 PReLU + 2 BN Gamma + 2 BN Bias + 2 Linear Bias
+    assert len(model_params_no_decay["params"]) == 8
+    assert model_params_no_decay["weight_decay"] == 0.0
 
 
 def set_up_stack_list_of_tensors_dicts_data():
