@@ -28,6 +28,8 @@ def mock_serve_experiment():
     }
     mock_exp.hooks = Mock()
     mock_exp.hooks.step_func_hooks.base_prepare_batch = []
+    mock_exp.fabric = Mock()
+    mock_exp.fabric.device = "cpu"
     return mock_exp
 
 
