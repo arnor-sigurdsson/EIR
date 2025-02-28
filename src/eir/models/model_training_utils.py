@@ -435,13 +435,14 @@ def add_wd_to_model_params(model: nn.Module, wd: float) -> list[ParamGroup]:
 
     num_decay_params = sum(p.numel() for p in decay_params)
     num_no_decay_params = sum(p.numel() for p in no_decay_params)
-    logger.debug(
-        f"Number of weight-decayed parameters: {num_decay_params:,} "
-        f"({len(decay_params)} tensors)"
-    )
-    logger.debug(
-        f"Number of non-decayed parameters: {num_no_decay_params:,} "
-        f"({len(no_decay_params)} tensors)"
-    )
+    if wd > 0.0:
+        logger.debug(
+            f"Number of weight-decayed (wd={wd}) parameters: {num_decay_params:,} "
+            f"({len(decay_params)} tensors)"
+        )
+        logger.debug(
+            f"Number of non-decayed parameters: {num_no_decay_params:,} "
+            f"({len(no_decay_params)} tensors)"
+        )
 
     return param_list
