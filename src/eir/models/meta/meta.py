@@ -33,7 +33,7 @@ class MetaModel(nn.Module):
         self.fusion_to_output_mapping = fusion_to_output_mapping
         self.tensor_broker = tensor_broker
 
-        apply_scaled_residual_init(model=self, base_std=0.02)
+        apply_transformer_specific_modifications(model=self)
 
     def forward(
         self,
@@ -48,6 +48,11 @@ class MetaModel(nn.Module):
         )
 
         return output_modules_out
+
+
+def apply_transformer_specific_modifications(model: MetaModel) -> None:
+    apply_scaled_residual_init(model=model, base_std=0.02)
+    apply_weight_tying(model=model)
 
 
 def apply_scaled_residual_init(model: MetaModel, base_std: float = 0.02) -> None:
@@ -71,3 +76,40 @@ def apply_scaled_residual_init(model: MetaModel, base_std: float = 0.02) -> None
     for name, param in model.named_parameters():
         if any(name.endswith(suffix) for suffix in ["out_proj.weight", "w3.weight"]):
             nn.init.normal_(param, mean=0.0, std=scaled_std)
+
+
+def apply_weight_tying(model: MetaModel) -> None:
+    """
+    Apply weight tying between input module embeddings and output module heads.
+    Supports both standard and unusual weight layouts.
+
+    TODO: Maybe make configurable in the model configuration.
+    """
+
+    if not isinstance(model, MetaModel):
+        logger.warning(f"Expected MetaModel, got {type(model).__name__}")
+        return
+
+    tied_pairs = []
+
+    for input_name, input_module in model.input_modules.items():
+        if input_name not in model.output_modules:
+            continue
+
+        output_module = model.output_modules[input_name]
+
+        embedding = getattr(input_module, "embedding", None)
+        head = getattr(output_module, "head", None)
+
+        if embedding is None or head is None:
+            continue
+
+        if embedding.weight.shape == head.weight.shape:
+            logger.info(f"Tying weights for {input_name} with direct sharing")
+            head.weight = embedding.weight
+            tied_pairs.append(input_name)
+
+    if tied_pairs:
+        logger.info(f"Weight tying applied for modules: {', '.join(tied_pairs)}")
+    else:
+        logger.info("No compatible modules found for weight tying.")
