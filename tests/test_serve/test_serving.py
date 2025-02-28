@@ -77,11 +77,11 @@ def get_base_parametrization(compiled: bool = False) -> dict:
                 "basic_experiment": {
                     "output_folder": "multi_task_multi_modal",
                     "n_epochs": 12,
-                    "wd": 1e-04,
                 },
                 "optimization": {
                     "gradient_clipping": 1.0,
                     "lr": 0.001,
+                    "wd": 1e-04,
                 },
                 "model": {
                     "compile_model": compiled,
