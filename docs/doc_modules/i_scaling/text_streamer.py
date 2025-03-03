@@ -33,7 +33,6 @@ class DatasetInfo(BaseModel):
 class ConnectionManager:
     def __init__(
         self,
-        max_sequences: int = 200_000,
         sequence_length: int = 256,
         dataset_name: str = "HuggingFaceFW/fineweb",
         dataset_split: str = "train",
@@ -43,17 +42,13 @@ class ConnectionManager:
         self._position_lock = Lock()
 
         self.dataset = None
-        self.max_sequences = max_sequences
         self.sequence_length = sequence_length
         self.dataset_name = dataset_name
         self.dataset_split = dataset_split
         self.validation_ids: set[str] = set()
 
         logger.info(f"Loading dataset {dataset_name} with split {dataset_split}")
-        logger.info(
-            f"Using max_sequences={self.max_sequences} and "
-            f"sequence_length={self.sequence_length}"
-        )
+        logger.info(f"Using sequence_length={self.sequence_length}")
 
         self.dataset_iterator = None
 
@@ -128,8 +123,7 @@ class ConnectionManager:
         accumulated_words = 0
 
         with self._position_lock:
-            items_processed = 0
-            while len(batch) < batch_size and items_processed < self.max_sequences:
+            while len(batch) < batch_size:
                 try:
                     sample = next(self.dataset_iterator)
                     text = sample["text"].strip()
@@ -138,7 +132,6 @@ class ConnectionManager:
                     word_count = len(words)
 
                     if word_count < min_words:
-                        items_processed += 1
                         continue
 
                     if accumulated_words > 0:
@@ -172,8 +165,6 @@ class ConnectionManager:
                         if len(batch) >= batch_size:
                             break
 
-                    items_processed += 1
-
                 except StopIteration:
                     logger.info("Reached end of dataset stream, restarting iterator")
                     self.dataset_iterator = iter(self.dataset)
@@ -197,19 +188,16 @@ class ConnectionManager:
 
 
 def create_manager():
-    max_sequences = int(os.getenv("MAX_SEQUENCES", "8000000"))
-    sequence_length = int(os.getenv("SEQUENCE_LENGTH", "1024"))
+    sequence_length = int(os.getenv("SEQUENCE_LENGTH", "512"))
     dataset_name = os.getenv("DATASET_NAME", "HuggingFaceFW/fineweb")
     dataset_split = os.getenv("DATASET_SPLIT", "train")
 
     logger.info(
-        f"Creating ConnectionManager with max_sequences={max_sequences}, "
-        f"sequence_length={sequence_length}, dataset_name={dataset_name}, "
-        f"dataset_split={dataset_split}"
+        f"Creating ConnectionManager with sequence_length={sequence_length}, "
+        f"dataset_name={dataset_name}, dataset_split={dataset_split}"
     )
 
     return ConnectionManager(
-        max_sequences=max_sequences,
         sequence_length=sequence_length,
         dataset_name=dataset_name,
         dataset_split=dataset_split,

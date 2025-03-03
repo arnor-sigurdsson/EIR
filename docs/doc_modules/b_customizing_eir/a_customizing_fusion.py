@@ -89,6 +89,10 @@ def modify_experiment(experiment: train.Experiment) -> train.Experiment:
         lr=1e-4,
     )
 
+    fabric = train.setup_accelerator(configs=experiment.configs)
+
+    my_model, my_optimizer = fabric.setup(my_model, my_optimizer)
+
     my_experiment_attributes["model"] = my_model
     my_experiment_attributes["optimizer"] = my_optimizer
 

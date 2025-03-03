@@ -1,3 +1,4 @@
+import argparse
 from collections.abc import Iterable
 from itertools import chain
 
@@ -143,30 +144,75 @@ def get_i_scaling_experiments() -> Iterable[AutoDocExperimentInfo]:
     )
 
 
-if __name__ == "__main__":
-    a_using_eir_experiments = _get_a_using_eir_experiments()
-    c_sequence_outputs_experiments = _get_c_sequence_outputs_experiments()
-    b_customizing_eir_experiments = _get_b_customizing_eir_experiments()
-    d_array_outputs_experiments = _get_d_array_outputs_experiments()
-    e_pretraining_experiments = _get_e_pretraining_outputs_experiments()
-    f_image_outputs_experiments = _get_f_image_outputs_experiments()
-    g_time_series_experiments = get_g_time_series_experiments()
-    h_survival_analysis_experiments = get_h_survival_analysis_experiments()
-    i_scaling_experiments = get_i_scaling_experiments()
-
-    experiment_iter = chain.from_iterable(
-        [
-            a_using_eir_experiments,
-            c_sequence_outputs_experiments,
-            b_customizing_eir_experiments,
-            d_array_outputs_experiments,
-            e_pretraining_experiments,
-            f_image_outputs_experiments,
-            g_time_series_experiments,
-            h_survival_analysis_experiments,
-            i_scaling_experiments,
-        ]
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate EIR documentation.")
+    parser.add_argument(
+        "--experiments",
+        type=str,
+        default=None,
+        help="Comma-separated list of experiment groups to run (e.g., 'a,b,c'). "
+        "Valid groups: a, b, c, d, e, f, g, h, i. "
+        "If not specified, all experiments will be run.",
     )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    if args.experiments is None:
+        run_a = run_b = run_c = run_d = run_e = run_f = run_g = run_h = run_i = True
+    else:
+        experiment_ids = args.experiments.split(",")
+        run_a = "a" in experiment_ids
+        run_b = "b" in experiment_ids
+        run_c = "c" in experiment_ids
+        run_d = "d" in experiment_ids
+        run_e = "e" in experiment_ids
+        run_f = "f" in experiment_ids
+        run_g = "g" in experiment_ids
+        run_h = "h" in experiment_ids
+        run_i = "i" in experiment_ids
+
+    experiments = []
+
+    if run_a:
+        a_using_eir_experiments = _get_a_using_eir_experiments()
+        experiments.append(a_using_eir_experiments)
+
+    if run_c:
+        c_sequence_outputs_experiments = _get_c_sequence_outputs_experiments()
+        experiments.append(c_sequence_outputs_experiments)
+
+    if run_b:
+        b_customizing_eir_experiments = _get_b_customizing_eir_experiments()
+        experiments.append(b_customizing_eir_experiments)
+
+    if run_d:
+        d_array_outputs_experiments = _get_d_array_outputs_experiments()
+        experiments.append(d_array_outputs_experiments)
+
+    if run_e:
+        e_pretraining_experiments = _get_e_pretraining_outputs_experiments()
+        experiments.append(e_pretraining_experiments)
+
+    if run_f:
+        f_image_outputs_experiments = _get_f_image_outputs_experiments()
+        experiments.append(f_image_outputs_experiments)
+
+    if run_g:
+        g_time_series_experiments = get_g_time_series_experiments()
+        experiments.append(g_time_series_experiments)
+
+    if run_h:
+        h_survival_analysis_experiments = get_h_survival_analysis_experiments()
+        experiments.append(h_survival_analysis_experiments)
+
+    if run_i:
+        i_scaling_experiments = get_i_scaling_experiments()
+        experiments.append(i_scaling_experiments)
+
+    experiment_iter = chain.from_iterable(experiments)
     for experiment in experiment_iter:
         match experiment:
             case AutoDocExperimentInfo():
