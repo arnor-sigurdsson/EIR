@@ -94,6 +94,8 @@ def compute_predict_attributions(
     background_dataloader = predict_config.fabric.setup_dataloaders(
         background_dataloader_base
     )
+    if isinstance(background_dataloader, list):
+        raise ValueError("Got a list of dataloaders, but expected a single dataloader.")
 
     overloaded_train_experiment = _overload_train_experiment_for_predict_attributions(
         train_config=loaded_train_experiment,
