@@ -111,6 +111,12 @@ class SequenceOutputSamplingConfig:
         the next token in an output sequence. For example, if top_p is 0.9, the model
         will stop sampling candidates once the cumulative probability of the most
         likely candidates reaches 0.9.
+
+    :param tau:
+        Controls locally typical sampling by filtering tokens based on how close their
+        probabilities are to the expected distribution. Values range from 0.0 to 1.0,
+        where 1.0 disables the filter. Lower values produce more consistent text by
+        removing outlier tokens.
     """
 
     manual_inputs: Sequence[dict[str, str]] = ()
@@ -121,3 +127,4 @@ class SequenceOutputSamplingConfig:
     temperature: float = 0.7
     top_k: int = 20
     top_p: float = 0.9
+    tau: float = 0.95

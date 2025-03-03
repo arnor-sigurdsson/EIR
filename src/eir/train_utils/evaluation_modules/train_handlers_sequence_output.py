@@ -641,6 +641,22 @@ def sample_next_token_index_from_output(
         top_p=sampling_config.top_p,
     )
 
+    tau = sampling_config.tau
+    filter_value = -float("Inf")
+    if tau < 1.0:
+        valid_tokens_mask = filtered_logits != filter_value
+        valid_tokens_count = valid_tokens_mask.sum(dim=-1)
+
+        batch_indices = torch.where(valid_tokens_count > 1)[0]
+        if len(batch_indices) > 0:
+            batch_logits = filtered_logits[batch_indices]
+            batch_filtered = locally_typical_sampling(
+                logits=batch_logits,
+                tau=tau,
+                filter_value=filter_value,
+            )
+            filtered_logits[batch_indices] = batch_filtered
+
     probabilities = F.softmax(input=filtered_logits, dim=-1)
     next_token_indices = torch.multinomial(input=probabilities, num_samples=1)
     next_token_indices_list = next_token_indices.squeeze(1).tolist()
@@ -678,3 +694,37 @@ def top_k_top_p_filtering(
             logits[i, indices_to_remove] = filter_value
 
     return logits
+
+
+def locally_typical_sampling(
+    logits: torch.Tensor,
+    tau: float = 0.95,
+    filter_value: float = -float("Inf"),
+) -> torch.Tensor:
+    """
+    From: https://arxiv.org/abs/2202.00666
+    """
+    filtered_logits = logits.clone()
+
+    probs = F.softmax(filtered_logits, dim=-1)
+
+    eps = 1e-10
+
+    # Calculate entropy of the distribution
+    entropy = -torch.sum(probs * torch.log(probs + eps), dim=-1, keepdim=True)
+
+    # Calculate typicality score
+    typical_score = torch.abs(torch.log(probs + eps) + entropy)
+
+    # Keep only tokens with typicality score below threshold
+    sorted_scores, _ = torch.sort(typical_score, dim=-1)
+
+    for i in range(filtered_logits.size(0)):
+        num_tokens = sorted_scores[i].size(-1)
+        threshold_idx = int((num_tokens - 1) * tau)
+
+        threshold = sorted_scores[i, threshold_idx]
+
+        filtered_logits[i, typical_score[i] > threshold] = filter_value
+
+    return filtered_logits
