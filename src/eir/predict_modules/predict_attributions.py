@@ -82,13 +82,17 @@ def compute_predict_attributions(
         train_configs=loaded_train_experiment.configs,
         predict_configs=predict_config.configs,
     )
-    background_dataloader = _get_predict_background_loader(
+    background_dataloader_base = _get_predict_background_loader(
         batch_size=gc.be.batch_size,
         num_attribution_background_samples=gc.aa.attribution_background_samples,
         outputs_as_dict=output_objects,
         configs=background_source_config,
         dataloader_workers=gc.be.dataloader_workers,
         loaded_hooks=loaded_train_experiment.hooks,
+    )
+
+    background_dataloader = predict_config.fabric.setup_dataloaders(
+        background_dataloader_base
     )
 
     overloaded_train_experiment = _overload_train_experiment_for_predict_attributions(
