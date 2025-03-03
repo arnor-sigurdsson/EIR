@@ -434,6 +434,7 @@ def autoregressive_sequence_generation(
             seq_output_name=seq_output_name,
             sampling_config=sampling_config,
             current_target_indices=target_indices,
+            generated_tokens_history=generated_tokens,
         )
 
         for sample_index, _ in enumerate(eval_samples):
@@ -626,10 +627,21 @@ def sample_next_token_index_from_output(
     seq_output_name: str,
     sampling_config: SequenceOutputSamplingConfig,
     current_target_indices: list[int],
+    generated_tokens_history: list[list[int]] | None = None,
 ) -> list[int]:
     cur_logits = outputs[seq_output_name][seq_output_name]
     batch_indices = torch.arange(cur_logits.size(0))
     cur_position_logits = cur_logits[batch_indices, current_target_indices, :]
+
+    repetition_penalty = sampling_config.repetition_penalty
+    if generated_tokens_history is not None and repetition_penalty != 1.0:
+        for i in range(cur_position_logits.size(0)):
+            cur_position_logits[i] = apply_repetition_penalty(
+                logits=cur_position_logits[i],
+                generated_tokens=generated_tokens_history[i],
+                penalty=repetition_penalty,
+                max_window=sampling_config.repetition_penalty_max_window,
+            )
 
     temperature = sampling_config.temperature
     if temperature != 1.0:
@@ -662,6 +674,38 @@ def sample_next_token_index_from_output(
     next_token_indices_list = next_token_indices.squeeze(1).tolist()
 
     return next_token_indices_list
+
+
+def apply_repetition_penalty(
+    logits: torch.Tensor,
+    generated_tokens: list[int],
+    penalty: float = 1.2,
+    max_window: int = 64,
+) -> torch.Tensor:
+    if not generated_tokens:
+        return logits
+
+    generated_tokens = generated_tokens[-max_window:]
+    unique_tokens = torch.tensor(list(set(generated_tokens)), device=logits.device)
+
+    valid_tokens = unique_tokens[unique_tokens < logits.size(0)]
+
+    if len(valid_tokens) == 0:
+        return logits
+
+    logits_modified = logits.clone()
+
+    token_logits = logits_modified[valid_tokens]
+
+    token_logits = torch.where(
+        token_logits >= 0,
+        token_logits / penalty,
+        token_logits * penalty,
+    )
+
+    logits_modified[valid_tokens] = token_logits
+
+    return logits_modified
 
 
 def top_k_top_p_filtering(
@@ -701,9 +745,6 @@ def locally_typical_sampling(
     tau: float = 0.95,
     filter_value: float = -float("Inf"),
 ) -> torch.Tensor:
-    """
-    From: https://arxiv.org/abs/2202.00666
-    """
     filtered_logits = logits.clone()
 
     probs = F.softmax(filtered_logits, dim=-1)

@@ -124,6 +124,8 @@ class SequenceOutputSamplingConfig:
 
     generated_sequence_length: int = 64
 
+    repetition_penalty: float = 1.1
+    repetition_penalty_max_window: int = 64
     temperature: float = 0.7
     top_k: int = 20
     top_p: float = 0.9
