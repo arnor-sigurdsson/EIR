@@ -631,11 +631,16 @@ def sample_next_token_index_from_output(
     batch_indices = torch.arange(cur_logits.size(0))
     cur_position_logits = cur_logits[batch_indices, current_target_indices, :]
 
+    temperature = sampling_config.temperature
+    if temperature != 1.0:
+        cur_position_logits = cur_position_logits / temperature
+
     filtered_logits = top_k_top_p_filtering(
         logits=cur_position_logits,
         top_k=sampling_config.top_k,
         top_p=sampling_config.top_p,
     )
+
     probabilities = F.softmax(input=filtered_logits, dim=-1)
     next_token_indices = torch.multinomial(input=probabilities, num_samples=1)
     next_token_indices_list = next_token_indices.squeeze(1).tolist()

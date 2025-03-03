@@ -97,6 +97,11 @@ class SequenceOutputSamplingConfig:
     :param generated_sequence_length:
         The length of the output sequences that are generated.
 
+    :param temperature:
+        Controls the randomness of predictions by scaling the logits before applying
+        softmax. A higher temperature results in more random predictions, while a
+        lower temperature results in more deterministic predictions.
+
     :param top_k:
         The number of top candidates to consider when sampling the next token
         in an output sequence. By default, the model considers the top 20 candidates
@@ -112,5 +117,7 @@ class SequenceOutputSamplingConfig:
     n_eval_inputs: int = 10
 
     generated_sequence_length: int = 64
+
+    temperature: float = 0.7
     top_k: int = 20
     top_p: float = 0.9
