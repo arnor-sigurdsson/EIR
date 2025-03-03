@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 from collections.abc import Generator, Iterator, Sequence
 from copy import copy
 from dataclasses import dataclass
@@ -643,6 +644,16 @@ def sample_next_token_index_from_output(
                 max_window=sampling_config.repetition_penalty_max_window,
             )
 
+    frequency_penalty = sampling_config.frequency_penalty
+    if generated_tokens_history is not None and repetition_penalty > 0.0:
+        for i in range(cur_position_logits.size(0)):
+            cur_position_logits[i] = apply_frequency_penalty(
+                logits=cur_position_logits[i],
+                generated_tokens=generated_tokens_history[i],
+                penalty=frequency_penalty,
+                max_window=sampling_config.frequency_penalty_max_window,
+            )
+
     temperature = sampling_config.temperature
     if temperature != 1.0:
         cur_position_logits = cur_position_logits / temperature
@@ -704,6 +715,41 @@ def apply_repetition_penalty(
     )
 
     logits_modified[valid_tokens] = token_logits
+
+    return logits_modified
+
+
+def apply_frequency_penalty(
+    logits: torch.Tensor,
+    generated_tokens: list[int],
+    penalty: float = 0.1,
+    max_window: int = 128,
+) -> torch.Tensor:
+    if not generated_tokens or penalty <= 0.0:
+        return logits
+
+    recent_tokens = generated_tokens[-max_window:]
+
+    token_counts = Counter(recent_tokens)
+
+    vocab_size = logits.size(0)
+    valid_tokens = []
+    penalties = []
+
+    for token, count in token_counts.items():
+        if token < vocab_size and count > 1:
+            valid_tokens.append(token)
+            penalties.append(penalty * (1.0 - 1.0 / count))
+
+    if not valid_tokens:
+        return logits
+
+    valid_tokens_tensor = torch.tensor(valid_tokens, device=logits.device)
+    penalties_tensor = torch.tensor(penalties, device=logits.device)
+
+    logits_modified = logits.clone()
+
+    logits_modified[valid_tokens_tensor] -= penalties_tensor
 
     return logits_modified
 
