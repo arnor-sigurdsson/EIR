@@ -16,36 +16,36 @@
                 {
                     "ancestry_output": {
                         "Origin": {
-                            "Asia": 0.015435182489454746,
-                            "Eastern_Asia": 0.003126966068521142,
-                            "Europe": 0.8955368399620056,
-                            "Latin_America_and_the_Caribbean": 0.016528597101569176,
-                            "Middle_East": 0.06664276868104935,
-                            "Sub-Saharan_Africa": 0.0027297146152704954
+                            "Asia": 0.01983393169939518,
+                            "Eastern_Asia": 0.0012704726541414857,
+                            "Europe": 0.8620039820671082,
+                            "Latin_America_and_the_Caribbean": 0.008544898591935635,
+                            "Middle_East": 0.10601409524679184,
+                            "Sub-Saharan_Africa": 0.0023326713126152754
                         }
                     }
                 },
                 {
                     "ancestry_output": {
                         "Origin": {
-                            "Asia": 0.0015249900752678514,
-                            "Eastern_Asia": 0.00774523988366127,
-                            "Europe": 0.002919111866503954,
-                            "Latin_America_and_the_Caribbean": 0.010920929722487926,
-                            "Middle_East": 0.010012505576014519,
-                            "Sub-Saharan_Africa": 0.9668771624565125
+                            "Asia": 0.0021338530350476503,
+                            "Eastern_Asia": 0.006517849396914244,
+                            "Europe": 0.006653491873294115,
+                            "Latin_America_and_the_Caribbean": 0.02456481382250786,
+                            "Middle_East": 0.015367639251053333,
+                            "Sub-Saharan_Africa": 0.9447623491287231
                         }
                     }
                 },
                 {
                     "ancestry_output": {
                         "Origin": {
-                            "Asia": 0.034582819789648056,
-                            "Eastern_Asia": 0.0017725713551044464,
-                            "Europe": 0.8446946740150452,
-                            "Latin_America_and_the_Caribbean": 0.044501446187496185,
-                            "Middle_East": 0.062216781079769135,
-                            "Sub-Saharan_Africa": 0.012231716886162758
+                            "Asia": 0.22242137789726257,
+                            "Eastern_Asia": 0.001802230253815651,
+                            "Europe": 0.4950845241546631,
+                            "Latin_America_and_the_Caribbean": 0.015688905492424965,
+                            "Middle_East": 0.2503822147846222,
+                            "Sub-Saharan_Africa": 0.014620678499341011
                         }
                     }
                 }

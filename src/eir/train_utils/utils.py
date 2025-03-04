@@ -9,13 +9,13 @@ from typing import Any
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
-from ignite.engine import Engine
 
 from eir.train_utils.distributed import (
     in_distributed_env,
     in_master_node,
     only_call_on_master_node,
 )
+from eir.train_utils.ignite_port.engine import Engine
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__, tqdm_compatible=True)

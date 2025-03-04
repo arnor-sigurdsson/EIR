@@ -45,25 +45,24 @@ def prepare_diffusion_batch(
     inputs: torch.Tensor,
     batch_size: int,
     num_steps: int,
+    device: str,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Later we can return t from here as well if used in models.
-    """
     t = torch.randint(
         low=0,
         high=num_steps,
         size=(batch_size,),
-        device=inputs.device,
         dtype=torch.long,
+        device=device,
     )
 
-    noise = torch.randn_like(inputs)
+    noise = torch.randn_like(inputs, device=device)
 
     x_noisy = q_sample(
         config=diffusion_config,
         x_start=inputs,
         t=t,
         noise=noise,
+        device=device,
     )
 
     return x_noisy, noise, t
@@ -74,6 +73,7 @@ def q_sample(
     x_start: torch.Tensor,
     t: torch.Tensor,
     noise: torch.Tensor,
+    device: str,
     input_scale: float = 1.0,
 ) -> torch.Tensor:
     """
@@ -82,18 +82,23 @@ def q_sample(
     """
 
     sqrt_alphas_cumprod_t = extract(
-        a=config.sqrt_alphas_cumprod,
-        t=t,
+        a=config.sqrt_alphas_cumprod.to(device=device),
+        t=t.to(device=device),
         x_shape=x_start.shape,
     )
 
     sqrt_one_minus_alphas_cumprod_t = extract(
-        a=config.sqrt_one_minus_alphas_cumprod,
-        t=t,
+        a=config.sqrt_one_minus_alphas_cumprod.to(device=device),
+        t=t.to(device=device),
         x_shape=x_start.shape,
     )
 
     scaled_x_start = input_scale * x_start
+
+    sqrt_alphas_cumprod_t = sqrt_alphas_cumprod_t.to(device)
+    sqrt_one_minus_alphas_cumprod_t = sqrt_one_minus_alphas_cumprod_t.to(device)
+    scaled_x_start = scaled_x_start.to(device)
+    noise = noise.to(device)
 
     x_noisy = (
         sqrt_alphas_cumprod_t * scaled_x_start + sqrt_one_minus_alphas_cumprod_t * noise
@@ -110,9 +115,8 @@ def p_sample_loop(
     model: nn.Module,
     output_shape: tuple,
     time_steps: int,
+    device: str,
 ) -> np.ndarray:
-    device = next(model.parameters()).device
-
     current_state: torch.Tensor = torch.randn(output_shape, device=device)
     batch_inputs[output_name] = current_state
 
@@ -122,8 +126,8 @@ def p_sample_loop(
         t = torch.full(
             size=(batch_size,),
             fill_value=i,
-            device=device,
             dtype=torch.long,
+            device=device,
         )
 
         current_state = p_sample(
@@ -133,6 +137,7 @@ def p_sample_loop(
             batch_inputs=batch_inputs,
             t=t,
             t_index=i,
+            device=device,
         )
 
         batch_inputs[output_name] = current_state
@@ -148,24 +153,31 @@ def p_sample(
     output_name: str,
     t: torch.Tensor,
     t_index: int,
+    device: str,
 ) -> torch.Tensor:
-    current_state = batch_inputs[output_name]
+    """
+    TODO: Move all config tensors to device beforehand.
+    """
+
+    current_state = batch_inputs[output_name].to(device)
+    t = t.to(device)
+
     output_module = getattr(model.output_modules, output_name)
     t_emb = output_module.feature_extractor.timestep_embeddings(t)
     batch_inputs[f"__extras_{output_name}"] = t_emb
 
     betas_t = extract(
-        a=config.betas,
+        a=config.betas.to(device),
         t=t,
         x_shape=current_state.shape,
     )
     sqrt_one_minus_alphas_cumprod_t = extract(
-        a=config.sqrt_one_minus_alphas_cumprod,
+        a=config.sqrt_one_minus_alphas_cumprod.to(device),
         t=t,
         x_shape=current_state.shape,
     )
     sqrt_recip_alphas_t = extract(
-        a=config.sqrt_recip_alphas,
+        a=config.sqrt_recip_alphas.to(device),
         t=t,
         x_shape=current_state.shape,
     )
@@ -180,8 +192,9 @@ def p_sample(
 
     if t_index == 0:
         return model_mean
+
     posterior_variance_t = extract(
-        a=config.posterior_variance,
+        a=config.posterior_variance.to(device),
         t=t,
         x_shape=current_state.shape,
     )
@@ -198,5 +211,5 @@ def extract(
     Allows us to extract the appropriate index for a batch of indices.
     """
     batch_size = t.shape[0]
-    out = a.gather(-1, t.cpu())
+    out = a.gather(-1, t)
     return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)

@@ -1,7 +1,6 @@
 basic_experiment:
   batch_size: 256
   dataloader_workers: 8
-  device: mps
   memory_dataset: false
   n_epochs: 20
   output_folder: eir_tutorials/tutorial_runs/e_pretraining/02_mini_foundation

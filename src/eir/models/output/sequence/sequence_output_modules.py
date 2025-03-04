@@ -127,6 +127,7 @@ class SequenceOutputModule(nn.Module):
 
             self.match_projections[input_name] = cur_projection
 
+        self.final_norm = nn.RMSNorm(normalized_shape=self.embedding_dim)
         self.head = nn.Linear(self.embedding_dim, self.num_tokens)
 
     def forward(self, input: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
@@ -143,6 +144,7 @@ class SequenceOutputModule(nn.Module):
 
         out = self.output_transformer(out, mask=self.mask)
 
+        out = self.final_norm(out)
         out = self.head(out)
 
         return {self.output_name: out}

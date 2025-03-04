@@ -51,7 +51,7 @@ def get_image_model(
             num_output_features=model_config.num_output_features,
         )
 
-    feature_extractor = feature_extractor.to(device=device)
+    feature_extractor = feature_extractor
 
     _check_image_model_num_output_features_compatibility(
         feature_extractor=feature_extractor,
@@ -136,7 +136,7 @@ def prepare_example_image_test_input(
     batch_size: int = 2,
 ) -> torch.Tensor:
     full_shape = data_dimensions.full_shape()
-    example_input = torch.rand((batch_size, *full_shape)).to(device=device)
+    example_input = torch.rand((batch_size, *full_shape))
     return example_input
 
 

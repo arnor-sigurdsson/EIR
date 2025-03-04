@@ -22,11 +22,17 @@ from eir.setup.streaming_data_setup.streaming_data_utils import (
     connect_to_server,
     receive_with_timeout,
 )
+from eir.train_utils.distributed import (
+    in_distributed_env,
+    in_master_node,
+    only_call_on_master_node,
+)
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
 
 
+@only_call_on_master_node
 def cleanup_streaming_setup(path: Path) -> None:
     if path.exists():
         logger.info(f"Cleaning up streaming setup folder: {path}")
@@ -62,10 +68,11 @@ class StreamDataGatherer:
 
         atexit.register(cleanup_streaming_setup, self.base_path)
 
+    @only_call_on_master_node
     def get_dataset_info(self, ws: websocket.WebSocket):
         ws.send(json.dumps({"type": "getInfo"}))
 
-        info_data = receive_with_timeout(websocket=ws)
+        info_data = receive_with_timeout(websocket_=ws)
 
         if info_data["type"] != "info":
             raise ValueError(f"Unexpected response type: {info_data['type']}")
@@ -73,6 +80,7 @@ class StreamDataGatherer:
         self.dataset_info = info_data["payload"]
         logger.info("Received dataset information.")
 
+    @only_call_on_master_node
     def gather_and_save_data(self):
         self.base_path.mkdir(parents=True, exist_ok=True)
 
@@ -100,7 +108,7 @@ class StreamDataGatherer:
                     )
                 )
 
-                batch_data = receive_with_timeout(websocket=ws)
+                batch_data = receive_with_timeout(websocket_=ws)
 
                 if batch_data["type"] != "data":
                     logger.error(f"Unexpected response type: {batch_data['type']}")
@@ -164,6 +172,7 @@ class StreamDataGatherer:
             ensure_path_exists(path=output_path, is_folder=True)
             df.to_csv(output_path / f"{name}.csv", index=False)
 
+    @only_call_on_master_node
     def reset(self):
         with connect_to_server(
             websocket_url=self.websocket_url,
@@ -179,7 +188,7 @@ class StreamDataGatherer:
             )
 
             for _ in range(2):
-                reset_message = receive_with_timeout(websocket=ws)
+                reset_message = receive_with_timeout(websocket_=ws)
 
                 if reset_message["type"] == "reset":
                     logger.info(
@@ -192,6 +201,7 @@ class StreamDataGatherer:
                         f"Unexpected response to reset command: {reset_message}"
                     )
 
+    @only_call_on_master_node
     def get_status(self):
         with connect_to_server(
             websocket_url=self.websocket_url,
@@ -206,7 +216,7 @@ class StreamDataGatherer:
                 )
             )
 
-            status_data = receive_with_timeout(websocket=ws)
+            status_data = receive_with_timeout(websocket_=ws)
 
             if status_data["type"] == "status":
                 logger.info(f"Current status: {status_data['payload']}")
@@ -427,24 +437,44 @@ def gather_streaming_data_for_setup(
         output_type = output_config.output_info.output_type
         outputs[output_name] = {"type": output_type}
 
-    gatherer = StreamDataGatherer(
-        websocket_url=websocket_url,
-        output_folder=output_folder,
-        input_configs=inputs,
-        output_configs=outputs,
-        batch_size=batch_size,
-        max_samples=max_samples,
-    )
+    base_path = Path(output_folder) / "streaming_setup"
 
-    gatherer.get_status()
+    if in_distributed_env():
+        if in_master_node():
+            gatherer = StreamDataGatherer(
+                websocket_url=websocket_url,
+                output_folder=output_folder,
+                input_configs=inputs,
+                output_configs=outputs,
+                batch_size=batch_size,
+                max_samples=max_samples,
+            )
 
-    gatherer.gather_and_save_data()
+            gatherer.get_status()
+            gatherer.gather_and_save_data()
+            gatherer.reset()
+            gatherer.get_status()
 
-    gatherer.reset()
+            base_path = gatherer.base_path
 
-    gatherer.get_status()
+    else:
+        gatherer = StreamDataGatherer(
+            websocket_url=websocket_url,
+            output_folder=output_folder,
+            input_configs=inputs,
+            output_configs=outputs,
+            batch_size=batch_size,
+            max_samples=max_samples,
+        )
 
-    return websocket_url, gatherer.base_path
+        gatherer.get_status()
+        gatherer.gather_and_save_data()
+        gatherer.reset()
+        gatherer.get_status()
+
+        base_path = gatherer.base_path
+
+    return websocket_url, base_path
 
 
 def patch_configs_for_local_data(

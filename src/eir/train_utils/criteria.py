@@ -458,13 +458,13 @@ def _survival_loss(
     loss_func: Literal["NegativeLogLikelihood", "CoxPHLoss"] = "NegativeLogLikelihood",
 ) -> torch.Tensor:
     if loss_func == "NegativeLogLikelihood":
-        return _negative_log_likelihood_loss(log_hazards=input, time=time, event=target)
+        return _discrete_survival_nll_loss(log_hazards=input, time=time, event=target)
     if loss_func == "CoxPHLoss":
         return _cox_ph_loss(risk_scores=input, time=time, event=target)
     raise ValueError(f"Unsupported loss function: {loss_func}")
 
 
-def _negative_log_likelihood_loss(
+def _discrete_survival_nll_loss(
     log_hazards: torch.Tensor,
     time: torch.Tensor,
     event: torch.Tensor,
@@ -489,7 +489,7 @@ def _negative_log_likelihood_loss(
     cum_log_surv = torch.cumsum(log_surv, dim=1)
 
     # Select the relevant timepoints
-    idx = torch.arange(masked_log_hazards.shape[0], device=masked_log_hazards.device)
+    idx = torch.arange(masked_log_hazards.shape[0])
     relevant_log_surv = cum_log_surv[idx, masked_time]
     relevant_hazards = hazards[idx, masked_time]
 

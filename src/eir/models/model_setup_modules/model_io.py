@@ -119,16 +119,13 @@ def _load_model_weights(
             repr_object.repr(incompatible_keys.unexpected_keys),
         )
 
-    num_loaded = total_keys - no_incompatible_keys
+    num_loaded = total_keys - no_unexpected
     logger.info(
         "Successfully loaded %d/%d modules from %s.",
         num_loaded,
         total_keys,
         model_state_dict_path,
     )
-
-    torch_device = torch.device(device)
-    model = model.to(device=torch_device)
 
     return model
 

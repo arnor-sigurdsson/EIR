@@ -7,6 +7,7 @@ import pytest
 from torch import nn
 from torch.utils.data import DataLoader
 
+import eir.train_utils.accelerator
 from eir import train
 from eir.experiment_io.input_object_io import serialize_chosen_input_objects
 from eir.experiment_io.output_object_io import serialize_output_objects
@@ -130,6 +131,10 @@ def prep_modelling_test_configs(
     serialize_all_input_transformers(inputs_dict=inputs_as_dict, run_folder=run_folder)
     serialize_chosen_input_objects(inputs_dict=inputs_as_dict, run_folder=run_folder)
 
+    fabric = eir.train_utils.accelerator.setup_accelerator(configs=c)
+    model, optimizer = fabric.setup(model, optimizer)
+    train_loader, valid_loader = fabric.setup_dataloaders(train_loader, valid_loader)
+
     experiment = Experiment(
         configs=c,
         inputs=inputs_as_dict,
@@ -143,6 +148,7 @@ def prep_modelling_test_configs(
         loss_function=loss_module,
         metrics=test_metrics,
         hooks=hooks,
+        fabric=fabric,
     )
 
     targets = config.get_all_tabular_targets(output_configs=c.output_configs)

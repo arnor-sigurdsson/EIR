@@ -111,6 +111,7 @@ al_tokenizer_choices = (
     | Literal["revtok"]
     | Literal["subword"]
     | Literal["bpe"]
+    | str
     | None
 )
 
@@ -141,6 +142,7 @@ class BasicExperimentConfig:
         Number of workers for multiprocess training and validation data loading.
 
     :param device:
+        DEPRECATED: Use AcceleratorConfig.hardware instead.
         Device to run the training on (e.g. 'cuda:0' / 'cpu' / 'mps'). 'mps' is
         currently experimental, and might not work for all models.
 
@@ -168,10 +170,6 @@ class GlobalModelConfig:
     :param n_iter_before_swa:
         Number of iterations to run before activating Stochastic Weight Averaging (SWA).
 
-    :param amp:
-        Whether to use Automatic Mixed Precision. Currently only supported when
-        training on GPUs.
-
     :param pretrained_checkpoint:
         Path to a pretrained checkpoint model file (under saved_models/ in the
         experiment output folder) to load and use as a starting point for training.
@@ -184,7 +182,6 @@ class GlobalModelConfig:
 
     compile_model: bool = False
     n_iter_before_swa: None | int = None
-    amp: bool = False
     pretrained_checkpoint: None | str = None
     strict_pretrained_loading: bool = True
 
@@ -415,6 +412,59 @@ class DataPreparationConfig:
 
     streaming_setup_samples: int = 10000
     streaming_batch_size: int | None = None
+    streaming_steps_per_epoch: int = 10000
+
+
+@dataclass
+class AcceleratorConfig:
+    """
+    Configuration for distributed and accelerated training setup.
+
+    :param hardware:
+        The hardware accelerator to use.
+        Options include 'cpu', 'cuda', 'mps', 'tpu', etc.
+
+    :param precision:
+        Numerical precision for training.
+        Options include '32-true', '16-mixed', 'bf16-mixed', etc.
+        Using mixed precision can significantly speed up training on supported hardware.
+
+    :param strategy:
+        The parallelization strategy to use. Common options:
+        - 'dp': Data Parallelism
+        - 'ddp': Distributed Data Parallelism
+        - 'ddp_spawn': Distributed Data Parallelism with spawn
+        - 'deepspeed': DeepSpeed
+        - 'fsdp': Fully Sharded Data Parallelism
+        - 'auto': Automatically choose the best strategy based on the
+            hardware available.
+
+    :param devices:
+        Number of devices to use or specific device indices.
+        Can be an integer (e.g., 4 for 4 GPUs) or a list of indices (e.g., [0, 1]).
+
+    :param num_nodes:
+        Number of compute nodes to use for distributed training.
+    """
+
+    hardware: str = "auto"
+    precision: Literal[
+        "64",
+        "32",
+        "16",
+        "bf16",
+        "64-true",
+        "32-true",
+        "16-true",
+        "bf16-true",
+        "16-mixed",
+        "bf16-mixed",
+        "transformer-engine",
+        "transformer-engine-float16",
+    ] = "32-true"
+    strategy: str = "auto"
+    devices: int | list[int] | str = "auto"
+    num_nodes: int = 1
 
 
 @dataclass
@@ -433,6 +483,7 @@ class GlobalConfig:
     metrics: SupervisedMetricsConfig
     visualization_logging: VisualizationLoggingConfig
     data_preparation: DataPreparationConfig
+    accelerator: AcceleratorConfig
     latent_sampling: LatentSamplingConfig | None = None
 
     be: BasicExperimentConfig = field(init=False, repr=False)
@@ -445,6 +496,7 @@ class GlobalConfig:
     met: SupervisedMetricsConfig = field(init=False, repr=False)
     vl: VisualizationLoggingConfig = field(init=False, repr=False)
     dp: DataPreparationConfig = field(init=False, repr=False)
+    ac: AcceleratorConfig = field(init=False, repr=False)
     ls: LatentSamplingConfig | None = field(init=False, repr=False)
 
     def __post_init__(self):
@@ -458,6 +510,7 @@ class GlobalConfig:
         self.met = self.metrics
         self.vl = self.visualization_logging
         self.dp = self.data_preparation
+        self.ac = self.accelerator
         self.ls = self.latent_sampling
 
 

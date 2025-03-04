@@ -1,3 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/f_image_output/03_mnist_diffusion_guided/saved_models/03_mnist_diffusion_guided_model_8500_perf-average=0.9682.pt \
---device mps
+--model-path eir_tutorials/tutorial_runs/f_image_output/03_mnist_diffusion_guided/saved_models/03_mnist_diffusion_guided_checkpoint_8000_perf-average=0.9673.pt

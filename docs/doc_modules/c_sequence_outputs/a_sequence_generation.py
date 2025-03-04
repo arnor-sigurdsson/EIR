@@ -46,12 +46,12 @@ def get_sequence_gen_01_imdb_generation() -> AutoDocExperimentInfo:
             "figures/manual_generated_iter_500.txt",
         ),
         (
-            "samples/9500/auto/0_generated.txt",
-            "figures/auto_generated_iter_9500.txt",
+            "samples/6000/auto/0_generated.txt",
+            "figures/auto_generated_iter_6000.txt",
         ),
         (
-            "samples/9500/manual/1_generated.txt",
-            "figures/manual_generated_iter_9500.txt",
+            "samples/6000/manual/1_generated.txt",
+            "figures/manual_generated_iter_6000.txt",
         ),
     ]
 
@@ -176,12 +176,12 @@ def get_sequence_gen_02_imdb_generation_bpe() -> AutoDocExperimentInfo:
             "figures/manual_generated_iter_500_bpe.txt",
         ),
         (
-            "samples/9500/auto/0_generated.txt",
-            "figures/auto_generated_iter_9500_bpe.txt",
+            "samples/6000/auto/0_generated.txt",
+            "figures/auto_generated_iter_6000_bpe.txt",
         ),
         (
-            "samples/9500/manual/1_generated.txt",
-            "figures/manual_generated_iter_9500_bpe.txt",
+            "samples/6000/manual/1_generated.txt",
+            "figures/manual_generated_iter_6000_bpe.txt",
         ),
     ]
 

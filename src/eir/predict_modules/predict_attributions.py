@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING, Literal, Union
 
 import polars as pl
 from aislib.misc_utils import ensure_path_exists
+from lightning.fabric import Fabric
 from torch.utils.data import DataLoader
 
 from eir.data_load import label_setup
+from eir.data_load.data_utils import consistent_nan_collate
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
@@ -80,7 +82,7 @@ def compute_predict_attributions(
         train_configs=loaded_train_experiment.configs,
         predict_configs=predict_config.configs,
     )
-    background_dataloader = _get_predict_background_loader(
+    background_dataloader_base = _get_predict_background_loader(
         batch_size=gc.be.batch_size,
         num_attribution_background_samples=gc.aa.attribution_background_samples,
         outputs_as_dict=output_objects,
@@ -88,6 +90,12 @@ def compute_predict_attributions(
         dataloader_workers=gc.be.dataloader_workers,
         loaded_hooks=loaded_train_experiment.hooks,
     )
+
+    background_dataloader = predict_config.fabric.setup_dataloaders(
+        background_dataloader_base
+    )
+    if isinstance(background_dataloader, list):
+        raise ValueError("Got a list of dataloaders, but expected a single dataloader.")
 
     overloaded_train_experiment = _overload_train_experiment_for_predict_attributions(
         train_config=loaded_train_experiment,
@@ -141,6 +149,7 @@ def get_background_source_config(
 class LoadedTrainExperimentMixedWithPredict(LoadedTrainExperiment):
     model: al_meta_model
     inputs: al_input_objects_as_dict
+    fabric: Fabric
 
 
 def _overload_train_experiment_for_predict_attributions(
@@ -159,6 +168,7 @@ def _overload_train_experiment_for_predict_attributions(
     mixed_experiment_kwargs["model"] = predict_config.model
     mixed_experiment_kwargs["configs"] = predict_config.configs
     mixed_experiment_kwargs["inputs"] = predict_config.inputs
+    mixed_experiment_kwargs["fabric"] = predict_config.fabric
 
     mixed_experiment = LoadedTrainExperimentMixedWithPredict(**mixed_experiment_kwargs)
 
@@ -229,6 +239,7 @@ def _get_predict_background_loader(
     )
     background_loader = DataLoader(
         dataset=background_dataset,
+        collate_fn=consistent_nan_collate,
         batch_size=batch_size,
         shuffle=False,
         num_workers=dataloader_workers,

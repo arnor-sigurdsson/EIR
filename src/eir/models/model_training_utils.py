@@ -1,22 +1,16 @@
 from collections.abc import Callable, Generator, Iterable, Sequence
 from copy import copy, deepcopy
-from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     Optional,
+    TypedDict,
 )
 
-import matplotlib.pyplot as plt
 import torch
-from aislib.pytorch_modules import Swish
-from ignite.engine import Engine
-from ignite.handlers.lr_finder import FastaiLRFinder
 from torch import nn
 from torch.nn import Module
-from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
 from eir.setup.output_setup import ComputedSurvivalOutputInfo, ComputedTabularOutputInfo
@@ -47,13 +41,18 @@ logger = get_logger(name=__name__, tqdm_compatible=True)
 
 
 def predict_on_batch(
-    model: Module, inputs: dict[str, torch.Tensor]
+    model: Module,
+    inputs: dict[str, torch.Tensor],
 ) -> dict[str, dict[str, torch.Tensor]]:
-    assert not model.training
-    with torch.no_grad():
-        val_outputs = model(inputs=inputs)
+    model_device = next(model.parameters()).device
+    device_as_str = str(model_device)
+    inputs = recursive_to_device(obj=inputs, device=device_as_str)
 
-    return val_outputs
+    assert not model.training
+    with torch.inference_mode():
+        batch_outputs = model(inputs=inputs)
+
+    return batch_outputs
 
 
 class ColumnType(Enum):
@@ -71,8 +70,6 @@ def prepare_all_targets(
         device=device,
         labels=labels,
     )
-
-    labels_prepared = recursive_to_device(obj=labels_prepared, device=device)
 
     return labels_prepared
 
@@ -115,16 +112,13 @@ def parse_tabular_target_labels(
                 if column_type == ColumnType.CON.value:
                     labels_casted[output_name_][column_name] = cur_labels.to(
                         dtype=torch.float,
-                        device=device,
                     )
                 elif column_type == ColumnType.CAT.value:
                     cur_labels = replace_nan_and_cast_to_long(
                         cur_labels=cur_labels.to(dtype=torch.float),
-                        device=device,
                     )
                     labels_casted[output_name_][column_name] = cur_labels.to(
                         dtype=torch.long,
-                        device=device,
                     )
 
     def handle_survival_object(
@@ -149,24 +143,22 @@ def parse_tabular_target_labels(
 
         if model_type == "cox":
             labels_casted[output_name_][time_column] = cur_labels_time.to(
-                dtype=torch.float, device=device
+                dtype=torch.float,
             )
         else:
             cur_labels_time = replace_nan_and_cast_to_long(
                 cur_labels=cur_labels_time.to(dtype=torch.float),
-                device=device,
             )
             labels_casted[output_name_][time_column] = cur_labels_time.to(
-                dtype=torch.float, device=device
+                dtype=torch.float,
             )
 
         cur_label_event = labels[output_name_][event_column]
         cur_label_event = replace_nan_and_cast_to_long(
             cur_labels=cur_label_event.to(dtype=torch.float),
-            device=device,
         )
         labels_casted[output_name_][event_column] = cur_label_event.to(
-            dtype=torch.long, device=device
+            dtype=torch.long,
         )
 
     for output_name, output_object in output_objects.items():
@@ -187,7 +179,6 @@ def parse_tabular_target_labels(
 
 def replace_nan_and_cast_to_long(
     cur_labels: torch.Tensor,
-    device: str,
     replacement_value: int = -1,
 ) -> torch.Tensor:
     """
@@ -227,10 +218,9 @@ def replace_nan_and_cast_to_long(
     replacement_tensor = torch.tensor(
         replacement_value,
         dtype=torch.float32,
-        device=device,
     )
 
-    cur_labels = cur_labels.to(device=device)
+    cur_labels = cur_labels
 
     cur_labels = cur_labels.where(~cur_labels.isnan(), replacement_tensor)
     return cur_labels.to(dtype=torch.long)
@@ -413,160 +403,46 @@ def _do_stack(
     return torch.stack(list_of_elements)
 
 
-def add_wd_to_model_params(
-    model: nn.Module, wd: float
-) -> list[dict[str, nn.Parameter | float]]:
+class ParamGroup(TypedDict):
+    params: list[nn.Parameter]
+    weight_decay: float
+
+
+def add_wd_to_model_params(model: nn.Module, wd: float) -> list[ParamGroup]:
     """
     We want to skip adding weight decay to learnable activation parameters so as
     not to bias them towards 0.
 
-    TODO:   Split this function in two, one to get the parameters and one to add the
-            WD to them. Possibly we have to do it in-place here, not copy as we have
-            tensors.
-
-    Note: Since we are adding the weight decay manually here, the optimizer does not
-    touch the parameter group weight decay at initialization.
+    Parameters with dimensionality >= 2 (weight matrices, embeddings) will have
+    weight decay applied, while parameters with dimensionality < 2 (biases,
+    normalization parameters) will not.
     """
-    _check_named_modules(model=model)
+    param_dict = {pn: p for pn, p in model.named_parameters() if p.requires_grad}
 
-    param_list = []
-    for name, param in model.named_parameters():
-        cur_dict: dict[str, nn.Parameter | float]
-        cur_dict = {"params": param}
+    decay_params = []
+    no_decay_params = []
 
-        if "act_" in name:
-            cur_dict["weight_decay"] = 0.0
+    for _name, param in param_dict.items():
+        if param.dim() >= 2:
+            decay_params.append(param)
         else:
-            cur_dict["weight_decay"] = wd
+            no_decay_params.append(param)
 
-        param_list.append(cur_dict)
+    param_list = [
+        ParamGroup(params=decay_params, weight_decay=wd),
+        ParamGroup(params=no_decay_params, weight_decay=0.0),
+    ]
+
+    num_decay_params = sum(p.numel() for p in decay_params)
+    num_no_decay_params = sum(p.numel() for p in no_decay_params)
+    if wd > 0.0:
+        logger.debug(
+            f"Number of weight-decayed (wd={wd}) parameters: {num_decay_params:,} "
+            f"({len(decay_params)} tensors)"
+        )
+        logger.debug(
+            f"Number of non-decayed parameters: {num_no_decay_params:,} "
+            f"({len(no_decay_params)} tensors)"
+        )
 
     return param_list
-
-
-def _check_named_modules(model: nn.Module):
-    """
-    We have this function as a safeguard to check that activations that have learnable
-    parameters are named correctly (so that WD is not applied to them). Also, we want
-    to make sure we don't have modules that are named 'incorrectly' and have the WD
-    skipped when they should have it.
-    """
-
-    for name, module in model.named_modules():
-        if name.startswith("act_"):
-            assert isinstance(module, Swish | nn.PReLU), (name, module)
-
-        if isinstance(module, Swish | nn.PReLU):
-            assert "act_" in name, name
-
-
-def run_lr_find(
-    trainer_engine: Engine,
-    train_dataloader: torch.utils.data.DataLoader,
-    model: nn.Module,
-    optimizer: Optimizer,
-    output_folder: Path,
-):
-    lr_find_results = get_lr_range_results(
-        trainer_engine=trainer_engine,
-        train_dataloader=train_dataloader,
-        model=model,
-        optimizer=optimizer,
-    )
-
-    plot_lr_find_results(
-        lr_values=lr_find_results.lr_history,
-        loss_values=lr_find_results.loss_history,
-        lr_suggestion=lr_find_results.lr_suggestion,
-        output_folder=output_folder,
-    )
-
-
-@dataclass
-class LRFindResults:
-    lr_history_groups: list[list[float]]
-    lr_history: list[float]
-    loss_history: list[float]
-    lr_suggestion: float
-
-
-def get_lr_range_results(
-    trainer_engine: Engine,
-    train_dataloader: torch.utils.data.DataLoader,
-    model: nn.Module,
-    optimizer: Optimizer,
-    num_iter: int = 500,
-) -> LRFindResults:
-    """
-    We do a little hack with max_epochs and epoch_length because we don't pass that
-    to the original trainer when running a normal training instance, which uses the
-    default of max_epochs = 1. This is normally not a problem, as 1 epoch is
-    generally more than for example 300 iterations, which should be enough for the LR
-    test.
-
-    However, in the cases where we have a small epoch length, the LR find will not
-    run to completion as it only runs for one epoch. Hence, we need to patch the
-    max_epochs here for the test.
-    """
-    lr_finder = FastaiLRFinder()
-
-    def _extract_loss(x: dict[str, dict[str, dict[str, float]]]) -> float:
-        return x["average"]["average"]["loss-average"]
-
-    to_save = {"optimizer": optimizer, "model": model}
-    with lr_finder.attach(
-        trainer_engine,
-        to_save=to_save,
-        output_transform=_extract_loss,
-        num_iter=num_iter,
-        start_lr=1e-7,
-    ) as trainer_with_lr_finder:
-        logger.info("Running LR range test for max %d iterations.", num_iter)
-
-        default_max_epochs = trainer_with_lr_finder.state.max_epochs
-        trainer_with_lr_finder.state.max_epochs = 100
-        trainer_with_lr_finder.state.epoch_length = len(train_dataloader)
-
-        assert (
-            trainer_with_lr_finder.state.max_epochs
-            * trainer_with_lr_finder.state.epoch_length
-        ) >= num_iter
-
-        trainer_with_lr_finder.run(train_dataloader)
-        trainer_with_lr_finder.state.max_epochs = default_max_epochs
-
-        lr_results = deepcopy(lr_finder.get_results())
-        lr_suggestions_all_groups = deepcopy(lr_finder.lr_suggestion())
-        lr_suggestion_single = lr_suggestions_all_groups[0]
-
-        logger.info(
-            "LR Find: The model has %d parameter groups which can have different "
-            "learning rates depending on implementation. For the LR find, "
-            "we are using the LR defined in group 0, so make sure that is taken "
-            "into consideration when analysing LR find results, the supplied LR "
-            "for training might have to be scaled accordingly.",
-            len(lr_results["lr"][0]),
-        )
-
-        return LRFindResults(
-            lr_history_groups=lr_results["lr"],
-            lr_history=[i[0] for i in lr_results["lr"]],
-            loss_history=lr_results["loss"],
-            lr_suggestion=lr_suggestion_single,
-        )
-
-
-def plot_lr_find_results(
-    lr_values: list[float],
-    loss_values: list[float],
-    lr_suggestion: float,
-    output_folder: Path,
-) -> None:
-    plt.plot(lr_values, loss_values)
-    plt.xscale("log")
-    plt.title(f"Learning Rate Search\nLR Suggestion: {lr_suggestion:.2e}")
-    plt.xlabel("Learning Rate")
-    plt.ylabel("Loss")
-    plt.axvline(x=lr_suggestion, color="red", linewidth=1)
-
-    plt.savefig(str(output_folder / "lr_search.pdf"))

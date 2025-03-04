@@ -19,7 +19,8 @@ from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from tqdm import tqdm
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast
+from transformers.models.auto.tokenization_auto import TOKENIZER_MAPPING_NAMES
 from transformers.tokenization_utils_base import (
     EncodedInput,
     PreTokenizedInput,
@@ -90,6 +91,7 @@ class ComputedSequenceInputInfo:
     vocab: Vocab
     computed_max_length: int
     encode_func: al_encode_funcs
+    special_tokens: "SpecialTokens"
     tokenizer: al_tokenizers | None
 
 
@@ -126,11 +128,18 @@ def set_up_computed_sequence_input(
         max_length_config_value=input_type_info.max_length,
         gathered_stats=gathered_stats,
     )
+
+    special_tokens = get_special_tokens(
+        tokenizer=tokenizer,
+        vocab=vocab,
+    )
+
     sequence_input_info = ComputedSequenceInputInfo(
         input_config=input_config,
         vocab=vocab,
         computed_max_length=computed_max_length,
         encode_func=encode_callable,
+        special_tokens=special_tokens,
         tokenizer=tokenizer,
     )
 
@@ -187,12 +196,31 @@ def get_sequence_input_objects_from_input(
     )
 
     encode_func: EncodeFuncProtocol
-    encode_func = get_tokenizer_encode_func(
-        tokenizer=tokenizer,
-        pytorch_vocab=vocab,
-    )
+    tokenizer_name = input_type_info.tokenizer
+    is_pretrained_tokenizer = tokenizer_name in TOKENIZER_MAPPING_NAMES
+    if is_pretrained_tokenizer:
+        # here we delegate to the __call__ logic of HFTokenizerWrapper
+        assert isinstance(tokenizer, HFTokenizerWrapper)
+        encode_func = tokenizer
+    else:
+        encode_func = get_tokenizer_encode_func(
+            tokenizer=tokenizer,
+            pytorch_vocab=vocab,
+        )
 
     return vocab, gathered_stats, tokenizer, encode_func
+
+
+class HFTokenizerWrapper:
+    def __init__(self, base_tokenizer):
+        self.tokenizer = base_tokenizer
+
+    def __call__(self, text, *args, **kwargs):
+        encoded = self.tokenizer.encode(text)
+        return encoded
+
+    def get_vocab(self):
+        return self.tokenizer.get_vocab()
 
 
 def init_vocab(
@@ -205,7 +233,9 @@ def init_vocab(
     gathered_stats: "GatheredSequenceStats",
     tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
 ) -> Vocab:
-    if tokenizer_name == "bpe":
+    is_hf_pretrained = tokenizer_name in TOKENIZER_MAPPING_NAMES
+
+    if tokenizer_name == "bpe" or is_hf_pretrained:
         tokenizer_object = extract_tokenizer_object_from_function(
             tokenizer_callable=tokenizer
         )
@@ -261,12 +291,18 @@ def _init_min_freq(
 def extract_tokenizer_object_from_function(
     tokenizer_callable: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
 ) -> Tokenizer | PreTrainedTokenizer:
-    closure = tokenizer_callable.__closure__
-    assert closure is not None
-    assert len(closure) == 1
+    assert isinstance(tokenizer_callable, TokenizerWrapper | HFTokenizerWrapper), (
+        f"Expected TokenizerWrapper instance, got {type(tokenizer_callable).__name__}"
+    )
 
-    tokenizer_object = closure[0].cell_contents
-    assert isinstance(tokenizer_object, Tokenizer | PreTrainedTokenizer)
+    tokenizer_object = tokenizer_callable.tokenizer
+    assert isinstance(
+        tokenizer_object, Tokenizer | PreTrainedTokenizer | PreTrainedTokenizerFast
+    ), (
+        f"Expected Tokenizer or PreTrainedTokenizer, got "
+        f"{type(tokenizer_object).__name__}"
+    )
+
     return tokenizer_object
 
 
@@ -277,6 +313,8 @@ def get_tokenizer(
     input_type_info = input_config.input_type_info
     assert isinstance(input_type_info, schemas.SequenceInputDataConfig)
     tokenizer_name = input_type_info.tokenizer
+
+    available_pretrained = TOKENIZER_MAPPING_NAMES.keys()
 
     tokenizer: TokenizerProtocolPreSplit | TokenizerProtocolRaw
     if tokenizer_name == "bpe":
@@ -294,6 +332,17 @@ def get_tokenizer(
             vocab_file=vocab_file,
             vocab_size=input_type_info.adaptive_tokenizer_max_vocab_size,
             split_on=input_type_info.split_on,
+        )
+
+    elif tokenizer_name in available_pretrained:
+        assert tokenizer_name is not None
+        logger.info("Using pretrained tokenizer '%s'.", tokenizer_name)
+        hf_tokenizer_base = _get_hf_tokenizer(
+            hf_model_name=tokenizer_name,
+        )
+        tokenizer_base = _add_specials_to_hf_tokenizer(hf_tokenizer=hf_tokenizer_base)
+        tokenizer = cast(
+            TokenizerProtocolRaw, HFTokenizerWrapper(base_tokenizer=tokenizer_base)
         )
 
     else:
@@ -341,7 +390,8 @@ def get_sequence_input_objects_from_pretrained(
     def _passthrough_hf_encode(
         raw_input_split: al_hf_tokenizer_inputs,
     ) -> Sequence[int]:
-        return hf_tokenizer.encode(text=raw_input_split, is_split_into_words=True)
+        encoded = hf_tokenizer.encode(text=raw_input_split, is_split_into_words=True)
+        return encoded
 
     vocab = sync_hf_and_pytorch_vocab(hf_tokenizer=hf_tokenizer)
 
@@ -358,7 +408,10 @@ def sync_hf_and_pytorch_vocab(hf_tokenizer: Tokenizer | PreTrainedTokenizer) -> 
     return vocab
 
 
-def _get_hf_tokenizer(hf_model_name: str) -> PreTrainedTokenizer:
+def _get_hf_tokenizer(
+    hf_model_name: str,
+    add_prefix_space: bool = True,
+) -> PreTrainedTokenizer:
     """
     See https://github.com/huggingface/transformers/issues/5486 for why we need to
     set the environment variable.
@@ -367,7 +420,7 @@ def _get_hf_tokenizer(hf_model_name: str) -> PreTrainedTokenizer:
 
     hf_tokenizer = AutoTokenizer.from_pretrained(
         pretrained_model_name_or_path=hf_model_name,
-        add_prefix_space=True,
+        add_prefix_space=add_prefix_space,
     )
 
     hf_tokenizer = _add_specials_to_hf_tokenizer(hf_tokenizer=hf_tokenizer)
@@ -385,10 +438,25 @@ def _add_specials_to_hf_tokenizer(
         if special_token_name not in hf_tokenizer_copy.special_tokens_map:
             specials_tokens_to_add[special_token_name] = special_token
 
-    hf_tokenizer_copy.add_special_tokens(special_tokens_dict=specials_tokens_to_add)
-    logger.debug("Special tokens %s added to %s.", specials_tokens_to_add, hf_tokenizer)
+    added_tokens = hf_tokenizer_copy.add_special_tokens(
+        special_tokens_dict=specials_tokens_to_add
+    )
+    logger.debug("Special tokens %s added to %s.", added_tokens, hf_tokenizer)
 
     return hf_tokenizer_copy
+
+
+class TokenizerWrapper:
+    def __init__(self, tokenizer, is_pretokenized: bool):
+        self.tokenizer = tokenizer
+        self.is_pretokenized = is_pretokenized
+
+    def __call__(self, input_text: str | Sequence[str]) -> Sequence[str]:
+        tokens = self.tokenizer.encode(
+            sequence=input_text,
+            is_pretokenized=self.is_pretokenized,
+        ).tokens
+        return tokens
 
 
 def get_bpe_tokenizer(
@@ -403,23 +471,21 @@ def get_bpe_tokenizer(
         vocab_size=vocab_size,
     )
 
-    def _tokenize_raw(raw_input: str) -> Sequence[str]:
-        tokens = tokenizer.encode(
-            sequence=raw_input,
-            is_pretokenized=False,
-        ).tokens
-        return tokens
-
-    def _tokenize_pre_split(raw_input_split: Sequence[str]) -> Sequence[str]:
-        tokens = tokenizer.encode(
-            sequence=raw_input_split,
-            is_pretokenized=True,
-        ).tokens
-        return tokens
-
     if split_on is None:
-        return cast(TokenizerProtocolRaw, _tokenize_raw)
-    return cast(TokenizerProtocolPreSplit, _tokenize_pre_split)
+        return cast(
+            TokenizerProtocolRaw,
+            TokenizerWrapper(
+                tokenizer=tokenizer,
+                is_pretokenized=False,
+            ),
+        )
+    return cast(
+        TokenizerProtocolPreSplit,
+        TokenizerWrapper(
+            tokenizer=tokenizer,
+            is_pretokenized=True,
+        ),
+    )
 
 
 class TokenizerVocabSizeError(Exception):
@@ -916,3 +982,71 @@ def get_max_length(
         return average_length
 
     raise ValueError("Unknown max length config value %s.", max_length_config_value)
+
+
+@dataclass
+class SpecialTokens:
+    mask_idx: int
+    pad_idx: int
+    eos_idx: int
+    bos_idx: int
+    unk_idx: int
+
+    mask_token: str
+    pad_token: str
+    eos_token: str
+    bos_token: str
+    unk_token: str
+
+
+def get_special_tokens(
+    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
+    vocab: Vocab,
+) -> SpecialTokens:
+    keys_and_defaults = (
+        ("mask_token", "<mask>"),
+        ("pad_token", "<pad>"),
+        ("bos_token", "<bos>"),
+        ("eos_token", "<eos>"),
+        ("unk_token", "<unk>"),
+    )
+
+    token_values = {}
+    index_values = {}
+
+    has_inner = hasattr(tokenizer, "tokenizer")
+    has_specials_map = False
+    if has_inner:
+        if isinstance(tokenizer, HFTokenizerWrapper):
+            has_specials_map = hasattr(tokenizer.tokenizer, "special_tokens_map")
+
+    for key, default in keys_and_defaults:
+        if has_inner and has_specials_map:
+            assert isinstance(tokenizer, HFTokenizerWrapper)
+            wrapper = tokenizer
+            inner_tokenizer = wrapper.tokenizer
+            cur_token = inner_tokenizer.special_tokens_map.get(key, default)
+        else:
+            cur_token = getattr(tokenizer, key, default)
+
+        token_values[key] = cur_token
+
+        cur_index = vocab[cur_token]
+        assert cur_index >= 0, f"Token '{cur_token}' not found in vocab."
+        idx_kwarg_key = key.replace("_token", "_idx")
+        index_values[idx_kwarg_key] = cur_index
+
+    special_tokens = SpecialTokens(
+        mask_idx=index_values["mask_idx"],
+        pad_idx=index_values["pad_idx"],
+        eos_idx=index_values["eos_idx"],
+        bos_idx=index_values["bos_idx"],
+        unk_idx=index_values["unk_idx"],
+        mask_token=token_values["mask_token"],
+        pad_token=token_values["pad_token"],
+        eos_token=token_values["eos_token"],
+        bos_token=token_values["bos_token"],
+        unk_token=token_values["unk_token"],
+    )
+
+    return special_tokens

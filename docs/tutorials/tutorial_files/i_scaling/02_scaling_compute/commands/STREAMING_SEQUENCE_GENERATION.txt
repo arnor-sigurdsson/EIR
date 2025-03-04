@@ -1,0 +1,4 @@
+eirtrain \
+--global_configs eir_tutorials/i_scaling/02_scaling_compute/globals.yaml \
+--fusion_configs eir_tutorials/i_scaling/02_scaling_compute/fusion.yaml \
+--output_configs eir_tutorials/i_scaling/02_scaling_compute/output.yaml

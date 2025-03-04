@@ -233,8 +233,7 @@ def get_output_dimensions_for_input(
     pool: Literal["max"] | Literal["avg"] | None,
     hf_model: bool = False,
 ) -> torch.LongTensor:
-    cpu_device = torch.device("cpu")
-    module_copy = deepcopy(module).to(device=cpu_device)
+    module_copy = deepcopy(module)
 
     with torch.no_grad():
         test_input = torch.randn(*input_shape)

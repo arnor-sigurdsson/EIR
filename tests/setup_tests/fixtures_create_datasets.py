@@ -4,7 +4,7 @@ import pytest
 from torch.utils.data import DataLoader
 
 from eir.data_load import datasets
-from eir.data_load.data_utils import get_train_sampler
+from eir.data_load.data_utils import consistent_nan_collate, get_finite_train_sampler
 from eir.setup import config, input_setup
 from eir.setup.output_setup import set_up_outputs_for_training
 
@@ -54,7 +54,7 @@ def create_test_dataloaders(create_test_config: config.Configs, create_test_data
     gc = c.global_config
     train_dataset, valid_dataset = create_test_datasets
 
-    train_sampler = get_train_sampler(
+    train_sampler = get_finite_train_sampler(
         columns_to_sample=gc.tc.weighted_sampling_columns,
         train_dataset=train_dataset,
     )
@@ -66,6 +66,7 @@ def create_test_dataloaders(create_test_config: config.Configs, create_test_data
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=gc.be.batch_size,
+        collate_fn=consistent_nan_collate,
         sampler=train_sampler,
         shuffle=shuffle,
         drop_last=True,
@@ -74,6 +75,7 @@ def create_test_dataloaders(create_test_config: config.Configs, create_test_data
     valid_dataloader = DataLoader(
         valid_dataset,
         batch_size=gc.be.batch_size,
+        collate_fn=consistent_nan_collate,
         shuffle=False,
         drop_last=False,
     )

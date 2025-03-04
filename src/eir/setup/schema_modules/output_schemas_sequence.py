@@ -97,6 +97,33 @@ class SequenceOutputSamplingConfig:
     :param generated_sequence_length:
         The length of the output sequences that are generated.
 
+    :param temperature:
+        Controls the randomness of predictions by scaling the logits before applying
+        softmax. A higher temperature results in more random predictions, while a
+        lower temperature results in more deterministic predictions.
+
+    :param repetition_penalty:
+        Discourages repetition by reducing the probability of tokens that have
+        already appeared in the generated text. Values greater than 1.0 apply
+        the penalty, with higher values (1.2-1.5) reducing repetition more
+        aggressively. A value of 1.0 disables this feature.
+
+    :param repetition_penalty_max_window:
+        The maximum number of most recent tokens to consider when applying the
+        repetition penalty. A smaller window focuses on preventing local repetition,
+        while a larger window prevents repetition across the entire sequence.
+
+    :param frequency_penalty:
+        Reduces the probability of tokens proportional to how frequently they've
+        appeared in the generated text. Unlike repetition penalty, this scales with
+        usage count. Positive values (0.1-0.3) increase diversity, with higher values
+        producing more varied vocabulary.
+
+    :param frequency_penalty_max_window:
+        The maximum number of most recent tokens to track when calculating token
+        frequencies for the frequency penalty. Larger windows maintain longer-term
+        memory of word usage patterns.
+
     :param top_k:
         The number of top candidates to consider when sampling the next token
         in an output sequence. By default, the model considers the top 20 candidates
@@ -106,11 +133,24 @@ class SequenceOutputSamplingConfig:
         the next token in an output sequence. For example, if top_p is 0.9, the model
         will stop sampling candidates once the cumulative probability of the most
         likely candidates reaches 0.9.
+
+    :param tau:
+        Controls locally typical sampling by filtering tokens based on how close their
+        probabilities are to the expected distribution. Values range from 0.0 to 1.0,
+        where 1.0 disables the filter. Lower values produce more consistent text by
+        removing outlier tokens.
     """
 
     manual_inputs: Sequence[dict[str, str]] = ()
     n_eval_inputs: int = 10
 
     generated_sequence_length: int = 64
+
+    repetition_penalty: float = 1.1
+    repetition_penalty_max_window: int = 64
+    frequency_penalty: float = 0.1
+    frequency_penalty_max_window: int = 128
+    temperature: float = 0.7
     top_k: int = 20
     top_p: float = 0.9
+    tau: float = 0.95

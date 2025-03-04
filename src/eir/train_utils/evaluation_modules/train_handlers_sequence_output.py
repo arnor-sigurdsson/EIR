@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 from collections.abc import Generator, Iterator, Sequence
 from copy import copy
 from dataclasses import dataclass
@@ -14,8 +15,12 @@ from eir.data_load.data_preparation_modules.imputation import (
     impute_missing_modalities_wrapper,
 )
 from eir.data_load.datasets import al_getitem_return
-from eir.models.model_training_utils import predict_on_batch
-from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.models.model_training_utils import predict_on_batch, recursive_to_device
+from eir.setup.input_setup_modules.setup_sequence import (
+    ComputedSequenceInputInfo,
+    SpecialTokens,
+    get_special_tokens,
+)
 from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
@@ -26,14 +31,12 @@ from eir.setup.schema_modules.output_schemas_sequence import (
 from eir.setup.schemas import OutputConfig, SequenceOutputTypeConfig
 from eir.train_utils import utils
 from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
-    SpecialTokens,
     convert_model_inputs_to_raw,
     decode_tokens,
     extract_input_types,
     general_pre_process_prepared_inputs,
     get_batch_generator,
     get_dataset_loader_single_sample_generator,
-    get_special_tokens,
     post_prepare_manual_inputs,
     prepare_base_input,
     prepare_manual_sample_data,
@@ -87,7 +90,8 @@ def sequence_out_single_sample_evaluation_wrapper(
     )
 
     auto_validation_generator = get_dataset_loader_single_sample_generator(
-        dataset=auto_dataset_to_load_from
+        dataset=auto_dataset_to_load_from,
+        fabric=experiment.fabric,
     )
     auto_samples = get_sequence_output_auto_validation_samples(
         output_configs=output_configs,
@@ -168,6 +172,7 @@ def sequence_out_single_sample_evaluation_wrapper(
                         tokens=generated_tokens,
                         vocab=cur_input_object.vocab,
                         split_on=output_type_info.split_on,
+                        tokenizer=cur_input_object.tokenizer,
                     )
                     special_tokens = get_special_tokens(
                         tokenizer=cur_input_object.tokenizer,
@@ -365,18 +370,23 @@ def autoregressive_sequence_generation(
         vocab=output_object.vocab,
     )
 
+    device = str(experiment.fabric.device)
     autoregressive_pre_batch = prepare_autoregressive_sampling_batch(
         eval_samples=eval_samples,
         seq_output_name=seq_output_name,
         special_tokens=st,
+        device=device,
     )
     prepared_sample_inputs = autoregressive_pre_batch.prepared_inputs
     prepared_targets = autoregressive_pre_batch.prepared_targets
     generated_tokens = autoregressive_pre_batch.generated_tokens
     indices = autoregressive_pre_batch.indices
 
-    indices_has_finished = {}
+    indices_has_finished: dict[int, bool] = {}
     for _i in range(0, sampling_config.generated_sequence_length):
+        if len(indices_has_finished) == len(eval_samples):
+            break
+
         target_indices = []
         for sample_index, _ in enumerate(eval_samples):
             cur_generated_tokens = generated_tokens[sample_index]
@@ -388,6 +398,10 @@ def autoregressive_sequence_generation(
                 seq_output_name=seq_output_name,
                 max_length=output_object.computed_max_length,
                 pad_idx=st.pad_idx,
+            )
+            cur_prepared_sample_inputs = recursive_to_device(
+                obj=cur_prepared_sample_inputs,
+                device=device,
             )
 
             cur_target_index = _compute_target_index(
@@ -421,6 +435,7 @@ def autoregressive_sequence_generation(
             seq_output_name=seq_output_name,
             sampling_config=sampling_config,
             current_target_indices=target_indices,
+            generated_tokens_history=generated_tokens,
         )
 
         for sample_index, _ in enumerate(eval_samples):
@@ -453,6 +468,7 @@ def prepare_autoregressive_sampling_batch(
     eval_samples: Sequence[SequenceOutputEvalSample],
     seq_output_name: str,
     special_tokens: SpecialTokens,
+    device: str,
 ) -> AutoRegressiveSamplingBatch:
     prepared_sample_inputs = []
     prepared_targets = []
@@ -477,6 +493,16 @@ def prepare_autoregressive_sampling_batch(
 
         generated_tokens.append(cur_generated_tokens)
         indices.append(len(cur_generated_tokens))
+
+    prepared_sample_inputs = recursive_to_device(
+        obj=prepared_sample_inputs,
+        device=device,
+    )
+
+    prepared_targets = recursive_to_device(
+        obj=prepared_targets,
+        device=device,
+    )
 
     return AutoRegressiveSamplingBatch(
         prepared_inputs=prepared_sample_inputs,
@@ -602,21 +628,130 @@ def sample_next_token_index_from_output(
     seq_output_name: str,
     sampling_config: SequenceOutputSamplingConfig,
     current_target_indices: list[int],
+    generated_tokens_history: list[list[int]] | None = None,
 ) -> list[int]:
     cur_logits = outputs[seq_output_name][seq_output_name]
     batch_indices = torch.arange(cur_logits.size(0))
     cur_position_logits = cur_logits[batch_indices, current_target_indices, :]
+
+    repetition_penalty = sampling_config.repetition_penalty
+    if generated_tokens_history is not None and repetition_penalty != 1.0:
+        for i in range(cur_position_logits.size(0)):
+            cur_position_logits[i] = apply_repetition_penalty(
+                logits=cur_position_logits[i],
+                generated_tokens=generated_tokens_history[i],
+                penalty=repetition_penalty,
+                max_window=sampling_config.repetition_penalty_max_window,
+            )
+
+    frequency_penalty = sampling_config.frequency_penalty
+    if generated_tokens_history is not None and repetition_penalty > 0.0:
+        for i in range(cur_position_logits.size(0)):
+            cur_position_logits[i] = apply_frequency_penalty(
+                logits=cur_position_logits[i],
+                generated_tokens=generated_tokens_history[i],
+                penalty=frequency_penalty,
+                max_window=sampling_config.frequency_penalty_max_window,
+            )
+
+    temperature = sampling_config.temperature
+    if temperature != 1.0:
+        cur_position_logits = cur_position_logits / temperature
 
     filtered_logits = top_k_top_p_filtering(
         logits=cur_position_logits,
         top_k=sampling_config.top_k,
         top_p=sampling_config.top_p,
     )
+
+    tau = sampling_config.tau
+    filter_value = -float("Inf")
+    if tau < 1.0:
+        valid_tokens_mask = filtered_logits != filter_value
+        valid_tokens_count = valid_tokens_mask.sum(dim=-1)
+
+        batch_indices = torch.where(valid_tokens_count > 1)[0]
+        if len(batch_indices) > 0:
+            batch_logits = filtered_logits[batch_indices]
+            batch_filtered = locally_typical_sampling(
+                logits=batch_logits,
+                tau=tau,
+                filter_value=filter_value,
+            )
+            filtered_logits[batch_indices] = batch_filtered
+
     probabilities = F.softmax(input=filtered_logits, dim=-1)
     next_token_indices = torch.multinomial(input=probabilities, num_samples=1)
     next_token_indices_list = next_token_indices.squeeze(1).tolist()
 
     return next_token_indices_list
+
+
+def apply_repetition_penalty(
+    logits: torch.Tensor,
+    generated_tokens: list[int],
+    penalty: float = 1.2,
+    max_window: int = 64,
+) -> torch.Tensor:
+    if not generated_tokens:
+        return logits
+
+    generated_tokens = generated_tokens[-max_window:]
+    unique_tokens = torch.tensor(list(set(generated_tokens)), device=logits.device)
+
+    valid_tokens = unique_tokens[unique_tokens < logits.size(0)]
+
+    if len(valid_tokens) == 0:
+        return logits
+
+    logits_modified = logits.clone()
+
+    token_logits = logits_modified[valid_tokens]
+
+    token_logits = torch.where(
+        token_logits >= 0,
+        token_logits / penalty,
+        token_logits * penalty,
+    )
+
+    logits_modified[valid_tokens] = token_logits
+
+    return logits_modified
+
+
+def apply_frequency_penalty(
+    logits: torch.Tensor,
+    generated_tokens: list[int],
+    penalty: float = 0.1,
+    max_window: int = 128,
+) -> torch.Tensor:
+    if not generated_tokens or penalty <= 0.0:
+        return logits
+
+    recent_tokens = generated_tokens[-max_window:]
+
+    token_counts = Counter(recent_tokens)
+
+    vocab_size = logits.size(0)
+    valid_tokens = []
+    penalties = []
+
+    for token, count in token_counts.items():
+        if token < vocab_size and count > 1:
+            valid_tokens.append(token)
+            penalties.append(penalty * (1.0 - 1.0 / count))
+
+    if not valid_tokens:
+        return logits
+
+    valid_tokens_tensor = torch.tensor(valid_tokens, device=logits.device)
+    penalties_tensor = torch.tensor(penalties, device=logits.device)
+
+    logits_modified = logits.clone()
+
+    logits_modified[valid_tokens_tensor] -= penalties_tensor
+
+    return logits_modified
 
 
 def top_k_top_p_filtering(
@@ -649,3 +784,34 @@ def top_k_top_p_filtering(
             logits[i, indices_to_remove] = filter_value
 
     return logits
+
+
+def locally_typical_sampling(
+    logits: torch.Tensor,
+    tau: float = 0.95,
+    filter_value: float = -float("Inf"),
+) -> torch.Tensor:
+    filtered_logits = logits.clone()
+
+    probs = F.softmax(filtered_logits, dim=-1)
+
+    eps = 1e-10
+
+    # Calculate entropy of the distribution
+    entropy = -torch.sum(probs * torch.log(probs + eps), dim=-1, keepdim=True)
+
+    # Calculate typicality score
+    typical_score = torch.abs(torch.log(probs + eps) + entropy)
+
+    # Keep only tokens with typicality score below threshold
+    sorted_scores, _ = torch.sort(typical_score, dim=-1)
+
+    for i in range(filtered_logits.size(0)):
+        num_tokens = sorted_scores[i].size(-1)
+        threshold_idx = int((num_tokens - 1) * tau)
+
+        threshold = sorted_scores[i, threshold_idx]
+
+        filtered_logits[i, typical_score[i] > threshold] = filter_value
+
+    return filtered_logits

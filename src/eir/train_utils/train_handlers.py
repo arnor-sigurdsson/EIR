@@ -1,20 +1,16 @@
-import os
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Any,
     overload,
 )
 
 import numpy as np
 import torch
-from ignite.contrib.handlers import ProgressBar
-from ignite.engine import CallableEventWithFilter, Engine, Events, EventsList, events
-from ignite.handlers import EarlyStopping, ModelCheckpoint
-from ignite.metrics import RunningAverage
-from ignite.metrics.metric import Metric, RunningBatchWise
+from lightning import fabric
 from torch import nn
 
 from eir.data_load.data_utils import get_output_info_generator
@@ -26,6 +22,17 @@ from eir.train_utils.distributed import (
     only_call_on_master_node,
 )
 from eir.train_utils.evaluation import validation_handler
+from eir.train_utils.ignite_port import events
+from eir.train_utils.ignite_port.engine import Engine
+from eir.train_utils.ignite_port.events import (
+    CallableEventWithFilter,
+    Events,
+    EventsList,
+)
+from eir.train_utils.ignite_port.handlers.early_stopping import EarlyStopping
+from eir.train_utils.ignite_port.handlers.tqdm_logger import ProgressBar
+from eir.train_utils.ignite_port.metrics.metric import Metric, RunningBatchWise
+from eir.train_utils.ignite_port.metrics.running_average import RunningAverage
 from eir.train_utils.lr_scheduling import attach_lr_scheduler, set_up_lr_scheduler
 from eir.train_utils.metrics import (
     MetricRecord,
@@ -73,7 +80,8 @@ def configure_trainer(
     run_folder = get_run_folder(output_folder=gc.be.output_folder)
 
     monitoring_metrics = _get_monitoring_metrics(
-        outputs_as_dict=experiment.outputs, metric_record_dict=experiment.metrics
+        outputs_as_dict=experiment.outputs,
+        metric_record_dict=experiment.metrics,
     )
 
     handler_config = HandlerConfig(
@@ -86,9 +94,9 @@ def configure_trainer(
     train_monitoring_metrics = _parse_metrics_for_train_running_average(
         monitoring_metrics=monitoring_metrics
     )
-    _call_and_undo_ignite_local_rank_side_effects(
-        func=_attach_running_average_metrics,
-        kwargs={"engine": trainer, "monitoring_metrics": train_monitoring_metrics},
+    _attach_running_average_metrics(
+        engine=trainer,
+        monitoring_metrics=train_monitoring_metrics,
     )
 
     _maybe_attach_progress_bar(trainer=trainer, do_not_attach=gc.vl.no_pbar)
@@ -106,7 +114,9 @@ def configure_trainer(
     if gc.lr_schedule != "same":
         lr_scheduler = set_up_lr_scheduler(handler_config=handler_config)
         attach_lr_scheduler(
-            engine=trainer, lr_scheduler=lr_scheduler, experiment=experiment
+            engine=trainer,
+            lr_scheduler=lr_scheduler,
+            experiment=experiment,
         )
     elif gc.lr_schedule == "same" and gc.lr.warmup_steps:
         raise NotImplementedError("Warmup not yet implemented for 'same' LR schedule.")
@@ -335,9 +345,10 @@ def _get_early_stopping_handler(
     )
 
     handler = EarlyStopping(
-        patience=patience_steps, score_function=scoring_function, trainer=trainer
+        patience=patience_steps,
+        score_function=scoring_function,
+        trainer=trainer,
     )
-    handler.logger = logger
 
     return handler
 
@@ -494,31 +505,10 @@ def _attach_running_average_metrics(
         )
 
         running_average.attach(
-            engine,
+            engine=engine,
             name=metric_name,
             usage=RunningBatchWise(),
         )
-
-
-def _call_and_undo_ignite_local_rank_side_effects(func: Callable, kwargs: dict):
-    """
-    This weird function is needed in the case where a GPU is available, calling some
-    functions will trigger obscure ignite side effects that change some environment
-    variables without warning.
-    """
-    original_local_rank = int(os.environ.get("LOCAL_RANK", 0))
-
-    result = func(**kwargs)
-
-    cur_local_rank = int(os.environ.get("LOCAL_RANK", 0))
-    if cur_local_rank != original_local_rank:
-        logger.debug(
-            "Enforcing local rank to be '%d' after ignite side effects",
-            original_local_rank,
-        )
-        os.environ["LOCAL_RANK"] = str(original_local_rank)
-
-    return result
 
 
 @only_call_on_master_node
@@ -571,6 +561,7 @@ def _attach_run_event_handlers(trainer: Engine, handler_config: HandlerConfig):
             checkpoint_interval=gc.ec.checkpoint_interval,
             sample_interval=gc.ec.sample_interval,
             model=exp.model,
+            fabric_object=exp.fabric,
         )
 
     metric_writing_funcs = _get_metric_writing_funcs(
@@ -622,6 +613,7 @@ def _add_checkpoint_handler_wrapper(
     checkpoint_interval: int,
     sample_interval: int,
     model: nn.Module,
+    fabric_object: fabric.Fabric,
 ) -> Engine:
     checkpoint_score_function, score_name = None, None
     if n_to_save is not None:
@@ -652,6 +644,7 @@ def _add_checkpoint_handler_wrapper(
     checkpoint_handler = _get_checkpoint_handler(
         run_folder=run_folder,
         output_folder=output_folder,
+        fabric_object=fabric_object,
         n_to_save=n_to_save,
         score_function=checkpoint_score_function,
         score_name=score_name,
@@ -696,23 +689,112 @@ def _get_metric_writing_funcs(
     return writer_funcs
 
 
+class SimpleModelCheckpoint:
+    def __init__(
+        self,
+        save_dir: Path,
+        filename_prefix: str,
+        fabric_object: fabric.Fabric,
+        n_saved: int | None = 1,
+        score_function: Callable[[Engine], float] | None = None,
+        score_name: str | None = None,
+        global_step_transform: Callable[[Engine, str], int] | None = None,
+    ):
+        self.save_dir = Path(save_dir)
+        self.filename_prefix = filename_prefix
+        self.n_saved = n_saved
+        self.fabric_object = fabric_object
+        self.score_function = score_function
+        self.score_name = score_name
+        self.global_step_transform = global_step_transform
+        self.saved_checkpoints: list[tuple[float, Path]] = []  # (score, path)
+
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+
+    def __call__(
+        self,
+        engine: Engine,
+        to_save: dict[str, Any],
+    ) -> None:
+        """
+        TODO: Potentially use the Fabric save/load functionality here and when loading.
+        """
+        score = None
+        if self.score_function is not None:
+            score = self.score_function(engine)
+
+            if self.saved_checkpoints and score <= self.saved_checkpoints[0][0]:
+                return
+
+        if self.global_step_transform is not None:
+            global_step = self.global_step_transform(engine, "")
+        else:
+            global_step = engine.state.iteration
+
+        if score is not None and self.score_name is not None:
+            filename = (
+                f"{self.filename_prefix}_checkpoint_{global_step}_"
+                f"{self.score_name}={score:.4f}.pt"
+            )
+        else:
+            filename = f"{self.filename_prefix}_checkpoint_{global_step}.pt"
+
+        save_path = self.save_dir / filename
+
+        fabric_model = to_save["model"]
+        module_to_save = fabric_model.module
+        if isinstance(module_to_save, AttrDelegatedSWAWrapper):
+            module_to_save = module_to_save.module
+
+        state_dict = module_to_save.state_dict()
+
+        torch.save(
+            obj=state_dict,
+            f=save_path,
+        )
+
+        self.saved_checkpoints.append(
+            (float("-inf") if score is None else score, save_path)
+        )
+        self.saved_checkpoints.sort(key=lambda x: x[0], reverse=True)
+
+        if self.n_saved is not None:
+            while len(self.saved_checkpoints) > self.n_saved:
+                _, old_file = self.saved_checkpoints.pop()
+                try:
+                    old_file.unlink()
+                except FileNotFoundError:
+                    logger.warning("Could not delete old checkpoint file: %s", old_file)
+
+    @property
+    def last_checkpoint(self) -> Path | None:
+        """Returns path to the last saved checkpoint."""
+        return self.saved_checkpoints[-1][1] if self.saved_checkpoints else None
+
+    @property
+    def best_checkpoint(self) -> Path | None:
+        """Returns path to the checkpoint with highest score."""
+        return self.saved_checkpoints[0][1] if self.saved_checkpoints else None
+
+
 def _get_checkpoint_handler(
     run_folder: Path,
     output_folder: Path,
     n_to_save: int,
+    fabric_object: fabric.Fabric,
     score_function: Callable | None = None,
     score_name: str | None = None,
-) -> ModelCheckpoint:
+) -> SimpleModelCheckpoint:
     def _default_global_step_transform(engine: Engine, event_name: str) -> int:
         return engine.state.iteration
 
-    checkpoint_handler = ModelCheckpoint(
-        dirname=str(Path(run_folder, "saved_models")),
+    checkpoint_handler = SimpleModelCheckpoint(
+        save_dir=Path(run_folder, "saved_models"),
         filename_prefix=output_folder.name,
-        create_dir=True,
-        score_name=score_name,
         n_saved=n_to_save,
+        fabric_object=fabric_object,
         score_function=score_function,
+        score_name=score_name,
         global_step_transform=_default_global_step_transform,
     )
 
@@ -724,7 +806,7 @@ def _get_checkpoint_handler(
 )
 def _attach_checkpoint_handler(
     trainer: Engine,
-    checkpoint_handler: ModelCheckpoint,
+    checkpoint_handler: SimpleModelCheckpoint,
     checkpoint_interval: int,
     model: nn.Module | AttrDelegatedSWAWrapper | AttrDelegatedDistributedDataParallel,
 ) -> Engine:
@@ -815,6 +897,7 @@ def _get_plot_events(
     return plot_events
 
 
+@only_call_on_master_node
 @validate_handler_dependencies([_write_training_metrics_handler])
 def _attach_plot_progress_handler(
     trainer: Engine,

@@ -4,7 +4,6 @@ attribution_analysis:
 basic_experiment:
   batch_size: 32
   dataloader_workers: 0
-  device: mps
   memory_dataset: true
   n_epochs: 200
   output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_05_is_it_a_hot_dog

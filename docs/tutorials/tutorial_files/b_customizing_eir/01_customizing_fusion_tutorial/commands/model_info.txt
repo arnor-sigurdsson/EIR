@@ -1,67 +1,136 @@
-MetaModel(
-  (input_modules): ModuleDict(
-    (genotype): LCLModel(
-      (fc_0): LCL(in_features=4000, num_chunks=500, kernel_size=8, out_feature_sets=4, out_features=2000, bias=True)
-      (lcl_blocks): Sequential(
-        (0): LCLResidualBlock(
-          (norm_1): RMSNorm((2000,), eps=None, elementwise_affine=True)
-          (fc_1): LCL(in_features=2000, num_chunks=125, kernel_size=16, out_feature_sets=4, out_features=500, bias=True)
-          (act_1): GELU(approximate='none')
-          (do): Dropout(p=0.1, inplace=False)
-          (fc_2): LCL(in_features=500, num_chunks=32, kernel_size=16, out_feature_sets=4, out_features=128, bias=True)
-          (ls): LayerScale(dim=128, init_values=1.0)
-          (downsample_identity): LCL(in_features=2000, num_chunks=128, kernel_size=16, out_feature_sets=1, out_features=128, bias=True)
-          (stochastic_depth): StochasticDepth(p=0.0, mode=batch)
+_FabricModule(
+  (_forward_module): MetaModel(
+    (input_modules): ModuleDict(
+      (genotype): LCLModel(
+        (fc_0): LCL(in_features=4000, num_chunks=500, kernel_size=8, out_feature_sets=4, out_features=2000, bias=True)
+        (lcl_blocks): Sequential(
+          (0): LCLResidualBlock(
+            (norm_1): RMSNorm((2000,), eps=None, elementwise_affine=True)
+            (fc_1): LCL(in_features=2000, num_chunks=125, kernel_size=16, out_feature_sets=4, out_features=500, bias=True)
+            (act_1): GELU(approximate='none')
+            (do): Dropout(p=0.1, inplace=False)
+            (fc_2): LCL(in_features=500, num_chunks=32, kernel_size=16, out_feature_sets=4, out_features=128, bias=True)
+            (ls): LayerScale(dim=128, init_values=1.0)
+            (downsample_identity): LCL(in_features=2000, num_chunks=128, kernel_size=16, out_feature_sets=1, out_features=128, bias=True)
+            (stochastic_depth): StochasticDepth(p=0.0, mode=batch)
+          )
         )
       )
     )
-  )
-  (fusion_modules): ModuleDict(
-    (computed): MyLSTMFusionModule(
-      (fusion): LSTM(128, 128, batch_first=True)
+    (fusion_modules): ModuleDict(
+      (computed): MyLSTMFusionModule(
+        (fusion): LSTM(128, 128, batch_first=True)
+      )
     )
-  )
-  (output_modules): ModuleDict(
-    (ancestry_output): ResidualMLPOutputModule(
-      (multi_task_branches): ModuleDict(
-        (Origin): Sequential(
-          (0): Sequential(
+    (output_modules): ModuleDict(
+      (ancestry_output): ResidualMLPOutputModule(
+        (multi_task_branches): ModuleDict(
+          (Origin): Sequential(
             (0): Sequential(
-              (0): MLPResidualBlock(
-                (norm_1): RMSNorm((128,), eps=None, elementwise_affine=True)
-                (fc_1): Linear(in_features=128, out_features=256, bias=False)
-                (act_1): GELU(approximate='none')
-                (do): Dropout(p=0.1, inplace=False)
-                (fc_2): Linear(in_features=256, out_features=256, bias=False)
-                (downsample_identity): Linear(in_features=128, out_features=256, bias=True)
-                (ls): LayerScale(dim=256, init_values=1.0)
-                (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
+              (0): Sequential(
+                (0): MLPResidualBlock(
+                  (norm_1): RMSNorm((128,), eps=None, elementwise_affine=True)
+                  (fc_1): Linear(in_features=128, out_features=256, bias=False)
+                  (act_1): GELU(approximate='none')
+                  (do): Dropout(p=0.1, inplace=False)
+                  (fc_2): Linear(in_features=256, out_features=256, bias=False)
+                  (downsample_identity): Linear(in_features=128, out_features=256, bias=True)
+                  (ls): LayerScale(dim=256, init_values=1.0)
+                  (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
+                )
+              )
+              (1): Sequential(
+                (0): MLPResidualBlock(
+                  (norm_1): RMSNorm((256,), eps=None, elementwise_affine=True)
+                  (fc_1): Linear(in_features=256, out_features=256, bias=False)
+                  (act_1): GELU(approximate='none')
+                  (do): Dropout(p=0.1, inplace=False)
+                  (fc_2): Linear(in_features=256, out_features=256, bias=False)
+                  (downsample_identity): Identity()
+                  (ls): LayerScale(dim=256, init_values=1e-05)
+                  (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
+                )
               )
             )
             (1): Sequential(
-              (0): MLPResidualBlock(
-                (norm_1): RMSNorm((256,), eps=None, elementwise_affine=True)
-                (fc_1): Linear(in_features=256, out_features=256, bias=False)
-                (act_1): GELU(approximate='none')
-                (do): Dropout(p=0.1, inplace=False)
-                (fc_2): Linear(in_features=256, out_features=256, bias=False)
-                (downsample_identity): Identity()
-                (ls): LayerScale(dim=256, init_values=1e-05)
-                (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
-              )
+              (norm_final): RMSNorm((256,), eps=None, elementwise_affine=True)
+              (act_final): GELU(approximate='none')
+              (do_final): Dropout(p=0.1, inplace=False)
             )
-          )
-          (1): Sequential(
-            (norm_final): RMSNorm((256,), eps=None, elementwise_affine=True)
-            (act_final): GELU(approximate='none')
-            (do_final): Dropout(p=0.1, inplace=False)
-          )
-          (2): Sequential(
-            (final): Linear(in_features=256, out_features=6, bias=True)
+            (2): Sequential(
+              (final): Linear(in_features=256, out_features=6, bias=True)
+            )
           )
         )
       )
     )
+    (tensor_broker): ModuleDict()
   )
-  (tensor_broker): ModuleDict()
+  (_original_module): MetaModel(
+    (input_modules): ModuleDict(
+      (genotype): LCLModel(
+        (fc_0): LCL(in_features=4000, num_chunks=500, kernel_size=8, out_feature_sets=4, out_features=2000, bias=True)
+        (lcl_blocks): Sequential(
+          (0): LCLResidualBlock(
+            (norm_1): RMSNorm((2000,), eps=None, elementwise_affine=True)
+            (fc_1): LCL(in_features=2000, num_chunks=125, kernel_size=16, out_feature_sets=4, out_features=500, bias=True)
+            (act_1): GELU(approximate='none')
+            (do): Dropout(p=0.1, inplace=False)
+            (fc_2): LCL(in_features=500, num_chunks=32, kernel_size=16, out_feature_sets=4, out_features=128, bias=True)
+            (ls): LayerScale(dim=128, init_values=1.0)
+            (downsample_identity): LCL(in_features=2000, num_chunks=128, kernel_size=16, out_feature_sets=1, out_features=128, bias=True)
+            (stochastic_depth): StochasticDepth(p=0.0, mode=batch)
+          )
+        )
+      )
+    )
+    (fusion_modules): ModuleDict(
+      (computed): MyLSTMFusionModule(
+        (fusion): LSTM(128, 128, batch_first=True)
+      )
+    )
+    (output_modules): ModuleDict(
+      (ancestry_output): ResidualMLPOutputModule(
+        (multi_task_branches): ModuleDict(
+          (Origin): Sequential(
+            (0): Sequential(
+              (0): Sequential(
+                (0): MLPResidualBlock(
+                  (norm_1): RMSNorm((128,), eps=None, elementwise_affine=True)
+                  (fc_1): Linear(in_features=128, out_features=256, bias=False)
+                  (act_1): GELU(approximate='none')
+                  (do): Dropout(p=0.1, inplace=False)
+                  (fc_2): Linear(in_features=256, out_features=256, bias=False)
+                  (downsample_identity): Linear(in_features=128, out_features=256, bias=True)
+                  (ls): LayerScale(dim=256, init_values=1.0)
+                  (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
+                )
+              )
+              (1): Sequential(
+                (0): MLPResidualBlock(
+                  (norm_1): RMSNorm((256,), eps=None, elementwise_affine=True)
+                  (fc_1): Linear(in_features=256, out_features=256, bias=False)
+                  (act_1): GELU(approximate='none')
+                  (do): Dropout(p=0.1, inplace=False)
+                  (fc_2): Linear(in_features=256, out_features=256, bias=False)
+                  (downsample_identity): Identity()
+                  (ls): LayerScale(dim=256, init_values=1e-05)
+                  (stochastic_depth): StochasticDepth(p=0.1, mode=batch)
+                )
+              )
+            )
+            (1): Sequential(
+              (norm_final): RMSNorm((256,), eps=None, elementwise_affine=True)
+              (act_final): GELU(approximate='none')
+              (do_final): Dropout(p=0.1, inplace=False)
+            )
+            (2): Sequential(
+              (final): Linear(in_features=256, out_features=6, bias=True)
+            )
+          )
+        )
+      )
+    )
+    (tensor_broker): ModuleDict()
+  )
 )

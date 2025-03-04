@@ -1,7 +1,6 @@
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from copy import deepcopy
-from dataclasses import dataclass
 from itertools import cycle
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
@@ -9,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Union
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists, get_logger
+from lightning.fabric import Fabric
 from PIL import Image
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader, Dataset
@@ -36,7 +36,7 @@ from eir.data_load.data_preparation_modules.prepare_sequence import (
 from eir.data_load.data_streaming.streaming_dataset_utils import (
     streamline_sequence_manual_data,
 )
-from eir.data_load.data_utils import Batch
+from eir.data_load.data_utils import Batch, consistent_nan_collate
 from eir.data_load.datasets import al_getitem_return
 from eir.data_load.label_setup import (
     al_label_transformers,
@@ -59,8 +59,9 @@ from eir.setup.input_setup_modules.setup_image import (
 from eir.setup.input_setup_modules.setup_omics import ComputedOmicsInputInfo
 from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
-    TokenizerProtocolPreSplit,
-    TokenizerProtocolRaw,
+    HFTokenizerWrapper,
+    SpecialTokens,
+    get_special_tokens,
 )
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
@@ -85,7 +86,8 @@ logger = get_logger(name=__name__)
 
 
 def remove_special_tokens_from_string(
-    string: str, special_tokens: "SpecialTokens"
+    string: str,
+    special_tokens: SpecialTokens,
 ) -> str:
     """
     TODO:   Deprecate in favor of `remove_special_tokens`, due to not being guaranteed
@@ -101,7 +103,8 @@ def remove_special_tokens_from_string(
 
 
 def remove_special_tokens(
-    tokens: list[int], special_tokens: "SpecialTokens"
+    tokens: list[int],
+    special_tokens: SpecialTokens,
 ) -> list[int]:
     token_names = ["mask_idx", "pad_idx", "eos_idx", "bos_idx", "unk_idx"]
     for token in token_names:
@@ -134,7 +137,7 @@ def convert_model_inputs_to_raw(
 
             case ComputedOmicsInputInfo() | ComputedBytesInputInfo():
                 assert isinstance(data, torch.Tensor)
-                raw_input = data.numpy().squeeze()
+                raw_input = data.cpu().numpy().squeeze()
 
             case ComputedSequenceInputInfo():
                 assert isinstance(data, torch.Tensor)
@@ -142,9 +145,10 @@ def convert_model_inputs_to_raw(
                 assert isinstance(input_type_info, SequenceInputDataConfig)
                 assert input_object.tokenizer is not None
                 raw_input = decode_tokens(
-                    tokens=data.numpy().tolist(),
+                    tokens=data.cpu().numpy().tolist(),
                     vocab=input_object.vocab,
                     split_on=input_type_info.split_on,
+                    tokenizer=input_object.tokenizer,
                 )
                 special_tokens = get_special_tokens(
                     tokenizer=input_object.tokenizer, vocab=input_object.vocab
@@ -175,9 +179,10 @@ def convert_model_inputs_to_raw(
 
 
 def convert_image_input_to_raw(
-    data: torch.Tensor, normalization_stats: ImageNormalizationStats
+    data: torch.Tensor,
+    normalization_stats: ImageNormalizationStats,
 ) -> Image.Image:
-    data_np: np.ndarray = data.numpy()
+    data_np: np.ndarray = data.cpu().numpy()
     assert data_np.ndim == 3, "Input should be 3D"
 
     cur_input = un_normalize_image(
@@ -210,7 +215,7 @@ def convert_tabular_input_to_raw(
     all_reversed: dict[str, np.ndarray] = {}
     for col_name, tensor_data in data.items():
         transformer = input_transformers[col_name]
-        tensor_data_reshaped = tensor_data.numpy().reshape(-1, 1)
+        tensor_data_reshaped = tensor_data.cpu().numpy().reshape(-1, 1)
         assert tensor_data_reshaped.shape[0] > 0, "Empty tensor"
 
         it = transformer.inverse_transform
@@ -233,10 +238,11 @@ def convert_array_input_to_raw(
     data: torch.Tensor, normalization_stats: ArrayNormalizationStats | None
 ) -> np.ndarray:
     data_un_normalized = un_normalize_array(
-        array=data, normalization_stats=normalization_stats
+        array=data,
+        normalization_stats=normalization_stats,
     )
 
-    data_un_normalized_numpy = data_un_normalized.numpy()
+    data_un_normalized_numpy = data_un_normalized.cpu().numpy()
 
     return data_un_normalized_numpy
 
@@ -268,65 +274,38 @@ def general_pre_process_prepared_inputs(
     return batch_final
 
 
-@dataclass
-class SpecialTokens:
-    mask_idx: int
-    pad_idx: int
-    eos_idx: int
-    bos_idx: int
-    unk_idx: int
-
-    mask_token: str
-    pad_token: str
-    eos_token: str
-    bos_token: str
-    unk_token: str
-
-
-def get_special_tokens(
-    tokenizer: TokenizerProtocolRaw | TokenizerProtocolPreSplit, vocab: Vocab
-) -> SpecialTokens:
-    keys_and_defaults = (
-        ("mask_token", "<mask>"),
-        ("pad_token", "<pad>"),
-        ("bos_token", "<bos>"),
-        ("eos_token", "<eos>"),
-        ("unk_token", "<unk>"),
-    )
-
-    token_values = {}
-    index_values = {}
-
-    for key, default in keys_and_defaults:
-        cur_token = getattr(tokenizer, key, default)
-        token_values[key] = cur_token
-
-        cur_index = vocab[cur_token]
-        idx_kwarg_key = key.replace("_token", "_idx")
-        index_values[idx_kwarg_key] = cur_index
-
-    special_tokens = SpecialTokens(
-        mask_idx=index_values["mask_idx"],
-        pad_idx=index_values["pad_idx"],
-        eos_idx=index_values["eos_idx"],
-        bos_idx=index_values["bos_idx"],
-        unk_idx=index_values["unk_idx"],
-        mask_token=token_values["mask_token"],
-        pad_token=token_values["pad_token"],
-        eos_token=token_values["eos_token"],
-        bos_token=token_values["bos_token"],
-        unk_token=token_values["unk_token"],
-    )
-
-    return special_tokens
-
-
 def decode_tokens(
     tokens: list[int],
     vocab: Vocab,
-    split_on: str | None,
+    tokenizer: Callable | None = None,
+    split_on: str | None = None,
+    token_cleaning_map: dict | None = None,
 ) -> str:
+    if tokenizer is not None:
+        if isinstance(tokenizer, HFTokenizerWrapper):
+            inner = tokenizer.tokenizer
+            return inner.decode(tokens)
+
     tokens_decoded = vocab.lookup_tokens(indices=tokens)
+
+    if token_cleaning_map is not None:
+        cleaned_tokens = []
+        for token in tokens_decoded:
+            for special_char, replacement in token_cleaning_map.items():
+                token = token.replace(special_char, replacement)
+            cleaned_tokens.append(token)
+        tokens_decoded = cleaned_tokens
+
+    elif any(
+        token.startswith("Ġ") for token in tokens_decoded if isinstance(token, str)
+    ):
+        for i, token in enumerate(tokens_decoded):
+            if isinstance(token, str) and token.startswith("Ġ"):
+                if i > 0:
+                    tokens_decoded[i] = " " + token[1:]
+                else:
+                    tokens_decoded[i] = token[1:]
+
     if split_on is not None:
         generated_sample = split_on.join(tokens_decoded)
     else:
@@ -371,7 +350,8 @@ def post_prepare_manual_inputs(
         assert input_object.tokenizer is not None
 
         specials = get_special_tokens(
-            tokenizer=input_object.tokenizer, vocab=input_object.vocab
+            tokenizer=input_object.tokenizer,
+            vocab=input_object.vocab,
         )
         pad_idx = specials.pad_idx
 
@@ -403,7 +383,8 @@ def _recursive_unsqueeze(
 
 
 def prepare_manual_sample_data(
-    sample_inputs: dict[str, Any], input_objects: "al_input_objects_as_dict"
+    sample_inputs: dict[str, Any],
+    input_objects: "al_input_objects_as_dict",
 ) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
     prepared_inputs: dict[str, torch.Tensor | dict[str, torch.Tensor]] = {}
     for name, data in sample_inputs.items():
@@ -558,13 +539,22 @@ def serialize_raw_inputs(
 
 def get_dataset_loader_single_sample_generator(
     dataset: Dataset,
+    fabric: Fabric,
     infinite: bool = True,
 ) -> Iterator[al_getitem_return]:
-    loader: Iterator[al_getitem_return]
-    if infinite:
-        loader = cycle(DataLoader(dataset=dataset, batch_size=1, shuffle=True))
-    else:
-        loader = iter(DataLoader(dataset=dataset, batch_size=1, shuffle=True))
+    dataloader_base = DataLoader(
+        dataset=dataset,
+        batch_size=1,
+        shuffle=True,
+        collate_fn=consistent_nan_collate,
+    )
+    dataloader = fabric.setup_dataloaders(dataloader_base)
+    if isinstance(dataloader, list):
+        raise ValueError("Dataloader is a list, expected a single DataLoader.")
+
+    loader: cycle[Any] | DataLoader[Any]
+
+    loader = cycle(dataloader) if infinite else dataloader
 
     for input_to_model, _, cur_ids in loader:
         inputs_squeezed = _recursive_batch_dimension_squeeze(inputs=input_to_model)

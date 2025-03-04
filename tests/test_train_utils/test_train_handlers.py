@@ -1,10 +1,9 @@
 import inspect
 from unittest.mock import patch
 
-from ignite.engine import Events
-
 from eir.train import Experiment
 from eir.train_utils import train_handlers
+from eir.train_utils.ignite_port.events import Events
 from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 
 al_prep_modelling_test_configs = tuple[Experiment, ModelTestConfig]

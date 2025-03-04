@@ -97,7 +97,7 @@ def _gather_column_sampling_weights(
                     if col.name == column
                 )
                 assert target_storage.numeric_int_data is not None
-                cur_label_data = target_storage.numeric_int_data[col_idx].numpy()
+                cur_label_data = target_storage.numeric_int_data[col_idx].cpu().numpy()
 
             elif any(
                 col.name == column for col in target_storage.numeric_float_columns
@@ -114,7 +114,9 @@ def _gather_column_sampling_weights(
                     if col.name == column
                 )
                 assert target_storage.numeric_float_data is not None
-                cur_label_data = target_storage.numeric_float_data[col_idx].numpy()
+                cur_label_data = (
+                    target_storage.numeric_float_data[col_idx].cpu().numpy()
+                )
 
             else:
                 raise KeyError(f"Column {column} not found in numeric data")

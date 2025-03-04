@@ -22,7 +22,7 @@ from eir.data_load.data_preparation_modules.imputation import (
 from eir.data_load.data_preparation_modules.prepare_array import un_normalize_array
 from eir.data_load.datasets import al_getitem_return
 from eir.interpretation.interpret_image import un_normalize_image
-from eir.models.model_training_utils import predict_on_batch
+from eir.models.model_training_utils import predict_on_batch, recursive_to_device
 from eir.setup.input_setup_modules.setup_array import ArrayNormalizationStats
 from eir.setup.input_setup_modules.setup_image import ImageNormalizationStats
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
@@ -87,12 +87,14 @@ def array_out_single_sample_evaluation_wrapper(
         input_objects=input_objects,
     )
 
-    auto_validation_generator = get_dataset_loader_single_sample_generator(
-        dataset=auto_dataset_to_load_from
+    auto_validation_dataloader = get_dataset_loader_single_sample_generator(
+        dataset=auto_dataset_to_load_from,
+        fabric=experiment.fabric,
     )
+
     auto_samples = get_array_output_auto_validation_samples(
         output_configs=output_configs,
-        eval_sample_iterator=auto_validation_generator,
+        eval_sample_iterator=auto_validation_dataloader,
     )
     eval_samples_base = ArrayOutputEvalSamples(
         auto_samples=auto_samples,
@@ -219,8 +221,11 @@ def one_shot_array_generation(
 
     assert isinstance(output_object, ComputedArrayOutputInfo | ComputedImageOutputInfo)
 
+    device = str(experiment.fabric.device)
     array_sampling_batch = prepare_array_sampling_batch(
-        eval_samples=eval_samples, array_output_name=array_output_name
+        eval_samples=eval_samples,
+        array_output_name=array_output_name,
+        device=device,
     )
     prepared_sample_inputs = array_sampling_batch.prepared_inputs
     prepared_targets = array_sampling_batch.prepared_targets
@@ -279,8 +284,10 @@ def reverse_diffusion_array_generation(
     batch_size = len(eval_samples)
     shape = (batch_size,) + dimensions.full_shape()
 
+    device = str(experiment.fabric.device)
     array_sampling_batch = prepare_array_sampling_batch(
         eval_samples=eval_samples,
+        device=device,
         array_output_name=array_output_name,
     )
     prepared_sample_inputs = array_sampling_batch.prepared_inputs
@@ -309,6 +316,7 @@ def reverse_diffusion_array_generation(
         model=experiment.model,
         output_shape=shape,
         time_steps=num_steps,
+        device=device,
     )
 
     assert output_object.normalization_stats is not None
@@ -333,6 +341,7 @@ class ArraySamplingBatch:
 
 def prepare_array_sampling_batch(
     eval_samples: Sequence[ArrayOutputEvalSample],
+    device: str,
     array_output_name: str,
 ) -> ArraySamplingBatch:
     """
@@ -346,6 +355,7 @@ def prepare_array_sampling_batch(
     for eval_sample in eval_samples:
         cur_inputs = eval_sample.inputs_to_model
         cur_prepared = prepare_base_input(prepared_inputs=cur_inputs)
+        cur_prepared = recursive_to_device(obj=cur_prepared, device=device)
 
         prepared_sample_inputs.append(cur_prepared)
         prepared_targets.append(eval_sample.target_labels)

@@ -50,7 +50,7 @@ def get_fusion_layer_wrapper(
         projection_layer=projection_layer,
         fusion_layer=fusion_layer,
     )
-    project_and_fuse_layer = project_and_fuse_layer.to(device=device)
+    project_and_fuse_layer = project_and_fuse_layer
     return project_and_fuse_layer
 
 

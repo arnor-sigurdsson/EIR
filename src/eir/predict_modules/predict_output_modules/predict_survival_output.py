@@ -60,7 +60,7 @@ def predict_survival_wrapper_with_labels(
             time_kbins_transformer = transformers[time_name]
             it_func = time_kbins_transformer.inverse_transform
             times = it_func(times_binned.reshape(-1, 1)).flatten()
-            times = torch.tensor(times)
+            times = torch.tensor(times).to(device=model_outputs.device)
         else:
             times = all_labels[output_name][time_name]
 

@@ -26,13 +26,16 @@ import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
 from captum.attr import NoiseTunnel
-from ignite.engine import Engine
 from torch import nn
 from torch.cuda import OutOfMemoryError
 from torch.utils.data import DataLoader, Subset
 from torch.utils.hooks import RemovableHandle
 
-from eir.data_load.data_utils import Batch, get_output_info_generator
+from eir.data_load.data_utils import (
+    Batch,
+    consistent_nan_collate,
+    get_output_info_generator,
+)
 from eir.data_load.datasets import al_local_datasets
 from eir.interpretation.interpret_array import (
     ArrayConsumerCallable,
@@ -65,6 +68,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
 from eir.setup.schemas import InputConfig, OutputConfig, SurvivalOutputTypeConfig
 from eir.target_setup.target_label_setup import MissingTargetsInfo
 from eir.train_utils.evaluation import validation_handler
+from eir.train_utils.ignite_port.engine import Engine
 from eir.train_utils.utils import (
     call_hooks_stage_iterable,
     prepare_sample_output_folder,
@@ -194,7 +198,13 @@ def attribution_analysis_handler(
         iteration=iteration,
     )
 
-    background_loader = get_background_loader(experiment=exp)
+    fabric = exp.fabric
+    background_loader_base = get_background_loader(experiment=exp)
+    background_loader = fabric.setup_dataloaders(background_loader_base)
+    if isinstance(background_loader, list):
+        raise ValueError(
+            "Expected background_loader to be a single DataLoader, but got a list."
+        )
 
     tabular_attribution_analysis_wrapper(
         model=exp.model,
@@ -222,6 +232,7 @@ def get_background_loader(experiment: "Experiment") -> torch.utils.data.DataLoad
     background_loader = torch.utils.data.DataLoader(
         dataset=original_loader.dataset,
         batch_size=original_loader.batch_size,
+        collate_fn=consistent_nan_collate,
         shuffle=shuffle,
         num_workers=original_loader.num_workers,
         pin_memory=original_loader.pin_memory,
@@ -917,7 +928,7 @@ def _get_interpretation_data_producer(
         column_type=column_type,
     )
 
-    attributions_data_loader = _get_attributions_dataloader(
+    attributions_data_loader_base = _get_attributions_dataloader(
         dataset=dataset,
         max_attributions_per_class=gc.aa.max_attributions_per_class,
         output_name=output_name,
@@ -925,6 +936,10 @@ def _get_interpretation_data_producer(
         column_type=column_type,
         target_classes_numerical=target_classes_numerical,
     )
+    fabric = experiment.fabric
+    attributions_data_loader = fabric.setup_dataloaders(attributions_data_loader_base)
+    if isinstance(attributions_data_loader, list):
+        raise ValueError("Got a list of dataloaders, but expected a single dataloader.")
 
     for loader_batch in attributions_data_loader:
         state = call_hooks_stage_iterable(
@@ -999,7 +1014,12 @@ def _get_attributions_dataloader(
     target_classes_numerical: Sequence[int],
 ) -> DataLoader:
     if max_attributions_per_class is None:
-        data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+        data_loader = DataLoader(
+            dataset=dataset,
+            batch_size=1,
+            shuffle=False,
+            collate_fn=consistent_nan_collate,
+        )
         return data_loader
 
     indices_func = _get_categorical_sample_indices_for_attributions
@@ -1014,7 +1034,12 @@ def _get_attributions_dataloader(
         target_classes_numerical=target_classes_numerical,
     )
     subset_dataset = _subsample_dataset(dataset=dataset, indices=subset_indices)
-    data_loader = DataLoader(dataset=subset_dataset, batch_size=1, shuffle=False)
+    data_loader = DataLoader(
+        dataset=subset_dataset,
+        batch_size=1,
+        shuffle=False,
+        collate_fn=consistent_nan_collate,
+    )
     return data_loader
 
 

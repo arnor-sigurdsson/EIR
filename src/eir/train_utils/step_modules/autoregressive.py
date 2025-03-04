@@ -1,8 +1,8 @@
 import torch
 from torch._C._nn import pad
 
-from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
-from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
+from eir.setup.input_setup_modules.setup_sequence import (
+    ComputedSequenceInputInfo,
     SpecialTokens,
     get_special_tokens,
 )
@@ -29,9 +29,9 @@ def prepare_sequence_input_for_sequence_output(
     assert cur_seq.dim() == 2
     assert cur_seq.shape[1] == input_object.computed_max_length
 
-    cur_seq = cur_seq.to(device=device)
+    cur_seq = cur_seq
 
-    cur_target_dict = {input_name: cur_target.to(device=device)}
+    cur_target_dict = {input_name: cur_target}
 
     return cur_seq, cur_target_dict
 

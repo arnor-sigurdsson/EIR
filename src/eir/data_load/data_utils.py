@@ -26,7 +26,10 @@ from eir.train_utils.distributed import in_distributed_env
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.data_load.datasets import al_local_datasets, al_sample_label_dict_target
+    from eir.data_load.datasets import (
+        al_local_datasets,
+        al_sample_label_dict_target,
+    )
     from eir.setup.output_setup import al_output_objects_as_dict
 
 logger = get_logger(name=__name__)
@@ -65,24 +68,22 @@ class Batch:
 
 
 @overload
-def get_train_sampler(
+def get_finite_train_sampler(
     columns_to_sample: None, train_dataset: "al_local_datasets"
 ) -> None: ...
 
 
 @overload
-def get_train_sampler(
+def get_finite_train_sampler(
     columns_to_sample: Sequence[str],
     train_dataset: "al_local_datasets",
 ) -> WeightedRandomSampler | DistributedSampler: ...
 
 
-def get_train_sampler(columns_to_sample, train_dataset):
+def get_finite_train_sampler(columns_to_sample, train_dataset):
     in_distributed_run = in_distributed_env()
 
     if columns_to_sample is None:
-        if in_distributed_run:
-            return DistributedSampler(dataset=train_dataset)
         return None
 
     if in_distributed_run:
@@ -154,3 +155,30 @@ class Sample:
     sample_id: str
     inputs: dict[str, Any]
     target_labels: "al_sample_label_dict_target"
+
+
+def consistent_nan_collate(batch):
+    """
+    Sometimes, if we have a mixed batch with NaN and float32 values, it can
+    happen that the first element is NaN. Then, PyTorch default_collate uses
+    that to determine the dtype, and the full thing will be cast to float64.
+    Generally, this is OK, but e.g. on MPS devices, this will raise an error
+    as float64 is not supported on MPS.
+
+    Hence, we enforce a float64 -> float32 conversion.
+    """
+
+    result = torch.utils.data.default_collate(batch)
+
+    def ensure_float32(obj):
+        if isinstance(obj, torch.Tensor) and obj.dtype == torch.float64:
+            return obj.to(torch.float32)
+        elif isinstance(obj, dict):
+            return {k: ensure_float32(v) for k, v in obj.items()}
+        elif isinstance(obj, list | tuple):
+            return type(obj)(ensure_float32(x) for x in obj)
+        return obj
+
+    final = ensure_float32(result)
+
+    return final

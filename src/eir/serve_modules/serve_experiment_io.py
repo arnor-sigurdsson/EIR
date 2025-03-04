@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
+from lightning.fabric import Fabric
+
 from eir.experiment_io.experiment_io import (
     LoadedTrainExperiment,
     load_serialized_train_experiment,
@@ -11,6 +13,7 @@ from eir.models.meta.meta import MetaModel
 from eir.serve_modules.serve_input_setup import set_up_inputs_for_serve
 from eir.setup.config import Configs
 from eir.setup.input_setup import al_input_objects_as_dict
+from eir.train_utils.accelerator import setup_accelerator
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -29,6 +32,7 @@ class ServeExperiment:
     inputs: al_input_objects_as_dict
     outputs: "al_output_objects_as_dict"
     model: MetaModel
+    fabric: Fabric
 
 
 def load_experiment_for_serve(
@@ -49,13 +53,15 @@ def load_experiment_for_serve(
     run_folder = model_path_object.parent.parent
 
     loaded_train_experiment = load_serialized_train_experiment(
-        run_folder=run_folder, device=device
+        run_folder=run_folder,
+        device=device,
     )
 
     default_train_hooks = loaded_train_experiment.hooks
     train_configs = loaded_train_experiment.configs
 
     loaded_train_experiment.configs.gc.be.device = device
+    loaded_train_experiment.configs.gc.ac.hardware = device
 
     inputs = set_up_inputs_for_serve(
         test_inputs_configs=train_configs.input_configs,
@@ -71,12 +77,15 @@ def load_experiment_for_serve(
         inputs=inputs,
         device=device,
     )
-
     assert not model.training
+
+    fabric = setup_accelerator(configs=loaded_train_experiment.configs)
+    model = fabric.setup(model)
+    model.eval()
 
     loaded_train_experiment_as_dict = loaded_train_experiment.__dict__
     serve_experiment_kwargs = {
-        **{"model": model, "inputs": inputs},
+        **{"model": model, "inputs": inputs, "fabric": fabric},
         **loaded_train_experiment_as_dict,
     }
 

@@ -1,9 +1,9 @@
-from unittest.mock import ANY, MagicMock, Mock, call, create_autospec, patch
+from unittest.mock import ANY, MagicMock, call, create_autospec, patch
 
 import pytest
 import torch
+from lightning.fabric import Fabric
 from torch import nn
-from torch.cuda.amp import GradScaler
 
 from eir.train_utils import step_logic
 from eir.train_utils.optim import AttrDelegatedSWAWrapper
@@ -97,35 +97,6 @@ def test_hook_default_optimizer_backward(prep_modelling_test_configs):
 
 
 @pytest.mark.parametrize(
-    "do_amp, loss, amp_scaler, device, expected",
-    [
-        (
-            True,
-            torch.tensor(2.0),
-            Mock(scale=Mock(return_value=torch.tensor(4.0))),
-            "cuda",
-            torch.tensor(4.0),
-        ),
-        (False, torch.tensor(2.0), None, "cpu", torch.tensor(2.0)),
-        (True, torch.tensor(2.0), None, "cpu", torch.tensor(2.0)),
-    ],
-)
-def test_maybe_scale_loss_with_amp_scaler(
-    do_amp: bool,
-    loss: torch.Tensor,
-    amp_scaler: Mock,
-    device: str,
-    expected: torch.Tensor,
-):
-    result = step_logic.maybe_scale_loss_with_amp_scaler(
-        do_amp=do_amp, loss=loss, amp_scaler=amp_scaler, device=device
-    )
-    assert torch.isclose(result, expected)
-    if amp_scaler and device != "cpu":
-        amp_scaler.scale.assert_called_once_with(loss)
-
-
-@pytest.mark.parametrize(
     "loss, grad_acc_steps, expected",
     [
         (torch.tensor(2.0), 2, torch.tensor(1.0)),
@@ -186,39 +157,14 @@ def test_maybe_apply_gradient_clipping_to_model():
         )
 
 
-def test_get_optimizer_step_func():
-    optimizer = MagicMock()
-    amp_scaler = GradScaler()
-
-    step_func = step_logic.get_optimizer_step_func(
-        do_amp=True,
-        optimizer=optimizer,
-        amp_scaler=amp_scaler,
-        device="cuda",
-    )
-    assert step_func.func.__self__ is amp_scaler
-    assert step_func.keywords == {"optimizer": optimizer}
-
-    step_func = step_logic.get_optimizer_step_func(
-        do_amp=False,
-        optimizer=optimizer,
-        amp_scaler=amp_scaler,
-        device="cuda",
-    )
-    assert step_func is optimizer.step
-
-    step_func = step_logic.get_optimizer_step_func(
-        do_amp=True,
-        optimizer=optimizer,
-        amp_scaler=amp_scaler,
-        device="cpu",
-    )
-    assert step_func is optimizer.step
-
-
 def test_maybe_update_model_parameters_with_swa_basics():
-    model = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
-    model.module = MagicMock()
+    model = create_autospec(spec=Fabric, instance=True)
+
+    swa_module = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
+    model.module = swa_module
+
+    inner_model = MagicMock()
+    model.module.module = inner_model
 
     n_iter_before_swa = 10
     sample_interval = 5
@@ -229,7 +175,7 @@ def test_maybe_update_model_parameters_with_swa_basics():
         iteration=12,
         sample_interval=sample_interval,
     )
-    model.update_parameters.assert_not_called()
+    swa_module.update_parameters.assert_not_called()
 
     step_logic.maybe_update_model_parameters_with_swa(
         n_iter_before_swa=n_iter_before_swa,
@@ -237,7 +183,7 @@ def test_maybe_update_model_parameters_with_swa_basics():
         iteration=8,
         sample_interval=sample_interval,
     )
-    model.update_parameters.assert_not_called()
+    swa_module.update_parameters.assert_not_called()
 
     step_logic.maybe_update_model_parameters_with_swa(
         n_iter_before_swa=n_iter_before_swa,
@@ -245,7 +191,7 @@ def test_maybe_update_model_parameters_with_swa_basics():
         iteration=11,
         sample_interval=sample_interval,
     )
-    model.update_parameters.assert_not_called()
+    swa_module.update_parameters.assert_not_called()
 
     step_logic.maybe_update_model_parameters_with_swa(
         n_iter_before_swa=n_iter_before_swa,
@@ -253,12 +199,17 @@ def test_maybe_update_model_parameters_with_swa_basics():
         iteration=15,
         sample_interval=sample_interval,
     )
-    model.update_parameters.assert_called_once_with(model.module)
+    swa_module.update_parameters.assert_called_once_with(swa_module.module)
 
 
 def test_maybe_update_model_parameters_with_swa_multiple_iterations():
-    model = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
-    model.module = MagicMock()
+    model = create_autospec(spec=Fabric, instance=True)
+
+    swa_module = create_autospec(spec=AttrDelegatedSWAWrapper, instance=True)
+    model.module = swa_module
+
+    inner_model = MagicMock()
+    model.module.module = inner_model
 
     n_iter_before_swa = 10
     sample_interval = 5
@@ -277,8 +228,8 @@ def test_maybe_update_model_parameters_with_swa_multiple_iterations():
         if iteration >= n_iter_before_swa and iteration % sample_interval == 0:
             update_parameters_call_count += 1
 
-    model.update_parameters.assert_has_calls(
-        [call(model.module)] * update_parameters_call_count
+    swa_module.update_parameters.assert_has_calls(
+        [call(swa_module.module)] * update_parameters_call_count
     )
 
 
@@ -299,19 +250,3 @@ def test_should_perform_optimizer_step(
         iteration=iteration, grad_acc_steps=grad_acc_steps
     )
     assert result == expected
-
-
-def test_get_hook_amp_objects():
-    device_type = "cuda"
-    with patch("eir.train_utils.step_logic.GradScaler") as mock_grad_scaler:
-        result_func = step_logic.get_hook_amp_objects(device=device_type)
-        assert callable(result_func)
-
-        result = result_func()
-        assert isinstance(result, dict)
-        assert "amp_context_manager" in result
-
-        assert isinstance(result["amp_context_manager"], step_logic.autocast)
-        if device_type != "cpu":
-            assert "amp_scaler" in result
-            mock_grad_scaler.assert_called_once()

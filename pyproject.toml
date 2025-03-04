@@ -17,7 +17,6 @@ dependencies = [
     "torch>=2.6.0",
     "torchvision>=0.21.0",
     "matplotlib>=3.9.0",
-    "pytorch-ignite>=0.5.0.post2",
     "tqdm>=4.66.4",
     "sympy>=1.12.1",
     "scikit-learn>=1.5.1",
@@ -49,6 +48,7 @@ dependencies = [
     "polars>=1.19.0",
     "torchsurv>=0.1.4",
     "datasets>=3.2.0",
+    "lightning>=2.5.0.post0",
 ]
 
 [project.scripts]
@@ -97,6 +97,10 @@ dev = [
 line-length = 88
 indent-width = 4
 target-version = "py313"
+exclude = [
+    "src/eir/train_utils/optimization_modules/soap.py",
+    "src/eir/train_utils/ignite_port/*"
+]
 
 [tool.ruff.lint]
 select = [

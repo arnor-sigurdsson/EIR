@@ -1,7 +1,5 @@
 from typing import TYPE_CHECKING
 
-import torch
-
 from eir.models.output.sequence.sequence_output_modules import SequenceOutputModule
 from eir.setup.output_setup_modules.sequence_output_setup import (
     ComputedSequenceOutputInfo,
@@ -29,9 +27,6 @@ def get_sequence_output_module_from_model_config(
         output_name=output_object.output_config.output_info.output_name,
         feature_dimensionalities_and_types=feature_dimensionalities_and_types,
     )
-
-    torch_device = torch.device(device=device)
-    output_module = output_module.to(device=torch_device)
 
     return output_module
 

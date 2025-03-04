@@ -27,7 +27,7 @@ def send_validation_ids(ws_url: str, valid_ids: list[str]):
             )
         )
 
-        response_data = receive_with_timeout(websocket=ws)
+        response_data = receive_with_timeout(websocket_=ws)
 
         if response_data["type"] != "validationIdsConfirmation":
             raise ValueError(f"Unexpected response type: {response_data['type']}")
@@ -38,9 +38,13 @@ def send_validation_ids(ws_url: str, valid_ids: list[str]):
 def connect_to_server(
     websocket_url: str,
     protocol_version: str,
+    worker_id: int | None = None,
     max_size: int = 10_000_000,
 ) -> Generator[websocket.WebSocket]:
-    logger.debug(f"Attempting WebSocket connection to: {websocket_url}")
+    logger.debug(
+        f"Attempting WebSocket connection to: {websocket_url} "
+        f"(worker_id: {worker_id if worker_id is not None else 'None'})"
+    )
 
     try:
         ws = websocket.create_connection(
@@ -59,10 +63,11 @@ def connect_to_server(
         handshake_payload = {
             "type": "handshake",
             "version": protocol_version,
+            "worker_id": worker_id if worker_id is not None else 0,
         }
         ws.send(json.dumps(handshake_payload))
 
-        response_data = receive_with_timeout(websocket=ws)
+        response_data = receive_with_timeout(websocket_=ws)
         if response_data is None:
             raise ValueError("No handshake response received from server")
 
@@ -89,10 +94,10 @@ def connect_to_server(
             logger.warning(f"Error closing WebSocket connection: {str(e)}")
 
 
-def receive_with_timeout(websocket: websocket.WebSocket, timeout: int = 30):
-    websocket.settimeout(timeout=timeout)
+def receive_with_timeout(websocket_: websocket.WebSocket, timeout: int = 30):
+    websocket_.settimeout(timeout=timeout)
     try:
-        opcode, data = websocket.recv_data()
+        opcode, data = websocket_.recv_data()
         message_parsed = json.loads(data)
         handle_server_message(message=message_parsed)
         return message_parsed

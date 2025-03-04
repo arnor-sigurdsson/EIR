@@ -1,0 +1,31 @@
+output_info:
+  output_source: ws://localhost:8000/ws
+  output_name: text_output
+  output_type: sequence
+
+output_type_info:
+  max_length: 512
+  split_on: null
+  tokenizer: "bpe"
+  vocab_file: "fineweb_tokenizer.json"
+  adaptive_tokenizer_max_vocab_size: 8192
+  sampling_strategy_if_longer: "uniform"
+  min_freq: 1
+
+model_config:
+  embedding_dim: 512
+  model_init_config:
+    num_layers: 4
+    num_heads: 8
+    dropout: 0.0
+  position: "embed"
+  position_dropout: 0.0
+
+sampling_config:
+  generated_sequence_length: 1024
+  n_eval_inputs: 1
+
+  manual_inputs:
+    - text_output: "This movie is the most"
+
+    - text_output: "Steven"

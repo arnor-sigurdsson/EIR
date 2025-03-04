@@ -7,7 +7,7 @@ from torch.optim.adamw import AdamW
 from torch.utils.data import RandomSampler, SequentialSampler, WeightedRandomSampler
 
 from eir import train
-from eir.data_load.data_utils import get_train_sampler
+from eir.data_load.data_utils import get_finite_train_sampler
 from eir.models.input.omics.omics_models import CNNModel, LinearModel
 from eir.models.meta.meta import MetaModel
 from eir.models.model_setup import get_model
@@ -137,7 +137,7 @@ def test_get_dataloaders(
     gc.training_control.weighted_sampling_columns = ["test_output_tabular__Origin"]
 
     train_dataset, valid_dataset = create_test_datasets
-    train_sampler = get_train_sampler(
+    train_sampler = get_finite_train_sampler(
         columns_to_sample=gc.training_control.weighted_sampling_columns,
         train_dataset=train_dataset,
     )

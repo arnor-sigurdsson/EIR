@@ -614,7 +614,7 @@ def plot_td_auc_curve(
     mean_auc = float(auc.integral())
 
     plt.figure(figsize=(10, 6))
-    plt.plot(time_points, aucs.numpy(), marker="o")
+    plt.plot(time_points, aucs.cpu().numpy(), marker="o")
     plt.axhline(mean_auc, color="r", linestyle="--", label=f"Mean AUC: {mean_auc:.3f}")
     plt.xlabel("Time")
     plt.ylabel("Time-dependent AUC")

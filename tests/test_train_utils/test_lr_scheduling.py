@@ -4,16 +4,17 @@ from unittest.mock import patch
 
 import pytest
 import torch
-from ignite.contrib.handlers import (
-    ConcatScheduler,
-    CosineAnnealingScheduler,
-    ParamGroupScheduler,
-)
-from ignite.engine import Engine, State
 from torch.optim import SGD, Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from eir.train_utils import lr_scheduling
+from eir.train_utils.ignite_port.contrib_handlers.param_scheduler import (
+    ConcatScheduler,
+    CosineAnnealingScheduler,
+    ParamGroupScheduler,
+)
+from eir.train_utils.ignite_port.engine import Engine
+from eir.train_utils.ignite_port.events import State
 from eir.train_utils.lr_scheduling import get_optimizer_lr
 from eir.train_utils.train_handlers import HandlerConfig
 

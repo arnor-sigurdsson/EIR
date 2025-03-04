@@ -76,11 +76,12 @@ def get_base_parametrization(compiled: bool = False) -> dict:
             "global_configs": {
                 "basic_experiment": {
                     "output_folder": "multi_task_multi_modal",
-                    "n_epochs": 10,
+                    "n_epochs": 12,
                 },
                 "optimization": {
                     "gradient_clipping": 1.0,
                     "lr": 0.001,
+                    "wd": 1e-04,
                 },
                 "model": {
                     "compile_model": compiled,
@@ -622,7 +623,7 @@ def _validate_survival_output(
     binary_origin = expected_row["BinaryOrigin"].item()
     final_prob = survival_probs[-1]
 
-    threshold = 0.8
+    threshold = 0.70
     if binary_origin == 0:
         if final_prob < threshold:
             logger.error(

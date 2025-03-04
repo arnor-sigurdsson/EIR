@@ -91,8 +91,7 @@ def get_array_or_image_output_module_from_model_config(
         target_data_dimensions=output_object.data_dimensions,
     )
 
-    torch_device = torch.device(device=device)
-    output_module = array_output_module.to(device=torch_device)
+    output_module = array_output_module
 
     return output_module
 

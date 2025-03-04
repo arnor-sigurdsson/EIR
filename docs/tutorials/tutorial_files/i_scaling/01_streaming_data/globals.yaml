@@ -1,10 +1,10 @@
 basic_experiment:
   batch_size: 256
-  device: mps
   memory_dataset: true
   n_epochs: 100
   output_folder: eir_tutorials/tutorial_runs/i_scaling/01_streaming
   valid_size: 500
+  dataloader_workers: 4
 evaluation_checkpoint:
   checkpoint_interval: 500
   n_saved_models: 1

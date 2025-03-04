@@ -26,7 +26,7 @@ def test_streaming_training(api_process):
     training_process = subprocess.Popen(
         [
             "eirtrain",
-            "--global_config",
+            "--global_configs",
             f"{base}/test_streaming_configs/global_config.yaml",
             "--input_configs",
             f"{base}/test_streaming_configs/sequence_config.yaml",
