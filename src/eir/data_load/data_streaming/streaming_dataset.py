@@ -1,4 +1,5 @@
 import json
+import time
 from collections.abc import Iterator
 from contextlib import _GeneratorContextManager
 from typing import TYPE_CHECKING, Any, Literal
@@ -145,6 +146,24 @@ class StreamingDataset(IterableDataset):
                 )
 
                 batch_msg = receive_with_timeout(websocket_=self.ws)
+                if batch_msg is None:
+                    consecutive_timeouts += 1
+                    if consecutive_timeouts > 1:
+                        extra_delay = min(2 ** (consecutive_timeouts - 1), 30)
+                        logger.warning(
+                            f"Received None message. "
+                            f"Consecutive errors: {consecutive_timeouts}. "
+                            f"Adding extra backoff delay of {extra_delay} seconds..."
+                        )
+                        time.sleep(extra_delay)
+                    else:
+                        logger.warning(
+                            f"Received None message. "
+                            f"Consecutive errors: {consecutive_timeouts}."
+                        )
+                    continue
+
+                consecutive_timeouts = 0
 
                 if batch_msg["type"] == "heartbeat":
                     continue

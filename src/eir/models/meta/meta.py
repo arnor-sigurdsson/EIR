@@ -112,4 +112,4 @@ def apply_weight_tying(model: MetaModel) -> None:
     if tied_pairs:
         logger.info(f"Weight tying applied for modules: {', '.join(tied_pairs)}")
     else:
-        logger.info("No compatible modules found for weight tying.")
+        logger.debug("No compatible modules found for weight tying.")
