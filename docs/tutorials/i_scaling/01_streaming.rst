@@ -66,8 +66,12 @@ C - Training
 ------------
 
 Before starting training, we need to ensure our streaming server is running.
-The server will serve chunks of text from the FineWeb dataset. Once it's
-running, we can start training:
+The server will serve chunks of text from the FineWeb dataset. See section F
+of this tutorial for the complete implementation of the server. To start it,
+ copy the content of the file ``text_streamer.py`` to a Python file and run it
+with ``python text_streamer.py``.
+
+Once it's running, in another terminal, we can start training:
 
 .. literalinclude:: ../tutorial_files/i_scaling/01_streaming_data/commands/STREAMING_SEQUENCE_GENERATION.txt
     :language: console

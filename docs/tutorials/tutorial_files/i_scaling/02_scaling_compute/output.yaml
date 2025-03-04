@@ -7,7 +7,7 @@ output_type_info:
   max_length: 512
   split_on: null
   tokenizer: "bpe"
-  vocab_file: "fineweb_tokenizer_1m.json"
+  vocab_file: "fineweb_tokenizer.json"
   adaptive_tokenizer_max_vocab_size: 8192
   sampling_strategy_if_longer: "uniform"
   min_freq: 1

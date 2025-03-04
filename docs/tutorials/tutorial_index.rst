@@ -80,6 +80,7 @@ Scaling
     :maxdepth: 2
 
     i_scaling/01_streaming.rst
+    i_scaling/02_compute_gpt.rst
 
 
 Customizing EIR

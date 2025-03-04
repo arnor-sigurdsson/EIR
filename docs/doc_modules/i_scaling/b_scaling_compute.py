@@ -90,12 +90,12 @@ def get_streaming_generation_experiment() -> AutoDocExperimentInfo:
             "figures/manual_generated_iter_500.txt",
         ),
         (
-            "samples/45000/auto/0_generated.txt",
-            "figures/auto_generated_iter_45000.txt",
+            "samples/52000/auto/0_generated.txt",
+            "figures/auto_generated_iter_52000.txt",
         ),
         (
-            "samples/45000/manual/1_generated.txt",
-            "figures/manual_generated_iter_45000.txt",
+            "samples/52000/manual/1_generated.txt",
+            "figures/manual_generated_iter_52000.txt",
         ),
     ]
 

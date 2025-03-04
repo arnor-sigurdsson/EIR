@@ -1,5 +1,5 @@
 basic_experiment:
-  batch_size: 64
+  batch_size: 32
   memory_dataset: false
   n_epochs: 100
   output_folder: eir_tutorials/tutorial_runs/i_scaling/02_scaling_compute
@@ -16,7 +16,9 @@ data_preparation:
   streaming_setup_samples: 2048
 model:
   compile_model: true
-visualization_logging:
-  log_level: debug
 accelerator:
+  devices: auto
+  hardware: auto
+  num_nodes: 1
   precision: bf16-mixed
+  strategy: auto

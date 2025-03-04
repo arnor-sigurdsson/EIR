@@ -109,6 +109,9 @@ def find_and_copy_files(
         if path.name == ".DS_Store":
             continue
 
+        if ".ipynb_checkpoints" in str(path):
+            continue
+
         for pattern, target in patterns:
             if re.match(pattern=pattern, string=str(path)) or pattern in str(path):
                 output_destination = output_folder / target
