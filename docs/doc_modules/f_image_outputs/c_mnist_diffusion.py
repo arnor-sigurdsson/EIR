@@ -263,8 +263,6 @@ def mnist_diffusion_03_serve() -> AutoDocServingInfo:
         "eirserve",
         "--model-path",
         "FILL_MODEL",
-        "--device",
-        "mps",
     ]
 
     image_base = (

@@ -6,7 +6,7 @@ eir_tutorials/e_pretraining/01_checkpointing
 │   └── imdb_output.yaml
 └── data
     └── IMDB
-        ├── IMDB_Reviews
         ├── conf
-        ├── imdb.vocab
-        └── imdb_labels.csv
+        ├── imdb_labels.csv
+        ├── IMDB_Reviews
+        └── imdb.vocab

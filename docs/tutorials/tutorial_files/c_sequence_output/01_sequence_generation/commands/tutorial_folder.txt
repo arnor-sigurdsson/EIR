@@ -2,12 +2,9 @@ eir_tutorials/c_sequence_output/01_sequence_generation
 ├── conf
 │   ├── fusion.yaml
 │   ├── globals.yaml
-│   ├── output.yaml
 │   ├── output_bpe.yaml
-│   └── output_test.yaml
+│   ├── output_test.yaml
+│   └── output.yaml
 └── data
     └── IMDB
-        ├── IMDB_Reviews
-        ├── conf
-        ├── imdb.vocab
-        └── imdb_labels.csv
+        └── IMDB_Reviews

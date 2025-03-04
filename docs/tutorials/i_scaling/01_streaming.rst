@@ -3,12 +3,12 @@
 .. role:: raw-html(raw)
     :format: html
 
-01 – Streaming Data: Training with OpenWebText
-==============================================
+01 – Streaming Data: Training with FineWeb
+==========================================
 
 In this tutorial, we will explore `EIR`'s built-in support for training with streaming data.
 Streaming allows us to train models on datasets that are too large to fit in memory
-or when data becomes available in real-time. We'll demonstrate this using the OpenWebText
+or when data becomes available in real-time. We'll demonstrate this using the FineWeb
 dataset, showing how to set up both the streaming server and the training configuration.
 
 .. note::
@@ -34,7 +34,7 @@ B - Setting Up
 --------------
 
 For this tutorial, we'll be using a simple server that streams text from the
-OpenWebText dataset. Here's the folder structure we'll be working with:
+FineWeb dataset. Here's the folder structure we'll be working with:
 
 .. literalinclude:: ../tutorial_files/i_scaling/01_streaming_data/commands/tutorial_folder.txt
     :language: console
@@ -66,7 +66,7 @@ C - Training
 ------------
 
 Before starting training, we need to ensure our streaming server is running.
-The server will serve chunks of text from the OpenWebText dataset. Once it's
+The server will serve chunks of text from the FineWeb dataset. Once it's
 running, we can start training:
 
 .. literalinclude:: ../tutorial_files/i_scaling/01_streaming_data/commands/STREAMING_SEQUENCE_GENERATION.txt
@@ -141,9 +141,9 @@ F - Complete Server Implementation
 Here's the complete implementation of our streaming server, which you can use
 as a reference for implementing your own:
 
-.. literalinclude:: ../../doc_modules/i_scaling/openwebtext_streamer.py
+.. literalinclude:: ../../doc_modules/i_scaling/text_streamer.py
     :language: python
-    :caption: openwebtext_streamer.py
+    :caption: text_streamer.py
 
 The server handles requests for data batches and streams them to EIR during
 training. This approach allows us to:

@@ -168,6 +168,7 @@ class ConnectionManager:
                 except StopIteration:
                     logger.info("Reached end of dataset stream, restarting iterator")
                     self.dataset_iterator = iter(self.dataset)
+                    continue
 
             if accumulated_words >= min_words and len(batch) < batch_size:
                 chunk = " ".join(accumulated_text)

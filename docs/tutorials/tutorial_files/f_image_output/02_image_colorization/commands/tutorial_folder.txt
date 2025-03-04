@@ -2,11 +2,17 @@ eir_tutorials/f_image_output/02_image_colorization
 ├── conf
 │   ├── fusion.yaml
 │   ├── globals.yaml
-│   ├── inputs_image_cnn.yaml
 │   ├── inputs_image_cnn_both.yaml
+│   ├── inputs_image_cnn_diffusion_pretrained.yaml
+│   ├── inputs_image_cnn_diffusion.yaml
+│   ├── inputs_image_cnn_pretrained.yaml
 │   ├── inputs_image_cnn_super_res.yaml
-│   ├── output_image.yaml
-│   └── output_image_super_res.yaml
+│   ├── inputs_image_cnn.yaml
+│   ├── inputs_sequence_pretrained.yaml
+│   ├── inputs_sequence.yaml
+│   ├── output_image_diffusion.yaml
+│   ├── output_image_super_res.yaml
+│   └── output_image.yaml
 └── data
     ├── annotations.csv
     └── images

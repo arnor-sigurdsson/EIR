@@ -6,6 +6,9 @@ from pathlib import Path
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
+from eir.utils.logging import get_logger
+
+logger = get_logger(name=__name__)
 
 CONTENT_ROOT = "i_scaling"
 TUTORIAL_NAME = "02_scaling_compute"
@@ -30,8 +33,7 @@ def run_with_server(command: list[str]) -> Path:
     env = os.environ.copy()
     env.update(
         {
-            "MAX_SEQUENCES": "8000000",
-            "SEQUENCE_LENGTH": "1024",
+            "SEQUENCE_LENGTH": "512",
             "DATASET_NAME": "HuggingFaceFW/fineweb",
             "DATASET_SPLIT": "train",
         }
@@ -43,11 +45,15 @@ def run_with_server(command: list[str]) -> Path:
     ]
 
     server_process = subprocess.Popen(
-        server_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
+        server_args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
     )
+    logger.info("Server process starting...")
 
     try:
-        time.sleep(5)
+        time.sleep(20)
         subprocess.run(args=command, check=True)
     finally:
         server_process.terminate()

@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_07c_multimodal_tabular_description_image/saved_models/tutorial_07c_multimodal_tabular_description_image_model_2800_perf-average=0.3865.pt
+--model-path eir_tutorials/tutorial_runs/a_using_eir/tutorial_07c_multimodal_tabular_description_image/saved_models/tutorial_07c_multimodal_tabular_description_image_checkpoint_1200_perf-average=0.3874.pt

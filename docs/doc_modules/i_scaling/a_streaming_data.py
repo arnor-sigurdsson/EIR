@@ -1,3 +1,4 @@
+import os
 import subprocess
 import time
 from collections.abc import Sequence
@@ -5,6 +6,9 @@ from pathlib import Path
 
 from docs.doc_modules.experiments import AutoDocExperimentInfo, run_capture_and_save
 from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
+from eir.utils.logging import get_logger
+
+logger = get_logger(name=__name__)
 
 CONTENT_ROOT = "i_scaling"
 TUTORIAL_NAME = "01_streaming_data"
@@ -26,14 +30,18 @@ def run_with_server(command: list[str]) -> Path:
     if run_folder.exists():
         return run_folder
 
+    cur_env = os.environ.copy()
+    cur_env["SEQUENCE_LENGTH"] = "64"
+
     server_process = subprocess.Popen(
         ["python", server_path],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+    logger.info("Server process starting...")
 
     try:
-        time.sleep(5)
+        time.sleep(20)
         subprocess.run(args=command, check=True)
     finally:
         server_process.terminate()

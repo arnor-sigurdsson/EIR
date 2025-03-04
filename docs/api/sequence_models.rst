@@ -2766,6 +2766,119 @@ Development of the model was led by `Shinya Otani <https://github.com/SO0529>`__
     hidden_dropout (`float`, *optional*, defaults to 0.0):
         The dropout ratio for the hidden layer.
 
+.. class:: transformers.models.granitemoeshared.configuration_granitemoeshared.GraniteMoeSharedConfig(vocab_size=32000, hidden_size=4096, intermediate_size=11008, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, hidden_act='silu', max_position_embeddings=2048, initializer_range=0.02, rms_norm_eps=1e-06, use_cache=True, pad_token_id=None, bos_token_id=1, eos_token_id=2, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, attention_bias=False, attention_dropout=0.0, embedding_multiplier=1.0, logits_scaling=1.0, residual_multiplier=1.0, attention_multiplier=1.0, num_local_experts=8, num_experts_per_tok=2, output_router_logits=False, router_aux_loss_coef=0.001, shared_intermediate_size=0, **kwargs)
+
+The GraniteMoe model was proposed in `Power Scheduler: A Batch Size and Token Number Agnostic Learning Rate Scheduler <https://arxiv.org/abs/2408.13359>`__ by Yikang Shen, Matthew Stallone, Mayank Mishra, Gaoyuan Zhang, Shawn Tan, Aditya Prasad, Adriana Meza Soria, David D. Cox and Rameswar Panda.
+
+Additionally this class GraniteMoeSharedModel adds shared experts for Moe.
+
+::
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model_path = "ibm-research/moe-7b-1b-active-shared-experts"
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+
+# drop device_map if running on CPU
+model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto")
+model.eval()
+
+# change input text as desired
+prompt = "Write a code to find the maximum value in a list of numbers."
+
+# tokenize the text
+input_tokens = tokenizer(prompt, return_tensors="pt")
+# generate output tokens
+output = model.generate(**input_tokens, max_new_tokens=100)
+# decode output tokens into text
+output = tokenizer.batch_decode(output)
+# loop over the batch to print, in this example the batch size is 1
+for i in output:
+    print(i)
+
+This HF implementation is contributed by `Mayank Mishra <https://huggingface.co/mayank-mishra>`__, `Shawn Tan <https://huggingface.co/shawntan>`__ and `Sukriti Sharma <https://huggingface.co/SukritiSharma>`__.
+
+
+Args:
+    vocab_size (`int`, *optional*, defaults to 32000):
+        Vocabulary size of the GraniteMoeShared model. Defines the number of different tokens that can be represented by the
+        `inputs_ids` passed when calling ``GraniteMoeSharedModel``
+    hidden_size (`int`, *optional*, defaults to 4096):
+        Dimension of the hidden representations.
+    intermediate_size (`int`, *optional*, defaults to 11008):
+        Dimension of the MLP representations.
+    num_hidden_layers (`int`, *optional*, defaults to 32):
+        Number of hidden layers in the Transformer decoder.
+    num_attention_heads (`int`, *optional*, defaults to 32):
+        Number of attention heads for each attention layer in the Transformer decoder.
+    num_key_value_heads (`int`, *optional*):
+        This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+        `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+        `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+        converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+        by meanpooling all the original heads within that group. For more details checkout `this
+        paper <https://arxiv.org/pdf/2305.13245.pdf>`__. If it is not specified, will default to
+        `num_attention_heads`.
+    hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
+        The non-linear activation function (function or string) in the decoder.
+    max_position_embeddings (`int`, *optional*, defaults to 2048):
+        The maximum sequence length that this model might ever be used with.
+    initializer_range (`float`, *optional*, defaults to 0.02):
+        The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+    rms_norm_eps (`float`, *optional*, defaults to 1e-06):
+        The epsilon used by the rms normalization layers.
+    use_cache (`bool`, *optional*, defaults to `True`):
+        Whether or not the model should return the last key/values attentions (not used by all models). Only
+        relevant if `config.is_decoder=True`.
+    pad_token_id (`int`, *optional*):
+        Padding token id.
+    bos_token_id (`int`, *optional*, defaults to 1):
+        Beginning of stream token id.
+    eos_token_id (`int`, *optional*, defaults to 2):
+        End of stream token id.
+    tie_word_embeddings (`bool`, *optional*, defaults to `False`):
+        Whether to tie weight embeddings
+    rope_theta (`float`, *optional*, defaults to 10000.0):
+        The base period of the RoPE embeddings.
+    rope_scaling (`Dict`, *optional*):
+        Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
+        strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
+        `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
+        `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
+        these scaling strategies behave:
+        https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
+        experimental feature, subject to breaking API changes in future versions.
+    attention_bias (`bool`, *optional*, defaults to `False`):
+        Whether to use a bias in the query, key, value and output projection layers during self-attention.
+    attention_dropout (`float`, *optional*, defaults to 0.0):
+        The dropout ratio for the attention probabilities.
+    embedding_multiplier (`float`, *optional*, defaults to 1.0): embedding multiplier
+    logits_scaling (`float`, *optional*, defaults to 1.0): divisor for output logits
+    residual_multiplier (`float`, *optional*, defaults to 1.0): residual multiplier
+    attention_multiplier (`float`, *optional*, defaults to 1.0): attention multiplier
+    num_local_experts (`int`, *optional*, defaults to 8): total number of experts
+    num_experts_per_tok (`int`, *optional*, defaults to 2): number of experts per token
+    output_router_logits (`bool`, *optional*, defaults to `False`):
+        Whether or not the router logits should be returned by the model. Enabeling this will also
+        allow the model to output the auxiliary loss.
+    router_aux_loss_coef (`float`, *optional*, defaults to 0.001): router auxialiary loss coefficient
+    shared_intermediate_size (`int`, *optional*, defaults to 0): intermediate size for shared experts. 0 implies
+        no shared experts.
+
+::
+
+>>> from transformers import GraniteMoeSharedModel, GraniteMoeSharedConfig
+
+>>> # Initializing a GraniteMoeShared granitemoe-3b style configuration
+>>> configuration = GraniteMoeSharedConfig()
+
+>>> # Initializing a model from the granitemoe-7b style configuration
+>>> model = GraniteMoeSharedModel(configuration)
+
+>>> # Accessing the model configuration
+>>> configuration = model.config
+
 .. class:: transformers.models.imagegpt.configuration_imagegpt.ImageGPTConfig(vocab_size=513, n_positions=1024, n_embd=512, n_layer=24, n_head=8, n_inner=None, activation_function='quick_gelu', resid_pdrop=0.1, embd_pdrop=0.1, attn_pdrop=0.1, layer_norm_epsilon=1e-05, initializer_range=0.02, scale_attn_weights=True, use_cache=True, tie_word_embeddings=False, scale_attn_by_inverse_layer_idx=False, reorder_and_upcast_attn=False, **kwargs)
 
 The ImageGPT model was proposed in `Generative Pretraining from Pixels <https://openai.com/blog/image-gpt>`__ by Mark
@@ -5674,7 +5787,7 @@ The Phi-1.5 model was proposed in `Textbooks Are All You Need II: phi-1.5 techni
     eos_token_id (`int`, *optional*, defaults to 2):
         Denotes end of sequences token id.
 
-.. class:: transformers.models.phi3.configuration_phi3.Phi3Config(vocab_size=32064, hidden_size=3072, intermediate_size=8192, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, resid_pdrop=0.0, embd_pdrop=0.0, attention_dropout=0.0, hidden_act='silu', max_position_embeddings=4096, original_max_position_embeddings=4096, initializer_range=0.02, rms_norm_eps=1e-05, use_cache=True, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, bos_token_id=1, eos_token_id=32000, pad_token_id=32000, sliding_window=None, **kwargs)
+.. class:: transformers.models.phi3.configuration_phi3.Phi3Config(vocab_size=32064, hidden_size=3072, intermediate_size=8192, num_hidden_layers=32, num_attention_heads=32, num_key_value_heads=None, resid_pdrop=0.0, embd_pdrop=0.0, attention_dropout=0.0, hidden_act='silu', max_position_embeddings=4096, original_max_position_embeddings=4096, initializer_range=0.02, rms_norm_eps=1e-05, use_cache=True, tie_word_embeddings=False, rope_theta=10000.0, rope_scaling=None, partial_rotary_factor=1.0, bos_token_id=1, eos_token_id=32000, pad_token_id=32000, sliding_window=None, **kwargs)
 
 The Phi-3 model was proposed in `Phi-3 Technical Report: A Highly Capable Language Model Locally on Your Phone <https://arxiv.org/abs/2404.14219>`__ by Microsoft.
 
@@ -5727,6 +5840,8 @@ The Phi-3 model was proposed in `Phi-3 Technical Report: A Highly Capable Langua
         contain the following keys: `type`, `short_factor` and `long_factor`. The `type` must be `longrope` and
         the `short_factor` and `long_factor` must be lists of numbers with the same length as the hidden size
         divided by the number of attention heads divided by 2.
+    partial_rotary_factor (`float`, *optional*, defaults to 1.0):
+        Percentage of the query and keys which will have rotary embedding. Must be between 0.0 and 1.0.
     bos_token_id (`int`, *optional*, defaults to 1):
         The id of the "beginning-of-sequence" token.
     eos_token_id (`int`, *optional*, defaults to 32000):
