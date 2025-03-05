@@ -932,7 +932,7 @@ def get_uncertainty_loss_hook(
         if not output_type_info.uncertainty_weighted_mt_loss:
             continue
 
-        logger.info(
+        logger.debug(
             f"Adding uncertainty loss for {output_config.output_info.output_name}."
         )
 
