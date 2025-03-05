@@ -105,9 +105,10 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
             norm_first=True,
         )
 
+        self.ca_mask: torch.Tensor | None
         if ca_mask:
-            ca_mask = torch.ones((1, self.target_max_length)).bool()
-            self.register_buffer("ca_mask", ca_mask)
+            ca_mask_tensor = torch.ones((1, self.target_max_length)).bool()
+            self.register_buffer("ca_mask", ca_mask_tensor)
         else:
             self.register_buffer("ca_mask", None)
 
