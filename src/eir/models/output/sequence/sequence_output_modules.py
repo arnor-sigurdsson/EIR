@@ -116,8 +116,8 @@ class SequenceOutputModule(nn.Module):
 
             in_elements = feature_extractor_info.output_dimension
             cur_projection = MetaSequenceProjection(
-                in_total_num_elements=in_elements,
-                in_embedding_dim=in_embed,
+                context_total_num_elements=in_elements,
+                context_embedding_dim=in_embed,
                 target_embedding_dim=self.embedding_dim,
                 target_max_length=self.max_length,
             )

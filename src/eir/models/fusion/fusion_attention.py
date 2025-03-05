@@ -10,8 +10,8 @@ from eir.models.layers.attention_layers import SwiGLU, Transformer
 class MetaSequenceProjection(nn.Module):
     def __init__(
         self,
-        in_total_num_elements: int,
-        in_embedding_dim: int,
+        context_total_num_elements: int,
+        context_embedding_dim: int,
         target_embedding_dim: int,
         target_max_length: int,
         context_mask: bool = False,
@@ -20,14 +20,14 @@ class MetaSequenceProjection(nn.Module):
     ):
         super().__init__()
 
-        self.in_total_num_elements = in_total_num_elements
-        self.in_embedding_dim = in_embedding_dim
+        self.context_total_num_elements = context_total_num_elements
+        self.context_embedding_dim = context_embedding_dim
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
         self.context_mask = context_mask
 
         self.cross_attention_projection = SequenceResidualCrossAttentionProjection(
-            in_embedding_dim=self.in_embedding_dim,
+            context_embedding_dim=self.context_embedding_dim,
             target_embedding_dim=self.target_embedding_dim,
             target_max_length=self.target_max_length,
             ca_mask=self.context_mask,
@@ -58,7 +58,7 @@ class MetaSequenceProjection(nn.Module):
 class SequenceResidualCrossAttentionProjection(nn.Module):
     def __init__(
         self,
-        in_embedding_dim: int,
+        context_embedding_dim: int,
         target_embedding_dim: int,
         target_max_length: int,
         ca_mask: bool = True,
@@ -67,13 +67,13 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
     ):
         super().__init__()
 
-        self.in_embedding_dim = in_embedding_dim
+        self.context_embedding_dim = context_embedding_dim
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
 
         self.projection_layer = UniDirectionalCrossAttention(
             dim=self.target_embedding_dim,
-            context_dim=self.in_embedding_dim,
+            context_dim=self.context_embedding_dim,
             dim_head=self.target_embedding_dim,
             dropout=0.1,
             talking_heads=False,
@@ -88,11 +88,11 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
             bias=False,
         )
 
-        self.norm_1_context = nn.RMSNorm(normalized_shape=in_embedding_dim)
+        self.norm_1_context = nn.RMSNorm(normalized_shape=context_embedding_dim)
         self.act_context = SwiGLU(
-            in_features=in_embedding_dim,
-            hidden_features=in_embedding_dim,
-            out_features=in_embedding_dim,
+            in_features=context_embedding_dim,
+            hidden_features=context_embedding_dim,
+            out_features=context_embedding_dim,
             bias=False,
         )
 
@@ -128,7 +128,7 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
 
         self.downsample_identity = UniDirectionalCrossAttention(
             dim=self.target_embedding_dim,
-            context_dim=self.in_embedding_dim,
+            context_dim=self.context_embedding_dim,
             dim_head=self.target_embedding_dim,
             dropout=0.1,
             talking_heads=False,
@@ -136,7 +136,7 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
         )
 
     def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
-        context = context.reshape(context.shape[0], -1, self.in_embedding_dim)
+        context = context.reshape(context.shape[0], -1, self.context_embedding_dim)
 
         identity = self.downsample_identity(
             x=x,
