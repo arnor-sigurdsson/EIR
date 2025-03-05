@@ -53,6 +53,15 @@ class SequenceModelConfig:
         instead of sequence_length * embedding_dim. If using windowed / conv
         transformers, this becomes embedding_dim * number_of_chunks.
 
+    :param masked:
+        Whether to use a causal mask in the transformer encoder. Note that for
+        sequence outputs, this is automatically applied to both the input
+        transformer module (i.e., 'encoder') and to the output transformer
+        module (i.e., 'decoder'). However, this is made configurable in case
+        you have a specific use case to manually enable masking for e.g.
+        non sequence generation cases / masking extra inputs linked
+        to the sequence generation modules.
+
     :param pretrained_model:
           Specify whether the model type is assumed to be pretrained and from the
           Pytorch Image Models repository.
@@ -72,6 +81,8 @@ class SequenceModelConfig:
     position_dropout: float = 0.10
     window_size: int = 0
     pool: Literal["avg"] | Literal["max"] | None = None
+
+    masked: bool = False
 
     pretrained_model: bool = False
     freeze_pretrained_model: bool = False
@@ -111,7 +122,8 @@ class TransformerWrapperModel(nn.Module):
             self.embedding = embeddings
         else:
             self.embedding = nn.Embedding(
-                num_embeddings=self.num_tokens, embedding_dim=self.embedding_dim
+                num_embeddings=self.num_tokens,
+                embedding_dim=self.embedding_dim,
             )
 
         self.feature_extractor = feature_extractor
@@ -463,7 +475,7 @@ def parse_dim_feedforward(
     return dim_feedforward
 
 
-class SequenceOutputTransformerFeatureExtractor(TransformerFeatureExtractor):
+class MaskedTransformerFeatureExtractor(TransformerFeatureExtractor):
     def __init__(
         self,
         model_config: BasicTransformerFeatureExtractorModelConfig,
@@ -479,7 +491,8 @@ class SequenceOutputTransformerFeatureExtractor(TransformerFeatureExtractor):
         )
 
         mask = torch.triu(
-            torch.ones(self.max_length, self.max_length) * float("-inf"), diagonal=1
+            torch.ones(self.max_length, self.max_length) * float("-inf"),
+            diagonal=1,
         )
         self.register_buffer("mask", mask)
 

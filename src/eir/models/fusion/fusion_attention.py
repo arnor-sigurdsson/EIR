@@ -45,7 +45,9 @@ class MetaSequenceProjection(nn.Module):
         self.scaling_factors = nn.Parameter(torch.ones(3))
 
     def forward(
-        self, input_tensor: torch.Tensor, target_tensor: torch.Tensor
+        self,
+        input_tensor: torch.Tensor,
+        target_tensor: torch.Tensor,
     ) -> torch.Tensor:
         weights = torch.softmax(self.scaling_factors, dim=0)
 
