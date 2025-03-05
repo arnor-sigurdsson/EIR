@@ -1,14 +1,10 @@
-from typing import Any, Literal
+from typing import Any
 
 import torch
 from einops import rearrange
-from torch import Tensor, einsum, nn
+from torch import einsum, nn
 
 from eir.models.layers.attention_layers import SwiGLU, Transformer
-from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
-from eir.models.layers.projection_layers import get_1d_projection_layer
-
-al_projection_layer_types = Literal["auto", "lcl", "lcl_residual", "linear"]
 
 
 class MetaSequenceProjection(nn.Module):
@@ -18,7 +14,7 @@ class MetaSequenceProjection(nn.Module):
         in_embedding_dim: int,
         target_embedding_dim: int,
         target_max_length: int,
-        projection_layer_type: al_projection_layer_types = "auto",
+        context_mask: bool = False,
         *args,
         **kwargs,
     ):
@@ -28,21 +24,16 @@ class MetaSequenceProjection(nn.Module):
         self.in_embedding_dim = in_embedding_dim
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
-
-        self.projection = SequenceProjection(
-            in_features=in_total_num_elements,
-            target_embedding_dim=self.target_embedding_dim,
-            target_max_length=self.target_max_length,
-            projection_layer_type=projection_layer_type,
-        )
+        self.context_mask = context_mask
 
         self.cross_attention_projection = SequenceResidualCrossAttentionProjection(
             in_embedding_dim=self.in_embedding_dim,
             target_embedding_dim=self.target_embedding_dim,
             target_max_length=self.target_max_length,
+            ca_mask=self.context_mask,
         )
 
-        self.scaling_factors = nn.Parameter(torch.ones(3))
+        self.scaling_factors = nn.Parameter(torch.ones(2))
 
     def forward(
         self,
@@ -51,96 +42,17 @@ class MetaSequenceProjection(nn.Module):
     ) -> torch.Tensor:
         weights = torch.softmax(self.scaling_factors, dim=0)
 
-        projected = self.projection(input_tensor)
-        projected = projected * weights[0]
-
         cross_attended = self.cross_attention_projection(
-            x=target_tensor, context=input_tensor
+            x=target_tensor,
+            context=input_tensor,
         )
-        cross_attended = cross_attended * weights[1]
+        cross_attended = cross_attended * weights[0]
 
-        identity = target_tensor * weights[2]
+        identity = target_tensor * weights[1]
 
-        out = projected + cross_attended + identity
+        out = cross_attended + identity
 
         return out
-
-
-class SequenceProjection(nn.Module):
-    def __init__(
-        self,
-        in_features: int,
-        target_embedding_dim: int,
-        target_max_length: int,
-        projection_layer_type: al_projection_layer_types = "auto",
-        *args,
-        **kwargs,
-    ):
-        super().__init__()
-
-        self.in_features = in_features
-        self.target_embedding_dim = target_embedding_dim
-        self.target_max_length = target_max_length
-        self.projection_layer_type = projection_layer_type
-
-        self.out_dim = self.target_max_length * self.target_embedding_dim
-
-        self.norm_1 = nn.RMSNorm(normalized_shape=in_features)
-        self.projection_layer = get_1d_projection_layer(
-            input_dimension=in_features,
-            target_dimension=self.out_dim,
-            projection_layer_type=self.projection_layer_type,
-        )
-
-        self.act = SwiGLU(
-            in_features=target_embedding_dim,
-            hidden_features=target_embedding_dim * 4,
-            out_features=target_embedding_dim,
-            bias=False,
-        )
-
-        self.encoder = Transformer(
-            d_model=target_embedding_dim,
-            nhead=8,
-            num_layers=1,
-            dim_feedforward=target_embedding_dim * 4,
-            dropout=0.1,
-            norm_first=True,
-        )
-
-        self.downsample_identity: nn.Linear | nn.Identity | LCL | LCLResidualBlock = (
-            nn.Identity()
-        )
-        if self.in_features != self.out_dim:
-            self.downsample_identity = get_1d_projection_layer(
-                input_dimension=in_features,
-                target_dimension=self.out_dim,
-                projection_layer_type=self.projection_layer_type,
-            )
-
-    def forward(self, input: Tensor) -> Tensor:
-        input_flat = input.flatten(1)
-
-        identity = self.downsample_identity(input_flat)[..., : self.out_dim]
-        identity = identity.reshape(
-            identity.shape[0],
-            self.target_max_length,
-            self.target_embedding_dim,
-        )
-
-        out = self.norm_1(input_flat)
-        out = self.projection_layer(out)[..., : self.out_dim]
-
-        out = out.reshape(
-            out.shape[0],
-            self.target_max_length,
-            self.target_embedding_dim,
-        )
-        out = self.act(out)
-
-        out = self.encoder(out)
-
-        return out + identity
 
 
 class SequenceResidualCrossAttentionProjection(nn.Module):
@@ -149,6 +61,7 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
         in_embedding_dim: int,
         target_embedding_dim: int,
         target_max_length: int,
+        ca_mask: bool = True,
         *args,
         **kwargs,
     ):
@@ -192,8 +105,11 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
             norm_first=True,
         )
 
-        ca_mask = torch.ones((1, self.target_max_length)).bool()
-        self.register_buffer("ca_mask", ca_mask)
+        if ca_mask:
+            ca_mask = torch.ones((1, self.target_max_length)).bool()
+            self.register_buffer("ca_mask", ca_mask)
+        else:
+            self.register_buffer("ca_mask", None)
 
         encoder_mask = torch.triu(
             torch.ones(self.target_max_length, self.target_max_length) * float("-inf"),
@@ -221,7 +137,11 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
     def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         context = context.reshape(context.shape[0], -1, self.in_embedding_dim)
 
-        identity = self.downsample_identity(x=x, context=context, mask=self.ca_mask)
+        identity = self.downsample_identity(
+            x=x,
+            context=context,
+            mask=self.ca_mask,
+        )
 
         out = self.norm_1_target(x)
         out = self.act_1(out)
@@ -229,11 +149,18 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
         out_context = self.norm_1_context(context)
         out_context = self.act_context(out_context)
 
-        out = self.projection_layer(x=out, context=out_context, mask=self.ca_mask)
+        out = self.projection_layer(
+            x=out,
+            context=out_context,
+            mask=self.ca_mask,
+        )
 
         out = self.norm_2_target(out)
         out = self.act_2(out)
-        out = self.encoder(out, mask=self.encoder_mask)
+        out = self.encoder(
+            out,
+            mask=self.encoder_mask,
+        )
 
         return out + identity
 
@@ -264,6 +191,13 @@ class UniDirectionalCrossAttention(nn.Module):
     ):
         """
         Adapted from: https://github.com/lucidrains/bidirectional-cross-attention
+
+        Note that enabling masking here means that position i in x is only allowed to
+        attend to position j in context, where j <= i. This can be useful if x and
+        the context are directly related position-wise, and we want to ensure that
+        the model cannot look at "future" positions through the context.
+
+        Without masking, position i in x can attend to all positions in context.
         """
         super().__init__()
         context_dim = default(val=context_dim, d=dim)
