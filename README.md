@@ -30,6 +30,12 @@ Supervised modelling, sequence generation, image generation, array output and su
 
 **WARNING:** This project is in alpha phase. Expect backwards incompatible changes and API changes between minor versions.
 
+## What's New
+
+- **March 2025**: Scaling tutorials added
+  - [Streaming Data: Training with FineWeb](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/01_streaming.html) - Train models on datasets too large to fit in memory
+  - [Scaling Compute: Training a BabyGPT](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/02_compute_gpt.html) - Examples of training GPT-style models
+
 # Table of Contents
 1. [Install](#install)
 2. [Usage](#usage)
@@ -96,6 +102,10 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
   - Time series inputs and outputs is possible, such as [Transformer-based Power Consumption Prediction](https://eir.readthedocs.io/en/stable/tutorials/g_time_series/01_time_series_power.html) and [Stock Price Prediction Using Transformers, One-shot and Diffusion Models](https://eir.readthedocs.io/en/stable/tutorials/g_time_series/02_time_series_stocks.html).
 - **Survival Analysis**
   - Time-to-event prediction is supported as an output type, demonstrated through [Patient Survival Prediction using Free Light Chain Data](https://eir.readthedocs.io/en/stable/tutorials/h_survival_analysis/01_survival_flchain.html) and [Survival Analysis Using Cox Proportional Hazards Model](https://eir.readthedocs.io/en/stable/tutorials/h_survival_analysis/02_survival_flchain_cox.html).
+- **Scaling**
+  - Support for [streaming data training](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/01_streaming.html) enabling models to train on datasets too large to fit in memory or with real-time data.
+  - Capabilities for [scaling compute resources](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/02_compute_gpt.html) to train larger language models like GPT variants.
+
 
 - [Many more settings](https://eir.readthedocs.io/en/stable/api_reference.html) and configurations (e.g., augmentation, regularization, optimizers) available.
 
