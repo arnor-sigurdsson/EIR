@@ -3,6 +3,7 @@ from typing import Any
 import torch
 from einops import rearrange
 from torch import einsum, nn
+from torch.nn import functional as F
 
 from eir.models.layers.attention_layers import SwiGLU, Transformer
 
@@ -14,7 +15,7 @@ class MetaSequenceProjection(nn.Module):
         context_embedding_dim: int,
         target_embedding_dim: int,
         target_max_length: int,
-        context_mask: bool = False,
+        apply_causal_mask: bool,
         *args,
         **kwargs,
     ):
@@ -24,13 +25,13 @@ class MetaSequenceProjection(nn.Module):
         self.context_embedding_dim = context_embedding_dim
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
-        self.context_mask = context_mask
+        self.apply_causal_mask = apply_causal_mask
 
-        self.cross_attention_projection = SequenceResidualCrossAttentionProjection(
+        self.cross_attention_projection = SequenceResidualCrossAttention(
             context_embedding_dim=self.context_embedding_dim,
             target_embedding_dim=self.target_embedding_dim,
             target_max_length=self.target_max_length,
-            ca_mask=self.context_mask,
+            apply_causal_mask=self.apply_causal_mask,
         )
 
         self.scaling_factors = nn.Parameter(torch.ones(2))
@@ -55,13 +56,13 @@ class MetaSequenceProjection(nn.Module):
         return out
 
 
-class SequenceResidualCrossAttentionProjection(nn.Module):
+class SequenceResidualCrossAttention(nn.Module):
     def __init__(
         self,
         context_embedding_dim: int,
         target_embedding_dim: int,
         target_max_length: int,
-        ca_mask: bool = True,
+        apply_causal_mask: bool,
         *args,
         **kwargs,
     ):
@@ -76,8 +77,8 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
             context_dim=self.context_embedding_dim,
             dim_head=self.target_embedding_dim,
             dropout=0.1,
-            talking_heads=False,
             pre_norm=False,
+            apply_causal_mask=apply_causal_mask,
         )
 
         self.norm_1_target = nn.RMSNorm(normalized_shape=target_embedding_dim)
@@ -106,7 +107,7 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
         )
 
         self.ca_mask: torch.Tensor | None
-        if ca_mask:
+        if apply_causal_mask:
             ca_mask_tensor = torch.ones((1, self.target_max_length)).bool()
             self.register_buffer("ca_mask", ca_mask_tensor)
         else:
@@ -131,8 +132,8 @@ class SequenceResidualCrossAttentionProjection(nn.Module):
             context_dim=self.context_embedding_dim,
             dim_head=self.target_embedding_dim,
             dropout=0.1,
-            talking_heads=False,
             pre_norm=False,
+            apply_causal_mask=apply_causal_mask,
         )
 
     def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
@@ -187,8 +188,8 @@ class UniDirectionalCrossAttention(nn.Module):
         heads: int = 8,
         dim_head: int = 64,
         dropout: float = 0.0,
-        talking_heads: bool = False,
         pre_norm: bool = False,
+        apply_causal_mask: bool = False,
     ):
         """
         Adapted from: https://github.com/lucidrains/bidirectional-cross-attention
@@ -201,12 +202,12 @@ class UniDirectionalCrossAttention(nn.Module):
         Without masking, position i in x can attend to all positions in context.
         """
         super().__init__()
-        context_dim = default(val=context_dim, d=dim)
+        context_dim = default(context_dim, dim)
 
-        self.norm = nn.RMSNorm(normalized_shape=dim) if pre_norm else nn.Identity()
-        self.context_norm = (
-            nn.RMSNorm(normalized_shape=context_dim) if pre_norm else nn.Identity()
-        )
+        self.apply_causal_mask = apply_causal_mask
+
+        self.norm = nn.RMSNorm(dim) if pre_norm else nn.Identity()
+        self.context_norm = nn.RMSNorm(context_dim) if pre_norm else nn.Identity()
 
         self.heads = heads
         self.scale = dim_head**-0.5
@@ -214,101 +215,67 @@ class UniDirectionalCrossAttention(nn.Module):
 
         self.dropout = nn.Dropout(p=dropout)
 
-        self.to_qk = nn.Linear(
-            in_features=dim,
-            out_features=inner_dim,
-            bias=False,
-        )
-        self.context_to_qk = nn.Linear(
-            in_features=context_dim,
-            out_features=inner_dim,
-            bias=False,
-        )
+        self.to_q = nn.Linear(dim, inner_dim, bias=False)
+        self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
+        self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
 
-        self.to_v = nn.Linear(
-            in_features=dim,
-            out_features=inner_dim,
-            bias=False,
-        )
-        self.context_to_v = nn.Linear(
-            in_features=context_dim,
-            out_features=inner_dim,
-            bias=False,
-        )
-
-        self.to_out = nn.Linear(
-            in_features=inner_dim,
-            out_features=dim,
-        )
-
-        self.talking_heads = (
-            nn.Conv2d(
-                in_channels=heads,
-                out_channels=heads,
-                kernel_size=1,
-                bias=False,
-            )
-            if talking_heads
-            else nn.Identity()
-        )
+        self.to_out = nn.Linear(inner_dim, dim)
 
     def forward(
         self,
         x: torch.Tensor,
         context: torch.Tensor,
         mask: torch.Tensor | None = None,
-        context_mask: torch.Tensor | None = None,
-        rel_pos_bias: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        _, i, j, h, device = (
-            x.shape[0],
-            x.shape[-2],
-            context.shape[-2],
-            self.heads,
-            x.device,
-        )
+        batch, seq_len, _ = x.shape
+        _, context_len, _ = context.shape
 
-        x = self.norm(x)
-        context = self.context_norm(context)
+        x_norm = self.norm(x)
+        context_norm = self.context_norm(context)
 
-        # get shared query/keys and values for sequence and context
-        qk, v = self.to_qk(x), self.to_v(x)
-        context_qk, context_v = self.context_to_qk(context), self.context_to_v(context)
+        # Project to queries, keys, values
+        q = self.to_q(x_norm)
+        k = self.to_k(context_norm)
+        v = self.to_v(context_norm)
 
-        # split out head
-        qk, context_qk, v, context_v = (
-            rearrange(t, "b n (h d) -> b h n d", h=h)
-            for t in (qk, context_qk, v, context_v)
-        )
+        # Split heads
+        q = rearrange(q, "b n (h d) -> b h n d", h=self.heads)
+        k = rearrange(k, "b n (h d) -> b h n d", h=self.heads)
+        v = rearrange(v, "b n (h d) -> b h n d", h=self.heads)
 
-        # get similarities
-        sim = einsum("b h i d, b h j d -> b h i j", qk, context_qk) * self.scale
+        # Calculate attention scores
+        sim = einsum("b h i d, b h j d -> b h i j", q, k) * self.scale
 
-        # relative positional bias, if supplied
-        if exists(val=rel_pos_bias):
-            sim = sim + rel_pos_bias
+        # Apply causal masking if it was set during initialization
+        if self.apply_causal_mask:
+            # Create causal mask - strictly enforces that position i in x
+            # can only attend to positions 0 through i in context
+            causal_mask = (
+                torch.ones(seq_len, context_len, device=x.device)
+                .triu_(diagonal=1)
+                .bool()
+            )
 
-        # causal mask
-        if exists(val=mask) or exists(val=context_mask):
-            i, j = sim.shape[-2:]
-            mask = torch.ones(i, j, device=device, dtype=torch.bool).triu(j - i + 1)
-            mask_value = -torch.finfo(sim.dtype).max
-            sim = sim.masked_fill(mask, mask_value)
+            # [1, 1, seq_len, context_len]
+            causal_mask = causal_mask.unsqueeze(0).unsqueeze(0)
+            sim = sim.masked_fill(causal_mask, -torch.finfo(sim.dtype).max)
 
-        # get attention along sequence length, using shared similarity matrix
-        attn = stable_softmax(t=sim, dim=-1)
+        if exists(val=mask):
+            assert mask is not None
+            mask = mask.unsqueeze(1)  # [batch, 1, seq_len, context_len]
+            sim = sim.masked_fill(~mask, -torch.finfo(sim.dtype).max)
 
+        # Calculate attention weights with softmax
+        attn = F.softmax(sim, dim=-1)
         attn = self.dropout(attn)
 
-        # talking heads
-        attn = self.talking_heads(attn)
+        # Apply attention weights to values
+        out = einsum("b h i j, b h j d -> b h i d", attn, v)
 
-        # src sequence aggregates values from context
-        out = einsum("b h i j, b h j d -> b h i d", attn, context_v)
-
-        # merge heads and combine out
+        # Merge heads
         out = rearrange(out, "b h n d -> b n (h d)")
 
+        # Project to output dimension
         out = self.to_out(out)
 
         return out
