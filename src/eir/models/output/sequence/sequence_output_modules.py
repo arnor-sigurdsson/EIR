@@ -120,6 +120,7 @@ class SequenceOutputModule(nn.Module):
                 context_embedding_dim=in_embed,
                 target_embedding_dim=self.embedding_dim,
                 target_max_length=self.max_length,
+                apply_causal_mask=False,
             )
 
             self.match_projections[input_name] = cur_projection

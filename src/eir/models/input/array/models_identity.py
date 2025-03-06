@@ -27,7 +27,9 @@ class IdentityModelConfig:
 
 class IdentityModel(nn.Module):
     def __init__(
-        self, model_config: IdentityModelConfig, data_dimensions: "DataDimensions"
+        self,
+        model_config: IdentityModelConfig,
+        data_dimensions: "DataDimensions",
     ):
         super().__init__()
 
@@ -48,6 +50,10 @@ class IdentityModel(nn.Module):
     @property
     def num_out_features(self) -> int:
         return self.fc_1_in_features
+
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.fc_1_in_features,)
 
     def _init_weights(self):
         pass

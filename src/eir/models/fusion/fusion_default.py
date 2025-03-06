@@ -60,6 +60,10 @@ class MLPResidualFusionModule(nn.Module):
     def num_out_features(self) -> int:
         return self.model_config.fc_task_dim
 
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.num_out_features,)
+
     def forward(self, inputs: dict[str, torch.Tensor]) -> torch.Tensor:
         fused_features = self.fusion_callable(inputs)
         out = calculate_module_dict_outputs(

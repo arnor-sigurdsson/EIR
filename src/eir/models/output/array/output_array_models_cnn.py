@@ -382,6 +382,10 @@ class CNNUpscaleModel(nn.Module):
     def num_out_features(self) -> int:
         return self.target_channels * self.final_height * self.final_width
 
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.target_channels, self.final_height, self.final_width)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.initial_layer(x)
         x = self.blocks(x)
@@ -494,6 +498,10 @@ class CNNPassThroughUpscaleModel(nn.Module):
     @property
     def num_out_features(self) -> int:
         return self.target_channels * self.final_height * self.final_width
+
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.target_channels, self.final_height, self.final_width)
 
     def timestep_embeddings(self, t: torch.Tensor) -> torch.Tensor:
         if isinstance(self.timestep_mixing_layer, TimeStepMixingBlock):
@@ -622,10 +630,14 @@ class CrossAttentionArrayOutBlock(nn.Module):
         self.norm_1 = nn.GroupNorm(num_groups=1, num_channels=input_channels)
         self.act_1 = nn.GELU()
 
-        if self.context_dim is None:
+        if self.context_dim is None or len(self.context_dim) <= 1:
             self.context_channels = 1
             self.context_height = 1
             self.context_width = context_num_elements
+        elif len(self.context_dim) == 2:
+            self.context_channels = self.context_dim[0]
+            self.context_height = self.context_dim[1]
+            self.context_width = 1
         else:
             self.context_channels = self.context_dim[0]
             self.context_height = self.context_dim[1]

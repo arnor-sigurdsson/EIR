@@ -161,6 +161,20 @@ class TransformerWrapperModel(nn.Module):
 
         return length_with_padding * self.embedding_dim
 
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        padding = self.dynamic_extras.get("padding", 0)
+        length_with_padding = self.max_length + padding
+
+        if self.model_config.pool in ("avg", "max"):
+            if self.model_config.window_size:
+                num_chunks = length_with_padding // self.model_config.window_size
+                return (num_chunks, self.embedding_dim)
+            else:
+                return (self.embedding_dim,)
+        else:
+            return (length_with_padding, self.embedding_dim)
+
     def init_embedding_weights(self) -> None:
         init_range = 0.1
         self.embedding.weight.data.uniform_(-init_range, init_range)
@@ -455,6 +469,10 @@ class TransformerFeatureExtractor(nn.Module):
     @property
     def num_out_features(self) -> int:
         return self.max_length * self.embedding_dim
+
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.max_length, self.embedding_dim)
 
     def forward(self, input: Tensor) -> Tensor:
         out = self.transformer_encoder(input)

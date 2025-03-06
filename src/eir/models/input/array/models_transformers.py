@@ -111,11 +111,13 @@ class ArrayTransformer(nn.Module):
             norm_first=True,
         )
 
-        self.output_shape = (1, self.num_patches, self.embedding_dim)
-
     @property
     def num_out_features(self) -> int:
         return self.num_patches * self.embedding_dim
+
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (1, self.num_patches, self.embedding_dim)
 
     def forward(self, input: Tensor) -> Tensor:
         out = self.flatten_fn(input)

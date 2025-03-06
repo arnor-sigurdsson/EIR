@@ -273,11 +273,11 @@ class CNNModel(nn.Module):
             input_height=self.data_dimensions.height,
             conv_sequence=self.conv,
         )
+        self.size_after_conv_w = size_after_conv_w
+        self.size_after_conv_h = size_after_conv_h
         self.data_size_after_conv = size_after_conv_w * size_after_conv_h
 
         self.no_out_channels = self.conv[-1].out_channels
-
-        self.output_shape = (self.no_out_channels, size_after_conv_h, size_after_conv_w)
 
         self.final_layer = (
             nn.Sequential(
@@ -302,6 +302,10 @@ class CNNModel(nn.Module):
         if self.model_config.num_output_features > 0:
             return self.model_config.num_output_features
         return self.no_out_channels * self.data_size_after_conv
+
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.no_out_channels, self.size_after_conv_h, self.size_after_conv_w)
 
     def _init_weights(self):
         for m in self.modules():

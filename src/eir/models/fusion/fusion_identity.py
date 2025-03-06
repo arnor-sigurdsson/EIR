@@ -41,6 +41,10 @@ class IdentityFusionModel(nn.Module):
     def num_out_features(self) -> int:
         return self.fusion_in_dim
 
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.fusion_in_dim,)
+
     def forward(
         self, inputs: dict[str, torch.Tensor]
     ) -> torch.Tensor | dict[str, torch.Tensor]:

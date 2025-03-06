@@ -88,6 +88,9 @@ class SimpleLCLModel(nn.Module):
     def num_out_features(self) -> int:
         return self.fc_0.out_features
 
+    def output_shape(self) -> tuple[int, ...]:
+        return (1, 1, self.num_out_features)
+
     def _init_weights(self):
         pass
 
@@ -251,8 +254,6 @@ class LCLModel(nn.Module):
             block_layer_spec=self.model_config.layers,
         )
 
-        self.output_shape = (1, 1, self.lcl_blocks[-1].out_features)
-
         self._init_weights()
 
     @property
@@ -266,6 +267,10 @@ class LCLModel(nn.Module):
     @property
     def num_out_features(self) -> int:
         return self.lcl_blocks[-1].out_features
+
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (1, 1, self.num_out_features)
 
     def _init_weights(self):
         pass

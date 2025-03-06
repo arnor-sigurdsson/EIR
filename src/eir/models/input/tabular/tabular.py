@@ -106,6 +106,10 @@ class SimpleTabularModel(nn.Module):
         return self.input_dim
 
     @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.input_dim,)
+
+    @property
     def l1_penalized_weights(self) -> torch.Tensor:
         if not self.cat_columns and not self.fc_layer:
             return torch.empty(0)
