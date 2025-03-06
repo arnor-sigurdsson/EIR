@@ -7,7 +7,7 @@ input_type_info:
   max_length: 32
   split_on: " "
   sampling_strategy_if_longer: "uniform"
-  min_freq: 10
+  min_freq: 5
 
 model_config:
   embedding_dim: 128

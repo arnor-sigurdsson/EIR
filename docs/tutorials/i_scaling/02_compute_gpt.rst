@@ -38,7 +38,7 @@ related to scaling:
 .. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/globals.yaml
     :language: yaml
     :caption: globals.yaml
-    :emphasize-lines: 8-10,17-25
+    :emphasize-lines: 8-10,17-24
 
 Now, the optimization parameters are not directly related to scaling, but follow
 common practice used to train large language models such as GPT2. However, we
