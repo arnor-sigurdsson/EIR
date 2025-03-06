@@ -59,8 +59,6 @@ class SequenceOutputModuleConfig:
     position: Literal["encode", "embed"] = "encode"
     position_dropout: float = 0.10
 
-    projection_layer_type: Literal["auto", "lcl", "lcl_residual", "linear"] = "auto"
-
 
 class SequenceOutputModule(nn.Module):
     def __init__(
@@ -118,11 +116,11 @@ class SequenceOutputModule(nn.Module):
 
             in_elements = feature_extractor_info.output_dimension
             cur_projection = MetaSequenceProjection(
-                in_total_num_elements=in_elements,
-                in_embedding_dim=in_embed,
+                context_total_num_elements=in_elements,
+                context_embedding_dim=in_embed,
                 target_embedding_dim=self.embedding_dim,
                 target_max_length=self.max_length,
-                projection_layer_type=self.output_model_config.projection_layer_type,
+                apply_causal_mask=False,
             )
 
             self.match_projections[input_name] = cur_projection

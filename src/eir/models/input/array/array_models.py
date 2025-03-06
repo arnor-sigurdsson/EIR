@@ -222,11 +222,14 @@ class ArrayWrapperModel(nn.Module):
         self.pre_normalization = get_pre_normalization_layer(
             normalization=normalization, data_dimensions=self.data_dimensions
         )
-        self.output_shape = self.feature_extractor.output_shape
 
     @property
     def num_out_features(self):
         return self.feature_extractor.num_out_features
+
+    @property
+    def output_shape(self):
+        return self.feature_extractor.output_shape
 
     @property
     def l1_penalized_weights(self) -> Tensor:

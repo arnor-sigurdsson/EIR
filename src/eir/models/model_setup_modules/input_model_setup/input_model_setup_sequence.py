@@ -54,6 +54,7 @@ def get_sequence_model(
         embedding_dim=embedding_dim,
         feature_extractor_max_length=feature_extractor_max_length,
         num_chunks=num_chunks,
+        masked=sequence_model_config.masked,
         pool=sequence_model_config.pool,
     )
 
@@ -98,10 +99,11 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
     embedding_dim: int,
     feature_extractor_max_length: int,
     num_chunks: int,
+    masked: bool,
     pool: Literal["max"] | Literal["avg"] | None,
 ) -> SequenceModelObjectsForWrapperModel:
     if "sequence-default" in model_type or model_type.startswith("eir-"):
-        model_class = model_registry_lookup(model_type=model_type)
+        model_class = model_registry_lookup(model_type=model_type, force_masked=masked)
         assert isinstance(model_config, BasicTransformerFeatureExtractorModelConfig), (
             model_config
         )

@@ -50,6 +50,10 @@ class LinearModel(nn.Module):
     def num_out_features(self) -> int:
         return self.model_config.fc_repr_dim
 
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.model_config.fc_repr_dim,)
+
     def _init_weights(self):
         pass
 

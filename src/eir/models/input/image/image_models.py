@@ -70,7 +70,7 @@ class ImageWrapperModel(nn.Module):
 
         self.feature_extractor = feature_extractor
         self.model_config = model_config
-        self.output_shape = estimated_out_shape
+        self.estimated_out_shape = estimated_out_shape
 
     @property
     def num_out_features(self):
@@ -81,6 +81,10 @@ class ImageWrapperModel(nn.Module):
             return self.model_config.num_output_features
 
         return reduce(lambda x, y: x * y, self.output_shape)
+
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return self.estimated_out_shape
 
     def forward(self, input: Tensor) -> Tensor:
         has_num_out_features = self.model_config.num_output_features > 0

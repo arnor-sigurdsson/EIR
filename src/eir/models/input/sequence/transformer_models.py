@@ -53,6 +53,15 @@ class SequenceModelConfig:
         instead of sequence_length * embedding_dim. If using windowed / conv
         transformers, this becomes embedding_dim * number_of_chunks.
 
+    :param masked:
+        Whether to use a causal mask in the transformer encoder. Note that for
+        sequence outputs, this is automatically applied to both the input
+        transformer module (i.e., 'encoder') and to the output transformer
+        module (i.e., 'decoder'). However, this is made configurable in case
+        you have a specific use case to manually enable masking for e.g.
+        non sequence generation cases / masking extra inputs linked
+        to the sequence generation modules.
+
     :param pretrained_model:
           Specify whether the model type is assumed to be pretrained and from the
           Pytorch Image Models repository.
@@ -72,6 +81,8 @@ class SequenceModelConfig:
     position_dropout: float = 0.10
     window_size: int = 0
     pool: Literal["avg"] | Literal["max"] | None = None
+
+    masked: bool = False
 
     pretrained_model: bool = False
     freeze_pretrained_model: bool = False
@@ -111,7 +122,8 @@ class TransformerWrapperModel(nn.Module):
             self.embedding = embeddings
         else:
             self.embedding = nn.Embedding(
-                num_embeddings=self.num_tokens, embedding_dim=self.embedding_dim
+                num_embeddings=self.num_tokens,
+                embedding_dim=self.embedding_dim,
             )
 
         self.feature_extractor = feature_extractor
@@ -148,6 +160,20 @@ class TransformerWrapperModel(nn.Module):
             return self.embedding_dim * num_chunks
 
         return length_with_padding * self.embedding_dim
+
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        padding = self.dynamic_extras.get("padding", 0)
+        length_with_padding = self.max_length + padding
+
+        if self.model_config.pool in ("avg", "max"):
+            if self.model_config.window_size:
+                num_chunks = length_with_padding // self.model_config.window_size
+                return (num_chunks, self.embedding_dim)
+            else:
+                return (self.embedding_dim,)
+        else:
+            return (length_with_padding, self.embedding_dim)
 
     def init_embedding_weights(self) -> None:
         init_range = 0.1
@@ -444,6 +470,10 @@ class TransformerFeatureExtractor(nn.Module):
     def num_out_features(self) -> int:
         return self.max_length * self.embedding_dim
 
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.max_length, self.embedding_dim)
+
     def forward(self, input: Tensor) -> Tensor:
         out = self.transformer_encoder(input)
         return out
@@ -463,7 +493,7 @@ def parse_dim_feedforward(
     return dim_feedforward
 
 
-class SequenceOutputTransformerFeatureExtractor(TransformerFeatureExtractor):
+class MaskedTransformerFeatureExtractor(TransformerFeatureExtractor):
     def __init__(
         self,
         model_config: BasicTransformerFeatureExtractorModelConfig,
@@ -479,7 +509,8 @@ class SequenceOutputTransformerFeatureExtractor(TransformerFeatureExtractor):
         )
 
         mask = torch.triu(
-            torch.ones(self.max_length, self.max_length) * float("-inf"), diagonal=1
+            torch.ones(self.max_length, self.max_length) * float("-inf"),
+            diagonal=1,
         )
         self.register_buffer("mask", mask)
 
