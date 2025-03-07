@@ -401,7 +401,11 @@ def test_predict(
         inferred_run_folder=model_test_config.run_path,
     )
 
-    predict.predict(predict_cl_args=predict_cl_args, predict_experiment=predict_config)
+    predict.predict(
+        predict_cl_args=predict_cl_args,
+        predict_experiment=predict_config,
+        run_folder=model_test_config.run_path,
+    )
 
     compute_predict_attributions(
         run_folder=model_test_config.run_path,

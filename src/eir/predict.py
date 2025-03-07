@@ -151,6 +151,7 @@ def run_predict(predict_cl_args: Namespace):
     predict(
         predict_experiment=predict_experiment,
         predict_cl_args=predict_cl_args,
+        run_folder=run_folder,
     )
     if predict_experiment.configs.gc.aa.compute_attributions:
         compute_predict_attributions(
@@ -179,10 +180,13 @@ def maybe_parse_device_from_predict_args(predict_cl_args: Namespace) -> str:
 def predict(
     predict_experiment: "PredictExperiment",
     predict_cl_args: Namespace,
+    run_folder: Path,
 ) -> None:
     hook_finalizers = register_pre_evaluation_hooks(
         model=predict_experiment.model,
         global_config=predict_experiment.configs.global_config,
+        run_folder=run_folder,
+        iteration="predict",
     )
 
     output_generator = get_prediction_outputs_generator(
@@ -214,10 +218,13 @@ def predict(
         evaluation_results=predict_results,
     )
 
+    latent_config = predict_experiment.configs.gc.latent_sampling
+    max_samples_for_viz: None | int = None
+    if latent_config is not None:
+        max_samples_for_viz = latent_config.max_samples_for_viz
     run_all_eval_hook_analysis(
         hook_outputs=hook_outputs,
-        run_folder=Path(predict_cl_args.output_folder),
-        iteration="predict",
+        max_samples_for_viz=max_samples_for_viz,
     )
 
     if predict_cl_args.evaluate:

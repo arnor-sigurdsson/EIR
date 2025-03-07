@@ -20,6 +20,7 @@ from docs.doc_modules.serving_experiments import (
     build_request_example_module_from_function,
 )
 from docs.doc_modules.utils import add_model_path_to_command, get_saved_model_path
+from eir.train_utils.latent_analysis import load_samples_for_viz
 
 CONTENT_ROOT = CR = get_content_root()
 TUTORIAL_NAME = TN = "01_array_mnist_generation"
@@ -52,8 +53,8 @@ def get_array_gen_01_mnist_generation() -> AutoDocExperimentInfo:
         ),
         (
             "latent_outputs/9000/fusion_modules.computed.fusion_modules.fusion.1.0/"
-            "latents.npy",
-            "figures/0_autoencoder/latent_9000.npy",
+            "batch_00000.npy",
+            "figures/0_autoencoder/latent_batches/batch_00000.npy",
         ),
     ]
 
@@ -105,7 +106,7 @@ def get_array_gen_01_mnist_generation() -> AutoDocExperimentInfo:
         visualize_latents,
         {
             "label_file": data_output_path.parent / "mnist_labels.csv",
-            "latents_path": Path(base_path, "figures/0_autoencoder/latent_9000.npy"),
+            "latents_folder": Path(base_path, "figures/0_autoencoder/latent_batches"),
             "output_folder": Path(base_path) / "figures/0_autoencoder",
         },
     )
@@ -136,45 +137,56 @@ def get_array_gen_01_mnist_generation() -> AutoDocExperimentInfo:
     return ade
 
 
-def visualize_latents(label_file: str, latents_path: str, output_folder: str) -> None:
+def visualize_latents(
+    label_file: str,
+    latents_folder: Path,
+    output_folder: str,
+    max_samples_for_tsne: int = 10000,
+) -> None:
     labels_df = pd.read_csv(filepath_or_buffer=label_file)
     labels_df["ID"] = labels_df["ID"].astype(str)
 
-    latents_array = np.load(file=latents_path)
+    latents, ids = load_samples_for_viz(
+        batch_dir=latents_folder,
+        max_samples=max_samples_for_tsne,
+    )
 
-    latents_data = [
-        {
-            "Latent": latent.reshape(-1),
-            "ID": ID,
-        }
-        for latent, ID in latents_array
-    ]
-    latents_df = pd.DataFrame(latents_data)
+    latents_df = pd.DataFrame({"Latent": list(latents), "ID": ids})
 
     merged_df = pd.merge(latents_df, labels_df, on="ID", how="left")
 
-    latents_2d = np.array(merged_df["Latent"].tolist())
-
-    tsne = TSNE(
-        n_components=2,
-        perplexity=30,
-        learning_rate=200,
-        random_state=42,
-    )
-    latents_reduced = tsne.fit_transform(latents_2d)
-
-    palette = sns.color_palette("tab10", n_colors=merged_df["CLASS"].nunique())
-    sorted_labels = sorted(merged_df["CLASS"].unique())
+    tsne = TSNE(n_components=2, random_state=42)
+    latents_reduced = tsne.fit_transform(latents)
 
     plt.figure(figsize=(10, 8))
-    for label, color in zip(sorted_labels, palette, strict=False):
-        subset = latents_reduced[merged_df["CLASS"] == label]
-        plt.scatter(subset[:, 0], subset[:, 1], c=[color], label=f"{label}")
 
-    plt.title("Latents Visualization with t-SNE")
+    if "CLASS" not in merged_df.columns:
+        plt.scatter(
+            latents_reduced[:, 0],
+            latents_reduced[:, 1],
+        )
+        plt.title("Latents Visualization with t-SNE")
+    else:
+        palette = sns.color_palette("tab10", n_colors=merged_df["CLASS"].nunique())
+        sorted_labels = sorted(merged_df["CLASS"].unique())
+
+        for label, color in zip(sorted_labels, palette, strict=False):
+            subset = latents_reduced[merged_df["CLASS"] == label]
+            if len(subset) > 0:
+                plt.scatter(
+                    subset[:, 0],
+                    subset[:, 1],
+                    c=[color],
+                    label=f"{label}",
+                )
+
+        plt.title("Latents Visualization with t-SNE by Class")
+        plt.legend(title="Class Label")
+
     plt.xlabel("t-SNE Dimension 1")
     plt.ylabel("t-SNE Dimension 2")
-    plt.legend(title="Class Label")
+
+    Path(output_folder).mkdir(parents=True, exist_ok=True)
 
     output_path = os.path.join(output_folder, "latents_visualization_tsne.png")
     plt.savefig(output_path)
@@ -267,8 +279,8 @@ def get_array_gen_02_mnist_generation() -> AutoDocExperimentInfo:
         ),
         (
             "latent_outputs/9000/fusion_modules.computed.fusion_modules.fusion.1.0/"
-            "latents.npy",
-            "figures/1_autoencoder_augmented/latent_9000.npy",
+            "batch_00000.npy",
+            "figures/1_autoencoder_augmented/latent_batches/batch_00000.npy",
         ),
     ]
 
@@ -340,9 +352,7 @@ def get_array_gen_02_mnist_generation() -> AutoDocExperimentInfo:
         visualize_latents,
         {
             "label_file": data_output_path.parent / "mnist_labels.csv",
-            "latents_path": Path(
-                base_path, "figures/1_autoencoder_augmented/latent_9000.npy"
-            ),
+            "latents_folder": Path(base_path, "figures/0_autoencoder/latent_batches"),
             "output_folder": Path(base_path) / "figures/1_autoencoder_augmented",
         },
     )

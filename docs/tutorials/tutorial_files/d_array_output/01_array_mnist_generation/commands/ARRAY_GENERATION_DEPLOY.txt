@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/d_array_output/01_array_mnist_generation/saved_models/01_array_mnist_generation_checkpoint_9000_perf-average=0.9703.pt
+--model-path eir_tutorials/tutorial_runs/d_array_output/01_array_mnist_generation/saved_models/01_array_mnist_generation_checkpoint_9000_perf-average=0.9707.pt

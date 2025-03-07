@@ -64,7 +64,12 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
 
     exp.model.eval()
 
-    hook_finalizers = register_pre_evaluation_hooks(model=exp.model, global_config=gc)
+    hook_finalizers = register_pre_evaluation_hooks(
+        model=exp.model,
+        global_config=gc,
+        run_folder=handler_config.run_folder,
+        iteration=iteration,
+    )
 
     output_generator = model_training_utils.get_prediction_outputs_generator(
         data_loader=exp.valid_loader,
@@ -88,10 +93,12 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         evaluation_results=evaluation_results,
     )
 
+    max_samples_for_viz: None | int = None
+    if gc.latent_sampling is not None:
+        max_samples_for_viz = gc.latent_sampling.max_samples_for_viz
     run_all_eval_hook_analysis(
         hook_outputs=hook_outputs,
-        run_folder=handler_config.run_folder,
-        iteration=iteration,
+        max_samples_for_viz=max_samples_for_viz,
     )
 
     write_eval_header = iteration == gc.ec.sample_interval
@@ -148,16 +155,14 @@ def expand_binary_logits(binary_logits: torch.Tensor) -> torch.Tensor:
 
 def run_all_eval_hook_analysis(
     hook_outputs: dict[str, LatentHookOutput],
-    run_folder: Path,
-    iteration: int | str,
+    max_samples_for_viz: int | None = None,
 ) -> None:
     for _hook_name, hook_output in hook_outputs.items():
         match hook_output:
             case LatentHookOutput():
                 latent_analysis_wrapper(
                     latent_outputs=hook_output,
-                    run_folder=run_folder,
-                    iteration=iteration,
+                    max_samples_for_viz=max_samples_for_viz,
                 )
             case _:
                 raise NotImplementedError()
@@ -166,14 +171,20 @@ def run_all_eval_hook_analysis(
 def register_pre_evaluation_hooks(
     model: torch.nn.Module,
     global_config: GlobalConfig,
+    run_folder: Path,
+    iteration: int | str,
 ) -> dict[str, Callable]:
     model_hook_finalizers: dict[str, Callable] = {}
 
-    if global_config.latent_sampling is not None:
-        for layer_path in global_config.latent_sampling.layers_to_sample:
+    latent_config = global_config.latent_sampling
+    if latent_config is not None:
+        for layer_path in latent_config.layers_to_sample:
             model_hook_finalizers[f"latent_{layer_path}"] = register_latent_hook(
                 model=model,
                 layer_path=layer_path,
+                batch_size_for_saving=latent_config.batch_size_for_saving,
+                run_folder=run_folder,
+                iteration=iteration,
             )
 
     return model_hook_finalizers
