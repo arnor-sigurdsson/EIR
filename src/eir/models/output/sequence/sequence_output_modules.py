@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Literal
 import torch
 from torch import nn
 
-from eir.models.fusion.fusion_attention import MetaSequenceProjection
+from eir.models.fusion.fusion_attention import MetaSequenceFusion
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     parse_dim_feedforward,
@@ -114,9 +114,8 @@ class SequenceOutputModule(nn.Module):
                 case _:
                     in_embed = feature_extractor_info.output_dimension
 
-            in_elements = feature_extractor_info.output_dimension
-            cur_projection = MetaSequenceProjection(
-                context_total_num_elements=in_elements,
+            cur_projection = MetaSequenceFusion(
+                context_shape=feature_extractor_info.output_shape,
                 context_embedding_dim=in_embed,
                 target_embedding_dim=self.embedding_dim,
                 target_max_length=self.max_length,
@@ -138,7 +137,7 @@ class SequenceOutputModule(nn.Module):
 
             cur_projection = self.match_projections[input_name]
             projected = cur_projection(input_tensor=input_tensor, target_tensor=out)
-            out = out + projected
+            out = projected
 
         out = self.output_transformer(out, mask=self.mask)
 

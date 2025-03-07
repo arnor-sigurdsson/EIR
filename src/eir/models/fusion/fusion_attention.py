@@ -6,50 +6,63 @@ from torch import einsum, nn
 from torch.nn import functional as F
 
 from eir.models.layers.attention_layers import SwiGLU, Transformer
+from eir.models.layers.norm_layers import LayerScale
+from eir.models.tensor_broker.projection_modules.sequence import (
+    get_reshape_to_attention_dims_func,
+)
 
 
-class MetaSequenceProjection(nn.Module):
+class MetaSequenceFusion(nn.Module):
     def __init__(
         self,
-        context_total_num_elements: int,
-        context_embedding_dim: int,
+        context_shape: tuple[int, ...],
         target_embedding_dim: int,
         target_max_length: int,
         apply_causal_mask: bool,
+        n_layers: int = 1,
         *args,
         **kwargs,
     ):
         super().__init__()
 
-        self.context_total_num_elements = context_total_num_elements
-        self.context_embedding_dim = context_embedding_dim
+        self.context_shape = torch.Size(context_shape)
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
         self.apply_causal_mask = apply_causal_mask
+        self.n_layers = n_layers
 
-        self.cross_attention_projection = SequenceResidualCrossAttention(
-            context_embedding_dim=self.context_embedding_dim,
-            target_embedding_dim=self.target_embedding_dim,
-            target_max_length=self.target_max_length,
-            apply_causal_mask=self.apply_causal_mask,
+        self.cross_attention_layers = nn.ModuleList(
+            [
+                SequenceResidualCrossAttention(
+                    context_shape=self.context_shape,
+                    target_embedding_dim=self.target_embedding_dim,
+                    target_max_length=self.target_max_length,
+                    apply_causal_mask=self.apply_causal_mask,
+                )
+                for _ in range(n_layers)
+            ]
         )
-
-        self.scaling_factors = nn.Parameter(torch.ones(2))
 
     def forward(
         self,
         input_tensor: torch.Tensor,
         target_tensor: torch.Tensor,
     ) -> torch.Tensor:
-        weights = torch.softmax(self.scaling_factors, dim=0)
+        """
+        Note:   input_tensor here is the context that we inject into the
+                target_tensor.
 
-        cross_attended = self.cross_attention_projection(
-            x=target_tensor,
-            context=input_tensor,
-        )
-        cross_attended = cross_attended * weights[0]
+        Note:   No LayerScale here as we are just wrapping the CA blocks
+                which apply their own LayerScale.
+        """
+        identity = target_tensor
 
-        identity = target_tensor * weights[1]
+        cross_attended = target_tensor
+        for layer in self.cross_attention_layers:
+            cross_attended = layer(
+                x=cross_attended,
+                context=input_tensor,
+            )
 
         out = cross_attended + identity
 
@@ -59,7 +72,7 @@ class MetaSequenceProjection(nn.Module):
 class SequenceResidualCrossAttention(nn.Module):
     def __init__(
         self,
-        context_embedding_dim: int,
+        context_shape: tuple[int, ...],
         target_embedding_dim: int,
         target_max_length: int,
         apply_causal_mask: bool,
@@ -68,9 +81,17 @@ class SequenceResidualCrossAttention(nn.Module):
     ):
         super().__init__()
 
-        self.context_embedding_dim = context_embedding_dim
+        self.context_shape = torch.Size(context_shape)
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
+
+        (
+            self.reshape_func,
+            self.reshaped_size,
+        ) = get_reshape_to_attention_dims_func(
+            input_shape=self.context_shape,
+        )
+        self.context_embedding_dim = self.reshaped_size[1]
 
         self.projection_layer = UniDirectionalCrossAttention(
             dim=self.target_embedding_dim,
@@ -84,16 +105,16 @@ class SequenceResidualCrossAttention(nn.Module):
         self.norm_1_target = nn.RMSNorm(normalized_shape=target_embedding_dim)
         self.act_1 = SwiGLU(
             in_features=target_embedding_dim,
-            hidden_features=target_embedding_dim,
+            hidden_features=target_embedding_dim * 4,
             out_features=target_embedding_dim,
             bias=False,
         )
 
-        self.norm_1_context = nn.RMSNorm(normalized_shape=context_embedding_dim)
+        self.norm_1_context = nn.RMSNorm(normalized_shape=self.context_embedding_dim)
         self.act_context = SwiGLU(
-            in_features=context_embedding_dim,
-            hidden_features=context_embedding_dim,
-            out_features=context_embedding_dim,
+            in_features=self.context_embedding_dim,
+            hidden_features=self.context_embedding_dim * 4,
+            out_features=self.context_embedding_dim,
             bias=False,
         )
 
@@ -122,7 +143,7 @@ class SequenceResidualCrossAttention(nn.Module):
         self.norm_2_target = nn.RMSNorm(normalized_shape=target_embedding_dim)
         self.act_2 = SwiGLU(
             in_features=target_embedding_dim,
-            hidden_features=target_embedding_dim,
+            hidden_features=target_embedding_dim * 4,
             out_features=target_embedding_dim,
             bias=False,
         )
@@ -136,8 +157,10 @@ class SequenceResidualCrossAttention(nn.Module):
             apply_causal_mask=apply_causal_mask,
         )
 
+        self.ls = LayerScale(dim=1, init_values=1e-5)
+
     def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
-        context = context.reshape(context.shape[0], -1, self.context_embedding_dim)
+        context = self.reshape_func(context)
 
         identity = self.downsample_identity(
             x=x,
@@ -163,6 +186,7 @@ class SequenceResidualCrossAttention(nn.Module):
             out,
             mask=self.encoder_mask,
         )
+        out = self.ls(out)
 
         return out + identity
 

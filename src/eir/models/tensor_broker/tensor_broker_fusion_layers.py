@@ -191,7 +191,9 @@ class CrossAttentionFusionLayer(nn.Module):
         self.ls = LayerScale(dim=1, init_values=1e-5)
 
     def forward(
-        self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
+        self,
+        input_tensor: torch.Tensor,
+        projected_context_tensor: torch.Tensor,
     ) -> torch.Tensor:
         identity = input_tensor
 

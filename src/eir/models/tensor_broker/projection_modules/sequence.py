@@ -107,6 +107,13 @@ def get_reshape_to_attention_dims_func(
             return x
 
         output_shape = input_shape
+    elif n_input_dims == 3:
+        c, h, w = input_shape
+
+        def func(x):
+            return x.permute(0, 2, 3, 1).reshape(x.size(0), h * w, c)
+
+        output_shape = torch.Size([h * w, c])
     else:
 
         def func(x):
