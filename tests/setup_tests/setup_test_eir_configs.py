@@ -284,7 +284,6 @@ def get_test_sequence_input_init(
         "model_config": {
             "model_type": "sequence-default",
             "embedding_dim": 64,
-            "pool": "avg",
             "model_init_config": {
                 "num_heads": 2,
                 "num_layers": 1,

@@ -108,11 +108,20 @@ class SequenceOutputModule(nn.Module):
             if input_name == self.output_name:
                 continue
 
+            forced_shape: tuple[int, ...] | None
             match feature_extractor_info.input_type:
                 case "sequence":
-                    in_embed = feature_extractor_info.input_dimension.width
+                    fe_in_shape = feature_extractor_info.input_dimension
+                    in_embed = fe_in_shape.width
+                    # This is to revert flat sequence from feature extractor
+                    # back to original shape (or, almost that in pooling case)
+                    # for better compatibility with cross-attention
+                    # No pooling case: back to original [seq_length, in_embed]
+                    # Pooling case: [1, in_embed]
+                    forced_shape = (-1, in_embed)
                 case _:
                     in_embed = feature_extractor_info.output_dimension
+                    forced_shape = None
 
             context_shape = feature_extractor_info.output_shape
             assert context_shape is not None
@@ -122,6 +131,7 @@ class SequenceOutputModule(nn.Module):
                 target_embedding_dim=self.embedding_dim,
                 target_max_length=self.max_length,
                 apply_causal_mask=False,
+                forced_context_shape=forced_shape,
             )
 
             self.match_projections[input_name] = cur_projection

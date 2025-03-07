@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 
 import torch
@@ -19,17 +20,32 @@ class MetaSequenceFusion(nn.Module):
         target_embedding_dim: int,
         target_max_length: int,
         apply_causal_mask: bool,
+        forced_context_shape: None | tuple[int, ...],
         n_layers: int = 1,
         *args,
         **kwargs,
     ):
+        """
+        The forced_context_shape allows us to overwrite inferred shape in
+        special cases where we know something about the modality. For example,
+        sequence feature extractors return the flattened sequence. During
+        setup, the inferred approach would do the CA with this as a single, flat
+        token, which probably results in a lot of parameters and does not
+        take advantage of the sequence structure. Forcing the reshape
+        treats this again as a sequence of tokens in the CA.
+        """
         super().__init__()
 
-        self.context_shape = torch.Size(context_shape)
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
         self.apply_causal_mask = apply_causal_mask
         self.n_layers = n_layers
+        self.forced_context_reshape = forced_context_shape
+
+        if self.forced_context_reshape:
+            self.context_shape = self.forced_context_reshape
+        else:
+            self.context_shape = torch.Size(context_shape)
 
         self.cross_attention_layers = nn.ModuleList(
             [
@@ -38,6 +54,7 @@ class MetaSequenceFusion(nn.Module):
                     target_embedding_dim=self.target_embedding_dim,
                     target_max_length=self.target_max_length,
                     apply_causal_mask=self.apply_causal_mask,
+                    forced_context_shape=self.forced_context_reshape,
                 )
                 for _ in range(n_layers)
             ]
@@ -69,6 +86,15 @@ class MetaSequenceFusion(nn.Module):
         return out
 
 
+def get_force_reshape_func(
+    force_shape: tuple[int, ...],
+) -> Callable[[torch.Tensor], torch.Tensor]:
+    def func(x: torch.Tensor) -> torch.Tensor:
+        return x.reshape(x.size(0), *force_shape)
+
+    return func
+
+
 class SequenceResidualCrossAttention(nn.Module):
     def __init__(
         self,
@@ -76,6 +102,7 @@ class SequenceResidualCrossAttention(nn.Module):
         target_embedding_dim: int,
         target_max_length: int,
         apply_causal_mask: bool,
+        forced_context_shape: None | tuple[int, ...],
         *args,
         **kwargs,
     ):
@@ -84,13 +111,21 @@ class SequenceResidualCrossAttention(nn.Module):
         self.context_shape = torch.Size(context_shape)
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
+        self.forced_context_shape = forced_context_shape
 
-        (
-            self.reshape_func,
-            self.reshaped_size,
-        ) = get_reshape_to_attention_dims_func(
-            input_shape=self.context_shape,
-        )
+        if not self.forced_context_shape:
+            (
+                self.reshape_func,
+                self.reshaped_size,
+            ) = get_reshape_to_attention_dims_func(
+                input_shape=self.context_shape,
+            )
+        else:
+            self.reshape_func = get_force_reshape_func(
+                force_shape=self.forced_context_shape,
+            )
+            self.reshaped_size = torch.Size(self.forced_context_shape)
+
         self.context_embedding_dim = self.reshaped_size[1]
 
         self.projection_layer = UniDirectionalCrossAttention(
