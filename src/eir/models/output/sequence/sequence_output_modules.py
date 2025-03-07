@@ -114,8 +114,10 @@ class SequenceOutputModule(nn.Module):
                 case _:
                     in_embed = feature_extractor_info.output_dimension
 
+            context_shape = feature_extractor_info.output_shape
+            assert context_shape is not None
             cur_projection = MetaSequenceFusion(
-                context_shape=feature_extractor_info.output_shape,
+                context_shape=context_shape,
                 context_embedding_dim=in_embed,
                 target_embedding_dim=self.embedding_dim,
                 target_max_length=self.max_length,
