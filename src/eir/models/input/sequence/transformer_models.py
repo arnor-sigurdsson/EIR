@@ -166,6 +166,10 @@ class TransformerWrapperModel(nn.Module):
         """
         Note: We always flatten here in the end, hence 1D output shape.
         """
+
+        if self.pre_computed_num_out_features:
+            return (self.pre_computed_num_out_features,)
+
         padding = self.dynamic_extras.get("padding", 0)
         length_with_padding = self.max_length + padding
 
