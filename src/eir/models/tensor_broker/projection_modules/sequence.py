@@ -115,7 +115,9 @@ def get_reshape_to_attention_dims_func(
     if n_input_dims == 1:
 
         def func(x):
-            return x.unsqueeze(0)
+            # 1 because at the point this is called, we have the batch dim
+            # hence e.g. [32, 1024] -> [32, 1, 1024]
+            return x.unsqueeze(1)
 
         output_shape = torch.Size([1, input_shape[0]])
     elif n_input_dims == 2:
