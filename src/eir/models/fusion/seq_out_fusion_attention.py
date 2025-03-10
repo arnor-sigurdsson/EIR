@@ -130,7 +130,9 @@ class SequenceResidualCrossAttention(nn.Module):
 
         self.projection_layer = CrossAttention(
             dim=self.target_embedding_dim,
+            seq_length=target_max_length,
             context_dim=self.context_embedding_dim,
+            context_length=context_shape[0],
             dim_head=self.target_embedding_dim,
             dropout=0.1,
             pre_norm=False,
@@ -178,7 +180,9 @@ class SequenceResidualCrossAttention(nn.Module):
 
         self.downsample_identity = CrossAttention(
             dim=self.target_embedding_dim,
+            seq_length=target_max_length,
             context_dim=self.context_embedding_dim,
+            context_length=context_shape[0],
             dim_head=self.target_embedding_dim,
             dropout=0.1,
             pre_norm=False,
@@ -235,6 +239,8 @@ class CrossAttention(nn.Module):
         self,
         dim: int,
         context_dim: int,
+        seq_length: int | None = None,
+        context_length: int | None = None,
         heads: int = 8,
         dim_head: int = 64,
         dropout: float = 0.0,
@@ -258,7 +264,7 @@ class CrossAttention(nn.Module):
         Without masking, position i in x can attend to all positions in context.
         """
         super().__init__()
-        context_dim = default(context_dim, dim)
+        context_dim = default(val=context_dim, d=dim)
 
         self.apply_causal_mask = apply_causal_mask
 
@@ -274,6 +280,24 @@ class CrossAttention(nn.Module):
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
         self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
         self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
+
+        attn_mask = None
+        if self.apply_causal_mask:
+            assert seq_length is not None
+            assert context_length is not None
+            attn_mask = ~torch.triu(
+                torch.ones(
+                    seq_length,
+                    context_length,
+                    dtype=torch.bool,
+                ),
+                diagonal=1,
+            )
+            # Expand dimensions for batch and heads: [1, 1, seq_length, context_length]
+            attn_mask = attn_mask.unsqueeze(0).unsqueeze(0)
+
+        self.attn_mask: torch.Tensor | None
+        self.register_buffer("attn_mask", attn_mask)
 
         self.to_out = nn.Linear(inner_dim, dim)
 
@@ -297,25 +321,11 @@ class CrossAttention(nn.Module):
         k = k.view(x_batch, context_len, self.heads, self.dim_head).transpose(1, 2)
         v = v.view(x_batch, context_len, self.heads, self.dim_head).transpose(1, 2)
 
-        attn_mask = None
-        if self.apply_causal_mask:
-            attn_mask = ~torch.triu(
-                torch.ones(
-                    seq_len,
-                    context_len,
-                    dtype=torch.bool,
-                    device=x.device,
-                ),
-                diagonal=1,
-            )
-            # Expand dimensions for batch and heads: [1, 1, seq_len, context_len]
-            attn_mask = attn_mask.unsqueeze(0).unsqueeze(0)
-
         attn_output = F.scaled_dot_product_attention(
             query=q,
             key=k,
             value=v,
-            attn_mask=attn_mask,
+            attn_mask=self.attn_mask,
             dropout_p=self.dropout_p if self.training else 0.0,
         )
 
