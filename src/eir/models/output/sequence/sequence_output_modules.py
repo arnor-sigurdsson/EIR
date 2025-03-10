@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Literal
 import torch
 from torch import nn
 
-from eir.models.fusion.fusion_attention import MetaSequenceFusion
+from eir.models.fusion.seq_out_fusion_attention import MetaSequenceFusion
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     parse_dim_feedforward,

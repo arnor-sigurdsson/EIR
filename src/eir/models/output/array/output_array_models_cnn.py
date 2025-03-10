@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import torch
 import torch.nn as nn
 
-from eir.models.fusion.fusion_attention import UniDirectionalCrossAttention
+from eir.models.fusion.seq_out_fusion_attention import UniDirectionalCrossAttention
 from eir.models.layers.cnn_layers import (
     ConvAttentionBlock,
     ECABlock,

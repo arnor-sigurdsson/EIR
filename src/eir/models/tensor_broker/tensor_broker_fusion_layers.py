@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from eir.models.fusion.fusion_attention import UniDirectionalCrossAttention
+from eir.models.fusion.seq_out_fusion_attention import UniDirectionalCrossAttention
 from eir.models.layers.attention_layers import SwiGLU
 from eir.models.layers.cnn_layers import adjust_num_heads
 from eir.models.layers.norm_layers import LayerScale

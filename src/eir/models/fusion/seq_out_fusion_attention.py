@@ -112,6 +112,7 @@ class SequenceResidualCrossAttention(nn.Module):
         self.target_embedding_dim = target_embedding_dim
         self.target_max_length = target_max_length
         self.forced_context_shape = forced_context_shape
+        self.apply_causal_mask = apply_causal_mask
 
         if not self.forced_context_shape:
             (
@@ -162,13 +163,6 @@ class SequenceResidualCrossAttention(nn.Module):
             norm_first=True,
         )
 
-        self.ca_mask: torch.Tensor | None
-        if apply_causal_mask:
-            ca_mask_tensor = torch.ones((1, self.target_max_length)).bool()
-            self.register_buffer("ca_mask", ca_mask_tensor)
-        else:
-            self.register_buffer("ca_mask", None)
-
         encoder_mask = torch.triu(
             torch.ones(self.target_max_length, self.target_max_length) * float("-inf"),
             diagonal=1,
@@ -200,7 +194,6 @@ class SequenceResidualCrossAttention(nn.Module):
         identity = self.downsample_identity(
             x=x,
             context=context,
-            mask=self.ca_mask,
         )
 
         out = self.norm_1_target(x)
@@ -212,7 +205,6 @@ class SequenceResidualCrossAttention(nn.Module):
         out = self.projection_layer(
             x=out,
             context=out_context,
-            mask=self.ca_mask,
         )
 
         out = self.norm_2_target(out)
