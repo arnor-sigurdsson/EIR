@@ -276,7 +276,6 @@ class UniDirectionalCrossAttention(nn.Module):
         self,
         x: torch.Tensor,
         context: torch.Tensor,
-        mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         batch, seq_len, _ = x.shape
         _, context_len, _ = context.shape
@@ -310,11 +309,6 @@ class UniDirectionalCrossAttention(nn.Module):
             # [1, 1, seq_len, context_len]
             causal_mask = causal_mask.unsqueeze(0).unsqueeze(0)
             sim = sim.masked_fill(causal_mask, -torch.finfo(sim.dtype).max)
-
-        if exists(val=mask):
-            assert mask is not None
-            mask = mask.unsqueeze(1)  # [batch, 1, seq_len, context_len]
-            sim = sim.masked_fill(~mask, -torch.finfo(sim.dtype).max)
 
         # Calculate attention weights with softmax
         attn = F.softmax(sim, dim=-1)
