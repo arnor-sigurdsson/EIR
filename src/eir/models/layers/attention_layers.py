@@ -190,7 +190,6 @@ class TransformerBlock(nn.Module):
             dropout_p=self.dropout.p if self.training else 0.0,
         )
 
-        # Reshape and project output
         attn_output = (
             attn_output.transpose(1, 2)
             .contiguous()

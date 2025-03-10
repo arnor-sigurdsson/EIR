@@ -2,8 +2,7 @@ from collections.abc import Callable
 from typing import Any
 
 import torch
-from einops import rearrange
-from torch import einsum, nn
+from torch import nn
 from torch.nn import functional as F
 
 from eir.models.layers.attention_layers import SwiGLU, Transformer
@@ -129,7 +128,7 @@ class SequenceResidualCrossAttention(nn.Module):
 
         self.context_embedding_dim = self.reshaped_size[1]
 
-        self.projection_layer = UniDirectionalCrossAttention(
+        self.projection_layer = CrossAttention(
             dim=self.target_embedding_dim,
             context_dim=self.context_embedding_dim,
             dim_head=self.target_embedding_dim,
@@ -177,7 +176,7 @@ class SequenceResidualCrossAttention(nn.Module):
             bias=False,
         )
 
-        self.downsample_identity = UniDirectionalCrossAttention(
+        self.downsample_identity = CrossAttention(
             dim=self.target_embedding_dim,
             context_dim=self.context_embedding_dim,
             dim_head=self.target_embedding_dim,
@@ -231,7 +230,7 @@ def stable_softmax(t: torch.Tensor, dim: int = -1) -> torch.Tensor:
     return t.softmax(dim=dim)
 
 
-class UniDirectionalCrossAttention(nn.Module):
+class CrossAttention(nn.Module):
     def __init__(
         self,
         dim: int,
@@ -243,12 +242,18 @@ class UniDirectionalCrossAttention(nn.Module):
         apply_causal_mask: bool = False,
     ):
         """
-        Adapted from: https://github.com/lucidrains/bidirectional-cross-attention
-
         Note that enabling masking here means that position i in x is only allowed to
         attend to position j in context, where j <= i. This can be useful if x and
         the context are directly related position-wise, and we want to ensure that
         the model cannot look at "future" positions through the context.
+
+        Attention pattern (✓ = can attend, ✗ = masked):
+              context
+               W  X  Y  Z
+          A    ✓  ✗  ✗  ✗
+          B    ✓  ✓  ✗  ✗
+        x C    ✓  ✓  ✓  ✗
+          D    ✓  ✓  ✓  ✓
 
         Without masking, position i in x can attend to all positions in context.
         """
@@ -261,10 +266,10 @@ class UniDirectionalCrossAttention(nn.Module):
         self.context_norm = nn.RMSNorm(context_dim) if pre_norm else nn.Identity()
 
         self.heads = heads
-        self.scale = dim_head**-0.5
+        self.dim_head = dim_head
         inner_dim = dim_head * heads
 
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout_p = dropout
 
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
         self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
@@ -277,50 +282,44 @@ class UniDirectionalCrossAttention(nn.Module):
         x: torch.Tensor,
         context: torch.Tensor,
     ) -> torch.Tensor:
-        batch, seq_len, _ = x.shape
-        _, context_len, _ = context.shape
+        x_batch, seq_len, _ = x.shape
+        context_batch, context_len, _ = context.shape
+        assert context_batch == x_batch
 
         x_norm = self.norm(x)
         context_norm = self.context_norm(context)
 
-        # Project to queries, keys, values
         q = self.to_q(x_norm)
         k = self.to_k(context_norm)
         v = self.to_v(context_norm)
 
-        # Split heads
-        q = rearrange(q, "b n (h d) -> b h n d", h=self.heads)
-        k = rearrange(k, "b n (h d) -> b h n d", h=self.heads)
-        v = rearrange(v, "b n (h d) -> b h n d", h=self.heads)
+        q = q.view(x_batch, seq_len, self.heads, self.dim_head).transpose(1, 2)
+        k = k.view(x_batch, context_len, self.heads, self.dim_head).transpose(1, 2)
+        v = v.view(x_batch, context_len, self.heads, self.dim_head).transpose(1, 2)
 
-        # Calculate attention scores
-        sim = einsum("b h i d, b h j d -> b h i j", q, k) * self.scale
-
-        # Apply causal masking if it was set during initialization
+        attn_mask = None
         if self.apply_causal_mask:
-            # Create causal mask - strictly enforces that position i in x
-            # can only attend to positions 0 through i in context
-            causal_mask = (
-                torch.ones(seq_len, context_len, device=x.device)
-                .triu_(diagonal=1)
-                .bool()
+            attn_mask = ~torch.triu(
+                torch.ones(
+                    seq_len,
+                    context_len,
+                    dtype=torch.bool,
+                    device=x.device,
+                ),
+                diagonal=1,
             )
+            # Expand dimensions for batch and heads: [1, 1, seq_len, context_len]
+            attn_mask = attn_mask.unsqueeze(0).unsqueeze(0)
 
-            # [1, 1, seq_len, context_len]
-            causal_mask = causal_mask.unsqueeze(0).unsqueeze(0)
-            sim = sim.masked_fill(causal_mask, -torch.finfo(sim.dtype).max)
+        attn_output = F.scaled_dot_product_attention(
+            query=q,
+            key=k,
+            value=v,
+            attn_mask=attn_mask,
+            dropout_p=self.dropout_p if self.training else 0.0,
+        )
 
-        # Calculate attention weights with softmax
-        attn = F.softmax(sim, dim=-1)
-        attn = self.dropout(attn)
-
-        # Apply attention weights to values
-        out = einsum("b h i j, b h j d -> b h i d", attn, v)
-
-        # Merge heads
-        out = rearrange(out, "b h n d -> b n (h d)")
-
-        # Project to output dimension
+        out = attn_output.transpose(1, 2).contiguous().view(x_batch, seq_len, -1)
         out = self.to_out(out)
 
         return out
