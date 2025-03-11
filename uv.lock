@@ -1,5 +1,4 @@
 version = 1
-revision = 1
 requires-python = ">=3.13.0, <3.14"
 
 [[package]]
@@ -707,7 +706,7 @@ wheels = [
 
 [[package]]
 name = "eir-dl"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "." }
 dependencies = [
     { name = "adabelief-pytorch" },
