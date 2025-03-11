@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import torch
 import torch.nn as nn
 
-from eir.models.fusion.fusion_attention import UniDirectionalCrossAttention
+from eir.models.fusion.seq_out_fusion_attention import CrossAttention
 from eir.models.layers.cnn_layers import (
     ConvAttentionBlock,
     ECABlock,
@@ -561,7 +561,7 @@ class TimeStepMixingBlock(nn.Module):
             embedding_dim=embedding_dim,
         )
 
-        self.cross_attention = UniDirectionalCrossAttention(
+        self.cross_attention = CrossAttention(
             dim=input_height * input_width,
             dim_head=input_height * input_width,
             context_dim=embedding_dim,
@@ -645,7 +645,7 @@ class CrossAttentionArrayOutBlock(nn.Module):
 
         context_emb_dim = self.context_height * self.context_width
 
-        self.cross_attention = UniDirectionalCrossAttention(
+        self.cross_attention = CrossAttention(
             dim=input_height * input_width,
             dim_head=input_height * input_width,
             context_dim=context_emb_dim,

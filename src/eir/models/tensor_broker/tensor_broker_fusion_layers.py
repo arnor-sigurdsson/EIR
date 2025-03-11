@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from eir.models.fusion.fusion_attention import UniDirectionalCrossAttention
+from eir.models.fusion.seq_out_fusion_attention import CrossAttention
 from eir.models.layers.attention_layers import SwiGLU
 from eir.models.layers.cnn_layers import adjust_num_heads
 from eir.models.layers.norm_layers import LayerScale
@@ -181,7 +181,7 @@ class CrossAttentionFusionLayer(nn.Module):
             bias=False,
         )
 
-        self.cross_attention = UniDirectionalCrossAttention(
+        self.cross_attention = CrossAttention(
             dim=self.embedding_dim,
             dim_head=self.embedding_dim // self.n_heads,
             context_dim=self.context_dim,
@@ -191,7 +191,9 @@ class CrossAttentionFusionLayer(nn.Module):
         self.ls = LayerScale(dim=1, init_values=1e-5)
 
     def forward(
-        self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
+        self,
+        input_tensor: torch.Tensor,
+        projected_context_tensor: torch.Tensor,
     ) -> torch.Tensor:
         identity = input_tensor
 

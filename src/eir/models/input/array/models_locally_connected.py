@@ -89,7 +89,7 @@ class SimpleLCLModel(nn.Module):
         return self.fc_0.out_features
 
     def output_shape(self) -> tuple[int, ...]:
-        return (1, 1, self.num_out_features)
+        return (self.num_out_features,)
 
     def _init_weights(self):
         pass
@@ -270,7 +270,7 @@ class LCLModel(nn.Module):
 
     @property
     def output_shape(self) -> tuple[int, ...]:
-        return (1, 1, self.num_out_features)
+        return (self.num_out_features,)
 
     def _init_weights(self):
         pass

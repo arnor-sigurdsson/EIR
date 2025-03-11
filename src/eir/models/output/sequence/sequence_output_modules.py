@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Literal
 import torch
 from torch import nn
 
-from eir.models.fusion.fusion_attention import MetaSequenceProjection
+from eir.models.fusion.seq_out_fusion_attention import MetaSequenceFusion
 from eir.models.input.sequence.transformer_models import (
     BasicTransformerFeatureExtractorModelConfig,
     parse_dim_feedforward,
@@ -108,19 +108,30 @@ class SequenceOutputModule(nn.Module):
             if input_name == self.output_name:
                 continue
 
+            forced_shape: tuple[int, ...] | None
             match feature_extractor_info.input_type:
                 case "sequence":
-                    in_embed = feature_extractor_info.input_dimension.width
+                    fe_in_shape = feature_extractor_info.input_dimension
+                    in_embed = fe_in_shape.width
+                    # This is to revert flat sequence from feature extractor
+                    # back to original shape (or, almost that in pooling case)
+                    # for better compatibility with cross-attention
+                    # No pooling case: back to original [seq_length, in_embed]
+                    # Pooling case: [1, in_embed]
+                    forced_shape = (-1, in_embed)
                 case _:
                     in_embed = feature_extractor_info.output_dimension
+                    forced_shape = None
 
-            in_elements = feature_extractor_info.output_dimension
-            cur_projection = MetaSequenceProjection(
-                context_total_num_elements=in_elements,
+            context_shape = feature_extractor_info.output_shape
+            assert context_shape is not None
+            cur_projection = MetaSequenceFusion(
+                context_shape=context_shape,
                 context_embedding_dim=in_embed,
                 target_embedding_dim=self.embedding_dim,
                 target_max_length=self.max_length,
                 apply_causal_mask=False,
+                forced_context_shape=forced_shape,
             )
 
             self.match_projections[input_name] = cur_projection
@@ -138,7 +149,7 @@ class SequenceOutputModule(nn.Module):
 
             cur_projection = self.match_projections[input_name]
             projected = cur_projection(input_tensor=input_tensor, target_tensor=out)
-            out = out + projected
+            out = projected
 
         out = self.output_transformer(out, mask=self.mask)
 

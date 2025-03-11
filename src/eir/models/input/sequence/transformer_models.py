@@ -163,17 +163,24 @@ class TransformerWrapperModel(nn.Module):
 
     @property
     def output_shape(self) -> tuple[int, ...]:
+        """
+        Note: We always flatten here in the end, hence 1D output shape.
+        """
+
+        if self.pre_computed_num_out_features:
+            return (self.pre_computed_num_out_features,)
+
         padding = self.dynamic_extras.get("padding", 0)
         length_with_padding = self.max_length + padding
 
         if self.model_config.pool in ("avg", "max"):
             if self.model_config.window_size:
                 num_chunks = length_with_padding // self.model_config.window_size
-                return (num_chunks, self.embedding_dim)
+                return (num_chunks * self.embedding_dim,)
             else:
                 return (self.embedding_dim,)
         else:
-            return (length_with_padding, self.embedding_dim)
+            return (length_with_padding * self.embedding_dim,)
 
     def init_embedding_weights(self) -> None:
         init_range = 0.1

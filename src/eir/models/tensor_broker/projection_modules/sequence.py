@@ -40,6 +40,9 @@ class SequenceProjectionLayer(nn.Module):
             input_embedding_dim = self.input_shape[0]
         elif n_input_dims == 2:
             input_embedding_dim = self.input_shape[1]
+        elif n_input_dims == 3:
+            # For 3D inputs [c, h, w], use c as the embedding dimension
+            input_embedding_dim = self.input_shape[0]
         else:
             input_embedding_dim = math.prod(self.input_shape[1:])
 
@@ -51,13 +54,27 @@ class SequenceProjectionLayer(nn.Module):
             ),
         ]
 
+        # While matching the sequence lengths is not strictly necessary,
+        # for e.g. cross-attention fusion, it is for example if we
+        # are doing e.g. a gated sum, so we keep this sequence length
+        # projection here for that case.
         if self.target_seq_len is not None:
             if n_input_dims == 2:
                 linear_layer = nn.Linear(
                     in_features=1,
                     out_features=self.target_seq_len,
                 )
-            elif n_input_dims > 2 and self.input_shape[1] != self.target_seq_len:
+            elif n_input_dims == 3:
+                # For 3D inputs, sequence length after reshape is h*w
+                c, h, w = self.input_shape
+                if h * w != self.target_seq_len:
+                    linear_layer = nn.Linear(
+                        in_features=h * w,
+                        out_features=self.target_seq_len,
+                    )
+                else:
+                    return nn.Sequential(*layers)
+            elif n_input_dims > 3 and self.input_shape[1] != self.target_seq_len:
                 linear_layer = nn.Linear(
                     in_features=self.input_shape[1],
                     out_features=self.target_seq_len,
@@ -98,7 +115,9 @@ def get_reshape_to_attention_dims_func(
     if n_input_dims == 1:
 
         def func(x):
-            return x.unsqueeze(0)
+            # 1 because at the point this is called, we have the batch dim
+            # hence e.g. [32, 1024] -> [32, 1, 1024]
+            return x.unsqueeze(1)
 
         output_shape = torch.Size([1, input_shape[0]])
     elif n_input_dims == 2:
@@ -107,6 +126,13 @@ def get_reshape_to_attention_dims_func(
             return x
 
         output_shape = input_shape
+    elif n_input_dims == 3:
+        c, h, w = input_shape
+
+        def func(x):
+            return x.permute(0, 2, 3, 1).reshape(x.size(0), h * w, c)
+
+        output_shape = torch.Size([h * w, c])
     else:
 
         def func(x):
