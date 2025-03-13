@@ -452,7 +452,7 @@ def _log_missing_samples_between_modalities(
     tabular inputs, we have the key as a prefix to the column name, e.g.
     "tabular_input__column1".
     """
-    missing_counts = {k: 0 for k in input_keys}
+    missing_counts = dict.fromkeys(input_keys, 0)
     missing_ids: dict[str, list[str]] = {k: [] for k in input_keys}
     any_missing = False
     no_samples = df.height

@@ -1646,7 +1646,7 @@ def filter_missing_outputs_and_labels(
                 if with_labels
                 else {k: torch.tensor([]) for k in output_inner_dict}
             )
-            filtered_ids[output_name] = {k: batch_ids for k in output_inner_dict}
+            filtered_ids[output_name] = dict.fromkeys(output_inner_dict, batch_ids)
             continue
 
         missing_ids = missing_ids_info.missing_ids_per_modality[output_name]

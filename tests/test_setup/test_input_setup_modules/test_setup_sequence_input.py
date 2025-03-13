@@ -64,7 +64,18 @@ def _get_simple_sample_pool() -> Sequence[str]:
 
 
 def test_get_tokenizer():
-    test_input = "the lazy dog JUMPED over:: the red fox or whatever".split()
+    test_input = [
+        "the",
+        "lazy",
+        "dog",
+        "JUMPED",
+        "over::",
+        "the",
+        "red",
+        "fox",
+        "or",
+        "whatever",
+    ]
 
     identity_tokenizer = setup_sequence.get_basic_tokenizer(
         tokenizer_name=None, tokenizer_language=None
@@ -80,16 +91,36 @@ def test_get_tokenizer():
         tokenizer_name="basic_english", tokenizer_language="en"
     )
 
-    test_input_tokenized_expected = (
-        "the lazy dog jumped over the red fox or whatever".split()
-    )
+    test_input_tokenized_expected = [
+        "the",
+        "lazy",
+        "dog",
+        "jumped",
+        "over",
+        "the",
+        "red",
+        "fox",
+        "or",
+        "whatever",
+    ]
     test_input_tokenized = basic_english_tokenizer(test_input)
     assert test_input_tokenized == test_input_tokenized_expected
 
 
 def test_get_tokenized_vocab_iterator():
     def _test_iterator():
-        yield "the lazy dog JUMPED over:: the red fox or whatever".split()
+        yield [
+            "the",
+            "lazy",
+            "dog",
+            "JUMPED",
+            "over::",
+            "the",
+            "red",
+            "fox",
+            "or",
+            "whatever",
+        ]
 
     basic_english_tokenizer = setup_sequence.get_basic_tokenizer(
         tokenizer_name="basic_english",
@@ -104,7 +135,18 @@ def test_get_tokenized_vocab_iterator():
     results = list(tokenized_vocab_iterator)
     assert len(results) == 1
 
-    assert results[0] == "the lazy dog jumped over the red fox or whatever".split()
+    assert results[0] == [
+        "the",
+        "lazy",
+        "dog",
+        "jumped",
+        "over",
+        "the",
+        "red",
+        "fox",
+        "or",
+        "whatever",
+    ]
 
 
 def test_get_vocab_iterator_basic(tmp_path: Path):
@@ -142,11 +184,11 @@ def test_get_bpe_tokenizer(tmp_path: Path):
         vocab_size=None,
         split_on=" ",
     )
-    known_sequence = "cat dog mouse".split()
+    known_sequence = ["cat", "dog", "mouse"]
     known_sequence_tokenized = bpe_tokenizer_from_scratch(known_sequence)
     assert known_sequence_tokenized == ["cat", "dog", "mouse"]
 
-    unknown_sequence = "edge knot city".split()
+    unknown_sequence = ["edge", "knot", "city"]
     unknown_sequence_tokenized = bpe_tokenizer_from_scratch(unknown_sequence)
     assert unknown_sequence_tokenized == [
         "e",

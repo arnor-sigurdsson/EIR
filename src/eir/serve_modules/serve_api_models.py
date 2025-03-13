@@ -11,8 +11,8 @@ def create_tabular_model(
     cat_columns: Sequence[str],
     con_columns: Sequence[str],
 ) -> type[BaseModel]:
-    fields: dict[str, Any] = {col: (str, ...) for col in cat_columns}
-    fields.update({col: (float, ...) for col in con_columns})
+    fields: dict[str, Any] = dict.fromkeys(cat_columns, (str, ...))
+    fields.update(dict.fromkeys(con_columns, (float, ...)))
     return create_model(name, **fields)
 
 

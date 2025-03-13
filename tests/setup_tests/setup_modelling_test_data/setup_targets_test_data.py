@@ -18,7 +18,7 @@ def set_up_label_file_writing(
 
 
 def set_up_label_line_dict(sample_name: str, fieldnames: list[str]):
-    label_line_dict = {k: None for k in fieldnames}
+    label_line_dict = dict.fromkeys(fieldnames)
     assert "ID" in label_line_dict
     label_line_dict["ID"] = sample_name
     return label_line_dict

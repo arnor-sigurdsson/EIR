@@ -301,7 +301,7 @@ def generate_test_data(
 
     target_data = {
         "ID": [str(i) for i in range(len(test_labels))],
-        **{col: test_labels for col in target_columns},
+        **dict.fromkeys(target_columns, test_labels),
     }
     target_df = pl.DataFrame(target_data)
 

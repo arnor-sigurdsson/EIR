@@ -257,7 +257,7 @@ def test_mixup_all_targets(test_targets):
     }
     random_indices = torch.randperm(len(test_targets)).to(dtype=torch.long)
     all_target_columns = target_columns["con"] + target_columns["cat"]
-    targets = {"test_output_tabular": {c: test_targets for c in all_target_columns}}
+    targets = {"test_output_tabular": dict.fromkeys(all_target_columns, test_targets)}
 
     def _target_columns_gen():
         for con_column in target_columns["con"]:
@@ -353,12 +353,12 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
     all_target_columns = target_columns["con"] + target_columns["cat"]
 
     targets = {
-        "test_output_tabular": {c: test_inputs["targets"] for c in all_target_columns}
+        "test_output_tabular": dict.fromkeys(all_target_columns, test_inputs["targets"])
     }
     targets_permuted = {
-        "test_output_tabular": {
-            c: test_inputs["targets_permuted"] for c in all_target_columns
-        }
+        "test_output_tabular": dict.fromkeys(
+            all_target_columns, test_inputs["targets_permuted"]
+        )
     }
 
     n_samples = len(test_inputs["outputs"])
@@ -375,7 +375,7 @@ def test_calc_all_mixed_losses(test_inputs, expected_output):
 
     test_criteria = {"test_output_tabular": vectorized_con_loss}
     outputs = {
-        "test_output_tabular": {c: test_inputs["outputs"] for c in all_target_columns}
+        "test_output_tabular": dict.fromkeys(all_target_columns, test_inputs["outputs"])
     }
 
     all_losses = data_augmentation.calc_all_mixed_losses(

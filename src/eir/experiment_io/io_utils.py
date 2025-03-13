@@ -162,7 +162,7 @@ def strip_config(config: dict | list[dict]) -> dict | list[dict]:
         "input_type_info.subset_snps_file",
         "output_type_info.vocab_file",
     ]
-    replacements = {k: None for k in keys_to_strip}
+    replacements = dict.fromkeys(keys_to_strip)
 
     if isinstance(config, list):
         stripped_configs = []
