@@ -33,7 +33,7 @@ Supervised modelling, sequence generation, image generation, array output and su
 ## What's New
 
 - **March 2025**: Scaling tutorials added
-  - [Streaming Data: Training with FineWeb](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/01_streaming.html) - Train models on datasets too large to fit in memory
+  - [Streaming Data: Training with FineWeb](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/01_streaming.html) - Train models via continuous data streaming
   - [Scaling Compute: Training a BabyGPT](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/02_compute_gpt.html) - Examples of training GPT-style models
 
 # Table of Contents
