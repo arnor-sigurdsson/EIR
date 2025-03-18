@@ -704,7 +704,8 @@ def _check_parsed_label_df(
 
         if dtype == pl.Categorical:
             non_null_vals = (
-                df_labels.filter(pl.col(column).is_not_null())
+                df_labels.select([column])
+                .filter(pl.col(column).is_not_null())
                 .get_column(column)
                 .unique()
             )
