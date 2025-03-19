@@ -160,17 +160,18 @@ def get_meta_model_kwargs_from_configs(
     )
     kwargs["input_modules"] = input_modules
 
-    out_feature_per_feature_extractor = _get_feature_extractors_num_output_features(
-        input_modules=input_modules
-    )
     output_types = _get_output_types(outputs_as_dict=outputs_as_dict)
     diffusion_targets = _extract_diffusion_targets(outputs_as_dict=outputs_as_dict)
+    feature_dims_and_types = get_all_feature_extractor_dimensions_and_types(
+        inputs_as_dict=inputs_as_dict,
+        input_modules=input_modules,
+    )
 
     fusion_modules = fusion.get_fusion_modules(
         fusion_model_type=fusion_config.model_type,
         model_config=fusion_config.model_config,
         modules_to_fuse=input_modules,
-        out_feature_per_feature_extractor=out_feature_per_feature_extractor,
+        feature_dimensions_and_types=feature_dims_and_types,
         output_types=output_types,
         any_diffusion=diffusion_targets != {},
         strict=strict,
@@ -178,10 +179,6 @@ def get_meta_model_kwargs_from_configs(
     kwargs["fusion_modules"] = fusion_modules
 
     computed_out_dimension = _get_maybe_computed_out_dims(fusion_modules=fusion_modules)
-    feature_dims_and_types = get_all_feature_extractor_dimensions_and_types(
-        inputs_as_dict=inputs_as_dict,
-        input_modules=input_modules,
-    )
     output_modules, output_types = get_output_modules(
         outputs_as_dict=outputs_as_dict,
         device=global_config.be.device,

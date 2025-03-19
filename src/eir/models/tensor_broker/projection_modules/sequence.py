@@ -33,6 +33,20 @@ class SequenceProjectionLayer(nn.Module):
         )
         self.projection = self._create_projection()
 
+    @property
+    def output_shape(self) -> torch.Size:
+        if self.target_seq_len is not None:
+            return torch.Size([self.target_seq_len, self.target_embedding_dim])
+        else:
+            return torch.Size([1, self.target_embedding_dim])
+
+    @property
+    def num_out_features(self) -> int:
+        if self.target_seq_len is not None:
+            return self.target_seq_len * self.target_embedding_dim
+        else:
+            return self.target_embedding_dim
+
     def _create_projection(self):
         n_input_dims = len(self.input_shape)
         target_embedding_dim = self.target_embedding_dim

@@ -83,10 +83,7 @@ def get_base_parametrization(
                 },
             ],
             "fusion_configs": {
-                "model_config": {
-                    "fc_task_dim": 256,
-                    "layers": [2],
-                },
+                "model_type": "attention",
             },
             "output_configs": [
                 {

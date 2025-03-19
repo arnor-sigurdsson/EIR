@@ -3,16 +3,30 @@ from typing import TYPE_CHECKING, Literal, NewType, cast
 import torch
 from torch import nn
 
-from eir.models.fusion import fusion_default, fusion_identity, fusion_mgmoe
+from eir.models.fusion import (
+    fusion_attention,
+    fusion_default,
+    fusion_identity,
+    fusion_mgmoe,
+)
 from eir.models.fusion.fusion_default import al_features, default_fuse_features
 from eir.models.fusion.fusion_identity import al_identity_features, pass_through_fuse
 from eir.models.layers.mlp_layers import ResidualMLPConfig
 from eir.models.meta.meta_utils import FusionModuleProtocol, al_fusion_modules
 from eir.utils.logging import get_logger
 
-al_fusion_model = Literal["pass-through", "mlp-residual", "identity", "mgmoe"]
+al_fusion_model = Literal[
+    "pass-through",
+    "mlp-residual",
+    "identity",
+    "mgmoe",
+    "attention",
+]
 al_fusion_model_configs = (
-    ResidualMLPConfig | fusion_identity.IdentityConfig | fusion_mgmoe.MGMoEModelConfig
+    ResidualMLPConfig
+    | fusion_identity.IdentityConfig
+    | fusion_mgmoe.MGMoEModelConfig
+    | fusion_attention.AttentionFusionConfig
 )
 
 ComputedType = NewType("ComputedType", torch.Tensor)
@@ -21,6 +35,7 @@ al_fused_features = dict[str, ComputedType | PassThroughType | torch.Tensor]
 
 if TYPE_CHECKING:
     from eir.models.meta.meta_utils import al_input_modules
+    from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
 
 logger = get_logger(name=__name__)
 
@@ -29,7 +44,7 @@ def get_fusion_modules(
     fusion_model_type: str,
     model_config: al_fusion_model_configs,
     modules_to_fuse: "al_input_modules",
-    out_feature_per_feature_extractor: dict[str, int],
+    feature_dimensions_and_types: dict[str, "FeatureExtractorInfo"] | None,
     output_types: dict[str, Literal["tabular", "sequence", "array"]],
     any_diffusion: bool,
     strict: bool = True,
@@ -54,7 +69,7 @@ def get_fusion_modules(
         fusion_class = get_fusion_class(fusion_model_type=fusion_model_type)
 
         fusion_callable: al_features | al_identity_features
-        if fusion_model_type == "pass-through":
+        if fusion_model_type == "pass-through" or fusion_model_type == "attention":
             fusion_callable = pass_through_fuse
         else:
             fusion_callable = default_fuse_features
@@ -63,6 +78,7 @@ def get_fusion_modules(
             model_config=model_config,
             fusion_in_dim=fusion_in_dim,
             fusion_callable=fusion_callable,
+            feature_dimensions_and_types=feature_dimensions_and_types,
         )
         fusion_modules["computed"] = computing_fusion_module
 
@@ -72,6 +88,7 @@ def get_fusion_modules(
             model_config=model_config,
             fusion_in_dim=fusion_in_dim,
             fusion_callable=pass_through_fuse,
+            feature_dimensions_and_types=feature_dimensions_and_types,
         )
         fusion_modules["pass-through"] = cast(
             FusionModuleProtocol, pass_through_fusion_module
@@ -105,6 +122,7 @@ def _check_fusion_modules(
         "mgmoe",
         "identity",
         "pass-through",
+        "attention",
     }
 
     if not full_set:
@@ -162,4 +180,6 @@ def get_fusion_class(
         return cast(type[FusionModuleProtocol], fusion_default.MLPResidualFusionModule)
     if fusion_model_type in ("identity", "pass-through"):
         return cast(type[FusionModuleProtocol], fusion_identity.IdentityFusionModel)
+    if fusion_model_type == "attention":
+        return cast(type[FusionModuleProtocol], fusion_attention.AttentionFusionModule)
     raise ValueError(f"Unrecognized fusion model type: {fusion_model_type}.")
