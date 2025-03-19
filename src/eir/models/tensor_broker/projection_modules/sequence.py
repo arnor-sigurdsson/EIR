@@ -24,13 +24,21 @@ class SequenceProjectionLayer(nn.Module):
         target_embedding_dim: int,
         target_seq_len: int | None = None,
     ):
+        """
+        If we are not projecting to a target_seq_length, then the "sequence length"
+        is what we get from the reshape function. Otherwise, we account for the
+        extra projection in the output_shape and num_out_features properties.
+        """
         super().__init__()
         self.input_shape = input_shape_no_batch
         self.target_embedding_dim = target_embedding_dim
+        (
+            self.reshape_func,
+            self.reshaped_out_shape,
+        ) = get_reshape_to_attention_dims_func(input_shape=input_shape_no_batch)
+        self.direct_reshape_seq_length = self.reshaped_out_shape[0]
         self.target_seq_len = target_seq_len
-        self.reshape_func, _ = get_reshape_to_attention_dims_func(
-            input_shape=input_shape_no_batch
-        )
+
         self.projection = self._create_projection()
 
     @property
@@ -38,14 +46,16 @@ class SequenceProjectionLayer(nn.Module):
         if self.target_seq_len is not None:
             return torch.Size([self.target_seq_len, self.target_embedding_dim])
         else:
-            return torch.Size([1, self.target_embedding_dim])
+            return torch.Size(
+                [self.direct_reshape_seq_length, self.target_embedding_dim]
+            )
 
     @property
     def num_out_features(self) -> int:
         if self.target_seq_len is not None:
             return self.target_seq_len * self.target_embedding_dim
         else:
-            return self.target_embedding_dim
+            return self.direct_reshape_seq_length * self.target_embedding_dim
 
     def _create_projection(self):
         n_input_dims = len(self.input_shape)

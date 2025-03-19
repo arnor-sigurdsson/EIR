@@ -28,7 +28,8 @@ class SequenceModelObjectsForWrapperModel:
     embeddings: nn.Embedding | None
     embedding_dim: int
     external: bool
-    known_out_features: None | int
+    known_out_num_features: None | int
+    known_out_shape: None | tuple[int, ...] = None
 
 
 def get_sequence_model(
@@ -67,7 +68,8 @@ def get_sequence_model(
         max_length=max_length,
         embeddings=objects_for_wrapper.embeddings,
         device=device,
-        pre_computed_num_out_features=objects_for_wrapper.known_out_features,
+        pre_computed_num_out_features=objects_for_wrapper.known_out_num_features,
+        pre_computed_out_shape=objects_for_wrapper.known_out_shape,
     )
 
     return sequence_model
@@ -137,13 +139,19 @@ def _get_sequence_feature_extractor_objects_for_wrapper_model(
     return objects_for_wrapper
 
 
+@dataclass
+class ExternalOutShapeInfo:
+    num_features: int
+    shape: tuple[int, ...]
+
+
 def _get_manual_out_features_for_external_feature_extractor(
     input_length: int,
     embedding_dim: int,
     num_chunks: int,
     feature_extractor: nn.Module,
     pool: Literal["max"] | Literal["avg"] | None,
-) -> int:
+) -> ExternalOutShapeInfo:
     input_shape = _get_sequence_input_dim(
         input_length=input_length,
         embedding_dim=embedding_dim,
@@ -156,7 +164,12 @@ def _get_manual_out_features_for_external_feature_extractor(
     )
     manual_out_features = out_feature_shape.numel() * num_chunks
 
-    return manual_out_features
+    shape_info = ExternalOutShapeInfo(
+        num_features=manual_out_features,
+        shape=tuple(out_feature_shape),
+    )
+
+    return shape_info
 
 
 def _get_sequence_input_dim(
@@ -203,7 +216,8 @@ def _get_pretrained_hf_sequence_feature_extractor_objects(
         embeddings=pretrained_model_embeddings,
         embedding_dim=pretrained_embedding_dim,
         external=True,
-        known_out_features=known_out_features,
+        known_out_num_features=known_out_features.num_features,
+        known_out_shape=known_out_features.shape,
     )
 
     return objects_for_wrapper
@@ -251,7 +265,8 @@ def _get_hf_sequence_feature_extractor_objects(
         embeddings=None,
         embedding_dim=pretrained_embedding_dim,
         external=True,
-        known_out_features=known_out_features,
+        known_out_num_features=known_out_features.num_features,
+        known_out_shape=known_out_features.shape,
     )
 
     return objects_for_wrapper
@@ -315,7 +330,8 @@ def _get_basic_sequence_feature_extractor_objects(
         embeddings=None,
         embedding_dim=parsed_embedding_dim,
         external=False,
-        known_out_features=0,
+        known_out_num_features=0,
+        known_out_shape=None,
     )
 
     return objects_for_wrapper

@@ -128,7 +128,6 @@ class ArrayTransformer(nn.Module):
         out = out * math.sqrt(self.embedding_dim)
         out = self.pos_representation(out)
         out = self.transformer_encoder(out)
-        out = out.flatten(1)
         return out
 
 
