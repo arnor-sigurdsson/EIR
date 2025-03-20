@@ -163,7 +163,7 @@ def get_07_multimodal_run_2_tabular_description_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/07_input_tabular.yaml",
         f"{conf_output_path}/07_input_description.yaml",
         "--fusion_configs",
-        f"{conf_output_path}/07_fusion.yaml",
+        f"{conf_output_path}/07_fusion_attention.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.basic_experiment.output_folder={output_folder}",
@@ -211,7 +211,7 @@ def get_07_multimodal_run_3_tabular_description_image_info() -> AutoDocExperimen
         f"{conf_output_path}/07_input_description.yaml",
         f"{conf_output_path}/07_input_image.yaml",
         "--fusion_configs",
-        f"{conf_output_path}/07_fusion.yaml",
+        f"{conf_output_path}/07_fusion_attention.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.basic_experiment.output_folder={output_folder}",
@@ -394,7 +394,7 @@ def get_07_mm_apx_run_1_tab_desc_pre_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/07_apx-a_input_description_pretrained.yaml",
         f"{conf_output_path}/07_input_image.yaml",
         "--fusion_configs",
-        f"{conf_output_path}/07_fusion.yaml",
+        f"{conf_output_path}/07_fusion_attention.yaml",
         "--output_configs",
         f"{conf_output_path}/07_output.yaml",
         f"--07_globals.basic_experiment.output_folder={output_folder}",
@@ -444,7 +444,7 @@ def get_07_mm_apx_run_2_tab_desc_mt_info() -> AutoDocExperimentInfo:
         f"{conf_output_path}/07_apx-a_input_description_pretrained.yaml",
         f"{conf_output_path}/07_input_image.yaml",
         "--fusion_configs",
-        f"{conf_output_path}/07_fusion.yaml",
+        f"{conf_output_path}/07_fusion_attention.yaml",
         "--output_configs",
         f"{conf_output_path}/07_apx-b_mt_output.yaml",
         f"--07_globals.basic_experiment.output_folder={output_folder}",
@@ -504,8 +504,15 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_1 = get_07_multimodal_run_1_tabular_info()
     exp_2 = get_07_multimodal_run_2_tabular_description_info()
     exp_3 = get_07_multimodal_run_3_tabular_description_image_info()
-    exp_4 = get_07_multimodal_serve_tabular_description_image_info()
+    # exp_4 = get_07_multimodal_serve_tabular_description_image_info()
     exp_a1 = get_07_mm_apx_run_1_tab_desc_pre_info()
     exp_a2 = get_07_mm_apx_run_2_tab_desc_mt_info()
 
-    return [exp_1, exp_2, exp_3, exp_4, exp_a1, exp_a2]
+    return [
+        exp_1,
+        exp_2,
+        exp_3,
+        # exp_4,
+        exp_a1,
+        exp_a2,
+    ]

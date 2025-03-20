@@ -15,7 +15,7 @@ model_config:
         model_type: sequence-default
         embedding_dim: 64
         position: embed
-        pool: avg
+        pool: null
         model_init_config:
           num_heads: 4
           dropout: 0.2

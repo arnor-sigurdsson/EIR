@@ -1,6 +1,6 @@
 eirtrain \
 --global_configs eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_globals.yaml \
 --input_configs eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_apx-b_mt_input_tabular.yaml eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_input_description.yaml eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_apx-a_input_description_pretrained.yaml eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_input_image.yaml \
---fusion_configs eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_fusion.yaml \
+--fusion_configs eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_fusion_attention.yaml \
 --output_configs eir_tutorials/a_using_eir/07_multimodal_tutorial/conf/07_apx-b_mt_output.yaml \
 --07_globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/a_using_eir/tutorial_07-apx-b_multimodal_tabular_description_multi_task
