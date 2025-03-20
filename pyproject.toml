@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "eir-dl"
-version = "0.17.0"
+version = "0.18.0"
 description = "Deep learning framework for genomics and multi-modal data"
 license = { text = "AGPLv3" }
 authors = [
