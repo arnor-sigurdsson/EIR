@@ -162,11 +162,13 @@ def _get_manual_out_features_for_external_feature_extractor(
         hf_model=True,
         pool=pool,
     )
-    manual_out_features = out_feature_shape.numel() * num_chunks
+    out_feature_shape_no_batch = out_feature_shape[1:]
+
+    manual_out_features = out_feature_shape_no_batch.numel() * num_chunks
 
     shape_info = ExternalOutShapeInfo(
         num_features=manual_out_features,
-        shape=tuple(out_feature_shape),
+        shape=tuple(out_feature_shape_no_batch),
     )
 
     return shape_info
