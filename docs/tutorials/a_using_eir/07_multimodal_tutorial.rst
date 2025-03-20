@@ -156,8 +156,19 @@ specify a configuration for the text data as well:
 .. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/07_input_description.yaml
     :language: yaml
 
-Then to train, we simply include that configuration file
-under the ``--input_configs`` parameter:
+Additionally, we will use a different fusion configuration:
+
+.. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/07_fusion_attention.yaml
+    :language: yaml
+
+So, by default, ``EIR`` will use a MLP based module to fuse representations
+from different input modalities. Another option is to use an attention-based
+fusion module, where we project the different representations
+onto a common embedding dimension, and then use transformer layers
+to fuse the different representations.
+
+Then to train, we simply include the new input configuration file
+under the ``--input_configs`` parameter, as well as the new fusion:
 
 .. literalinclude:: ../tutorial_files/a_using_eir/07_multimodal_tutorial/commands/MULTIMODAL_2_TABULAR_DESCRIPTION.txt
     :language: console

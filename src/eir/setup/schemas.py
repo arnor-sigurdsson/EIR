@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
+from eir.models.fusion.fusion_attention import AttentionFusionConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.input.array.array_models import ArrayModelConfig
@@ -960,8 +961,16 @@ class FusionConfig:
         Fusion model configuration.
     """
 
-    model_type: Literal["mlp-residual", "identity", "mgmoe", "pass-through"]
-    model_config: ResidualMLPConfig | IdentityConfig | MGMoEModelConfig
+    model_type: Literal[
+        "mlp-residual",
+        "identity",
+        "mgmoe",
+        "pass-through",
+        "attention",
+    ]
+    model_config: (
+        ResidualMLPConfig | IdentityConfig | MGMoEModelConfig | AttentionFusionConfig
+    )
     tensor_broker_config: None | TensorBrokerConfig = None
 
 

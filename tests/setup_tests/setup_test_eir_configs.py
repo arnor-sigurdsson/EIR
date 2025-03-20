@@ -390,7 +390,19 @@ def get_test_array_input_init(
 def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
     if model_type in ("identity", "pass-through"):
         return [{}]
-    if model_type in ("mlp-residual", "mgmoe"):
+    elif model_type == "attention":
+        return [
+            {
+                "model_config": {
+                    "n_layers": 1,
+                    "common_embedding_dim": 128,
+                    "n_heads": 4,
+                    "dim_feedforward": "auto",
+                    "dropout": 0.1,
+                }
+            }
+        ]
+    elif model_type in ("mlp-residual", "mgmoe"):
         return [
             {
                 "model_config": {

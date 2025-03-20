@@ -12,6 +12,7 @@ from typing import (
 import configargparse
 import yaml
 
+from eir.models.fusion.fusion_attention import AttentionFusionConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
 from eir.models.fusion.fusion_mgmoe import MGMoEModelConfig
 from eir.models.layers.mlp_layers import ResidualMLPConfig
@@ -350,12 +351,17 @@ def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
     fusion_model_type = combined_config["model_type"]
 
     model_dataclass_config_class: (
-        type[ResidualMLPConfig] | type[MGMoEModelConfig] | type[IdentityConfig]
+        type[ResidualMLPConfig]
+        | type[MGMoEModelConfig]
+        | type[IdentityConfig]
+        | type[AttentionFusionConfig]
     ) = ResidualMLPConfig
     if fusion_model_type == "mgmoe":
         model_dataclass_config_class = MGMoEModelConfig
     elif fusion_model_type == "linear":
         model_dataclass_config_class = IdentityConfig
+    elif fusion_model_type == "attention":
+        model_dataclass_config_class = AttentionFusionConfig
 
     fusion_config_kwargs = combined_config["model_config"]
     fusion_model_config = model_dataclass_config_class(**fusion_config_kwargs)

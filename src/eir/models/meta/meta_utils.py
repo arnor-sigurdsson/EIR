@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from eir.models.fusion.fusion import al_fused_features, al_fusion_model_configs
     from eir.models.fusion.fusion_default import al_features
     from eir.models.fusion.fusion_identity import al_identity_features
+    from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
 
 FeatureExtractorOutType = NewType("FeatureExtractorOutType", torch.Tensor)
 
@@ -40,6 +41,7 @@ class FusionModuleProtocol(Protocol):
         model_config: "al_fusion_model_configs",
         fusion_in_dim: int,
         fusion_callable: Union["al_features", "al_identity_features"],
+        feature_dimensions_and_types: dict[str, "FeatureExtractorInfo"] | None = None,
     ) -> None: ...
 
     @property
