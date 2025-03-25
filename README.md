@@ -113,13 +113,13 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
 
 | Modality   | Input | Output |
 |------------|:-----:|:------:|
-| Genotype   | x     | †      |
-| Tabular    | x     | x      |
-| Sequence   | x     | x      |
-| Image      | x     | x      |
-| Array      | x     | x      |
-| Binary     | x     |        |
-| Survival   | n/a   | x      |
+| Genotype   | ✓     | †      |
+| Tabular    | ✓     | ✓      |
+| Sequence   | ✓     | ✓      |
+| Image      | ✓     | ✓      |
+| Array      | ✓     | ✓      |
+| Binary     | ✓     |        |
+| Survival   | n/a   | ✓      |
 
 † While not directly supported, genotypes can be treated as arrays. For example see the [MNIST Digit Generation](https://eir.readthedocs.io/en/stable/tutorials/d_array_output/01_autoencoder.html) tutorial.
 
