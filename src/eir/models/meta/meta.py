@@ -1,5 +1,5 @@
 import math
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import torch
 from torch import nn
@@ -14,6 +14,9 @@ from eir.models.meta.meta_utils import (
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
+
+if TYPE_CHECKING:
+    from eir.models.model_setup_modules.meta_setup import al_meta_model
 
 
 class MetaModel(nn.Module):
@@ -78,7 +81,7 @@ def apply_scaled_residual_init(model: MetaModel, base_std: float = 0.02) -> None
             nn.init.normal_(param, mean=0.0, std=scaled_std)
 
 
-def apply_weight_tying(model: MetaModel) -> None:
+def apply_weight_tying(model: "al_meta_model") -> None:
     """
     Apply weight tying between input module embeddings and output module heads.
     Supports both standard and unusual weight layouts.

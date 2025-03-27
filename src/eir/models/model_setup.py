@@ -99,7 +99,6 @@ def get_model(
 
     meta_model = meta_class(**meta_kwargs)
 
-    compiled_model: al_meta_model
     if global_config.m.compile_model:
         logger.info("Compiling model.")
         compile_fn = _capture_compile_kwargs(compile_fn=torch.compile)
