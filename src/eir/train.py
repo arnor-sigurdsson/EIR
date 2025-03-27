@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 import torch.multiprocessing
 
+from eir.models.models_utils import log_model
 from eir.train_utils.accelerator import setup_accelerator
 
 multiprocessing.set_start_method("spawn", force=True)
@@ -14,7 +15,6 @@ multiprocessing.set_start_method("spawn", force=True)
 torch.multiprocessing.set_sharing_strategy("file_system")
 from aislib.misc_utils import ensure_path_exists
 from lightning.fabric import Fabric
-from torch import nn
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler, WeightedRandomSampler
 
@@ -214,7 +214,7 @@ def get_default_experiment(
         model=model,
         device=torch.device(gc.be.device),
     )
-    _log_model(
+    log_model(
         model=model,
         structure_file=run_folder / "model_info.txt",
     )
@@ -380,44 +380,6 @@ def check_dataset_and_batch_size_compatibility(
             f" passed to the prediction module. Future work includes making this "
             f"easier to work with."
         )
-
-
-def _log_model(
-    model: nn.Module,
-    structure_file: Path | None,
-    verbose: bool = False,
-    parameter_file: str | None = None,
-) -> None:
-    no_params = sum(p.numel() for p in model.parameters())
-    no_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-    model_summary = "Starting training with following model specifications:\n"
-    model_summary += f"Total parameters: {format(no_params, ',.0f')}\n"
-    model_summary += f"Trainable parameters: {format(no_trainable_params, ',.0f')}"
-
-    logger.info(model_summary)
-
-    if structure_file:
-        with open(structure_file, "w") as structure_handle:
-            structure_handle.write(str(model))
-
-    layer_summary = ""
-    if verbose:
-        layer_summary = "\nModel layers:\n"
-        for name, param in model.named_parameters():
-            layer_summary += (
-                f"Layer: {name}, "
-                f"Shape: {list(param.size())}, "
-                f"Parameters: {param.numel()}, "
-                f"Trainable: {param.requires_grad}\n"
-            )
-        logger.info(layer_summary)
-
-    if parameter_file:
-        with open(parameter_file, "w") as f:
-            f.write(model_summary)
-            if verbose:
-                f.write(layer_summary)
 
 
 def _log_eir_version_info(outfile: Path) -> None:
