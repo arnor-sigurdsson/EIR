@@ -3,6 +3,7 @@ from pathlib import Path
 import torch
 from torch import nn
 
+import eir.models.models_utils
 from eir import train
 from eir.models.fusion.fusion import al_fused_features
 from eir.models.meta.meta import MetaModel
@@ -103,7 +104,7 @@ def modify_experiment(experiment: train.Experiment) -> train.Experiment:
     my_experiment = train.Experiment(**my_experiment_attributes)
 
     output_folder = my_experiment.configs.global_config.be.output_folder
-    train._log_model(
+    eir.models.models_utils.log_model(
         model=my_model,
         structure_file=Path(output_folder, "model_info.txt"),
     )

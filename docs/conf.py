@@ -14,6 +14,7 @@ html_theme_options = {
     "logo_only": True,
 }
 html_theme = "sphinx_rtd_theme"
+html_static_path = ["source/_static"]
 
 extensions = [
     "sphinx.ext.napoleon",
@@ -25,3 +26,12 @@ copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: 
 copybutton_prompt_is_regexp = True
 
 python_maximum_signature_line_length = 80
+
+
+def setup(app):
+    app.add_css_file("custom.css")
+    return {
+        "version": "0.1",
+        "parallel_read_safe": True,
+        "parallel_write_safe": True,
+    }

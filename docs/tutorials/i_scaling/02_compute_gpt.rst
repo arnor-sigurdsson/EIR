@@ -99,23 +99,32 @@ the model was trained for around 2 hours on two H100 GPUs.
 
 At iteration 500:
 
-.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/figures/auto_generated_iter_500.txt
-    :language: console
-    :caption: Auto-generated sequence at iteration 500
+.. container:: wrapped-output
 
-.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/figures/manual_generated_iter_500.txt
-    :language: console
-    :caption: Manually generated sequence at iteration 500
+    .. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/figures/auto_generated_iter_500.txt
+        :language: console
+        :caption: Auto-generated sequence at iteration 500
+
+
+.. container:: wrapped-output
+
+    .. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/figures/manual_generated_iter_500.txt
+        :language: console
+        :caption: Manually generated sequence at iteration 500
 
 By iteration 52000, we can see improvement:
 
-.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/figures/auto_generated_iter_52000.txt
-    :language: console
-    :caption: Auto-generated sequence at iteration 52000
+.. container:: wrapped-output
 
-.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/figures/manual_generated_iter_52000.txt
-    :language: console
-    :caption: Manually generated sequence at iteration 52000
+    .. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/figures/auto_generated_iter_52000.txt
+        :language: console
+        :caption: Auto-generated sequence at iteration 52000
+
+.. container:: wrapped-output
+
+    .. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/figures/manual_generated_iter_52000.txt
+        :language: console
+        :caption: Manually generated sequence at iteration 52000
 
 Here's the training curve showing our progress:
 
@@ -133,11 +142,151 @@ as a reference for implementing your own:
     :language: python
     :caption: text_streamer.py
 
-F - Conclusion
+
+E - Supervised Fine-Tuning from a Pretrained Model
+--------------------------------------------------
+
+In this section,
+we will explore how to perform supervised fine-tuning (SFT)
+using a pretrained model.
+This approach allows us to leverage the knowledge already
+captured in a pretrained model and adapt it to a new specific task.
+
+For this example,
+we'll use the model we trained in the previous section
+as our pretrained checkpoint and fine-tune it on the Alpaca dataset,
+which contains instruction-following examples.
+
+Training
+""""""""
+
+
+.. note::
+    If you look at the code in the ``text_streamer.py`` file,
+    you might notice that the dataset to use is grabbed from a
+    ``DATASET_NAME`` environment variable. To use the Alpaca dataset,
+    start the server with the following command:
+    ``DATASET_NAME=tatsu-lab/alpaca python text_streamer.py``.
+
+Before starting the fine-tuning process,
+we need to set up our command with the path to the pretrained model:
+
+.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/commands/SFT_FROM_PRETRAINED_EXPERIMENT.txt
+    :language: console
+    :emphasize-lines: 8-9
+
+Note the important parameters in the command above:
+
+- We're specifying a new output folder for our fine-tuned model
+- We're providing the path to our pretrained checkpoint via the ``pretrained_checkpoint`` parameter
+
+This time, our training should be much faster since we're starting from a pretrained model. Let's look at the training curve:
+
+.. image:: ../tutorial_files/i_scaling/02_scaling_compute/figures/sft_pretrained_training_curve_LOSS.png
+    :width: 100%
+    :align: center
+
+Let's examine the output at different stages of training. At iteration 500:
+
+.. container:: wrapped-output
+
+   .. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/figures/sft_pretrained_auto_generated_iter_500.txt
+       :language: console
+       :caption: Auto-generated response at iteration 500
+
+The initial outputs might be somewhat incoherent as the model is still learning the instruction format.
+By iteration 12000, we can see significant improvement:
+
+.. container:: wrapped-output
+
+    .. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/figures/sft_pretrained_auto_generated_iter_12000.txt
+        :language: console
+        :caption: Auto-generated response at iteration 12000
+
+Now the model is starting to generate coherent responses that follow the instruction format, demonstrating the effectiveness of supervised fine-tuning.
+
+F - Deploying the Model
+-----------------------
+
+In this section, we'll demonstrate how to deploy our fine-tuned model as a web service and interact with it using HTTP requests.
+
+Starting the Web Service
+""""""""""""""""""""""""
+
+To serve the model, we use the ``eirserve`` command:
+
+.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/commands/SFT_GENERATION_DEPLOY.txt
+    :language: console
+
+This command initiates a web service that listens for incoming requests on the default port (8000). Note that we're specifying:
+
+- The GPU device for inference
+- The path to our fine-tuned model
+
+Sending Requests
+""""""""""""""""
+
+With the server running, we can now send inference requests to our model. Here are two approaches to interact with the deployed model:
+
+Python Example
+''''''''''''''
+
+Here's a Python function for sending requests to the model:
+
+.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/request_example/python_request_example_module.py
+    :language: python
+    :caption: python_request_example_module.py
+
+When running this code, we get the following response:
+
+.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/request_example/python_request_example.json
+    :language: json
+    :caption: python_request_example.json
+
+.. note::
+    Notice how in the response, we often end up with multiple instruction-answer pairs.
+    This is because how the data is structured for the model in the streaming server,
+    where multiple samples are aggregated together into a single sequence. Optimally,
+    we might want to change this for the SFT part to only feed one sample at a time,
+    or build some trimming functionality into our response handling.
+
+
+Bash Example
+''''''''''''
+
+Alternatively, you can use a simple curl command from bash:
+
+.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/request_example/bash_request_example_module.sh
+    :language: console
+    :caption: bash_request_example_module.sh
+
+This produces a similar response:
+
+.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/request_example/bash_request_example.json
+    :language: json
+    :caption: bash_request_example.json
+
+Analyzing Responses
+"""""""""""""""""""
+
+Let's look at some example responses from our model for various instructions:
+
+.. literalinclude:: ../tutorial_files/i_scaling/02_scaling_compute/serve_results/predictions.json
+    :language: json
+    :caption: predictions.json
+
+As we can see, the model is able to generate appropriate responses for different types of instructions, from generating creative content to providing explanations and advice.
+
+G - Conclusion
 --------------
 
-In this tutorial we explored how to scale up `EIR`
-to train a baby version of the GPT model,
-streaming data from the FineWeb dataset for model training.
+In this tutorial,
+we've explored how to scale up ``EIR`` to
+train a baby version of the GPT model,
+stream data for training,
+and perform supervised fine-tuning using a pretrained checkpoint.
+We've also learned how to
+deploy the model as a web service and
+interact with it using HTTP requests.
 
 Thank you for reading!
