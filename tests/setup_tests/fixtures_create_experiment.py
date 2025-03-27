@@ -7,6 +7,7 @@ import pytest
 from torch import nn
 from torch.utils.data import DataLoader
 
+import eir.models.models_utils
 import eir.train_utils.accelerator
 from eir import train
 from eir.experiment_io.input_object_io import serialize_chosen_input_objects
@@ -123,7 +124,7 @@ def prep_modelling_test_configs(
     )
 
     run_folder = get_run_folder(output_folder=gc.be.output_folder)
-    train._log_model(
+    eir.models.models_utils.log_model(
         model=model,
         structure_file=run_folder / "model_info.txt",
     )
