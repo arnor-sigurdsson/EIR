@@ -1075,15 +1075,15 @@ wheels = [
 
 [[package]]
 name = "hypothesis"
-version = "6.130.4"
+version = "6.130.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "sortedcontainers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/3d/199be3124dac341deb47747354a9e9ae2fa69f644229b5f3d0705a680cfd/hypothesis-6.130.4.tar.gz", hash = "sha256:d0672eb0ac1060b0324b0e43925a50b2bef1c60a32739bb9233000d85838436a", size = 427602 }
+sdist = { url = "https://files.pythonhosted.org/packages/0d/6e/e32a9c896ed621461fc7afcb0e7b61960247c2764d80c341d88ba14f45fa/hypothesis-6.130.5.tar.gz", hash = "sha256:2cdcdd894adc390a688c8a1c08580c345a67ecf73e31d5bb51a7712acf7b747c", size = 428116 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/d4/5a0c46cc8d266626cdc8082f07f836fa4a96e8715002de69be46ed406d1d/hypothesis-6.130.4-py3-none-any.whl", hash = "sha256:cda4a57115d10ecbefe0a9cc8d69d20a13eb56ecbfe7c24eaee5d368c2b7c477", size = 491324 },
+    { url = "https://files.pythonhosted.org/packages/99/84/318648e1a0c40aee9fe2140c0bbd507ecfa691bab16ba854bff479967dfe/hypothesis-6.130.5-py3-none-any.whl", hash = "sha256:c13e42ec7df7fdc45c44d0b39f1e429d2253e19a37041d927e092afa7645bfcf", size = 492048 },
 ]
 
 [[package]]
@@ -3438,14 +3438,14 @@ wheels = [
 
 [[package]]
 name = "types-setuptools"
-version = "76.0.0.20250313"
+version = "77.0.2.20250328"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "setuptools" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/0f/2d1d000c2be3919bcdea15e5da48456bf1e55c18d02c5509ea59dade1408/types_setuptools-76.0.0.20250313.tar.gz", hash = "sha256:b2be66f550f95f3cad2a7d46177b273c7e9c80df7d257fa57addbbcfc8126a9e", size = 43627 }
+sdist = { url = "https://files.pythonhosted.org/packages/60/54/5f3d3f07663f94f87506bece0ef166b8b89ad00fb951d6e4f00795c9be19/types_setuptools-77.0.2.20250328.tar.gz", hash = "sha256:0d4d03c89ef34a4a81e19ee797ed1ea4496ef787524e03b40dcf91ba0328e8f5", size = 43990 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/89/ea9669a0a76b160ffb312d0b02b15bad053c1bc81d2a54e42e3a402ca754/types_setuptools-76.0.0.20250313-py3-none-any.whl", hash = "sha256:bf454b2a49b8cfd7ebcf5844d4dd5fe4c8666782df1e3663c5866fd51a47460e", size = 65845 },
+    { url = "https://files.pythonhosted.org/packages/2c/8f/ef5a20fa17dcbf6bfe59199d2e4d020d95c3dcb6415506080bdc9f566dbd/types_setuptools-77.0.2.20250328-py3-none-any.whl", hash = "sha256:034fb89e346fc8b19be25b73c304b64bd8d7e6a4f7a20d21be38ee67f8ed081d", size = 66995 },
 ]
 
 [[package]]
