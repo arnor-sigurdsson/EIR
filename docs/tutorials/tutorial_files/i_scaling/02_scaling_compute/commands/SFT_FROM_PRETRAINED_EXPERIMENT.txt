@@ -1,0 +1,6 @@
+eirtrain \
+--global_configs eir_tutorials/i_scaling/02_scaling_compute/globals.yaml \
+--fusion_configs eir_tutorials/i_scaling/02_scaling_compute/fusion.yaml \
+--output_configs eir_tutorials/i_scaling/02_scaling_compute/output.yaml \
+--globals.basic_experiment.output_folder=eir_tutorials/tutorial_runs/i_scaling/02_scaling_compute_sft_pretrained/ \
+--globals.model.pretrained_checkpoint=eir_tutorials/tutorial_runs/i_scaling/02_scaling_compute/saved_models/02_scaling_compute_checkpoint_54000_perf-average=-2.1537.pt

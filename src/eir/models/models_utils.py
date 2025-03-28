@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -257,3 +258,42 @@ def get_output_dimensions_for_input(
             type(module).__name__,
         )
         return output_shape
+
+
+def log_model(
+    model: nn.Module,
+    structure_file: Path | None,
+    verbose: bool = False,
+    parameter_file: str | None = None,
+    context: str = "Starting Training",
+) -> None:
+    no_params = sum(p.numel() for p in model.parameters())
+    no_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    model_summary = f"{context} with following model specifications:\n"
+    model_summary += f"Total parameters: {format(no_params, ',.0f')}\n"
+    model_summary += f"Trainable parameters: {format(no_trainable_params, ',.0f')}"
+
+    logger.info(model_summary)
+
+    if structure_file:
+        with open(structure_file, "w") as structure_handle:
+            structure_handle.write(str(model))
+
+    layer_summary = ""
+    if verbose:
+        layer_summary = "\nModel layers:\n"
+        for name, param in model.named_parameters():
+            layer_summary += (
+                f"Layer: {name}, "
+                f"Shape: {list(param.size())}, "
+                f"Parameters: {param.numel()}, "
+                f"Trainable: {param.requires_grad}\n"
+            )
+        logger.info(layer_summary)
+
+    if parameter_file:
+        with open(parameter_file, "w") as f:
+            f.write(model_summary)
+            if verbose:
+                f.write(layer_summary)

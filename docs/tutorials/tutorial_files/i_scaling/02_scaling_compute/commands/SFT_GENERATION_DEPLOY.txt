@@ -1,0 +1,3 @@
+eirserve \
+--device cuda \
+--model-path eir_tutorials/tutorial_runs/i_scaling/02_scaling_compute_sft_pretrained/saved_models/02_scaling_compute_sft_pretrained_checkpoint_19000_perf-average=0.5751.pt

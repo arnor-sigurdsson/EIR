@@ -106,9 +106,14 @@ class ConnectionManager:
 
     def load_dataset(self):
         if self.dataset is None:
+            name = None
+            path = self.dataset_name
+            if path == "HuggingFaceFW/fineweb":
+                name = "sample-10BT"
+
             self.dataset = load_dataset(
-                "HuggingFaceFW/fineweb",
-                name="sample-10BT",
+                path,
+                name=name,
                 split="train",
                 streaming=True,
                 trust_remote_code=True,

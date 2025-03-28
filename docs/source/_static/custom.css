@@ -1,0 +1,7 @@
+.wrapped-output .highlight pre,
+.wrapped-output pre,
+div.wrapped-output div.highlight pre {
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    overflow-x: visible !important;
+}

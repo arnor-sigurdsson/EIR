@@ -11,6 +11,7 @@ from eir.experiment_io.input_object_io_modules.sequence_input_io import (
     load_sequence_input_object,
 )
 from eir.models.input.sequence.transformer_models import TransformerWrapperModel
+from eir.models.meta.meta import apply_weight_tying
 from eir.models.model_setup_modules.meta_setup import (
     MetaClassGetterCallable,
     al_meta_model,
@@ -21,6 +22,7 @@ from eir.models.model_setup_modules.model_io import load_model, strip_orig_mod_p
 from eir.models.model_setup_modules.pretrained_setup import (
     overload_meta_model_feature_extractors_with_pretrained,
 )
+from eir.models.models_utils import log_model
 from eir.setup import schemas
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
@@ -69,8 +71,23 @@ def get_model(
             device=global_config.be.device,
             pretrained_checkpoint=global_config.m.pretrained_checkpoint,
         )
+        apply_weight_tying(model=loaded_meta_model)
+        log_model(model=loaded_meta_model, structure_file=None, context="Loaded model")
 
-        return loaded_meta_model
+        compiled_model: al_meta_model
+        if global_config.m.compile_model:
+            logger.info("Compiling model.")
+            compile_fn = _capture_compile_kwargs(compile_fn=torch.compile)
+            compiled_model = cast(al_meta_model, compile_fn(model=loaded_meta_model))
+            # needed for Fabric to properly capture the compiled kwargs,
+            # otherwise raises an error due to checking for None,
+            # but it does not properly initialize the attribute
+            # in some cases (e.g. when there are no args passed to the compile function)
+            compiled_model._compile_kwargs = {}  # type: ignore
+        else:
+            compiled_model = loaded_meta_model
+
+        return compiled_model
 
     input_modules = overload_meta_model_feature_extractors_with_pretrained(
         input_modules=meta_kwargs["input_modules"],
@@ -82,7 +99,6 @@ def get_model(
 
     meta_model = meta_class(**meta_kwargs)
 
-    compiled_model: al_meta_model
     if global_config.m.compile_model:
         logger.info("Compiling model.")
         compile_fn = _capture_compile_kwargs(compile_fn=torch.compile)
