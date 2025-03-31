@@ -712,6 +712,16 @@ class SequenceInputDataConfig:
         therefore useful if (a) you want to manually specify / limit the vocabulary used
         and/or (b) you want to save time by pre-computing the vocabulary.
 
+        Here, there are two formats supported:
+
+        - A ``.json`` file containing a dictionary with the vocabulary as keys and
+         the corresponding token IDs as values. For example:
+         ``{"the": 0, "cat": 1, "sat": 2, "on": 3, "the": 4, "mat": 5}``
+
+        - A ``.json`` file with the results of training and saving the vocabulary of
+         a Huggingface BPE tokenizer. This is the file create by calling
+         ``hf_tokenizer.save()``. This is only valid when using the ``bpe`` tokenizer.
+
     :param max_length:
         Maximum length to truncate/pad sequences to. This can be an integer or the
         values 'max' or 'average'. The 'max' keyword will use the maximum sequence

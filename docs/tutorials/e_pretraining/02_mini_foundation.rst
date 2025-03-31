@@ -74,6 +74,22 @@ The global configuration establishes the foundational settings for training:
     :language: yaml
     :caption: inputs_sequence.yaml
 
+.. note::
+   The ``vocab_file`` parameter allows you to provide a pre-defined vocabulary for training.
+   This is optional - if not provided, the framework will automatically generate a vocabulary
+   from your training data. Using a custom vocabulary file can be beneficial in two main cases:
+
+   1. When you want to manually specify or limit the vocabulary used in your model
+   2. When you want to improve efficiency by pre-computing the vocabulary rather than
+      generating it during training
+
+   The file can be provided in one of two JSON formats:
+
+   - A simple dictionary mapping tokens to their IDs (e.g., ``{"the": 0, "cat": 1, "sat": 2}``)
+   - A saved Hugging Face BPE tokenizer vocabulary file (created via ``hf_tokenizer.save()``) -
+     this option is only compatible with the ``bpe`` tokenizer type
+
+
 .. literalinclude:: ../tutorial_files/e_pretraining/02_mini_foundation/inputs_image_array_cnn.yaml
     :language: yaml
     :caption: inputs_image_array_cnn.yaml
