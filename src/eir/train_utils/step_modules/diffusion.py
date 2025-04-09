@@ -15,6 +15,22 @@ class DiffusionConfig:
     sqrt_recip_alphas: torch.Tensor
     posterior_variance: torch.Tensor
 
+    device_pinned: bool = False
+
+    def to_device(self, device: str) -> None:
+        if self.device_pinned:
+            return
+
+        self.betas = self.betas.to(device)
+        self.sqrt_alphas_cumprod = self.sqrt_alphas_cumprod.to(device)
+        self.sqrt_one_minus_alphas_cumprod = self.sqrt_one_minus_alphas_cumprod.to(
+            device
+        )
+        self.sqrt_recip_alphas = self.sqrt_recip_alphas.to(device)
+        self.posterior_variance = self.posterior_variance.to(device)
+
+        self.device_pinned = True
+
 
 def initialize_diffusion_config(time_steps: int) -> DiffusionConfig:
     beta_start = 0.0001
@@ -122,6 +138,8 @@ def p_sample_loop(
 
     batch_size = output_shape[0]
 
+    config.to_device(device=device)
+
     for i in reversed(range(0, time_steps)):
         t = torch.full(
             size=(batch_size,),
@@ -155,10 +173,6 @@ def p_sample(
     t_index: int,
     device: str,
 ) -> torch.Tensor:
-    """
-    TODO: Move all config tensors to device beforehand.
-    """
-
     current_state = batch_inputs[output_name].to(device)
     t = t.to(device)
 
@@ -167,17 +181,17 @@ def p_sample(
     batch_inputs[f"__extras_{output_name}"] = t_emb
 
     betas_t = extract(
-        a=config.betas.to(device),
+        a=config.betas,
         t=t,
         x_shape=current_state.shape,
     )
     sqrt_one_minus_alphas_cumprod_t = extract(
-        a=config.sqrt_one_minus_alphas_cumprod.to(device),
+        a=config.sqrt_one_minus_alphas_cumprod,
         t=t,
         x_shape=current_state.shape,
     )
     sqrt_recip_alphas_t = extract(
-        a=config.sqrt_recip_alphas.to(device),
+        a=config.sqrt_recip_alphas,
         t=t,
         x_shape=current_state.shape,
     )
@@ -194,7 +208,7 @@ def p_sample(
         return model_mean
 
     posterior_variance_t = extract(
-        a=config.posterior_variance.to(device),
+        a=config.posterior_variance,
         t=t,
         x_shape=current_state.shape,
     )
