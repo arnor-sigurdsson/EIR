@@ -174,12 +174,6 @@ class CrossAttentionFusionLayer(nn.Module):
         self.n_heads = adjust_num_heads(num_heads=8, embedding_dim=self.embedding_dim)
 
         self.norm_1 = nn.RMSNorm(self.embedding_dim)
-        self.act_1 = SwiGLU(
-            in_features=self.embedding_dim,
-            hidden_features=self.embedding_dim,
-            out_features=self.embedding_dim,
-            bias=False,
-        )
 
         self.cross_attention = CrossAttention(
             dim=self.embedding_dim,
@@ -188,7 +182,17 @@ class CrossAttentionFusionLayer(nn.Module):
             heads=self.n_heads,
         )
 
-        self.ls = LayerScale(dim=1, init_values=1e-5)
+        self.act_1 = SwiGLU(
+            in_features=self.embedding_dim,
+            hidden_features=self.embedding_dim,
+            out_features=self.embedding_dim,
+            bias=False,
+        )
+
+        self.ls = LayerScale(
+            dim=self.embedding_dim,
+            init_values=1e-05,
+        )
 
     def forward(
         self,
