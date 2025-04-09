@@ -160,6 +160,11 @@ def get_test_external_sequence_models_parametrization() -> Sequence[dict]:
     for model in all_models:
         if any(i for i in {"big_bird", "bigbird", "gpt_neo", "reformer"} if i in model):
             continue
+
+        # skip these large models for now
+        if any(i for i in {"llama"} if i in model):
+            continue
+
         all_models_filtered.append(model)
 
     all_parameterizations = []
