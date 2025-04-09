@@ -300,7 +300,7 @@ def get_all_feature_extractor_dimensions_and_types(
     for input_name, input_object in inputs_as_dict.items():
         cur_output_shape = output_shapes.get(input_name)
 
-        extras = {}
+        extras: dict[str, Any] = {}
         match input_object:
             case ComputedArrayInputInfo() | ComputedImageInputInfo():
                 cur_config = input_object.input_config.model_config

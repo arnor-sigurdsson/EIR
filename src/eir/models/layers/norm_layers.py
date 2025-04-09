@@ -26,6 +26,7 @@ class LayerScale(nn.Module):
         self.init_values = init_values
         self.n_dims = n_dims
 
+        gamma_shape: tuple[int, ...]
         if n_dims is None:
             gamma_shape = (dim,)
         elif n_dims == 4:
