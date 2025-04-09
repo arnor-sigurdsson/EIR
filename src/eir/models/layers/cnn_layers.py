@@ -14,43 +14,6 @@ from eir.utils.logging import get_logger
 logger = get_logger(name=__name__)
 
 
-class SEBlock(nn.Module):
-    def __init__(self, channels: int, reduction: int):
-        super().__init__()
-        reduced_channels = max(1, channels // reduction)
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-
-        self.conv_down = nn.Conv2d(
-            in_channels=channels,
-            out_channels=reduced_channels,
-            kernel_size=1,
-            padding=0,
-            bias=False,
-        )
-        self.act_1 = nn.GELU()
-
-        self.conv_up = nn.Conv2d(
-            in_channels=reduced_channels,
-            out_channels=channels,
-            kernel_size=1,
-            padding=0,
-            bias=False,
-        )
-
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        out = self.avg_pool(x)
-
-        out = self.conv_down(out)
-        out = self.act_1(out)
-
-        out = self.conv_up(out)
-        out = self.sigmoid(out)
-
-        return out
-
-
 def get_eca_kernel_size(
     channels: int,
     gamma: int = 2,
