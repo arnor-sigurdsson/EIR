@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from einops import rearrange
 from torch import Tensor, nn
 
-from eir.models.layers.norm_layers import RMSNorm
+from eir.models.layers.norm_layers import LayerScale, RMSNorm
 
 
 class LinearAttention(nn.Module):
@@ -139,6 +139,9 @@ class TransformerBlock(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
+        self.ls1 = LayerScale(dim=d_model, init_values=1e-05)
+        self.ls2 = LayerScale(dim=d_model, init_values=1e-05)
+
         self.rope_freqs: torch.Tensor
         self._init_rope()
 
@@ -199,11 +202,11 @@ class TransformerBlock(nn.Module):
 
     def forward(self, x: Tensor, attn_mask: Tensor | None = None) -> Tensor:
         if self.norm_first:
-            x = x + self._attention(self.norm1(x), attn_mask)
-            x = x + self.ffn(self.norm2(x))
+            x = x + self.ls1(self._attention(self.norm1(x), attn_mask))
+            x = x + self.ls2(self.ffn(self.norm2(x)))
         else:
-            x = self.norm1(x + self._attention(x, attn_mask))
-            x = self.norm2(x + self.ffn(x))
+            x = self.norm1(x + self.ls1(self._attention(x, attn_mask)))
+            x = self.norm2(x + self.ls2(self.ffn(x)))
         return x
 
 
