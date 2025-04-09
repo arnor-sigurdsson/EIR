@@ -134,6 +134,10 @@ class StreamingDataset(IterableDataset):
 
         while consecutive_timeouts < self.max_consecutive_timeouts:
             try:
+                if self.ws.sock is None:
+                    logger.warning("Connection appears to be closed. Reconnecting...")
+                    self._reconnect()
+
                 self.ws.send(json.dumps({"type": "heartbeat"}))
 
                 self.ws.send(
@@ -191,20 +195,29 @@ class StreamingDataset(IterableDataset):
                     f"Timeout waiting for next batch. "
                     f"Consecutive timeouts: {consecutive_timeouts}"
                 )
+            except ConnectionResetError as e:
+                logger.warning(
+                    f"Connection reset by peer ({str(e)}). Attempting to reconnect."
+                )
+                self._reconnect()
+                time.sleep(0.5)
             except websocket.WebSocketConnectionClosedException:
                 logger.warning("WebSocket connection closed. Attempting to reconnect.")
-                self._reconnect()
+                time.sleep(0.5)
             except OSError as e:
                 if e.errno == 32:
-                    logger.warning("Broken pipe detected. Attempting to reconnect.")
+                    logger.warning(
+                        f"Broken pipe detected ({str(e)}). Attempting to reconnect."
+                    )
                     self._reconnect()
+                    time.sleep(0.5)
                 else:
-                    logger.error(f"Unexpected OSError: {e}")
+                    logger.error(f"Unexpected OSError: {e}", exc_info=True)
                     raise
             except StopIteration:
                 raise
             except Exception as e:
-                logger.error(f"Error fetching batch: {e}")
+                logger.error(f"Error fetching batch: {e}", exc_info=True)
                 raise
 
         logger.error(

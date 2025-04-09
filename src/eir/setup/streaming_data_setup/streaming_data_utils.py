@@ -107,6 +107,12 @@ def receive_with_timeout(websocket_: websocket.WebSocket, timeout: int = 30):
     except json.JSONDecodeError:
         logger.error("Received message was not valid JSON")
         return None
+    except UnicodeDecodeError:
+        logger.error("Received message was not valid UTF-8")
+        return None
+    except Exception as e:
+        logger.error(f"Error receiving message: {str(e)}")
+        return None
 
 
 def handle_server_message(message: dict):
