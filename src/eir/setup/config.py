@@ -203,7 +203,8 @@ def generate_aggregated_config(
     strict: bool = True,
 ) -> Configs:
     global_config_iter = get_yaml_iterator_with_injections(
-        yaml_config_files=cl_args.global_configs, extra_cl_args=extra_cl_args_overload
+        yaml_config_files=cl_args.global_configs,
+        extra_cl_args=extra_cl_args_overload,
     )
     global_config = get_global_config(global_configs=global_config_iter)
 

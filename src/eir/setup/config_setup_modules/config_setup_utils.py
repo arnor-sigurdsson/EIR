@@ -18,11 +18,16 @@ logger = get_logger(name=__name__)
 
 
 def get_yaml_iterator_with_injections(
-    yaml_config_files: Iterable[str], extra_cl_args: list[str] | None
+    yaml_config_files: Iterable[str],
+    extra_cl_args: list[str] | None,
 ) -> Generator[dict]:
     if not extra_cl_args:
         yield from get_yaml_to_dict_iterator(yaml_config_files=yaml_config_files)
         return
+
+    all_file_names = {
+        Path(yaml_config_file).stem for yaml_config_file in yaml_config_files
+    }
 
     for yaml_config_file in yaml_config_files:
         loaded_yaml = load_yaml_config(config_path=yaml_config_file)
@@ -34,12 +39,20 @@ def get_yaml_iterator_with_injections(
             )
             target_file, str_to_inject = extra_arg_parsed.split(".", 1)
 
+            if target_file not in all_file_names:
+                raise ValueError(
+                    f"Attempting to inject {str_to_inject} into {target_file}, "
+                    f"but {target_file} is not in the provided yaml files."
+                    f"Please check the provided yaml files and the extra arguments."
+                )
+
             if target_file == yaml_file_path_object.stem:
                 dict_to_inject = convert_cl_str_to_dict(str_=str_to_inject)
 
                 logger.debug("Injecting %s into %s", dict_to_inject, loaded_yaml)
                 loaded_yaml = recursive_dict_inject(
-                    dict_=loaded_yaml, dict_to_inject=dict_to_inject
+                    dict_=loaded_yaml,
+                    dict_to_inject=dict_to_inject,
                 )
 
         yield loaded_yaml
