@@ -310,6 +310,7 @@ def get_all_feature_extractor_dimensions_and_types(
                 mic = cur_config.model_init_config
                 if isinstance(mic, CNNModelConfig):
                     extras["down_every_n_blocks"] = mic.down_sample_every_n_blocks
+                    extras["layers"] = mic.layers
 
         input_dimensionality_and_types[input_name] = FeatureExtractorInfo(
             input_dimension=in_features_per_input[input_name],

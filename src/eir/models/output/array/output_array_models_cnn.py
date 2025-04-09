@@ -12,7 +12,7 @@ from eir.models.layers.cnn_layers import (
     StochasticDepth,
     UpSamplingResidualBlock,
 )
-from eir.models.layers.norm_layers import GRN
+from eir.models.layers.norm_layers import GRN, LayerScale
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -92,11 +92,15 @@ class CNNUpscaleResidualBlock(nn.Module):
 
         self.stochastic_depth_p = stochastic_depth_p
 
+        output_padding_h = stride[0] - 1 if stride[0] > 1 else 0
+        output_padding_w = stride[1] - 1 if stride[1] > 1 else 0
+        self.output_padding = (output_padding_h, output_padding_w)
+
         self.conv_ds = nn.ConvTranspose2d(
             in_channels=in_channels,
             out_channels=in_channels,
             kernel_size=3,
-            stride=stride,
+            stride=1,
             padding=1,
             bias=False,
             groups=in_channels,
@@ -110,6 +114,7 @@ class CNNUpscaleResidualBlock(nn.Module):
             kernel_size=3,
             stride=stride,
             padding=1,
+            output_padding=self.output_padding,
             bias=False,
         )
 
@@ -135,6 +140,7 @@ class CNNUpscaleResidualBlock(nn.Module):
                 kernel_size=3,
                 stride=stride,
                 padding=1,
+                output_padding=self.output_padding,
                 bias=False,
             )
 
@@ -145,6 +151,12 @@ class CNNUpscaleResidualBlock(nn.Module):
 
         self.eca_block = ECABlock(
             channels=out_channels,
+        )
+
+        self.ls = LayerScale(
+            dim=out_channels,
+            init_values=1e-5,
+            n_dims=4,
         )
 
     def forward(self, x: Any) -> Any:
@@ -161,10 +173,11 @@ class CNNUpscaleResidualBlock(nn.Module):
         out = self.rb_do(out)
         out = self.conv_2(out)
 
-        channel_recalibrations = self.eca_block(out)
-        out = out * channel_recalibrations
+        out = self.eca_block(out)
 
         out = self.stochastic_depth(out)
+
+        out = self.ls(out)
 
         out = out + identity
 
@@ -192,13 +205,27 @@ def setup_blocks(
     attention_inclusion_cutoff: int,
     up_sample_every_n_blocks: int,
     n_final_extra_blocks: int,
+    dropout: float,
     allow_pooling: bool = True,
+    layers: list[int] | None = None,
 ) -> tuple[nn.Sequential, int, int, int]:
     blocks = nn.Sequential()
     current_height = initial_height
     current_width = initial_width
-    reduce_counter = 0
     block_counter = 0
+
+    if layers is None:
+        layers = [2, 2, 2, 2]
+
+    channel_dims = []
+    current_channels = out_channels
+    for _ in range(len(layers)):
+        channel_dims.append(current_channels)
+        current_channels = max(current_channels // 2, 1)
+
+    current_channels = in_channels
+    layer_group_idx = 0
+    blocks_in_current_group = 0
 
     if _do_add_attention(
         width=current_width,
@@ -206,9 +233,10 @@ def setup_blocks(
         attention_inclusion_cutoff=attention_inclusion_cutoff,
     ):
         cur_attention_block = ConvAttentionBlock(
-            channels=in_channels,
+            channels=current_channels,
             width=current_width,
             height=current_height,
+            dropout_p=dropout,
         )
         blocks.add_module(
             name=f"block_{len(blocks)}",
@@ -216,28 +244,31 @@ def setup_blocks(
         )
 
     while current_height < target_height or current_width < target_width:
-        stride_height = 1
-        stride_width = 1
-
-        stride = (stride_height, stride_width)
-
-        block_counter += 1
-        if block_counter % 2 == 0 and reduce_counter < 4:
-            out_channels = max(out_channels // 2, 1)
-            reduce_counter += 1
+        target_channels = channel_dims[layer_group_idx]
 
         blocks.add_module(
             name=f"block_{len(blocks)}",
             module=CNNUpscaleResidualBlock(
-                in_channels=in_channels,
+                in_channels=current_channels,
                 in_height=current_height,
                 in_width=current_width,
-                out_channels=out_channels,
-                stride=stride,
+                out_channels=target_channels,
+                rb_do=dropout,
+                stride=(1, 1),
             ),
         )
 
-        in_channels = out_channels
+        current_channels = target_channels
+        blocks_in_current_group += 1
+        block_counter += 1
+
+        finished_current_group = blocks_in_current_group >= layers[layer_group_idx]
+        not_out_of_bounds = layer_group_idx < len(layers) - 1
+        should_increment_block_idx = finished_current_group and not_out_of_bounds
+
+        if should_increment_block_idx:
+            layer_group_idx += 1
+            blocks_in_current_group = 0
 
         up_every = up_sample_every_n_blocks
         if up_every and block_counter % up_every == 0:
@@ -245,7 +276,7 @@ def setup_blocks(
             do_width = current_width < target_width
 
             up_sampling_block = UpSamplingResidualBlock(
-                in_channels=in_channels,
+                in_channels=current_channels,
                 in_height=current_height,
                 in_width=current_width,
                 upsample_height=do_height,
@@ -265,9 +296,10 @@ def setup_blocks(
             attention_inclusion_cutoff=attention_inclusion_cutoff,
         ):
             cur_attention_block = ConvAttentionBlock(
-                channels=out_channels,
+                channels=current_channels,
                 width=current_width,
                 height=current_height,
+                dropout_p=dropout,
             )
             blocks.add_module(
                 name=f"block_{len(blocks)}",
@@ -278,14 +310,14 @@ def setup_blocks(
         blocks.add_module(
             name=f"block_{len(blocks)}",
             module=CNNUpscaleResidualBlock(
-                in_channels=in_channels,
+                in_channels=current_channels,
                 in_height=current_height,
                 in_width=current_width,
-                out_channels=out_channels,
+                out_channels=current_channels,
                 stride=(1, 1),
+                rb_do=dropout,
             ),
         )
-        in_channels = out_channels
 
     not_matching = current_height != target_height or current_width != target_width
     if allow_pooling and not_matching:
@@ -298,7 +330,7 @@ def setup_blocks(
         current_height = target_height
         current_width = target_width
 
-    return blocks, in_channels, current_height, current_width
+    return blocks, current_channels, current_height, current_width
 
 
 class CNNUpscaleModel(nn.Module):
@@ -368,6 +400,7 @@ class CNNUpscaleModel(nn.Module):
             out_channels=2**self.model_config.channel_exp_base,
             allow_pooling=self.model_config.allow_pooling,
             attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
+            dropout=self.model_config.rb_do,
             up_sample_every_n_blocks=up_every_n_blocks,
             n_final_extra_blocks=model_config.n_final_extra_blocks,
         )
@@ -413,7 +446,8 @@ class CNNPassThroughUpscaleModel(nn.Module):
                 f"When using CNNPassThroughUpscaleModel, the output_name "
                 f"'{output_name}' must be included as an input module, as the "
                 f"passthrough model is intended to be linked with a feature "
-                f"extractor."
+                f"extractor. Alternatively, if you are using a 'pass-through' fusion"
+                f"module, please change it to another type."
             )
 
         cur_fei = feature_extractor_infos[output_name]
@@ -485,6 +519,8 @@ class CNNPassThroughUpscaleModel(nn.Module):
             attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
             up_sample_every_n_blocks=up_every_n_blocks,
             n_final_extra_blocks=model_config.n_final_extra_blocks,
+            dropout=self.model_config.rb_do,
+            layers=cur_fei.extras.get("layers", None),
         )
 
         self.final_layer = nn.Sequential(
