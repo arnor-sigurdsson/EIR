@@ -345,9 +345,9 @@ class CNNResidualBlock(CNNResidualBlockBase):
 
         out = self.eca_block(out)
 
-        out = self.stochastic_depth(out)
-
         out = self.ls(out)
+
+        out = self.stochastic_depth(out)
 
         out = out + identity
 
