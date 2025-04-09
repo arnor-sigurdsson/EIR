@@ -134,7 +134,11 @@ class ConcatenationFusionLayer(nn.Module):
         self.norm = nn.GroupNorm(1, self.out_channels)
         self.act = nn.GELU()
 
-        self.ls = LayerScale(dim=1, init_values=1e-05)
+        self.ls = LayerScale(
+            dim=self.out_channels,
+            init_values=1e-05,
+            n_dims=4,
+        )
 
     def forward(
         self,
