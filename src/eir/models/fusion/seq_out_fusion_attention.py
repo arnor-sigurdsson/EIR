@@ -189,7 +189,10 @@ class SequenceResidualCrossAttention(nn.Module):
             apply_causal_mask=apply_causal_mask,
         )
 
-        self.ls = LayerScale(dim=1, init_values=1e-5)
+        self.ls = LayerScale(
+            dim=target_embedding_dim,
+            init_values=1e-05,
+        )
 
     def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         context = self.reshape_func(context)
