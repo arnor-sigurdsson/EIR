@@ -56,6 +56,7 @@ class TensorMessageConfig:
         - ``grouped_linear``: Grouped linear layer (each dimension is projected
           separately with a learnable linear layer).
         - ``interpolate``: Interpolates the tensor to the target size.
+        - ``sequence``: Project to a 2D sequence to be e.g. used with cross-attention.
 
         If the tensor is already of the target size, no projection is performed.
     """

@@ -82,8 +82,9 @@ class SequenceProjectionLayer(nn.Module):
         # for e.g. cross-attention fusion, it is for example if we
         # are doing e.g. a gated sum, so we keep this sequence length
         # projection here for that case.
-        if self.target_seq_len is not None:
-            if n_input_dims == 2:
+        # Note: We don't do this if we already have a 2D shape
+        if self.target_seq_len is not None and n_input_dims != 2:
+            if n_input_dims == 1:
                 linear_layer = nn.Linear(
                     in_features=1,
                     out_features=self.target_seq_len,
