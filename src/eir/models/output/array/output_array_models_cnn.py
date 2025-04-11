@@ -606,6 +606,12 @@ class TimeStepMixingBlock(nn.Module):
 
         self.grn = GRN(in_channels=input_channels)
 
+        self.ls = LayerScale(
+            dim=input_channels,
+            init_values=1e-5,
+            n_dims=4,
+        )
+
     def forward(self, input: torch.Tensor, t_emb: torch.Tensor) -> torch.Tensor:
         identity = input
 
@@ -633,6 +639,8 @@ class TimeStepMixingBlock(nn.Module):
         )
 
         out = self.grn(out)
+
+        out = self.ls(out)
 
         return out + identity
 
@@ -699,6 +707,12 @@ class CrossAttentionArrayOutBlock(nn.Module):
 
         self.grn = GRN(in_channels=input_channels)
 
+        self.ls = LayerScale(
+            dim=input_channels,
+            init_values=1e-5,
+            n_dims=4,
+        )
+
     def forward(self, input: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         identity = input
 
@@ -731,5 +745,7 @@ class CrossAttentionArrayOutBlock(nn.Module):
 
         out = self.conv_1(out)
         out = self.grn(out)
+
+        out = self.ls(out)
 
         return out + identity
