@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import torch
+from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from torch import nn
 from torch.nn import functional as F
 
@@ -32,13 +33,22 @@ class DiffusionConfig:
         self.device_pinned = True
 
 
-def initialize_diffusion_config(time_steps: int) -> DiffusionConfig:
-    beta_start = 0.0001
-    beta_end = 0.02
-    betas = torch.linspace(beta_start, beta_end, time_steps)
+def initialize_diffusion_config(time_steps: int, beta_schedule: str) -> DiffusionConfig:
+    """
+    Note that DDPMScheduler, DDIM, and other schedulers are all using the
+    same core function to compute the actual betas, hence does not matter
+    which one we use here to initialize the betas and other parameters.
+    """
 
+    scheduler = DDPMScheduler(
+        num_train_timesteps=time_steps,
+        beta_schedule=beta_schedule,
+        prediction_type="epsilon",
+    )
+
+    betas = scheduler.betas
     alphas = 1.0 - betas
-    alphas_cumprod = torch.cumprod(alphas, dim=0)
+    alphas_cumprod = scheduler.alphas_cumprod
     alphas_cumprod_prev = F.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
 
     sqrt_recip_alphas = torch.sqrt(1.0 / alphas)
