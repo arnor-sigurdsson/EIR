@@ -103,16 +103,11 @@ class ConvAttentionBlock(nn.Module):
 
         self.dropout = nn.Dropout(dropout_p)
 
-        self.ls = LayerScale(
-            dim=channels,
-            init_values=1e-5,
-            n_dims=4,
-        )
+        self.ls1 = LayerScale(dim=self.embedding_dim, init_values=1e-5)
+        self.ls2 = LayerScale(dim=self.embedding_dim, init_values=1e-5)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_size, channels, height, width = x.size()
-
-        identity = x
 
         if self.attention_mode == "spatial":
             # [B, C, H, W] -> [B, H*W, C]
@@ -123,6 +118,7 @@ class ConvAttentionBlock(nn.Module):
         else:
             raise ValueError(f"Unsupported attention mode: {self.attention_mode}")
 
+        # First branch (norm -> attention -> LS)
         residual = out
         out = self.norm1(out)
 
@@ -149,20 +145,25 @@ class ConvAttentionBlock(nn.Module):
         )
         attn_output = self.dropout(self.out_proj(attn_output))
 
+        attn_output = self.ls1(attn_output)
+
         out = residual + attn_output
 
+        # Second residual path (norm -> ffn -> LS)
         residual = out
         out = self.norm2(out)
-        out = residual + self.dropout(self.ffn(out))
+        ffn_output = self.dropout(self.ffn(out))
+
+        ffn_output = self.ls2(ffn_output)
+
+        out = residual + ffn_output
 
         if self.attention_mode == "spatial":
             out = rearrange(out, "b (h w) c -> b c h w", h=height, w=width)
         elif self.attention_mode == "channel":
             out = rearrange(out, "b c (h w) -> b c h w", h=height, w=width)
 
-        out = self.ls(out)
-
-        return identity + out
+        return out
 
 
 def adjust_num_heads(num_heads: int, embedding_dim: int) -> int:
