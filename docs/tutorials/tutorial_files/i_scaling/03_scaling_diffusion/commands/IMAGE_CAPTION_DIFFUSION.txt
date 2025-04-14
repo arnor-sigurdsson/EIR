@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/i_scaling/03_scaling_diffusion/conf/globals.yaml \
+--input_configs eir_tutorials/i_scaling/03_scaling_diffusion/conf/inputs_image_cnn.yaml eir_tutorials/i_scaling/03_scaling_diffusion/conf/inputs_caption.yaml \
+--fusion_configs eir_tutorials/i_scaling/03_scaling_diffusion/conf/fusion.yaml \
+--output_configs eir_tutorials/i_scaling/03_scaling_diffusion/conf/output_image.yaml

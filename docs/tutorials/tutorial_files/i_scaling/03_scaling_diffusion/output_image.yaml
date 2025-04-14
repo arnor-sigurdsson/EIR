@@ -1,0 +1,83 @@
+output_info:
+  output_source: ws://localhost:8000/ws
+  output_name: image
+  output_type: image
+
+output_type_info:
+  adaptive_normalization_max_samples: 10000
+  mode: "RGB"
+  size:
+    - 128
+    - 128
+  loss: "diffusion"
+  diffusion_time_steps: 1000
+  diffusion_beta_schedule: "squaredcos_cap_v2"
+
+
+sampling_config:
+  diffusion_inference_steps: 200
+  diffusion_sampler: "ddim"
+  diffusion_eta: 0.2
+
+model_config:
+  model_type: cnn
+  model_init_config:
+    channel_exp_base: 9
+    allow_pooling: true
+    attention_inclusion_cutoff: 256
+    stochastic_depth_p: 0.1
+    rb_do: 0.1
+    n_final_extra_blocks: 2
+
+tensor_broker_config:
+  message_configs:
+    - name: bottleneck_connect
+      layer_path: output_modules.image.feature_extractor.blocks.block_0
+      use_from_cache:
+        - bottleneck  # [H/16, W/16]
+
+    - name: deep_connect
+      layer_path: output_modules.image.feature_extractor.blocks.block_5
+      use_from_cache:
+        - res_block_11  # [H/8, W/8]
+
+    - name: mid_deep_connect
+      layer_path: output_modules.image.feature_extractor.blocks.block_10
+      use_from_cache:
+        - res_block_8  # [H/4, W/4]
+
+    - name: mid_connect
+      layer_path: output_modules.image.feature_extractor.blocks.block_13
+      use_from_cache:
+        - res_block_5  # [H/2, W/2]
+
+    - name: shallow_connect
+      layer_path: output_modules.image.feature_extractor.blocks.block_16
+      use_from_cache:
+        - res_block_2  # [H, W]
+
+    - name: input_connect
+      layer_path: output_modules.image.feature_extractor.blocks.block_17
+      use_from_cache:
+        - input_conv  # [H, W]
+
+    - name: caption_to_deep
+      layer_path: output_modules.image.feature_extractor.blocks.block_3
+      use_from_cache:
+        - caption_fine_details
+      cache_fusion_type: "cross-attention"
+      projection_type: "sequence"
+
+    - name: caption_to_mid
+      layer_path: output_modules.image.feature_extractor.blocks.block_8
+      use_from_cache:
+        - caption_mid_features
+      cache_fusion_type: "cross-attention"
+      projection_type: "sequence"
+
+    - name: caption_to_global
+      layer_path: output_modules.image.feature_extractor.blocks.block_17
+      use_from_cache:
+        - caption_global
+      cache_fusion_type: "cross-attention"
+      projection_type: "sequence"

@@ -1,0 +1,62 @@
+input_info:
+  input_source: ws://localhost:8000/ws
+  input_name: image
+  input_type: image
+
+input_type_info:
+  adaptive_normalization_max_samples: 10000
+  auto_augment: false
+  mode: "RGB"
+  size:
+    - 128
+    - 128
+
+model_config:
+  model_type: cnn
+  model_init_config:
+    channel_exp_base: 6
+    kernel_width: 3
+    down_stride_width: 1
+    first_stride_expansion_width: 1
+    first_kernel_expansion_width: 1.7
+    kernel_height: 3
+    down_stride_height: 1
+    first_stride_expansion_height: 1
+    first_kernel_expansion_height: 1.7
+    allow_first_conv_size_reduction: false
+    attention_inclusion_cutoff: 256
+    down_sample_every_n_blocks: 2
+    layers:
+      - 2
+      - 2
+      - 2
+      - 2
+    stochastic_depth_p: 0.1
+    rb_do: 0.1
+
+tensor_broker_config:
+  message_configs:
+    - name: input_conv
+      layer_path: input_modules.image.feature_extractor.conv.0.conv_1
+      cache_tensor: true
+      layer_cache_target: "input"
+    - name: res_block_2
+      layer_path: input_modules.image.feature_extractor.conv.2
+      cache_tensor: true
+      layer_cache_target: "output"
+    - name: res_block_5
+      layer_path: input_modules.image.feature_extractor.conv.5
+      cache_tensor: true
+      layer_cache_target: "output"
+    - name: res_block_8
+      layer_path: input_modules.image.feature_extractor.conv.8
+      cache_tensor: true
+      layer_cache_target: "output"
+    - name: res_block_11
+      layer_path: input_modules.image.feature_extractor.conv.11
+      cache_tensor: true
+      layer_cache_target: "output"
+    - name: bottleneck
+      layer_path: input_modules.image.feature_extractor.conv.15
+      cache_tensor: true
+      layer_cache_target: "output"

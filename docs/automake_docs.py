@@ -33,7 +33,11 @@ from docs.doc_modules.f_image_outputs import (
 )
 from docs.doc_modules.g_time_series import a_time_series_power, b_time_series_stocks
 from docs.doc_modules.h_survival_analysis import a_flchain, b_flchain_cox
-from docs.doc_modules.i_scaling import a_streaming_data, b_scaling_compute
+from docs.doc_modules.i_scaling import (
+    a_streaming_data,
+    b_scaling_compute,
+    c_scaling_diffusion,
+)
 from docs.doc_modules.serving_experiments import (
     AutoDocServingInfo,
     make_serving_tutorial_data,
@@ -137,10 +141,12 @@ def get_h_survival_analysis_experiments() -> Iterable[AutoDocExperimentInfo]:
 def get_i_scaling_experiments() -> Iterable[AutoDocExperimentInfo]:
     a_experiments = a_streaming_data.get_experiments()
     b_experiments = b_scaling_compute.get_experiments()
+    c_experiments = c_scaling_diffusion.get_experiments()
 
     return chain(
         a_experiments,
         b_experiments,
+        c_experiments,
     )
 
 
