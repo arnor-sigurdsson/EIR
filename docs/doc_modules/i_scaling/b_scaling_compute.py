@@ -63,7 +63,7 @@ def run_with_server(
     logger.info("Server process starting...")
 
     try:
-        time.sleep(20)
+        time.sleep(60)
         subprocess.run(args=command, check=True)
     finally:
         server_process.terminate()
