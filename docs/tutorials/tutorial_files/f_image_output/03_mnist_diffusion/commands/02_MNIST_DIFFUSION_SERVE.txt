@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/f_image_output/03_mnist_diffusion_guided/saved_models/03_mnist_diffusion_guided_checkpoint_8500_perf-average=0.9678.pt
+--model-path eir_tutorials/tutorial_runs/f_image_output/03_mnist_diffusion_guided/saved_models/03_mnist_diffusion_guided_checkpoint_9000_perf-average=0.7076.pt
