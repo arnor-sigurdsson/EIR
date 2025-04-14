@@ -6,8 +6,14 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from eir.setup import schemas
-from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
-from eir.setup.schema_modules.output_schemas_image import ImageOutputTypeConfig
+from eir.setup.schema_modules.output_schemas_array import (
+    ArrayOutputSamplingConfig,
+    ArrayOutputTypeConfig,
+)
+from eir.setup.schema_modules.output_schemas_image import (
+    ImageOutputSamplingConfig,
+    ImageOutputTypeConfig,
+)
 from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 
@@ -106,7 +112,14 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
 
                 if loss == "diffusion":
                     time_steps = output_config.output_type_info.diffusion_time_steps
+                    assert time_steps is not None
+
                     sampling_config = output_config.sampling_config
+                    if sampling_config is None:
+                        continue
+
+                    assert isinstance(sampling_config, ArrayOutputSamplingConfig)
+
                     inference_steps = sampling_config.diffusion_inference_steps
 
                     if inference_steps > time_steps:
@@ -129,7 +142,14 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
 
                 if loss == "diffusion":
                     time_steps = output_config.output_type_info.diffusion_time_steps
+                    assert time_steps is not None
+
                     sampling_config = output_config.sampling_config
+                    if sampling_config is None:
+                        continue
+
+                    assert isinstance(sampling_config, ImageOutputSamplingConfig)
+
                     inference_steps = sampling_config.diffusion_inference_steps
 
                     if inference_steps > time_steps:
