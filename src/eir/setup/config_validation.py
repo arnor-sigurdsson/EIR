@@ -103,6 +103,21 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                         "array model type 'cnn'. Please check the model type for "
                         f"output '{name}'."
                     )
+
+                if loss == "diffusion":
+                    time_steps = output_config.output_type_info.diffusion_time_steps
+                    sampling_config = output_config.sampling_config
+                    inference_steps = sampling_config.diffusion_inference_steps
+
+                    if inference_steps > time_steps:
+                        raise ValueError(
+                            "Diffusion loss requires setting the number of "
+                            "inference steps to be less than or equal to the "
+                            "number of diffusion time steps. Please check the "
+                            f"output '{name}'. Got inference_steps={inference_steps} "
+                            f"and diffusion_time_steps={time_steps}."
+                        )
+
             case ImageOutputTypeConfig(_, _, loss, _):
                 model_type = output_config.model_config.model_type
                 if loss == "diffusion" and model_type not in ("cnn",):
@@ -111,6 +126,21 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                         "image model type 'cnn'. Please check the model type for "
                         f"output '{name}'."
                     )
+
+                if loss == "diffusion":
+                    time_steps = output_config.output_type_info.diffusion_time_steps
+                    sampling_config = output_config.sampling_config
+                    inference_steps = sampling_config.diffusion_inference_steps
+
+                    if inference_steps > time_steps:
+                        raise ValueError(
+                            "Diffusion loss requires setting the number of "
+                            "inference steps to be less than or equal to the "
+                            "number of diffusion time steps. Please check the "
+                            f"output '{name}'. Got inference_steps={inference_steps} "
+                            f"and diffusion_time_steps={time_steps}."
+                        )
+
             case SurvivalOutputTypeConfig(
                 time_column, event_column, num_durations, loss_function, _, _
             ):
