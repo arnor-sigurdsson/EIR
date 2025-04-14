@@ -205,7 +205,7 @@ def get_meta_model_kwargs_from_configs(
         input_configs=input_configs,
         fusion_configs=[fusion_config],
         output_configs=output_configs,
-        device=global_config.be.device,
+        device="cpu",
     )
     kwargs["tensor_broker"] = tensor_broker
 
