@@ -8,5 +8,5 @@ evaluation_checkpoint:
   n_saved_models: 1
   sample_interval: 500
 optimization:
-  lr: 0.001
+  lr: 0.003
   optimizer: adabelief

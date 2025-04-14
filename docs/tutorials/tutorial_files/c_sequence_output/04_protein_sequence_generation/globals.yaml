@@ -12,5 +12,5 @@ latent_sampling:
   layers_to_sample:
   - output_modules.protein_sequence.output_transformer.layers.1
 optimization:
-  lr: 0.0005
+  lr: 0.001
   optimizer: adabelief

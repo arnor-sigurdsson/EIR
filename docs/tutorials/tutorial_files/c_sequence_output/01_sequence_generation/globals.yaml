@@ -8,3 +8,5 @@ evaluation_checkpoint:
   checkpoint_interval: 500
   n_saved_models: 1
   sample_interval: 500
+optimization:
+  lr: 0.001

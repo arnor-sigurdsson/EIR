@@ -10,8 +10,10 @@ evaluation_checkpoint:
   n_saved_models: 1
   sample_interval: 500
 optimization:
-  lr: 0.0003
+  lr: 0.001
   optimizer: adamw
+lr_schedule:
+  lr_schedule: cosine
 training_control:
   early_stopping_patience: 16
 visualization_logging:
