@@ -299,7 +299,8 @@ def get_scheduler(
             num_train_timesteps=num_train_steps,
             trained_betas=betas_numpy,
             clip_sample=False,
-            prediction_type="epsilon",
+            prediction_type="v_prediction",
+            timestep_spacing="trailing",
         )
         eta_for_step = None
     elif scheduler_type == "ddim":
@@ -307,14 +308,16 @@ def get_scheduler(
             num_train_timesteps=num_train_steps,
             trained_betas=betas_numpy,
             clip_sample=False,
-            prediction_type="epsilon",
+            prediction_type="v_prediction",
+            timestep_spacing="trailing",
         )
         eta_for_step = eta if eta is not None else 0.0
     elif scheduler_type == "dpm_solver":
         scheduler = DPMSolverMultistepScheduler(
             num_train_timesteps=num_train_steps,
             trained_betas=betas_numpy,
-            prediction_type="epsilon",
+            prediction_type="v_prediction",
+            timestep_spacing="trailing",
         )
         eta_for_step = None
     else:
@@ -323,7 +326,8 @@ def get_scheduler(
             num_train_timesteps=num_train_steps,
             trained_betas=betas_numpy,
             clip_sample=False,
-            prediction_type="epsilon",
+            prediction_type="v_prediction",
+            timestep_spacing="trailing",
         )
         eta_for_step = eta if eta is not None else 0.0
 
