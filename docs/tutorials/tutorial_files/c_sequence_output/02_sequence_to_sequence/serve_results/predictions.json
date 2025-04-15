@@ -21,7 +21,7 @@
         "response": {
             "result": [
                 {
-                    "english": "I'm very hungry."
+                    "english": "I am very hungry hungry."
                 },
                 {
                     "english": "Why is Tom still in Boston?"
@@ -30,7 +30,7 @@
                     "english": "Why is Tom still in Boston?"
                 },
                 {
-                    "english": "A high cat was very tall."
+                    "english": "A loud cat"
                 }
             ]
         }

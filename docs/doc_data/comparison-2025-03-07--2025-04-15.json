@@ -1,0 +1,1530 @@
+{
+    "metadata": {
+        "baseline_report": {
+            "date_generated": "2025-04-15T16:38:18.350129",
+            "num_experiments": 64,
+            "root_directory": null
+        },
+        "current_report": {
+            "date_generated": "2025-04-15T07:58:27.334145",
+            "num_experiments": 59,
+            "root_directory": null
+        },
+        "comparison_date": "2025-04-15T08:38:38.290686",
+        "thresholds": {
+            "significant_improvement": 0.05,
+            "improvement": 0.01,
+            "minor_improvement": 0.001,
+            "significant_regression": 0.05,
+            "regression": 0.01,
+            "minor_regression": 0.001
+        },
+        "statistical_significance_alpha": 0.05
+    },
+    "summary": {
+        "total_experiments_compared": 58,
+        "new_experiments": 0,
+        "removed_experiments": 5,
+        "change_counts": {
+            "significant_improvement": 5,
+            "improvement": 11,
+            "minor_improvement": 11,
+            "unchanged": 8,
+            "minor_regression": 16,
+            "regression": 6,
+            "significant_regression": 1
+        },
+        "average_changes": {
+            "perf_average": 0.02600996351968113,
+            "loss_average": -0.02507149382046937
+        },
+        "top_improvements": [
+            "g_time_series/01_time_series_power_transformer_sim",
+            "f_image_output/03_mnist_diffusion",
+            "c_sequence_output/02_seq_to_seq_eng_only",
+            "c_sequence_output/01_sequence_generation",
+            "g_time_series/02_time_series_stocks_transformer"
+        ],
+        "top_regressions": [
+            "c_sequence_output/02_seq_to_seq",
+            "a_using_eir/tutorial_07c_multimodal_tabular_description_image",
+            "e_pretraining/02_mini_foundation_cifar_from_pretrained",
+            "g_time_series/01_time_series_power_transformer_real",
+            "a_using_eir/tutorial_07-apx-b_multimodal_tabular_description_multi_task"
+        ],
+        "statistical_test": {
+            "significant": false,
+            "p_value": 0.1894094939155515,
+            "mean_difference": 0.026009963519681132,
+            "sample_size": 58,
+            "enough_samples": true
+        }
+    },
+    "statistical_test": {
+        "significant": false,
+        "p_value": 0.1894094939155515,
+        "mean_difference": 0.026009963519681132,
+        "sample_size": 58,
+        "enough_samples": true
+    },
+    "new_experiments": [],
+    "removed_experiments": [
+        "i_scaling/03_scaling_diffusion",
+        "c_sequence_output/01_sequence_generation_bpe",
+        "f_image_output/01_image_foundation",
+        "i_scaling/02_scaling_compute_sft_pretrained",
+        "i_scaling/02_scaling_compute"
+    ],
+    "comparison_results": [
+        {
+            "experiment_id": "g_time_series/01_time_series_power_transformer_sim",
+            "change_type": "significant_improvement",
+            "baseline": {
+                "max_perf_average": -0.40777267093258623,
+                "min_loss_average": 1.4077726709325862,
+                "total_iterations": 2500
+            },
+            "current": {
+                "max_perf_average": 0.6518444006141809,
+                "min_loss_average": 0.348155599385819,
+                "total_iterations": 9500
+            },
+            "changes": {
+                "max_perf_average_abs_change": 1.0596170715467672,
+                "max_perf_average_rel_change": -259.85485224485416,
+                "final_perf_average_abs_change": 1.0596170715467672,
+                "final_perf_average_rel_change": -259.85485224485416,
+                "min_loss_average_abs_change": -1.0596170715467672,
+                "min_loss_average_rel_change": -75.26904687280359,
+                "final_loss_average_abs_change": -1.0596170715467672,
+                "final_loss_average_rel_change": -75.26904687280359,
+                "iterations_change": 7000
+            }
+        },
+        {
+            "experiment_id": "f_image_output/03_mnist_diffusion",
+            "change_type": "significant_improvement",
+            "baseline": {
+                "max_perf_average": 0.6450148168951273,
+                "min_loss_average": 0.3549851831048727,
+                "total_iterations": 9000
+            },
+            "current": {
+                "max_perf_average": 0.9662841509561986,
+                "min_loss_average": 0.03371584904380143,
+                "total_iterations": 9000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.3212693340610713,
+                "max_perf_average_rel_change": 49.80805489206402,
+                "final_perf_average_abs_change": 0.3339799421373755,
+                "final_perf_average_rel_change": 52.83983256900192,
+                "min_loss_average_abs_change": -0.3212693340610713,
+                "min_loss_average_rel_change": -90.50218131672251,
+                "final_loss_average_abs_change": -0.3339799421373755,
+                "final_loss_average_rel_change": -90.77045031168758,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "c_sequence_output/02_seq_to_seq_eng_only",
+            "change_type": "significant_improvement",
+            "baseline": {
+                "max_perf_average": -2.2337505016326906,
+                "min_loss_average": 3.2337505016326906,
+                "total_iterations": 5000
+            },
+            "current": {
+                "max_perf_average": -2.147469522476196,
+                "min_loss_average": 3.147469522476196,
+                "total_iterations": 5000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.08628097915649446,
+                "max_perf_average_rel_change": -3.862605921898173,
+                "final_perf_average_abs_change": 0.08628097915649446,
+                "final_perf_average_rel_change": -3.862605921898173,
+                "min_loss_average_abs_change": -0.08628097915649446,
+                "min_loss_average_rel_change": -2.668139645063279,
+                "final_loss_average_abs_change": -0.08628097915649446,
+                "final_loss_average_rel_change": -2.668139645063279,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "c_sequence_output/01_sequence_generation",
+            "change_type": "significant_improvement",
+            "baseline": {
+                "max_perf_average": -0.37922365474700925,
+                "min_loss_average": 1.3792236547470094,
+                "total_iterations": 6000
+            },
+            "current": {
+                "max_perf_average": -0.3205068349838257,
+                "min_loss_average": 1.3205068349838256,
+                "total_iterations": 3000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.05871681976318355,
+                "max_perf_average_rel_change": -15.483427531005468,
+                "final_perf_average_abs_change": 0.05871681976318355,
+                "final_perf_average_rel_change": -15.483427531005468,
+                "min_loss_average_abs_change": -0.05871681976318377,
+                "min_loss_average_rel_change": -4.257237001489377,
+                "final_loss_average_abs_change": -0.05871681976318377,
+                "final_loss_average_rel_change": -4.257237001489377,
+                "iterations_change": -3000
+            }
+        },
+        {
+            "experiment_id": "g_time_series/02_time_series_stocks_transformer",
+            "change_type": "significant_improvement",
+            "baseline": {
+                "max_perf_average": 0.9007216336434347,
+                "min_loss_average": 0.09927836635656524,
+                "total_iterations": 20500
+            },
+            "current": {
+                "max_perf_average": 0.9570496949252852,
+                "min_loss_average": 0.04295030507471478,
+                "total_iterations": 20500
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.05632806128185053,
+                "max_perf_average_rel_change": 6.253659197015457,
+                "final_perf_average_abs_change": 0.056099198823958196,
+                "final_perf_average_rel_change": 6.22825040817949,
+                "min_loss_average_abs_change": -0.056328061281850465,
+                "min_loss_average_rel_change": -56.73749815699451,
+                "final_loss_average_abs_change": -0.05609919882395811,
+                "final_loss_average_rel_change": -56.50697214584886,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_03_anti_breast_cancer_peptides_run",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": 0.6943707500636426,
+                "min_loss_average": 0.3580775260925293,
+                "total_iterations": 2400
+            },
+            "current": {
+                "max_perf_average": 0.7410807429714192,
+                "min_loss_average": 0.29782000184059143,
+                "total_iterations": 2400
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.046709992907776665,
+                "max_perf_average_rel_change": 6.726952842338975,
+                "final_perf_average_abs_change": 0.026691109625897824,
+                "final_perf_average_rel_change": 3.8439277033848915,
+                "min_loss_average_abs_change": -0.060257524251937866,
+                "min_loss_average_rel_change": -16.82806651104012,
+                "final_loss_average_abs_change": -0.0105457603931427,
+                "final_loss_average_rel_change": -2.589809008565925,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_08_run_cnn-2d",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": 0.7973147315621447,
+                "min_loss_average": 0.6691406965255737,
+                "total_iterations": 1400
+            },
+            "current": {
+                "max_perf_average": 0.8337944415444399,
+                "min_loss_average": 0.6069782376289368,
+                "total_iterations": 1400
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.036479709982295216,
+                "max_perf_average_rel_change": 4.575321204817335,
+                "final_perf_average_abs_change": 0.03969868230057705,
+                "final_perf_average_rel_change": 4.999231117715336,
+                "min_loss_average_abs_change": -0.06216245889663696,
+                "min_loss_average_rel_change": -9.289893623180815,
+                "final_loss_average_abs_change": -0.154829740524292,
+                "final_loss_average_rel_change": -20.12492020106233,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_08_run_cnn-1d",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": 0.8727131999384254,
+                "min_loss_average": 0.49739882349967957,
+                "total_iterations": 1400
+            },
+            "current": {
+                "max_perf_average": 0.8959120230056458,
+                "min_loss_average": 0.4075094163417816,
+                "total_iterations": 1400
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.02319882306722032,
+                "max_perf_average_rel_change": 2.6582413407814984,
+                "final_perf_average_abs_change": 0.010765863588101499,
+                "final_perf_average_rel_change": 1.2440900734024214,
+                "min_loss_average_abs_change": -0.08988940715789795,
+                "min_loss_average_rel_change": -18.071897823448683,
+                "final_loss_average_abs_change": -0.013934791088104248,
+                "final_loss_average_rel_change": -1.702828907164443,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "c_sequence_output/04_protein_sequence_generation_sequence_only",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": -1.6629340648651123,
+                "min_loss_average": 2.6629340648651123,
+                "total_iterations": 5500
+            },
+            "current": {
+                "max_perf_average": -1.642528772354126,
+                "min_loss_average": 2.642528772354126,
+                "total_iterations": 5500
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.020405292510986328,
+                "max_perf_average_rel_change": -1.2270656391082764,
+                "final_perf_average_abs_change": 0.020405292510986328,
+                "final_perf_average_rel_change": -1.2270656391082764,
+                "min_loss_average_abs_change": -0.020405292510986328,
+                "min_loss_average_rel_change": -0.7662710384089038,
+                "final_loss_average_abs_change": -0.020405292510986328,
+                "final_loss_average_rel_change": -0.7662710384089038,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_resnet",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": 0.9164139688014739,
+                "min_loss_average": 0.28277337551116943,
+                "total_iterations": 2800
+            },
+            "current": {
+                "max_perf_average": 0.9339357788372957,
+                "min_loss_average": 0.2737967371940613,
+                "total_iterations": 2500
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.017521810035821872,
+                "max_perf_average_rel_change": 1.9119972667742786,
+                "final_perf_average_abs_change": -0.05341310546012501,
+                "final_perf_average_rel_change": -5.887050660874749,
+                "min_loss_average_abs_change": -0.008976638317108154,
+                "min_loss_average_rel_change": -3.1744991199688037,
+                "final_loss_average_abs_change": 0.042447566986083984,
+                "final_loss_average_rel_change": 14.73919216042339,
+                "iterations_change": -300
+            }
+        },
+        {
+            "experiment_id": "e_pretraining/02_mini_foundation_cifar_from_scratch",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": 0.8339605189151635,
+                "min_loss_average": 0.6706503629684448,
+                "total_iterations": 9200
+            },
+            "current": {
+                "max_perf_average": 0.8488743450926529,
+                "min_loss_average": 0.621578574180603,
+                "total_iterations": 9500
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.014913826177489375,
+                "max_perf_average_rel_change": 1.7883132161807431,
+                "final_perf_average_abs_change": 0.01798226148325166,
+                "final_perf_average_rel_change": 2.175462182464322,
+                "min_loss_average_abs_change": -0.0490717887878418,
+                "min_loss_average_rel_change": -7.317044990572935,
+                "final_loss_average_abs_change": -0.05917841196060181,
+                "final_loss_average_rel_change": -8.39036919689842,
+                "iterations_change": 300
+            }
+        },
+        {
+            "experiment_id": "g_time_series/02_time_series_stocks_diffusion",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": 0.9680821719138246,
+                "min_loss_average": 0.031917828086175416,
+                "total_iterations": 20500
+            },
+            "current": {
+                "max_perf_average": 0.9818593249533718,
+                "min_loss_average": 0.01814067504662824,
+                "total_iterations": 20500
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.013777153039547185,
+                "max_perf_average_rel_change": 1.4231388036318038,
+                "final_perf_average_abs_change": 0.015486933139822745,
+                "final_perf_average_rel_change": 1.6053330108323993,
+                "min_loss_average_abs_change": -0.013777153039547175,
+                "min_loss_average_rel_change": -43.16444402905497,
+                "final_loss_average_abs_change": -0.015486933139822724,
+                "final_loss_average_rel_change": -43.89445281054118,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "c_sequence_output/03_image_captioning",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": -1.506149631500244,
+                "min_loss_average": 2.5061496315002443,
+                "total_iterations": 11000
+            },
+            "current": {
+                "max_perf_average": -1.492777795791626,
+                "min_loss_average": 2.492777795791626,
+                "total_iterations": 11000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.013371835708618107,
+                "max_perf_average_rel_change": -0.8878158868782978,
+                "final_perf_average_abs_change": 0.013371835708618107,
+                "final_perf_average_rel_change": -0.8878158868782978,
+                "min_loss_average_abs_change": -0.013371835708618107,
+                "min_loss_average_rel_change": -0.5335609470617838,
+                "final_loss_average_abs_change": -0.013371835708618107,
+                "final_loss_average_rel_change": -0.5335609470617838,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "e_pretraining/02_mini_foundation",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": 0.2574559152126312,
+                "min_loss_average": 0.7425440847873688,
+                "total_iterations": 18000
+            },
+            "current": {
+                "max_perf_average": 0.26972679793834686,
+                "min_loss_average": 0.7302732020616531,
+                "total_iterations": 18000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.012270882725715637,
+                "max_perf_average_rel_change": 4.766207339062764,
+                "final_perf_average_abs_change": 0.008235156536102295,
+                "final_perf_average_rel_change": 3.1986666646602124,
+                "min_loss_average_abs_change": -0.012270882725715637,
+                "min_loss_average_rel_change": -1.6525460207833271,
+                "final_loss_average_abs_change": -0.008235156536102295,
+                "final_loss_average_rel_change": -1.109046143497389,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_07a_multimodal_tabular",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": 0.40436557059578165,
+                "min_loss_average": 1.3153985738754272,
+                "total_iterations": 4000
+            },
+            "current": {
+                "max_perf_average": 0.4159494834148988,
+                "min_loss_average": 1.3154672384262085,
+                "total_iterations": 5200
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.011583912819117137,
+                "max_perf_average_rel_change": 2.8647129383566714,
+                "final_perf_average_abs_change": 0.0010481260799836134,
+                "final_perf_average_rel_change": 0.2625820462117344,
+                "min_loss_average_abs_change": 6.866455078125e-05,
+                "min_loss_average_rel_change": 0.005220056653927372,
+                "final_loss_average_abs_change": 0.020709991455078125,
+                "final_loss_average_rel_change": 1.5536051826425972,
+                "iterations_change": 1200
+            }
+        },
+        {
+            "experiment_id": "g_time_series/02_time_series_stocks_one_shot",
+            "change_type": "improvement",
+            "baseline": {
+                "max_perf_average": 0.9736648604022073,
+                "min_loss_average": 0.026335139597792653,
+                "total_iterations": 20500
+            },
+            "current": {
+                "max_perf_average": 0.9839118031208942,
+                "min_loss_average": 0.016088196879105742,
+                "total_iterations": 20500
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.010246942718686869,
+                "max_perf_average_rel_change": 1.0524096262911244,
+                "final_perf_average_abs_change": 0.01080614585008699,
+                "final_perf_average_rel_change": 1.110480220657039,
+                "min_loss_average_abs_change": -0.01024694271868691,
+                "min_loss_average_rel_change": -38.90977179230819,
+                "final_loss_average_abs_change": -0.010806145850087007,
+                "final_loss_average_rel_change": -40.17999606421823,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_05_is_it_a_hot_dog",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": 0.7384984975762947,
+                "min_loss_average": 0.5066683888435364,
+                "total_iterations": 2800
+            },
+            "current": {
+                "max_perf_average": 0.7483596854328736,
+                "min_loss_average": 0.5243963003158569,
+                "total_iterations": 2500
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.009861187856578857,
+                "max_perf_average_rel_change": 1.335302358629388,
+                "final_perf_average_abs_change": 0.12641841172473356,
+                "final_perf_average_rel_change": 26.469707120305685,
+                "min_loss_average_abs_change": 0.017727911472320557,
+                "min_loss_average_rel_change": 3.498918002913951,
+                "final_loss_average_abs_change": -0.04543566703796387,
+                "final_loss_average_rel_change": -6.648168619165669,
+                "iterations_change": -300
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_01_run_lr-0.002_epochs-20",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": 0.8812015068089759,
+                "min_loss_average": 0.45891276001930237,
+                "total_iterations": 1400
+            },
+            "current": {
+                "max_perf_average": 0.8899300498480625,
+                "min_loss_average": 0.4749792218208313,
+                "total_iterations": 1400
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.008728543039086545,
+                "max_perf_average_rel_change": 0.9905274754572896,
+                "final_perf_average_abs_change": 0.007062746020595867,
+                "final_perf_average_rel_change": 0.8135403905274695,
+                "min_loss_average_abs_change": 0.01606646180152893,
+                "min_loss_average_rel_change": 3.5009838908931528,
+                "final_loss_average_abs_change": -0.034834861755371094,
+                "final_loss_average_rel_change": -5.214500156319371,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "e_pretraining/02_mini_foundation_imdb_from_pretrained",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": 0.44753292521874777,
+                "min_loss_average": 0.6776257753372192,
+                "total_iterations": 4500
+            },
+            "current": {
+                "max_perf_average": 0.4537875364308748,
+                "min_loss_average": 0.6774625182151794,
+                "total_iterations": 3000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.006254611212127059,
+                "max_perf_average_rel_change": 1.397575655259307,
+                "final_perf_average_abs_change": 0.009592194111831709,
+                "final_perf_average_rel_change": 2.2279766800891747,
+                "min_loss_average_abs_change": -0.00016325712203979492,
+                "min_loss_average_rel_change": -0.02409251949699675,
+                "final_loss_average_abs_change": 0.002431631088256836,
+                "final_loss_average_rel_change": 0.3543377186925393,
+                "iterations_change": -1500
+            }
+        },
+        {
+            "experiment_id": "e_pretraining/01_checkpointing_imdb_from_pretrained_global_non_strict",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": 0.7799200127018,
+                "min_loss_average": 0.4561307728290558,
+                "total_iterations": 1800
+            },
+            "current": {
+                "max_perf_average": 0.7857693974677539,
+                "min_loss_average": 0.4508935809135437,
+                "total_iterations": 1800
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.005849384765953869,
+                "max_perf_average_rel_change": 0.7499980345023359,
+                "final_perf_average_abs_change": 0.004448681624798723,
+                "final_perf_average_rel_change": 0.5704022915616171,
+                "min_loss_average_abs_change": -0.005237191915512085,
+                "min_loss_average_rel_change": -1.1481777217155285,
+                "final_loss_average_abs_change": 0.0004769563674926758,
+                "final_loss_average_rel_change": 0.1029620835243553,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "c_sequence_output/04_protein_sequence_generation_tabular",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": -1.612886905670166,
+                "min_loss_average": 2.612886905670166,
+                "total_iterations": 5500
+            },
+            "current": {
+                "max_perf_average": -1.6079013347625732,
+                "min_loss_average": 2.6079013347625732,
+                "total_iterations": 5500
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.0049855709075927734,
+                "max_perf_average_rel_change": -0.30910852398055977,
+                "final_perf_average_abs_change": 0.0049855709075927734,
+                "final_perf_average_rel_change": -0.30910852398055977,
+                "min_loss_average_abs_change": -0.0049855709075927734,
+                "min_loss_average_rel_change": -0.1908069919434209,
+                "final_loss_average_abs_change": -0.0049855709075927734,
+                "final_loss_average_rel_change": -0.1908069919434209,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "e_pretraining/01_checkpointing_imdb_from_pretrained_global",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": 0.7781118267889203,
+                "min_loss_average": 0.45721399784088135,
+                "total_iterations": 1800
+            },
+            "current": {
+                "max_perf_average": 0.7828635637614898,
+                "min_loss_average": 0.4551331400871277,
+                "total_iterations": 1800
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.004751736972569476,
+                "max_perf_average_rel_change": 0.6106753308427076,
+                "final_perf_average_abs_change": -0.0003446132491791154,
+                "final_perf_average_rel_change": -0.04487720795243245,
+                "min_loss_average_abs_change": -0.002080857753753662,
+                "min_loss_average_rel_change": -0.45511680822988226,
+                "final_loss_average_abs_change": 0.07195425033569336,
+                "final_loss_average_rel_change": 14.572367821458823,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_08_run_transformer-2d",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": 0.8915379032572216,
+                "min_loss_average": 0.4449350833892822,
+                "total_iterations": 1400
+            },
+            "current": {
+                "max_perf_average": 0.8946274414360282,
+                "min_loss_average": 0.4294533133506775,
+                "total_iterations": 1400
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.003089538178806639,
+                "max_perf_average_rel_change": 0.34654030608446973,
+                "final_perf_average_abs_change": 0.008497618179289068,
+                "final_perf_average_rel_change": 0.9796218324194296,
+                "min_loss_average_abs_change": -0.015481770038604736,
+                "min_loss_average_rel_change": -3.4795570447429607,
+                "final_loss_average_abs_change": -0.03581416606903076,
+                "final_loss_average_rel_change": -4.291997122772881,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_04_imdb_run_combined",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": 0.8859282489174467,
+                "min_loss_average": 0.29633572697639465,
+                "total_iterations": 4500
+            },
+            "current": {
+                "max_perf_average": 0.8889523443191243,
+                "min_loss_average": 0.30070337653160095,
+                "total_iterations": 4000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.0030240954016775845,
+                "max_perf_average_rel_change": 0.3413476661764488,
+                "final_perf_average_abs_change": -0.01078006060504344,
+                "final_perf_average_rel_change": -1.270689094722088,
+                "min_loss_average_abs_change": 0.004367649555206299,
+                "min_loss_average_rel_change": 1.4738855823328432,
+                "final_loss_average_abs_change": -0.10500791668891907,
+                "final_loss_average_rel_change": -18.858100152974348,
+                "iterations_change": -500
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_08_run_transformer-1d",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": 0.8930750671951874,
+                "min_loss_average": 0.44646623730659485,
+                "total_iterations": 1400
+            },
+            "current": {
+                "max_perf_average": 0.8952840656027449,
+                "min_loss_average": 0.44295841455459595,
+                "total_iterations": 1400
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.0022089984075575053,
+                "max_perf_average_rel_change": 0.24734745025355348,
+                "final_perf_average_abs_change": -0.008264243760936707,
+                "final_perf_average_rel_change": -0.9398807487321982,
+                "min_loss_average_abs_change": -0.0035078227519989014,
+                "min_loss_average_rel_change": -0.7856860068883617,
+                "final_loss_average_abs_change": 0.11709821224212646,
+                "final_loss_average_rel_change": 16.99560961472747,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_08_run_lcl-2d",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": 0.8748220321309806,
+                "min_loss_average": 0.46598541736602783,
+                "total_iterations": 1400
+            },
+            "current": {
+                "max_perf_average": 0.8766788363599954,
+                "min_loss_average": 0.46633878350257874,
+                "total_iterations": 1400
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.0018568042290147968,
+                "max_perf_average_rel_change": 0.21224936739325184,
+                "final_perf_average_abs_change": -0.0016007817088468101,
+                "final_perf_average_rel_change": -0.18390069351339933,
+                "min_loss_average_abs_change": 0.0003533661365509033,
+                "min_loss_average_rel_change": 0.07583201606357072,
+                "final_loss_average_abs_change": -0.010282635688781738,
+                "final_loss_average_rel_change": -1.4111552710061228,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "f_image_output/02_image_colorization",
+            "change_type": "minor_improvement",
+            "baseline": {
+                "max_perf_average": 0.9285965343005955,
+                "min_loss_average": 0.07140346569940448,
+                "total_iterations": 9000
+            },
+            "current": {
+                "max_perf_average": 0.9298876577522606,
+                "min_loss_average": 0.07011234224773943,
+                "total_iterations": 9000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.0012911234516650438,
+                "max_perf_average_rel_change": 0.1390403048012125,
+                "final_perf_average_abs_change": 0.0010944900568574667,
+                "final_perf_average_rel_change": 0.11786497326116122,
+                "min_loss_average_abs_change": -0.0012911234516650438,
+                "min_loss_average_rel_change": -1.8082083817898102,
+                "final_loss_average_abs_change": -0.0010944900568574667,
+                "final_loss_average_rel_change": -1.5328248371935747,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_combined",
+            "change_type": "unchanged",
+            "baseline": {
+                "max_perf_average": 0.9857411530165191,
+                "min_loss_average": 0.12290642410516739,
+                "total_iterations": 2600
+            },
+            "current": {
+                "max_perf_average": 0.9856579936486416,
+                "min_loss_average": 0.12082023918628693,
+                "total_iterations": 2800
+            },
+            "changes": {
+                "max_perf_average_abs_change": -8.315936787750555e-05,
+                "max_perf_average_rel_change": -0.008436227667174606,
+                "final_perf_average_abs_change": 0.03111386022282181,
+                "final_perf_average_rel_change": 3.2595517727562204,
+                "min_loss_average_abs_change": -0.0020861849188804626,
+                "min_loss_average_rel_change": -1.6973766294716832,
+                "final_loss_average_abs_change": -0.017263054847717285,
+                "final_loss_average_rel_change": -11.328757450331368,
+                "iterations_change": 200
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_04_imdb_run_longformer",
+            "change_type": "unchanged",
+            "baseline": {
+                "max_perf_average": 0.9062139453556431,
+                "min_loss_average": 0.25011223554611206,
+                "total_iterations": 7000
+            },
+            "current": {
+                "max_perf_average": 0.9065134775684659,
+                "min_loss_average": 0.2516227066516876,
+                "total_iterations": 8000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.00029953221282275067,
+                "max_perf_average_rel_change": 0.03305314538116045,
+                "final_perf_average_abs_change": -0.007725550561416661,
+                "final_perf_average_rel_change": -0.8633768830036966,
+                "min_loss_average_abs_change": 0.0015104711055755615,
+                "min_loss_average_rel_change": 0.6039173182701343,
+                "final_loss_average_abs_change": -0.0048514604568481445,
+                "final_loss_average_rel_change": -1.562874876403295,
+                "iterations_change": 1000
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_08_run_lcl-3d",
+            "change_type": "unchanged",
+            "baseline": {
+                "max_perf_average": 0.8810426877324086,
+                "min_loss_average": 0.47141340374946594,
+                "total_iterations": 1400
+            },
+            "current": {
+                "max_perf_average": 0.8815870882013211,
+                "min_loss_average": 0.47988173365592957,
+                "total_iterations": 1400
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.0005444004689125759,
+                "max_perf_average_rel_change": 0.06179047581834331,
+                "final_perf_average_abs_change": -0.0023016835666975766,
+                "final_perf_average_rel_change": -0.2612454082811305,
+                "min_loss_average_abs_change": 0.008468329906463623,
+                "min_loss_average_rel_change": 1.7963702005732833,
+                "final_loss_average_abs_change": 0.008903324604034424,
+                "final_loss_average_rel_change": 1.288037607148918,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "h_survival_analysis/01_flchain",
+            "change_type": "unchanged",
+            "baseline": {
+                "max_perf_average": 0.8143373727798462,
+                "min_loss_average": 1.1089614629745483,
+                "total_iterations": 5200
+            },
+            "current": {
+                "max_perf_average": 0.814946174621582,
+                "min_loss_average": 1.1107052564620972,
+                "total_iterations": 4500
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.0006088018417358398,
+                "max_perf_average_rel_change": 0.07476039564015291,
+                "final_perf_average_abs_change": 0.0019481778144836426,
+                "final_perf_average_rel_change": 0.23991181286570312,
+                "min_loss_average_abs_change": 0.0017437934875488281,
+                "min_loss_average_rel_change": 0.15724563438584066,
+                "final_loss_average_abs_change": -0.006519913673400879,
+                "final_loss_average_rel_change": -0.5810568641691268,
+                "iterations_change": -700
+            }
+        },
+        {
+            "experiment_id": "d_array_output/01_array_mnist_generation",
+            "change_type": "unchanged",
+            "baseline": {
+                "max_perf_average": 0.9703458015024662,
+                "min_loss_average": 0.0296541984975338,
+                "total_iterations": 9000
+            },
+            "current": {
+                "max_perf_average": 0.970698227852583,
+                "min_loss_average": 0.02930177214741707,
+                "total_iterations": 9000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.0003524263501167857,
+                "max_perf_average_rel_change": 0.03631966558427882,
+                "final_perf_average_abs_change": 0.0003524263501167857,
+                "final_perf_average_rel_change": 0.03631966558427882,
+                "min_loss_average_abs_change": -0.0003524263501167302,
+                "min_loss_average_rel_change": -1.1884534668709386,
+                "final_loss_average_abs_change": -0.0003524263501167302,
+                "final_loss_average_rel_change": -1.1884534668709386,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "d_array_output/02_array_mnist_generation_with_labels",
+            "change_type": "unchanged",
+            "baseline": {
+                "max_perf_average": 0.9646840653717518,
+                "min_loss_average": 0.03531593462824822,
+                "total_iterations": 9000
+            },
+            "current": {
+                "max_perf_average": 0.9643645977079869,
+                "min_loss_average": 0.03563540229201317,
+                "total_iterations": 9000
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.0003194676637648941,
+                "max_perf_average_rel_change": -0.03311629944273866,
+                "final_perf_average_abs_change": -0.0003194676637648941,
+                "final_perf_average_rel_change": -0.03311629944273866,
+                "min_loss_average_abs_change": 0.0003194676637649496,
+                "min_loss_average_rel_change": 0.9045992046587844,
+                "final_loss_average_abs_change": 0.0003194676637649496,
+                "final_loss_average_rel_change": 0.9045992046587844,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "h_survival_analysis/02_flchain_cox",
+            "change_type": "unchanged",
+            "baseline": {
+                "max_perf_average": 0.8083223700523376,
+                "min_loss_average": 5.744862079620361,
+                "total_iterations": 5000
+            },
+            "current": {
+                "max_perf_average": 0.8090521693229675,
+                "min_loss_average": 5.74567174911499,
+                "total_iterations": 3800
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.0007297992706298828,
+                "max_perf_average_rel_change": 0.09028567037958252,
+                "final_perf_average_abs_change": -0.0011098384857177734,
+                "final_perf_average_rel_change": -0.13753947057792876,
+                "min_loss_average_abs_change": 0.0008096694946289062,
+                "min_loss_average_rel_change": 0.014093802138456415,
+                "final_loss_average_abs_change": 0.006160259246826172,
+                "final_loss_average_rel_change": 0.10705815638711413,
+                "iterations_change": -1200
+            }
+        },
+        {
+            "experiment_id": "f_image_output/02_image_super_resolution",
+            "change_type": "unchanged",
+            "baseline": {
+                "max_perf_average": 0.9417359069921076,
+                "min_loss_average": 0.05826409300789237,
+                "total_iterations": 9000
+            },
+            "current": {
+                "max_perf_average": 0.9420245657674968,
+                "min_loss_average": 0.057975434232503176,
+                "total_iterations": 9000
+            },
+            "changes": {
+                "max_perf_average_abs_change": 0.0002886587753891945,
+                "max_perf_average_rel_change": 0.030651775433642208,
+                "final_perf_average_abs_change": 0.0002886587753891945,
+                "final_perf_average_rel_change": 0.030651775433642208,
+                "min_loss_average_abs_change": -0.0002886587753891945,
+                "min_loss_average_rel_change": -0.4954316809670292,
+                "final_loss_average_abs_change": -0.0002886587753891945,
+                "final_loss_average_rel_change": -0.4954316809670292,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_08_run_transformer-3d",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.8944890541792432,
+                "min_loss_average": 0.43325093388557434,
+                "total_iterations": 1400
+            },
+            "current": {
+                "max_perf_average": 0.8933891617129276,
+                "min_loss_average": 0.43549689650535583,
+                "total_iterations": 1400
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.0010998924663155885,
+                "max_perf_average_rel_change": -0.12296321136370052,
+                "final_perf_average_abs_change": 0.003043833139107166,
+                "final_perf_average_rel_change": 0.35052045820783756,
+                "min_loss_average_abs_change": 0.002245962619781494,
+                "min_loss_average_rel_change": 0.5183976407479999,
+                "final_loss_average_abs_change": 0.023325204849243164,
+                "final_loss_average_rel_change": 2.798572465729051,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "f_image_output/02_image_colorization_and_super_resolution",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.8749184962362051,
+                "min_loss_average": 0.1250815037637949,
+                "total_iterations": 36500
+            },
+            "current": {
+                "max_perf_average": 0.8735608900897205,
+                "min_loss_average": 0.1264391099102795,
+                "total_iterations": 28500
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.0013576061464846134,
+                "max_perf_average_rel_change": -0.15516944176227535,
+                "final_perf_average_abs_change": -0.003604206256568432,
+                "final_perf_average_rel_change": -0.4119741410201856,
+                "min_loss_average_abs_change": 0.0013576061464846134,
+                "min_loss_average_rel_change": 1.0853772185600916,
+                "final_loss_average_abs_change": 0.003604206256568432,
+                "final_loss_average_rel_change": 2.880191129827719,
+                "iterations_change": -8000
+            }
+        },
+        {
+            "experiment_id": "b_customizing_eir/tutorial_01_run",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.8804784161551502,
+                "min_loss_average": 0.45796337723731995,
+                "total_iterations": 1000
+            },
+            "current": {
+                "max_perf_average": 0.8790559517721438,
+                "min_loss_average": 0.4605964422225952,
+                "total_iterations": 1000
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.0014224643830064165,
+                "max_perf_average_rel_change": -0.1615558492867998,
+                "final_perf_average_abs_change": -0.0014224643830064165,
+                "final_perf_average_rel_change": -0.1615558492867998,
+                "min_loss_average_abs_change": 0.0026330649852752686,
+                "min_loss_average_rel_change": 0.5749509930596033,
+                "final_loss_average_abs_change": 0.0026330649852752686,
+                "final_loss_average_rel_change": 0.5749509930596033,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_01_run",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.8519334967352787,
+                "min_loss_average": 0.5198855996131897,
+                "total_iterations": 600
+            },
+            "current": {
+                "max_perf_average": 0.8498878315326668,
+                "min_loss_average": 0.5394218564033508,
+                "total_iterations": 600
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.002045665202611957,
+                "max_perf_average_rel_change": -0.24012029230582144,
+                "final_perf_average_abs_change": -0.002045665202611957,
+                "final_perf_average_rel_change": -0.24012029230582144,
+                "min_loss_average_abs_change": 0.019536256790161133,
+                "min_loss_average_rel_change": 3.7577991782608877,
+                "final_loss_average_abs_change": 0.019536256790161133,
+                "final_loss_average_rel_change": 3.7577991782608877,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_07b_multimodal_tabular_description",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.416426075090368,
+                "min_loss_average": 1.3139605522155762,
+                "total_iterations": 3200
+            },
+            "current": {
+                "max_perf_average": 0.4136967213741581,
+                "min_loss_average": 1.3016999959945679,
+                "total_iterations": 3000
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.0027293537162099146,
+                "max_perf_average_rel_change": -0.655423346296848,
+                "final_perf_average_abs_change": 0.01016675432375419,
+                "final_perf_average_rel_change": 2.5396416730202636,
+                "min_loss_average_abs_change": -0.0122605562210083,
+                "min_loss_average_rel_change": -0.9330992624043983,
+                "final_loss_average_abs_change": -0.047483205795288086,
+                "final_loss_average_rel_change": -3.032680817420917,
+                "iterations_change": -200
+            }
+        },
+        {
+            "experiment_id": "e_pretraining/01_checkpointing",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.7717915933379929,
+                "min_loss_average": 0.4551241397857666,
+                "total_iterations": 1800
+            },
+            "current": {
+                "max_perf_average": 0.7690219828746774,
+                "min_loss_average": 0.47568026185035706,
+                "total_iterations": 1800
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.002769610463315475,
+                "max_perf_average_rel_change": -0.35885470730990093,
+                "final_perf_average_abs_change": -0.002769610463315475,
+                "final_perf_average_rel_change": -0.35885470730990093,
+                "min_loss_average_abs_change": 0.020556122064590454,
+                "min_loss_average_rel_change": 4.516596740895026,
+                "final_loss_average_abs_change": 0.02408963441848755,
+                "final_loss_average_rel_change": 5.292981038058513,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "f_image_output/03_mnist_diffusion_guided",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.7104303073137999,
+                "min_loss_average": 0.28956969268620014,
+                "total_iterations": 9000
+            },
+            "current": {
+                "max_perf_average": 0.7075732909142971,
+                "min_loss_average": 0.2924267090857029,
+                "total_iterations": 9000
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.002857016399502754,
+                "max_perf_average_rel_change": -0.4021529445028024,
+                "final_perf_average_abs_change": 0.002499788999557495,
+                "final_perf_average_rel_change": 0.354543035976947,
+                "min_loss_average_abs_change": 0.002857016399502754,
+                "min_loss_average_rel_change": 0.9866420663708186,
+                "final_loss_average_abs_change": -0.002499788999557495,
+                "final_loss_average_rel_change": -0.8475972880655948,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_03_imdb_run",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.8001344652095475,
+                "min_loss_average": 0.4246022403240204,
+                "total_iterations": 8500
+            },
+            "current": {
+                "max_perf_average": 0.7972295480656086,
+                "min_loss_average": 0.42575639486312866,
+                "total_iterations": 8500
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.002904917143938812,
+                "max_perf_average_rel_change": -0.363053620390923,
+                "final_perf_average_abs_change": -0.007025600790959041,
+                "final_perf_average_rel_change": -0.888640654074469,
+                "min_loss_average_abs_change": 0.0011541545391082764,
+                "min_loss_average_rel_change": 0.271820171798322,
+                "final_loss_average_abs_change": -0.04236343502998352,
+                "final_loss_average_rel_change": -8.025137222365496,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_04_imdb_run_local",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.9043957328704637,
+                "min_loss_average": 0.2513507306575775,
+                "total_iterations": 5500
+            },
+            "current": {
+                "max_perf_average": 0.9009180520146333,
+                "min_loss_average": 0.2665763795375824,
+                "total_iterations": 6500
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.003477680855830445,
+                "max_perf_average_rel_change": -0.38453087840127526,
+                "final_perf_average_abs_change": -0.0004885351481606071,
+                "final_perf_average_rel_change": -0.05492929554914381,
+                "min_loss_average_abs_change": 0.015225648880004883,
+                "min_loss_average_rel_change": 6.057531179707304,
+                "final_loss_average_abs_change": 0.012881070375442505,
+                "final_loss_average_rel_change": 4.347370402009328,
+                "iterations_change": 1000
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_04_imdb_run",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.857379691696903,
+                "min_loss_average": 0.3328332006931305,
+                "total_iterations": 7000
+            },
+            "current": {
+                "max_perf_average": 0.8536673391137921,
+                "min_loss_average": 0.34118860960006714,
+                "total_iterations": 5500
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.0037123525831108672,
+                "max_perf_average_rel_change": -0.4329881637111649,
+                "final_perf_average_abs_change": -0.0030674265380556953,
+                "final_perf_average_rel_change": -0.3591466601211721,
+                "min_loss_average_abs_change": 0.008355408906936646,
+                "min_loss_average_rel_change": 2.510389254898962,
+                "final_loss_average_abs_change": 0.0032883882522583008,
+                "final_loss_average_rel_change": 0.9312196318720174,
+                "iterations_change": -1500
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_08_run_lcl-1d",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.8804964721258766,
+                "min_loss_average": 0.482226699590683,
+                "total_iterations": 1400
+            },
+            "current": {
+                "max_perf_average": 0.875458285674411,
+                "min_loss_average": 0.4891490936279297,
+                "total_iterations": 1400
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.005038186451465587,
+                "max_perf_average_rel_change": -0.5721983688703892,
+                "final_perf_average_abs_change": -0.00010095889394656776,
+                "final_perf_average_rel_change": -0.011644292080474414,
+                "min_loss_average_abs_change": 0.006922394037246704,
+                "min_loss_average_rel_change": 1.4355061723298348,
+                "final_loss_average_abs_change": -0.047496676445007324,
+                "final_loss_average_rel_change": -5.464759910107305,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_02_run",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.8047037899012204,
+                "min_loss_average": 0.08957119286060333,
+                "total_iterations": 16000
+            },
+            "current": {
+                "max_perf_average": 0.7992896272954593,
+                "min_loss_average": 0.07681087404489517,
+                "total_iterations": 16000
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.005414162605761108,
+                "max_perf_average_rel_change": -0.6728143540153715,
+                "final_perf_average_abs_change": -0.008760233690800256,
+                "final_perf_average_rel_change": -1.0886283624780244,
+                "min_loss_average_abs_change": -0.01276031881570816,
+                "min_loss_average_rel_change": -14.246007458633066,
+                "final_loss_average_abs_change": -0.01276031881570816,
+                "final_loss_average_rel_change": -14.246007458633066,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_08_run_cnn-3d",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.8180818635110608,
+                "min_loss_average": 0.617983341217041,
+                "total_iterations": 1400
+            },
+            "current": {
+                "max_perf_average": 0.8115663063884783,
+                "min_loss_average": 0.6338098049163818,
+                "total_iterations": 1400
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.00651555712258256,
+                "max_perf_average_rel_change": -0.7964431694670452,
+                "final_perf_average_abs_change": -0.002004390668445599,
+                "final_perf_average_rel_change": -0.2463695749731945,
+                "min_loss_average_abs_change": 0.01582646369934082,
+                "min_loss_average_rel_change": 2.5609854900251157,
+                "final_loss_average_abs_change": -0.016085505485534668,
+                "final_loss_average_rel_change": -2.405660053590051,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_04_imdb_run_tiny-bert",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.890052266922663,
+                "min_loss_average": 0.29134321212768555,
+                "total_iterations": 4000
+            },
+            "current": {
+                "max_perf_average": 0.8819592543547516,
+                "min_loss_average": 0.3114476203918457,
+                "total_iterations": 5000
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.008093012567911395,
+                "max_perf_average_rel_change": -0.9092738560054249,
+                "final_perf_average_abs_change": -0.0022112755833615383,
+                "final_perf_average_rel_change": -0.2611979033022675,
+                "min_loss_average_abs_change": 0.020104408264160156,
+                "min_loss_average_rel_change": 6.900592643754163,
+                "final_loss_average_abs_change": 0.06123325228691101,
+                "final_loss_average_rel_change": 12.661708709837386,
+                "iterations_change": 1000
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_06_imdb_sentiment_binary",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.5687628380339534,
+                "min_loss_average": 0.6293090581893921,
+                "total_iterations": 17000
+            },
+            "current": {
+                "max_perf_average": 0.5589958519266374,
+                "min_loss_average": 0.6289692521095276,
+                "total_iterations": 15000
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.009766986107316078,
+                "max_perf_average_rel_change": -1.7172335205791027,
+                "final_perf_average_abs_change": -0.008839716565825606,
+                "final_perf_average_rel_change": -1.6909037119401247,
+                "min_loss_average_abs_change": -0.00033980607986450195,
+                "min_loss_average_rel_change": -0.053996692951182104,
+                "final_loss_average_abs_change": 0.16877979040145874,
+                "final_loss_average_rel_change": 22.51429796326526,
+                "iterations_change": -2000
+            }
+        },
+        {
+            "experiment_id": "e_pretraining/02_mini_foundation_imdb_from_scratch",
+            "change_type": "minor_regression",
+            "baseline": {
+                "max_perf_average": 0.4560778161286709,
+                "min_loss_average": 0.677283763885498,
+                "total_iterations": 3500
+            },
+            "current": {
+                "max_perf_average": 0.4461667450828609,
+                "min_loss_average": 0.6792828440666199,
+                "total_iterations": 3500
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.00991107104580996,
+                "max_perf_average_rel_change": -2.173109652633006,
+                "final_perf_average_abs_change": -0.008637671032583505,
+                "final_perf_average_rel_change": -1.9330105193801004,
+                "min_loss_average_abs_change": 0.001999080181121826,
+                "min_loss_average_rel_change": 0.2951613913868739,
+                "final_loss_average_abs_change": 0.0009303689002990723,
+                "final_loss_average_rel_change": 0.1370314470886019,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "c_sequence_output/03_image_captioning_text_only",
+            "change_type": "regression",
+            "baseline": {
+                "max_perf_average": -1.7863135070800782,
+                "min_loss_average": 2.786313507080078,
+                "total_iterations": 11000
+            },
+            "current": {
+                "max_perf_average": -1.8054832668304444,
+                "min_loss_average": 2.805483266830444,
+                "total_iterations": 11000
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.019169759750366167,
+                "max_perf_average_rel_change": 1.0731464367473325,
+                "final_perf_average_abs_change": -0.01831450653076172,
+                "final_perf_average_rel_change": 1.0235415245655057,
+                "min_loss_average_abs_change": 0.019169759750365944,
+                "min_loss_average_rel_change": 0.6879972300911295,
+                "final_loss_average_abs_change": 0.0183145065307615,
+                "final_loss_average_rel_change": 0.6565922696028224,
+                "iterations_change": 0
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_07-apx-a_multimodal_tabular_description_pretrained",
+            "change_type": "regression",
+            "baseline": {
+                "max_perf_average": 0.41950566934694794,
+                "min_loss_average": 1.308635950088501,
+                "total_iterations": 3000
+            },
+            "current": {
+                "max_perf_average": 0.4001741615831611,
+                "min_loss_average": 1.33101487159729,
+                "total_iterations": 4000
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.019331507763786837,
+                "max_perf_average_rel_change": -4.608163649821597,
+                "final_perf_average_abs_change": -0.009116357890878612,
+                "final_perf_average_rel_change": -2.3186410650590092,
+                "min_loss_average_abs_change": 0.022378921508789062,
+                "min_loss_average_rel_change": 1.710095271895565,
+                "final_loss_average_abs_change": 0.11321544647216797,
+                "final_loss_average_rel_change": 7.379308271045912,
+                "iterations_change": 1000
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_07-apx-b_multimodal_tabular_description_multi_task",
+            "change_type": "regression",
+            "baseline": {
+                "max_perf_average": 0.4901326590188877,
+                "min_loss_average": 0.8398082256317139,
+                "total_iterations": 3400
+            },
+            "current": {
+                "max_perf_average": 0.463140089852247,
+                "min_loss_average": 0.8679755330085754,
+                "total_iterations": 3800
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.026992569166640668,
+                "max_perf_average_rel_change": -5.507196606868119,
+                "final_perf_average_abs_change": -0.008778270056246651,
+                "final_perf_average_rel_change": -1.862898540347183,
+                "min_loss_average_abs_change": 0.028167307376861572,
+                "min_loss_average_rel_change": 3.3540166096460635,
+                "final_loss_average_abs_change": -0.011068642139434814,
+                "final_loss_average_rel_change": -1.2375950425555127,
+                "iterations_change": 400
+            }
+        },
+        {
+            "experiment_id": "g_time_series/01_time_series_power_transformer_real",
+            "change_type": "regression",
+            "baseline": {
+                "max_perf_average": -1.887760720665588,
+                "min_loss_average": 2.887760720665588,
+                "total_iterations": 2800
+            },
+            "current": {
+                "max_perf_average": -1.9149806131277263,
+                "min_loss_average": 2.9149806131277263,
+                "total_iterations": 2700
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.027219892462138295,
+                "max_perf_average_rel_change": 1.441914336078626,
+                "final_perf_average_abs_change": -0.15738472724404784,
+                "final_perf_average_rel_change": 8.247520838336838,
+                "min_loss_average_abs_change": 0.027219892462138073,
+                "min_loss_average_rel_change": 0.9425951488066597,
+                "final_loss_average_abs_change": 0.15738472724404806,
+                "final_loss_average_rel_change": 5.41163247703665,
+                "iterations_change": -100
+            }
+        },
+        {
+            "experiment_id": "e_pretraining/02_mini_foundation_cifar_from_pretrained",
+            "change_type": "regression",
+            "baseline": {
+                "max_perf_average": 0.8514358854319639,
+                "min_loss_average": 0.607425332069397,
+                "total_iterations": 9200
+            },
+            "current": {
+                "max_perf_average": 0.8193909352542798,
+                "min_loss_average": 0.7120814323425293,
+                "total_iterations": 6200
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.03204495017768416,
+                "max_perf_average_rel_change": -3.76363631436871,
+                "final_perf_average_abs_change": -0.030149225061910867,
+                "final_perf_average_rel_change": -3.5551368656803426,
+                "min_loss_average_abs_change": 0.10465610027313232,
+                "min_loss_average_rel_change": 17.229459284581765,
+                "final_loss_average_abs_change": 0.08712321519851685,
+                "final_loss_average_rel_change": 13.687213116411986,
+                "iterations_change": -3000
+            }
+        },
+        {
+            "experiment_id": "a_using_eir/tutorial_07c_multimodal_tabular_description_image",
+            "change_type": "regression",
+            "baseline": {
+                "max_perf_average": 0.4239792992755273,
+                "min_loss_average": 1.2987748384475708,
+                "total_iterations": 3000
+            },
+            "current": {
+                "max_perf_average": 0.3865293860361717,
+                "min_loss_average": 1.3391915559768677,
+                "total_iterations": 3800
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.03744991323935559,
+                "max_perf_average_rel_change": -8.832957954161433,
+                "final_perf_average_abs_change": -0.013637079427243959,
+                "final_perf_average_rel_change": -3.5029934543178416,
+                "min_loss_average_abs_change": 0.040416717529296875,
+                "min_loss_average_rel_change": 3.1119110359118975,
+                "final_loss_average_abs_change": 0.11744499206542969,
+                "final_loss_average_rel_change": 7.833768264380614,
+                "iterations_change": 800
+            }
+        },
+        {
+            "experiment_id": "c_sequence_output/02_seq_to_seq",
+            "change_type": "significant_regression",
+            "baseline": {
+                "max_perf_average": -0.12139809608459473,
+                "min_loss_average": 1.1213980960845946,
+                "total_iterations": 5000
+            },
+            "current": {
+                "max_perf_average": -0.23851111793518068,
+                "min_loss_average": 1.2385111179351806,
+                "total_iterations": 5000
+            },
+            "changes": {
+                "max_perf_average_abs_change": -0.11711302185058595,
+                "max_perf_average_rel_change": 96.47022945811045,
+                "final_perf_average_abs_change": -0.11711302185058595,
+                "final_perf_average_rel_change": 96.47022945811045,
+                "min_loss_average_abs_change": 0.11711302185058603,
+                "min_loss_average_rel_change": 10.44348320721167,
+                "final_loss_average_abs_change": 0.11711302185058603,
+                "final_loss_average_rel_change": 10.44348320721167,
+                "iterations_change": 0
+            }
+        }
+    ]
+}

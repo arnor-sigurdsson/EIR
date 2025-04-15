@@ -155,7 +155,6 @@ def main():
         "metadata": {
             "num_experiments": len(experiment_data),
             "date_generated": datetime.datetime.now().isoformat(),
-            "root_directory": os.path.abspath(args.root_dir),
         },
         "experiments": experiment_data,
     }
