@@ -117,6 +117,6 @@ class ImageOutputSamplingConfig:
     manual_inputs: Sequence[dict[str, str]] = ()
     n_eval_inputs: int = 10
 
-    diffusion_inference_steps: int = 1000
+    diffusion_inference_steps: int = 500
     diffusion_sampler: Literal["ddpm", "ddim", "dpm_solver"] = "ddpm"
     diffusion_eta: float = 0.2
