@@ -1,5 +1,5 @@
 basic_experiment:
-  batch_size: 32
+  batch_size: 64
   memory_dataset: false
   n_epochs: 100
   output_folder: eir_tutorials/tutorial_runs/i_scaling/02_scaling_compute
@@ -9,9 +9,9 @@ optimization:
   lr: 0.0006
   wd: 0.1
 evaluation_checkpoint:
-  checkpoint_interval: 500
+  checkpoint_interval: 1000
   n_saved_models: 1
-  sample_interval: 500
+  sample_interval: 1000
 data_preparation:
   streaming_setup_samples: 2048
 model:
@@ -22,3 +22,5 @@ accelerator:
   num_nodes: 1
   precision: bf16-mixed
   strategy: auto
+visualization_logging:
+  plot_skip_steps: 5000

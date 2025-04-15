@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 
-import numpy as np
 import torch
-from torch import nn
+from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from torch.nn import functional as F
 
 
@@ -16,13 +15,23 @@ class DiffusionConfig:
     posterior_variance: torch.Tensor
 
 
-def initialize_diffusion_config(time_steps: int) -> DiffusionConfig:
-    beta_start = 0.0001
-    beta_end = 0.02
-    betas = torch.linspace(beta_start, beta_end, time_steps)
+def initialize_diffusion_config(time_steps: int, beta_schedule: str) -> DiffusionConfig:
+    """
+    Note that DDPMScheduler, DDIM, and other schedulers are all using the
+    same core function to compute the actual betas, hence does not matter
+    which one we use here to initialize the betas and other parameters.
+    """
 
+    scheduler = DDPMScheduler(
+        num_train_timesteps=time_steps,
+        beta_schedule=beta_schedule,
+        prediction_type="v_prediction",
+        rescale_betas_zero_snr=True,
+    )
+
+    betas = scheduler.betas
     alphas = 1.0 - betas
-    alphas_cumprod = torch.cumprod(alphas, dim=0)
+    alphas_cumprod = scheduler.alphas_cumprod
     alphas_cumprod_prev = F.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
 
     sqrt_recip_alphas = torch.sqrt(1.0 / alphas)
@@ -65,7 +74,20 @@ def prepare_diffusion_batch(
         device=device,
     )
 
-    return x_noisy, noise, t
+    sqrt_alphas_cumprod_t = extract(
+        a=diffusion_config.sqrt_alphas_cumprod.to(device=device),
+        t=t,
+        x_shape=inputs.shape,
+    )
+    sqrt_one_minus_alphas_cumprod_t = extract(
+        a=diffusion_config.sqrt_one_minus_alphas_cumprod.to(device=device),
+        t=t,
+        x_shape=inputs.shape,
+    )
+
+    v_target = sqrt_alphas_cumprod_t * noise - sqrt_one_minus_alphas_cumprod_t * inputs
+
+    return x_noisy, v_target, t
 
 
 def q_sample(
@@ -95,111 +117,16 @@ def q_sample(
 
     scaled_x_start = input_scale * x_start
 
-    sqrt_alphas_cumprod_t = sqrt_alphas_cumprod_t.to(device)
-    sqrt_one_minus_alphas_cumprod_t = sqrt_one_minus_alphas_cumprod_t.to(device)
-    scaled_x_start = scaled_x_start.to(device)
-    noise = noise.to(device)
+    sqrt_alphas_cumprod_t = sqrt_alphas_cumprod_t.to(device=device)
+    sqrt_one_minus_alphas_cumprod_t = sqrt_one_minus_alphas_cumprod_t.to(device=device)
+    scaled_x_start = scaled_x_start.to(device=device)
+    noise = noise.to(device=device)
 
     x_noisy = (
         sqrt_alphas_cumprod_t * scaled_x_start + sqrt_one_minus_alphas_cumprod_t * noise
     )
 
     return x_noisy
-
-
-@torch.no_grad()
-def p_sample_loop(
-    config: DiffusionConfig,
-    batch_inputs: dict,
-    output_name: str,
-    model: nn.Module,
-    output_shape: tuple,
-    time_steps: int,
-    device: str,
-) -> np.ndarray:
-    current_state: torch.Tensor = torch.randn(output_shape, device=device)
-    batch_inputs[output_name] = current_state
-
-    batch_size = output_shape[0]
-
-    for i in reversed(range(0, time_steps)):
-        t = torch.full(
-            size=(batch_size,),
-            fill_value=i,
-            dtype=torch.long,
-            device=device,
-        )
-
-        current_state = p_sample(
-            config=config,
-            model=model,
-            output_name=output_name,
-            batch_inputs=batch_inputs,
-            t=t,
-            t_index=i,
-            device=device,
-        )
-
-        batch_inputs[output_name] = current_state
-
-    return current_state.cpu().numpy()
-
-
-@torch.no_grad()
-def p_sample(
-    config: DiffusionConfig,
-    model: nn.Module,
-    batch_inputs: dict[str, torch.Tensor],
-    output_name: str,
-    t: torch.Tensor,
-    t_index: int,
-    device: str,
-) -> torch.Tensor:
-    """
-    TODO: Move all config tensors to device beforehand.
-    """
-
-    current_state = batch_inputs[output_name].to(device)
-    t = t.to(device)
-
-    output_module = getattr(model.output_modules, output_name)
-    t_emb = output_module.feature_extractor.timestep_embeddings(t)
-    batch_inputs[f"__extras_{output_name}"] = t_emb
-
-    betas_t = extract(
-        a=config.betas.to(device),
-        t=t,
-        x_shape=current_state.shape,
-    )
-    sqrt_one_minus_alphas_cumprod_t = extract(
-        a=config.sqrt_one_minus_alphas_cumprod.to(device),
-        t=t,
-        x_shape=current_state.shape,
-    )
-    sqrt_recip_alphas_t = extract(
-        a=config.sqrt_recip_alphas.to(device),
-        t=t,
-        x_shape=current_state.shape,
-    )
-
-    model_outputs = model(batch_inputs)
-    model_diffusion_output = model_outputs[output_name][output_name]
-
-    model_mean = sqrt_recip_alphas_t * (
-        current_state
-        - betas_t * model_diffusion_output / sqrt_one_minus_alphas_cumprod_t
-    )
-
-    if t_index == 0:
-        return model_mean
-
-    posterior_variance_t = extract(
-        a=config.posterior_variance.to(device),
-        t=t,
-        x_shape=current_state.shape,
-    )
-    noise = torch.randn_like(current_state)
-    return model_mean + torch.sqrt(posterior_variance_t) * noise
 
 
 def extract(

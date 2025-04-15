@@ -57,7 +57,8 @@ def prepare_example_test_batch(
     batch_size: int = 2,
 ) -> Batch:
     imputed_inputs = impute_missing_modalities_wrapper(
-        inputs_values={}, inputs_objects=input_objects
+        inputs_values={},
+        inputs_objects=input_objects,
     )
 
     loader_batch: al_dataloader_getitem_batch = (imputed_inputs, {}, [])

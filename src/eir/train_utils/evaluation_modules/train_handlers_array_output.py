@@ -12,6 +12,11 @@ from typing import (
 import numpy as np
 import torch
 from aislib.misc_utils import ensure_path_exists
+from diffusers.schedulers import (
+    DDIMScheduler,
+    DDPMScheduler,
+    DPMSolverMultistepScheduler,
+)
 from PIL import Image
 from torch.utils.data import Dataset
 from torch.utils.data._utils.collate import default_collate
@@ -44,7 +49,6 @@ from eir.train_utils.evaluation_modules.evaluation_handlers_utils import (
     prepare_manual_sample_data,
     serialize_raw_inputs,
 )
-from eir.train_utils.step_modules.diffusion import p_sample_loop
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -143,14 +147,28 @@ def array_out_single_sample_evaluation_wrapper(
             batch_eval_types, batch_eval_samples = zip(*batch_eval_data, strict=False)
 
             if output_type_info.loss == "diffusion":
-                time_steps = output_type_info.diffusion_time_steps
-                assert time_steps is not None
-                batch_generated_arrays = reverse_diffusion_array_generation(
+                train_time_steps = output_type_info.diffusion_time_steps
+                assert train_time_steps is not None
+
+                sampling_config = config.sampling_config
+                assert isinstance(
+                    sampling_config,
+                    ArrayOutputSamplingConfig | ImageOutputSamplingConfig,
+                )
+
+                inference_steps = sampling_config.diffusion_inference_steps
+                scheduler_type = sampling_config.diffusion_sampler
+                eta = sampling_config.diffusion_eta
+
+                batch_generated_arrays = diffusion_generation_with_scheduler(
                     eval_samples=batch_eval_samples,
                     array_output_name=cur_output_name,
                     experiment=experiment,
                     default_eir_hooks=default_eir_hooks,
-                    num_steps=time_steps,
+                    num_train_steps=train_time_steps,
+                    num_inference_steps=inference_steps,
+                    scheduler_type=scheduler_type,
+                    eta=eta,
                 )
             else:
                 batch_generated_arrays = one_shot_array_generation(
@@ -265,26 +283,108 @@ def one_shot_array_generation(
     return final_numpy_outputs
 
 
+def get_scheduler(
+    scheduler_type: str,
+    num_train_steps: int,
+    num_inference_steps: int,
+    device: str,
+    betas: torch.Tensor,
+    eta: float | None = None,
+) -> Any:
+    betas_numpy = betas.cpu().numpy()
+
+    scheduler: DDPMScheduler | DDIMScheduler | DPMSolverMultistepScheduler
+    if scheduler_type == "ddpm":
+        scheduler = DDPMScheduler(
+            num_train_timesteps=num_train_steps,
+            trained_betas=betas_numpy,
+            clip_sample=False,
+            prediction_type="v_prediction",
+            timestep_spacing="trailing",
+        )
+        eta_for_step = None
+    elif scheduler_type == "ddim":
+        scheduler = DDIMScheduler(
+            num_train_timesteps=num_train_steps,
+            trained_betas=betas_numpy,
+            clip_sample=False,
+            prediction_type="v_prediction",
+            timestep_spacing="trailing",
+        )
+        eta_for_step = eta if eta is not None else 0.0
+    elif scheduler_type == "dpm_solver":
+        scheduler = DPMSolverMultistepScheduler(
+            num_train_timesteps=num_train_steps,
+            trained_betas=betas_numpy,
+            prediction_type="v_prediction",
+            timestep_spacing="trailing",
+        )
+        eta_for_step = None
+    else:
+        logger.warning(f"Unknown scheduler type: {scheduler_type}, defaulting to DDPM")
+        scheduler = DDPMScheduler(
+            num_train_timesteps=num_train_steps,
+            trained_betas=betas_numpy,
+            clip_sample=False,
+            prediction_type="v_prediction",
+            timestep_spacing="trailing",
+        )
+        eta_for_step = eta if eta is not None else 0.0
+
+    scheduler.set_timesteps(  # type: ignore[union-attr]
+        num_inference_steps=num_inference_steps,
+        device=device,
+    )
+    return scheduler, eta_for_step
+
+
+def prepare_model_timestep(
+    model: Any,
+    output_name: str,
+    t_batch: torch.Tensor,
+    batch_inputs: dict[str, torch.Tensor],
+) -> dict[str, torch.Tensor]:
+    batch_inputs = deepcopy(batch_inputs)
+
+    output_module = getattr(model.output_modules, output_name)
+    t_emb = output_module.feature_extractor.timestep_embeddings(t_batch)
+    batch_inputs[f"__extras_{output_name}"] = t_emb
+
+    return batch_inputs
+
+
 @torch.inference_mode()
-def reverse_diffusion_array_generation(
+def diffusion_generation_with_scheduler(
     eval_samples: tuple[ArrayOutputEvalSample, ...],
     array_output_name: str,
     experiment: Union["Experiment", "PredictExperiment", "ServeExperiment"],
     default_eir_hooks: Union["Hooks", "PredictHooks"],
-    num_steps: int,
+    num_train_steps: int,
+    num_inference_steps: int = 50,
+    scheduler_type: str = "ddim",
+    eta: float | None = None,
 ) -> list[np.ndarray]:
-    """
-    TODO: Consider not keeping / making configurable whether to keep intermediate
-          states as this might blow up memory usage in some cases.
-    """
     output_object = experiment.outputs[array_output_name]
     assert isinstance(output_object, ComputedArrayOutputInfo | ComputedImageOutputInfo)
 
     dimensions = output_object.data_dimensions
     batch_size = len(eval_samples)
     shape = (batch_size,) + dimensions.full_shape()
-
     device = str(experiment.fabric.device)
+
+    diffusion_config = output_object.diffusion_config
+    assert diffusion_config is not None
+    betas = diffusion_config.betas
+
+    scheduler, eta_for_step = get_scheduler(
+        scheduler_type=scheduler_type,
+        num_train_steps=num_train_steps,
+        num_inference_steps=num_inference_steps,
+        device=device,
+        eta=eta,
+        betas=betas,
+    )
+
     array_sampling_batch = prepare_array_sampling_batch(
         eval_samples=eval_samples,
         device=device,
@@ -306,25 +406,51 @@ def reverse_diffusion_array_generation(
     )
     batch_inputs = deepcopy(batch.inputs)
 
-    dc = output_object.diffusion_config
-    assert dc is not None
+    current_state = torch.randn(shape, device=device)
 
-    final_states = p_sample_loop(
-        config=dc,
-        batch_inputs=batch_inputs,
-        output_name=array_output_name,
-        model=experiment.model,
-        output_shape=shape,
-        time_steps=num_steps,
-        device=device,
-    )
+    for t in scheduler.timesteps:
+        batch_inputs[array_output_name] = current_state
+
+        t_batch = torch.full(
+            (batch_size,),
+            t,
+            dtype=torch.long,
+            device=device,
+        )
+        batch_inputs = prepare_model_timestep(
+            model=experiment.model,
+            output_name=array_output_name,
+            t_batch=t_batch,
+            batch_inputs=batch_inputs,
+        )
+
+        model_outputs = experiment.model(batch_inputs)
+        model_diffusion_output = model_outputs[array_output_name][array_output_name]
+
+        if scheduler_type == "ddim" and eta_for_step is not None:
+            scheduler_output = scheduler.step(
+                model_output=model_diffusion_output,
+                timestep=t,
+                sample=current_state,
+                eta=eta_for_step,
+            )
+        else:
+            scheduler_output = scheduler.step(
+                model_output=model_diffusion_output,
+                timestep=t,
+                sample=current_state,
+            )
+
+        current_state = scheduler_output.prev_sample
+
+    final_states = current_state.cpu().numpy()
 
     assert output_object.normalization_stats is not None
     final_numpy_outputs = []
     for batch_idx in range(batch_size):
         cur_sample_final_state = final_states[batch_idx]
         cur_final_output = un_normalize_wrapper(
-            array=torch.from_numpy(cur_sample_final_state),
+            array=torch.from_numpy(cur_sample_final_state).to(device),
             normalization_stats=output_object.normalization_stats,
         )
         cur_final_output_numpy = cur_final_output.cpu().numpy()

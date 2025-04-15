@@ -36,6 +36,7 @@ class ConnectionManager:
         sequence_length: int = 256,
         dataset_name: str = "HuggingFaceFW/fineweb",
         dataset_split: str = "train",
+        max_iterations: int | None = None,
     ):
         self.active_connections: dict[WebSocket, dict] = {}
         self.global_position = 0
@@ -45,10 +46,13 @@ class ConnectionManager:
         self.sequence_length = sequence_length
         self.dataset_name = dataset_name
         self.dataset_split = dataset_split
+        self.max_iterations = max_iterations
         self.validation_ids: set[str] = set()
 
         logger.info(f"Loading dataset {dataset_name} with split {dataset_split}")
         logger.info(f"Using sequence_length={self.sequence_length}")
+        if self.max_iterations is not None:
+            logger.info(f"Will terminate after {self.max_iterations} iterations")
 
         self.dataset_iterator = None
 
@@ -103,6 +107,8 @@ class ConnectionManager:
         if self.dataset is not None:
             self.dataset_iterator = iter(self.dataset)
         self.global_position = 0
+        if self.max_iterations is not None:
+            logger.info(f"Reset: Will terminate after {self.max_iterations} iterations")
 
     def load_dataset(self):
         if self.dataset is None:
@@ -121,6 +127,13 @@ class ConnectionManager:
             self.dataset_iterator = iter(self.dataset)
 
     def get_sequence_batch(self, batch_size: int) -> list[dict[str, Any]]:
+        if (
+            self.max_iterations is not None
+            and self.global_position >= self.max_iterations
+        ):
+            logger.info(f"Reached max iterations ({self.max_iterations}), terminating")
+            return []
+
         batch = []
         min_words = 20
 
@@ -167,6 +180,16 @@ class ConnectionManager:
 
                         self.global_position += 1
 
+                        if (
+                            self.max_iterations is not None
+                            and self.global_position >= self.max_iterations
+                        ):
+                            logger.info(
+                                f"Reached max iterations ({self.max_iterations}) "
+                                f"during batch creation"
+                            )
+                            return batch
+
                         if len(batch) >= batch_size:
                             break
 
@@ -190,6 +213,15 @@ class ConnectionManager:
 
                 self.global_position += 1
 
+                if (
+                    self.max_iterations is not None
+                    and self.global_position >= self.max_iterations
+                ):
+                    logger.info(
+                        f"Reached max iterations ({self.max_iterations}) after "
+                        f"adding last chunk"
+                    )
+
         return batch
 
 
@@ -198,15 +230,20 @@ def create_manager():
     dataset_name = os.getenv("DATASET_NAME", "HuggingFaceFW/fineweb")
     dataset_split = os.getenv("DATASET_SPLIT", "train")
 
+    max_iterations_str = os.getenv("MAX_ITERATIONS")
+    max_iterations = int(max_iterations_str) if max_iterations_str else None
+
     logger.info(
         f"Creating ConnectionManager with sequence_length={sequence_length}, "
-        f"dataset_name={dataset_name}, dataset_split={dataset_split}"
+        f"dataset_name={dataset_name}, dataset_split={dataset_split}, "
+        f"max_iterations={max_iterations}"
     )
 
     return ConnectionManager(
         sequence_length=sequence_length,
         dataset_name=dataset_name,
         dataset_split=dataset_split,
+        max_iterations=max_iterations,
     )
 
 
@@ -287,6 +324,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     "validation_ids_count": len(manager.validation_ids),
                 }
 
+                if manager.max_iterations is not None:
+                    status_data["max_iterations"] = manager.max_iterations
+                    status_data["remaining_iterations"] = max(
+                        0, manager.max_iterations - manager.global_position
+                    )
+
                 await manager.send_personal_message(
                     message={"type": "status", "payload": status_data},
                     websocket=websocket,
@@ -311,8 +354,17 @@ def main():
     parser.add_argument(
         "--port", type=int, default=8000, help="Port to run the server on"
     )
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=None,
+        help="Maximum number of iterations before terminating (default: no limit)",
+    )
 
     args = parser.parse_args()
+
+    if args.max_iterations is not None:
+        os.environ["MAX_ITERATIONS"] = str(args.max_iterations)
 
     import uvicorn
 

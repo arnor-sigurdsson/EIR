@@ -4,6 +4,7 @@ from collections import Counter
 from collections.abc import Generator, Iterable, Mapping, Sequence
 from copy import copy
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import (
     Any,
     Literal,
@@ -197,13 +198,41 @@ class Configs:
         self.gc = self.global_config
 
 
+def _check_injections(
+    cl_args: argparse.Namespace | types.SimpleNamespace,
+    extra_cl_args_overload: list[str] | None = None,
+) -> None:
+    if not extra_cl_args_overload:
+        return
+
+    all_filename = []
+    for files in vars(cl_args).values():
+        assert isinstance(files, list)
+        for f in files:
+            cur_filename = Path(f).stem
+            all_filename.append(cur_filename)
+
+    for extra_arg in extra_cl_args_overload:
+        extra_arg_parsed = extra_arg[2:] if extra_arg.startswith("--") else extra_arg
+        target_file, str_to_inject = extra_arg_parsed.split(".", 1)
+        if target_file not in all_filename:
+            raise ValueError(
+                f"Attempting to inject {str_to_inject} into {target_file}, "
+                f"but {target_file} is not in the provided yaml files."
+                f"Please check the provided yaml files and the extra arguments."
+            )
+
+
 def generate_aggregated_config(
     cl_args: argparse.Namespace | types.SimpleNamespace,
     extra_cl_args_overload: list[str] | None = None,
     strict: bool = True,
 ) -> Configs:
+    _check_injections(cl_args=cl_args, extra_cl_args_overload=extra_cl_args_overload)
+
     global_config_iter = get_yaml_iterator_with_injections(
-        yaml_config_files=cl_args.global_configs, extra_cl_args=extra_cl_args_overload
+        yaml_config_files=cl_args.global_configs,
+        extra_cl_args=extra_cl_args_overload,
     )
     global_config = get_global_config(global_configs=global_config_iter)
 

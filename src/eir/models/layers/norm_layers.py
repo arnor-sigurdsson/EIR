@@ -8,24 +8,48 @@ class LayerScale(nn.Module):
         self,
         dim: int,
         init_values: float = 1.0,
+        n_dims: int | None = None,
     ) -> None:
         """
         Note: We use an init value of 1.0 here instead of the generally applied
         1e-5. As we often have linear down sampling layers for residual identities,
         the models might be more inclined to use the main branch, and having the
         scaling too low might cause learning issues.
+
+        Args:
+            dim: Number of features to scale
+            init_values: Initial value for scaling parameters
+            n_dims: Number of dimensions in the input tensor (including batch)
         """
         super().__init__()
         self.dim = dim
         self.init_values = init_values
+        self.n_dims = n_dims
+
+        gamma_shape: tuple[int, ...]
+        if n_dims is None:
+            gamma_shape = (dim,)
+        elif n_dims == 4:
+            gamma_shape = (1, dim, 1, 1)
+        elif n_dims == 3:
+            gamma_shape = (1, 1, dim)
+        elif n_dims == 2:
+            gamma_shape = (1, dim)
+        else:
+            raise ValueError(
+                f"Unsupported n_dims: {n_dims}. Supported values are None, 2, 3, and 4."
+            )
+
         self.gamma = nn.Parameter(
-            data=init_values * torch.ones(dim),
+            data=init_values * torch.ones(gamma_shape),
             requires_grad=True,
         )
 
     def __repr__(self):
         return (
-            f"{self.__class__.__name__}(dim={self.dim}, init_values={self.init_values})"
+            f"{self.__class__.__name__}(dim={self.dim}, "
+            f"init_values={self.init_values}, "
+            f"n_dims={self.n_dims})"
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -61,7 +85,7 @@ class GRN(nn.Module):
             dim=(2, 3),
             keepdim=True,
         )
-        nx = gx / (gx.mean(dim=-1, keepdim=True) + 1e-6)
+        nx = gx / (gx.mean(dim=1, keepdim=True) + 1e-6)
         return self.gamma * (x * nx) + self.beta + x
 
 

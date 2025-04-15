@@ -81,6 +81,7 @@ Scaling
 
     i_scaling/01_streaming.rst
     i_scaling/02_compute_gpt.rst
+    i_scaling/03_diffusion.rst
 
 
 Customizing EIR

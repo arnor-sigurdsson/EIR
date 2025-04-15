@@ -2,52 +2,16 @@ import math
 from typing import Literal
 
 import torch
+import torch.nn.functional as F
 from einops import rearrange
 from torch import nn
 from torchvision.ops import StochasticDepth
 
-from eir.models.layers.attention_layers import LinearAttention
-from eir.models.layers.norm_layers import GRN
+from eir.models.layers.attention_layers import SwiGLU
+from eir.models.layers.norm_layers import GRN, LayerScale
 from eir.utils.logging import get_logger
 
 logger = get_logger(name=__name__)
-
-
-class SEBlock(nn.Module):
-    def __init__(self, channels: int, reduction: int):
-        super().__init__()
-        reduced_channels = max(1, channels // reduction)
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-
-        self.conv_down = nn.Conv2d(
-            in_channels=channels,
-            out_channels=reduced_channels,
-            kernel_size=1,
-            padding=0,
-            bias=False,
-        )
-        self.act_1 = nn.GELU()
-
-        self.conv_up = nn.Conv2d(
-            in_channels=reduced_channels,
-            out_channels=channels,
-            kernel_size=1,
-            padding=0,
-            bias=False,
-        )
-
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        out = self.avg_pool(x)
-
-        out = self.conv_down(out)
-        out = self.act_1(out)
-
-        out = self.conv_up(out)
-        out = self.sigmoid(out)
-
-        return out
 
 
 def get_eca_kernel_size(
@@ -106,7 +70,7 @@ class ConvAttentionBlock(nn.Module):
         num_heads: int = 4,
         dropout_p: float = 0.1,
         attention_mode: Literal["spatial", "channel"] = "spatial",
-        attention_type: Literal["full", "linear"] = "full",
+        ffn_expansion: int = 4,
     ):
         super().__init__()
         self.in_channels = channels
@@ -114,67 +78,92 @@ class ConvAttentionBlock(nn.Module):
         self.in_height = height
         self.in_width = width
         self.attention_mode = attention_mode
-        self.attention_type = attention_type
 
         self.embedding_dim = channels if attention_mode == "spatial" else height * width
         self.num_heads = adjust_num_heads(
             num_heads=num_heads,
             embedding_dim=self.embedding_dim,
         )
+        self.head_dim = self.embedding_dim // self.num_heads
 
-        self.attention: nn.MultiheadAttention | LinearAttention
-        if attention_type == "full":
-            self.norm = nn.RMSNorm(normalized_shape=self.embedding_dim)
-            self.attention = nn.MultiheadAttention(
-                embed_dim=self.embedding_dim,
-                num_heads=self.num_heads,
-                batch_first=True,
-                dropout=dropout_p,
-            )
-        elif attention_type == "linear":
-            self.norm = nn.RMSNorm(normalized_shape=[channels, height, width])
-            self.attention = LinearAttention(
-                embed_dim=self.embedding_dim,
-                heads=self.num_heads,
-                dim_head=self.embedding_dim // self.num_heads,
-            )
+        self.q_proj = nn.Linear(self.embedding_dim, self.embedding_dim, bias=False)
+        self.k_proj = nn.Linear(self.embedding_dim, self.embedding_dim, bias=False)
+        self.v_proj = nn.Linear(self.embedding_dim, self.embedding_dim, bias=False)
+        self.out_proj = nn.Linear(self.embedding_dim, self.embedding_dim, bias=False)
 
-        self.grn = GRN(in_channels=channels)
+        self.norm1 = nn.RMSNorm(normalized_shape=self.embedding_dim)
+        self.norm2 = nn.RMSNorm(normalized_shape=self.embedding_dim)
+
+        self.ffn = SwiGLU(
+            in_features=self.embedding_dim,
+            hidden_features=self.embedding_dim * ffn_expansion,
+            out_features=self.embedding_dim,
+            bias=False,
+        )
+
+        self.dropout = nn.Dropout(dropout_p)
+
+        self.ls1 = LayerScale(dim=self.embedding_dim, init_values=1e-5)
+        self.ls2 = LayerScale(dim=self.embedding_dim, init_values=1e-5)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_size, channels, height, width = x.size()
 
-        if self.attention_type == "full":
-            if self.attention_mode == "spatial":
-                out = rearrange(x, "b c h w -> b (h w) c")
-            elif self.attention_mode == "channel":
-                out = rearrange(x, "b c h w -> b (h w) c").permute(0, 2, 1)
-            else:
-                raise ValueError()
-
-            out = self.norm(out)
-            attn_output, _ = self.attention(out, out, out)
-            out = out + attn_output
-
-            if self.attention_mode == "spatial":
-                out = rearrange(out, "b (h w) c -> b c h w", h=height, w=width)
-            elif self.attention_mode == "channel":
-                out = rearrange(out, "b c (h w) -> b c h w", h=height, w=width)
-            else:
-                raise ValueError()
-
-        elif self.attention_type == "linear":
-            assert self.attention_mode == "spatial"
-            out = self.norm(x)
-            attn_output = self.attention(x)
-            out = out + attn_output
-
+        if self.attention_mode == "spatial":
+            # [B, C, H, W] -> [B, H*W, C]
+            out = rearrange(x, "b c h w -> b (h w) c")
+        elif self.attention_mode == "channel":
+            # [B, C, H, W] -> [B, C, H*W]
+            out = rearrange(x, "b c h w -> b c (h w)")
         else:
-            raise ValueError()
+            raise ValueError(f"Unsupported attention mode: {self.attention_mode}")
 
-        out = self.grn(out)
+        # First branch (norm -> attention -> LS)
+        residual = out
+        out = self.norm1(out)
 
-        return x + out
+        q = self.q_proj(out)
+        k = self.k_proj(out)
+        v = self.v_proj(out)
+
+        seq_len = out.size(1)
+        q = q.view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        k = k.view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        v = v.view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+
+        attn_output = F.scaled_dot_product_attention(
+            query=q,
+            key=k,
+            value=v,
+            dropout_p=self.dropout.p if self.training else 0.0,
+        )
+
+        attn_output = (
+            attn_output.transpose(1, 2)
+            .contiguous()
+            .view(batch_size, seq_len, self.embedding_dim)
+        )
+        attn_output = self.dropout(self.out_proj(attn_output))
+
+        attn_output = self.ls1(attn_output)
+
+        out = residual + attn_output
+
+        # Second residual path (norm -> ffn -> LS)
+        residual = out
+        out = self.norm2(out)
+        ffn_output = self.dropout(self.ffn(out))
+
+        ffn_output = self.ls2(ffn_output)
+
+        out = residual + ffn_output
+
+        if self.attention_mode == "spatial":
+            out = rearrange(out, "b (h w) c -> b c h w", h=height, w=width)
+        elif self.attention_mode == "channel":
+            out = rearrange(out, "b c (h w) -> b c h w", h=height, w=width)
+
+        return out
 
 
 def adjust_num_heads(num_heads: int, embedding_dim: int) -> int:
@@ -287,6 +276,12 @@ class CNNResidualBlockBase(nn.Module):
 
         self.eca_block = ECABlock(channels=out_channels)
 
+        self.ls = LayerScale(
+            dim=out_channels,
+            init_values=1e-5,
+            n_dims=4,
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError()
 
@@ -318,6 +313,7 @@ class FirstCNNBlock(CNNResidualBlockBase):
         delattr(self, "conv_2")
         delattr(self, "eca_block")
         delattr(self, "stochastic_depth")
+        delattr(self, "ls")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.conv_1(x)
@@ -348,8 +344,9 @@ class CNNResidualBlock(CNNResidualBlockBase):
         out = self.rb_do(out)
         out = self.conv_2(out)
 
-        channel_recalibrations = self.eca_block(out)
-        out = out * channel_recalibrations
+        out = self.eca_block(out)
+
+        out = self.ls(out)
 
         out = self.stochastic_depth(out)
 
@@ -404,6 +401,12 @@ class DownSamplingResidualBlock(nn.Module):
 
         self.grn = GRN(in_channels=self.out_channels)
 
+        self.ls = LayerScale(
+            dim=self.out_channels,
+            init_values=1e-5,
+            n_dims=4,
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = self.identity(x)
 
@@ -411,6 +414,8 @@ class DownSamplingResidualBlock(nn.Module):
         out = self.act_1(out)
         out = self.conv_1(out)
         out = self.grn(out)
+
+        out = self.ls(out)
 
         return out + identity
 
@@ -481,6 +486,12 @@ class UpSamplingResidualBlock(nn.Module):
 
         self.grn = GRN(in_channels=self.out_channels)
 
+        self.ls = LayerScale(
+            dim=self.out_channels,
+            init_values=1e-5,
+            n_dims=4,
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         upsampled = self.upsample(x)
         identity = self.identity(upsampled)
@@ -490,6 +501,7 @@ class UpSamplingResidualBlock(nn.Module):
         out = self.act_1(out)
         out = self.conv_1(out)
         out = self.grn(out)
+        out = self.ls(out)
 
         return out + identity
 

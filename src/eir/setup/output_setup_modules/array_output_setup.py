@@ -69,7 +69,11 @@ def set_up_array_output(
                 "Diffusion loss requires specifying the number of time steps."
                 "Please set `diffusion_time_steps` in the output config."
             )
-        diffusion_config = initialize_diffusion_config(time_steps=time_steps)
+        beta_schedule = output_type_info.diffusion_beta_schedule
+        diffusion_config = initialize_diffusion_config(
+            time_steps=time_steps,
+            beta_schedule=beta_schedule,
+        )
 
     array_output_object = ComputedArrayOutputInfo(
         output_config=output_config,

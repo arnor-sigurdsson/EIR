@@ -1,0 +1,480 @@
+{
+    "experiments": {
+        "a_using_eir/tutorial_01_run": {
+            "final_loss_average": 0.5394218564033508,
+            "final_perf_average": 0.8498878315326668,
+            "log_file": "a_using_eir/tutorial_01_run/validation_average_history.log",
+            "max_perf_average": 0.8498878315326668,
+            "min_loss_average": 0.5394218564033508,
+            "total_iterations": 600
+        },
+        "a_using_eir/tutorial_01_run_lr-0.002_epochs-20": {
+            "final_loss_average": 0.6332035064697266,
+            "final_perf_average": 0.8752121462017772,
+            "log_file": "a_using_eir/tutorial_01_run_lr-0.002_epochs-20/validation_average_history.log",
+            "max_perf_average": 0.8899300498480625,
+            "min_loss_average": 0.4749792218208313,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_02_run": {
+            "final_loss_average": 0.07681087404489517,
+            "final_perf_average": 0.7959435562104201,
+            "log_file": "a_using_eir/tutorial_02_run/validation_average_history.log",
+            "max_perf_average": 0.7992896272954593,
+            "min_loss_average": 0.07681087404489517,
+            "total_iterations": 16000
+        },
+        "a_using_eir/tutorial_03_anti_breast_cancer_peptides_run": {
+            "final_loss_average": 0.39665648341178894,
+            "final_perf_average": 0.7210618596895404,
+            "log_file": "a_using_eir/tutorial_03_anti_breast_cancer_peptides_run/validation_average_history.log",
+            "max_perf_average": 0.7410807429714192,
+            "min_loss_average": 0.29782000184059143,
+            "total_iterations": 2400
+        },
+        "a_using_eir/tutorial_03_imdb_run": {
+            "final_loss_average": 0.4855208098888397,
+            "final_perf_average": 0.783575274686238,
+            "log_file": "a_using_eir/tutorial_03_imdb_run/validation_average_history.log",
+            "max_perf_average": 0.7972295480656086,
+            "min_loss_average": 0.42575639486312866,
+            "total_iterations": 8500
+        },
+        "a_using_eir/tutorial_04_imdb_run": {
+            "final_loss_average": 0.35641542077064514,
+            "final_perf_average": 0.8510200198051122,
+            "log_file": "a_using_eir/tutorial_04_imdb_run/validation_average_history.log",
+            "max_perf_average": 0.8536673391137921,
+            "min_loss_average": 0.34118860960006714,
+            "total_iterations": 5500
+        },
+        "a_using_eir/tutorial_04_imdb_run_combined": {
+            "final_loss_average": 0.45182397961616516,
+            "final_perf_average": 0.8375832919899627,
+            "log_file": "a_using_eir/tutorial_04_imdb_run_combined/validation_average_history.log",
+            "max_perf_average": 0.8889523443191243,
+            "min_loss_average": 0.30070337653160095,
+            "total_iterations": 4000
+        },
+        "a_using_eir/tutorial_04_imdb_run_local": {
+            "final_loss_average": 0.3091767430305481,
+            "final_perf_average": 0.8889005299701557,
+            "log_file": "a_using_eir/tutorial_04_imdb_run_local/validation_average_history.log",
+            "max_perf_average": 0.9009180520146333,
+            "min_loss_average": 0.2665763795375824,
+            "total_iterations": 6500
+        },
+        "a_using_eir/tutorial_04_imdb_run_longformer": {
+            "final_loss_average": 0.30556753277778625,
+            "final_perf_average": 0.8870807285387828,
+            "log_file": "a_using_eir/tutorial_04_imdb_run_longformer/validation_average_history.log",
+            "max_perf_average": 0.9065134775684659,
+            "min_loss_average": 0.2516227066516876,
+            "total_iterations": 8000
+        },
+        "a_using_eir/tutorial_04_imdb_run_tiny-bert": {
+            "final_loss_average": 0.5448429584503174,
+            "final_perf_average": 0.8443788215823771,
+            "log_file": "a_using_eir/tutorial_04_imdb_run_tiny-bert/validation_average_history.log",
+            "max_perf_average": 0.8819592543547516,
+            "min_loss_average": 0.3114476203918457,
+            "total_iterations": 5000
+        },
+        "a_using_eir/tutorial_05_is_it_a_hot_dog": {
+            "final_loss_average": 0.6379956603050232,
+            "final_perf_average": 0.6040149757900545,
+            "log_file": "a_using_eir/tutorial_05_is_it_a_hot_dog/validation_average_history.log",
+            "max_perf_average": 0.7483596854328736,
+            "min_loss_average": 0.5243963003158569,
+            "total_iterations": 2500
+        },
+        "a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_combined": {
+            "final_loss_average": 0.13511954247951508,
+            "final_perf_average": 0.9856579936486416,
+            "log_file": "a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_combined/validation_average_history.log",
+            "max_perf_average": 0.9856579936486416,
+            "min_loss_average": 0.12082023918628693,
+            "total_iterations": 2800
+        },
+        "a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_resnet": {
+            "final_loss_average": 0.3304387032985687,
+            "final_perf_average": 0.8538851078049265,
+            "log_file": "a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_resnet/validation_average_history.log",
+            "max_perf_average": 0.9339357788372957,
+            "min_loss_average": 0.2737967371940613,
+            "total_iterations": 2500
+        },
+        "a_using_eir/tutorial_06_imdb_sentiment_binary": {
+            "final_loss_average": 0.91843581199646,
+            "final_perf_average": 0.5139408831457339,
+            "log_file": "a_using_eir/tutorial_06_imdb_sentiment_binary/validation_average_history.log",
+            "max_perf_average": 0.5589958519266374,
+            "min_loss_average": 0.6289692521095276,
+            "total_iterations": 15000
+        },
+        "a_using_eir/tutorial_07-apx-a_multimodal_tabular_description_pretrained": {
+            "final_loss_average": 1.6474438905715942,
+            "final_perf_average": 0.38406040535456154,
+            "log_file": "a_using_eir/tutorial_07-apx-a_multimodal_tabular_description_pretrained/validation_average_history.log",
+            "max_perf_average": 0.4001741615831611,
+            "min_loss_average": 1.33101487159729,
+            "total_iterations": 4000
+        },
+        "a_using_eir/tutorial_07-apx-b_multimodal_tabular_description_multi_task": {
+            "final_loss_average": 0.883298397064209,
+            "final_perf_average": 0.4624374116421603,
+            "log_file": "a_using_eir/tutorial_07-apx-b_multimodal_tabular_description_multi_task/validation_average_history.log",
+            "max_perf_average": 0.463140089852247,
+            "min_loss_average": 0.8679755330085754,
+            "total_iterations": 3800
+        },
+        "a_using_eir/tutorial_07a_multimodal_tabular": {
+            "final_loss_average": 1.3537379503250122,
+            "final_perf_average": 0.4002094911104212,
+            "log_file": "a_using_eir/tutorial_07a_multimodal_tabular/validation_average_history.log",
+            "max_perf_average": 0.4159494834148988,
+            "min_loss_average": 1.3154672384262085,
+            "total_iterations": 5200
+        },
+        "a_using_eir/tutorial_07b_multimodal_tabular_description": {
+            "final_loss_average": 1.5182340145111084,
+            "final_perf_average": 0.41048914750859267,
+            "log_file": "a_using_eir/tutorial_07b_multimodal_tabular_description/validation_average_history.log",
+            "max_perf_average": 0.4136967213741581,
+            "min_loss_average": 1.3016999959945679,
+            "total_iterations": 3000
+        },
+        "a_using_eir/tutorial_07c_multimodal_tabular_description_image": {
+            "final_loss_average": 1.6166595220565796,
+            "final_perf_average": 0.37566080551269765,
+            "log_file": "a_using_eir/tutorial_07c_multimodal_tabular_description_image/validation_average_history.log",
+            "max_perf_average": 0.3865293860361717,
+            "min_loss_average": 1.3391915559768677,
+            "total_iterations": 3800
+        },
+        "a_using_eir/tutorial_08_run_cnn-1d": {
+            "final_loss_average": 0.8043970465660095,
+            "final_perf_average": 0.876126324077774,
+            "log_file": "a_using_eir/tutorial_08_run_cnn-1d/validation_average_history.log",
+            "max_perf_average": 0.8959120230056458,
+            "min_loss_average": 0.4075094163417816,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_cnn-2d": {
+            "final_loss_average": 0.614513635635376,
+            "final_perf_average": 0.8337944415444399,
+            "log_file": "a_using_eir/tutorial_08_run_cnn-2d/validation_average_history.log",
+            "max_perf_average": 0.8337944415444399,
+            "min_loss_average": 0.6069782376289368,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_cnn-3d": {
+            "final_loss_average": 0.6525669693946838,
+            "final_perf_average": 0.8115663063884783,
+            "log_file": "a_using_eir/tutorial_08_run_cnn-3d/validation_average_history.log",
+            "max_perf_average": 0.8115663063884783,
+            "min_loss_average": 0.6338098049163818,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_lcl-1d": {
+            "final_loss_average": 0.821648120880127,
+            "final_perf_average": 0.8669237880707866,
+            "log_file": "a_using_eir/tutorial_08_run_lcl-1d/validation_average_history.log",
+            "max_perf_average": 0.875458285674411,
+            "min_loss_average": 0.4891490936279297,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_lcl-2d": {
+            "final_loss_average": 0.7183852791786194,
+            "final_perf_average": 0.868859072609307,
+            "log_file": "a_using_eir/tutorial_08_run_lcl-2d/validation_average_history.log",
+            "max_perf_average": 0.8766788363599954,
+            "min_loss_average": 0.46633878350257874,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_lcl-3d": {
+            "final_loss_average": 0.7001350522041321,
+            "final_perf_average": 0.878741004165711,
+            "log_file": "a_using_eir/tutorial_08_run_lcl-3d/validation_average_history.log",
+            "max_perf_average": 0.8815870882013211,
+            "min_loss_average": 0.47988173365592957,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_transformer-1d": {
+            "final_loss_average": 0.8060891628265381,
+            "final_perf_average": 0.8710221733812716,
+            "log_file": "a_using_eir/tutorial_08_run_transformer-1d/validation_average_history.log",
+            "max_perf_average": 0.8952840656027449,
+            "min_loss_average": 0.44295841455459595,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_transformer-2d": {
+            "final_loss_average": 0.7986264228820801,
+            "final_perf_average": 0.8759362458282872,
+            "log_file": "a_using_eir/tutorial_08_run_transformer-2d/validation_average_history.log",
+            "max_perf_average": 0.8946274414360282,
+            "min_loss_average": 0.4294533133506775,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_transformer-3d": {
+            "final_loss_average": 0.8567931652069092,
+            "final_perf_average": 0.8714191498523919,
+            "log_file": "a_using_eir/tutorial_08_run_transformer-3d/validation_average_history.log",
+            "max_perf_average": 0.8933891617129276,
+            "min_loss_average": 0.43549689650535583,
+            "total_iterations": 1400
+        },
+        "b_customizing_eir/tutorial_01_run": {
+            "final_loss_average": 0.4605964422225952,
+            "final_perf_average": 0.8790559517721438,
+            "log_file": "b_customizing_eir/tutorial_01_run/validation_average_history.log",
+            "max_perf_average": 0.8790559517721438,
+            "min_loss_average": 0.4605964422225952,
+            "total_iterations": 1000
+        },
+        "c_sequence_output/01_sequence_generation": {
+            "final_loss_average": 1.3205068349838256,
+            "final_perf_average": -0.3205068349838257,
+            "log_file": "c_sequence_output/01_sequence_generation/validation_average_history.log",
+            "max_perf_average": -0.3205068349838257,
+            "min_loss_average": 1.3205068349838256,
+            "total_iterations": 3000
+        },
+        "c_sequence_output/02_seq_to_seq": {
+            "final_loss_average": 1.2385111179351806,
+            "final_perf_average": -0.23851111793518068,
+            "log_file": "c_sequence_output/02_seq_to_seq/validation_average_history.log",
+            "max_perf_average": -0.23851111793518068,
+            "min_loss_average": 1.2385111179351806,
+            "total_iterations": 5000
+        },
+        "c_sequence_output/02_seq_to_seq_eng_only": {
+            "final_loss_average": 3.147469522476196,
+            "final_perf_average": -2.147469522476196,
+            "log_file": "c_sequence_output/02_seq_to_seq_eng_only/validation_average_history.log",
+            "max_perf_average": -2.147469522476196,
+            "min_loss_average": 3.147469522476196,
+            "total_iterations": 5000
+        },
+        "c_sequence_output/03_image_captioning": {
+            "final_loss_average": 2.492777795791626,
+            "final_perf_average": -1.492777795791626,
+            "log_file": "c_sequence_output/03_image_captioning/validation_average_history.log",
+            "max_perf_average": -1.492777795791626,
+            "min_loss_average": 2.492777795791626,
+            "total_iterations": 11000
+        },
+        "c_sequence_output/03_image_captioning_text_only": {
+            "final_loss_average": 2.8076416702270506,
+            "final_perf_average": -1.8076416702270508,
+            "log_file": "c_sequence_output/03_image_captioning_text_only/validation_average_history.log",
+            "max_perf_average": -1.8054832668304444,
+            "min_loss_average": 2.805483266830444,
+            "total_iterations": 11000
+        },
+        "c_sequence_output/04_protein_sequence_generation_sequence_only": {
+            "final_loss_average": 2.642528772354126,
+            "final_perf_average": -1.642528772354126,
+            "log_file": "c_sequence_output/04_protein_sequence_generation_sequence_only/validation_average_history.log",
+            "max_perf_average": -1.642528772354126,
+            "min_loss_average": 2.642528772354126,
+            "total_iterations": 5500
+        },
+        "c_sequence_output/04_protein_sequence_generation_tabular": {
+            "final_loss_average": 2.6079013347625732,
+            "final_perf_average": -1.6079013347625732,
+            "log_file": "c_sequence_output/04_protein_sequence_generation_tabular/validation_average_history.log",
+            "max_perf_average": -1.6079013347625732,
+            "min_loss_average": 2.6079013347625732,
+            "total_iterations": 5500
+        },
+        "d_array_output/01_array_mnist_generation": {
+            "final_loss_average": 0.02930177214741707,
+            "final_perf_average": 0.970698227852583,
+            "log_file": "d_array_output/01_array_mnist_generation/validation_average_history.log",
+            "max_perf_average": 0.970698227852583,
+            "min_loss_average": 0.02930177214741707,
+            "total_iterations": 9000
+        },
+        "d_array_output/02_array_mnist_generation_with_labels": {
+            "final_loss_average": 0.03563540229201317,
+            "final_perf_average": 0.9643645977079869,
+            "log_file": "d_array_output/02_array_mnist_generation_with_labels/validation_average_history.log",
+            "max_perf_average": 0.9643645977079869,
+            "min_loss_average": 0.03563540229201317,
+            "total_iterations": 9000
+        },
+        "e_pretraining/01_checkpointing": {
+            "final_loss_average": 0.47921377420425415,
+            "final_perf_average": 0.7690219828746774,
+            "log_file": "e_pretraining/01_checkpointing/validation_average_history.log",
+            "max_perf_average": 0.7690219828746774,
+            "min_loss_average": 0.47568026185035706,
+            "total_iterations": 1800
+        },
+        "e_pretraining/01_checkpointing_imdb_from_pretrained_global": {
+            "final_loss_average": 0.565726101398468,
+            "final_perf_average": 0.7675579923326741,
+            "log_file": "e_pretraining/01_checkpointing_imdb_from_pretrained_global/validation_average_history.log",
+            "max_perf_average": 0.7828635637614898,
+            "min_loss_average": 0.4551331400871277,
+            "total_iterations": 1800
+        },
+        "e_pretraining/01_checkpointing_imdb_from_pretrained_global_non_strict": {
+            "final_loss_average": 0.4637119174003601,
+            "final_perf_average": 0.7843686943265987,
+            "log_file": "e_pretraining/01_checkpointing_imdb_from_pretrained_global_non_strict/validation_average_history.log",
+            "max_perf_average": 0.7857693974677539,
+            "min_loss_average": 0.4508935809135437,
+            "total_iterations": 1800
+        },
+        "e_pretraining/02_mini_foundation": {
+            "final_loss_average": 0.7343089282512665,
+            "final_perf_average": 0.2656910717487335,
+            "log_file": "e_pretraining/02_mini_foundation/validation_average_history.log",
+            "max_perf_average": 0.26972679793834686,
+            "min_loss_average": 0.7302732020616531,
+            "total_iterations": 18000
+        },
+        "e_pretraining/02_mini_foundation_cifar_from_pretrained": {
+            "final_loss_average": 0.7236531972885132,
+            "final_perf_average": 0.8178975928526857,
+            "log_file": "e_pretraining/02_mini_foundation_cifar_from_pretrained/validation_average_history.log",
+            "max_perf_average": 0.8193909352542798,
+            "min_loss_average": 0.7120814323425293,
+            "total_iterations": 6200
+        },
+        "e_pretraining/02_mini_foundation_cifar_from_scratch": {
+            "final_loss_average": 0.646135151386261,
+            "final_perf_average": 0.8445772548690571,
+            "log_file": "e_pretraining/02_mini_foundation_cifar_from_scratch/validation_average_history.log",
+            "max_perf_average": 0.8488743450926529,
+            "min_loss_average": 0.621578574180603,
+            "total_iterations": 9500
+        },
+        "e_pretraining/02_mini_foundation_imdb_from_pretrained": {
+            "final_loss_average": 0.6886783838272095,
+            "final_perf_average": 0.44012605910039077,
+            "log_file": "e_pretraining/02_mini_foundation_imdb_from_pretrained/validation_average_history.log",
+            "max_perf_average": 0.4537875364308748,
+            "min_loss_average": 0.6774625182151794,
+            "total_iterations": 3000
+        },
+        "e_pretraining/02_mini_foundation_imdb_from_scratch": {
+            "final_loss_average": 0.679875910282135,
+            "final_perf_average": 0.4382130287428906,
+            "log_file": "e_pretraining/02_mini_foundation_imdb_from_scratch/validation_average_history.log",
+            "max_perf_average": 0.4461667450828609,
+            "min_loss_average": 0.6792828440666199,
+            "total_iterations": 3500
+        },
+        "f_image_output/02_image_colorization": {
+            "final_loss_average": 0.07030897564254701,
+            "final_perf_average": 0.929691024357453,
+            "log_file": "f_image_output/02_image_colorization/validation_average_history.log",
+            "max_perf_average": 0.9298876577522606,
+            "min_loss_average": 0.07011234224773943,
+            "total_iterations": 9000
+        },
+        "f_image_output/02_image_colorization_and_super_resolution": {
+            "final_loss_average": 0.12874195212498307,
+            "final_perf_average": 0.8712580478750169,
+            "log_file": "f_image_output/02_image_colorization_and_super_resolution/validation_average_history.log",
+            "max_perf_average": 0.8735608900897205,
+            "min_loss_average": 0.1264391099102795,
+            "total_iterations": 28500
+        },
+        "f_image_output/02_image_super_resolution": {
+            "final_loss_average": 0.057975434232503176,
+            "final_perf_average": 0.9420245657674968,
+            "log_file": "f_image_output/02_image_super_resolution/validation_average_history.log",
+            "max_perf_average": 0.9420245657674968,
+            "min_loss_average": 0.057975434232503176,
+            "total_iterations": 9000
+        },
+        "f_image_output/03_mnist_diffusion": {
+            "final_loss_average": 0.033959118416532874,
+            "final_perf_average": 0.9660408815834671,
+            "log_file": "f_image_output/03_mnist_diffusion/validation_average_history.log",
+            "max_perf_average": 0.9662841509561986,
+            "min_loss_average": 0.03371584904380143,
+            "total_iterations": 9000
+        },
+        "f_image_output/03_mnist_diffusion_guided": {
+            "final_loss_average": 0.2924267090857029,
+            "final_perf_average": 0.7075732909142971,
+            "log_file": "f_image_output/03_mnist_diffusion_guided/validation_average_history.log",
+            "max_perf_average": 0.7075732909142971,
+            "min_loss_average": 0.2924267090857029,
+            "total_iterations": 9000
+        },
+        "g_time_series/01_time_series_power_transformer_real": {
+            "final_loss_average": 3.065651833554087,
+            "final_perf_average": -2.065651833554087,
+            "log_file": "g_time_series/01_time_series_power_transformer_real/validation_average_history.log",
+            "max_perf_average": -1.9149806131277263,
+            "min_loss_average": 2.9149806131277263,
+            "total_iterations": 2700
+        },
+        "g_time_series/01_time_series_power_transformer_sim": {
+            "final_loss_average": 0.348155599385819,
+            "final_perf_average": 0.6518444006141809,
+            "log_file": "g_time_series/01_time_series_power_transformer_sim/validation_average_history.log",
+            "max_perf_average": 0.6518444006141809,
+            "min_loss_average": 0.348155599385819,
+            "total_iterations": 9500
+        },
+        "g_time_series/02_time_series_stocks_diffusion": {
+            "final_loss_average": 0.019795277135512025,
+            "final_perf_average": 0.980204722864488,
+            "log_file": "g_time_series/02_time_series_stocks_diffusion/validation_average_history.log",
+            "max_perf_average": 0.9818593249533718,
+            "min_loss_average": 0.01814067504662824,
+            "total_iterations": 20500
+        },
+        "g_time_series/02_time_series_stocks_one_shot": {
+            "final_loss_average": 0.016088196879105742,
+            "final_perf_average": 0.9839118031208942,
+            "log_file": "g_time_series/02_time_series_stocks_one_shot/validation_average_history.log",
+            "max_perf_average": 0.9839118031208942,
+            "min_loss_average": 0.016088196879105742,
+            "total_iterations": 20500
+        },
+        "g_time_series/02_time_series_stocks_transformer": {
+            "final_loss_average": 0.04317916753260713,
+            "final_perf_average": 0.9568208324673929,
+            "log_file": "g_time_series/02_time_series_stocks_transformer/validation_average_history.log",
+            "max_perf_average": 0.9570496949252852,
+            "min_loss_average": 0.04295030507471478,
+            "total_iterations": 20500
+        },
+        "h_survival_analysis/01_flchain": {
+            "final_loss_average": 1.1155585050582886,
+            "final_perf_average": 0.8139873147010803,
+            "log_file": "h_survival_analysis/01_flchain/validation_average_history.log",
+            "max_perf_average": 0.814946174621582,
+            "min_loss_average": 1.1107052564620972,
+            "total_iterations": 4500
+        },
+        "h_survival_analysis/02_flchain_cox": {
+            "final_loss_average": 5.760284423828125,
+            "final_perf_average": 0.8058137893676758,
+            "log_file": "h_survival_analysis/02_flchain_cox/validation_average_history.log",
+            "max_perf_average": 0.8090521693229675,
+            "min_loss_average": 5.74567174911499,
+            "total_iterations": 3800
+        },
+        "i_scaling/01_streaming": {
+            "final_loss_average": 5.915701473236084,
+            "final_perf_average": -4.915701473236084,
+            "log_file": "i_scaling/01_streaming/validation_average_history.log",
+            "max_perf_average": -4.915701473236084,
+            "min_loss_average": 5.915701473236084,
+            "total_iterations": 2500
+        }
+    },
+    "metadata": {
+        "date_generated": "2025-04-15T07:58:27.334145",
+        "num_experiments": 59
+    }
+}

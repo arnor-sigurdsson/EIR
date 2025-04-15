@@ -1,0 +1,33 @@
+basic_experiment:
+  batch_size: 128
+  dataloader_workers: 8
+  memory_dataset: false
+  n_epochs: 20
+  output_folder: eir_tutorials/tutorial_runs/i_scaling/03_scaling_diffusion
+  valid_size: 1024
+evaluation_checkpoint:
+  checkpoint_interval: 1000
+  n_saved_models: 1
+  sample_interval: 1000
+data_preparation:
+  streaming_setup_samples: 16384
+optimization:
+  lr: 0.0001
+  optimizer: adamw
+  wd: 0.0001
+  gradient_clipping: 1.0
+lr_schedule:
+  warmup_steps: 2000
+  lr_plateau_patience: 16
+training_control:
+  early_stopping_patience: 32
+visualization_logging:
+  plot_skip_steps: 5000
+model:
+  compile_model: true
+accelerator:
+  devices: auto
+  hardware: auto
+  num_nodes: 1
+  precision: bf16-mixed
+  strategy: auto

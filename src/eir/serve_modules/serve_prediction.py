@@ -13,8 +13,10 @@ from eir.setup.schema_modules.output_schemas_sequence import (
 from eir.setup.schemas import SequenceOutputTypeConfig
 from eir.train_utils.evaluation_modules.train_handlers_array_output import (
     ArrayOutputEvalSample,
+    ArrayOutputSamplingConfig,
+    ImageOutputSamplingConfig,
+    diffusion_generation_with_scheduler,
     one_shot_array_generation,
-    reverse_diffusion_array_generation,
 )
 from eir.train_utils.evaluation_modules.train_handlers_sequence_output import (
     SequenceOutputEvalSample,
@@ -188,12 +190,25 @@ def _run_serve_array_generation(
         if is_diffusion:
             time_steps = output_type_info.diffusion_time_steps
             assert time_steps is not None
-            array_outputs = reverse_diffusion_array_generation(
+
+            sampling_config = config.sampling_config
+            assert isinstance(
+                sampling_config, ArrayOutputSamplingConfig | ImageOutputSamplingConfig
+            )
+
+            inference_steps = sampling_config.diffusion_inference_steps
+            scheduler_type = sampling_config.diffusion_sampler
+            eta = sampling_config.diffusion_eta
+
+            array_outputs = diffusion_generation_with_scheduler(
                 eval_samples=eval_samples,
                 array_output_name=cur_output_name,
                 experiment=serve_experiment,
                 default_eir_hooks=hooks,
-                num_steps=time_steps,
+                num_train_steps=time_steps,
+                num_inference_steps=inference_steps,
+                scheduler_type=scheduler_type,
+                eta=eta,
             )
         else:
             array_outputs = one_shot_array_generation(

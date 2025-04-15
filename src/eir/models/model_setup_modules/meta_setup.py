@@ -205,7 +205,7 @@ def get_meta_model_kwargs_from_configs(
         input_configs=input_configs,
         fusion_configs=[fusion_config],
         output_configs=output_configs,
-        device=global_config.be.device,
+        device="cpu",
     )
     kwargs["tensor_broker"] = tensor_broker
 
@@ -300,7 +300,7 @@ def get_all_feature_extractor_dimensions_and_types(
     for input_name, input_object in inputs_as_dict.items():
         cur_output_shape = output_shapes.get(input_name)
 
-        extras = {}
+        extras: dict[str, Any] = {}
         match input_object:
             case ComputedArrayInputInfo() | ComputedImageInputInfo():
                 cur_config = input_object.input_config.model_config
@@ -310,6 +310,7 @@ def get_all_feature_extractor_dimensions_and_types(
                 mic = cur_config.model_init_config
                 if isinstance(mic, CNNModelConfig):
                     extras["down_every_n_blocks"] = mic.down_sample_every_n_blocks
+                    extras["layers"] = mic.layers
 
         input_dimensionality_and_types[input_name] = FeatureExtractorInfo(
             input_dimension=in_features_per_input[input_name],

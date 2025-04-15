@@ -18,7 +18,8 @@ logger = get_logger(name=__name__)
 
 
 def get_yaml_iterator_with_injections(
-    yaml_config_files: Iterable[str], extra_cl_args: list[str] | None
+    yaml_config_files: Iterable[str],
+    extra_cl_args: list[str] | None,
 ) -> Generator[dict]:
     if not extra_cl_args:
         yield from get_yaml_to_dict_iterator(yaml_config_files=yaml_config_files)
@@ -39,7 +40,8 @@ def get_yaml_iterator_with_injections(
 
                 logger.debug("Injecting %s into %s", dict_to_inject, loaded_yaml)
                 loaded_yaml = recursive_dict_inject(
-                    dict_=loaded_yaml, dict_to_inject=dict_to_inject
+                    dict_=loaded_yaml,
+                    dict_to_inject=dict_to_inject,
                 )
 
         yield loaded_yaml

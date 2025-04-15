@@ -1,4 +1,6 @@
 import argparse
+import datetime
+import os
 from collections.abc import Iterable
 from itertools import chain
 
@@ -33,11 +35,22 @@ from docs.doc_modules.f_image_outputs import (
 )
 from docs.doc_modules.g_time_series import a_time_series_power, b_time_series_stocks
 from docs.doc_modules.h_survival_analysis import a_flchain, b_flchain_cox
-from docs.doc_modules.i_scaling import a_streaming_data, b_scaling_compute
+from docs.doc_modules.i_scaling import (
+    a_streaming_data,
+    b_scaling_compute,
+    c_scaling_diffusion,
+)
 from docs.doc_modules.serving_experiments import (
     AutoDocServingInfo,
     make_serving_tutorial_data,
 )
+from docs.doc_scripts.doc_performance_report import (
+    collect_performance_data,
+    generate_report,
+)
+from eir.utils.logging import get_logger
+
+logger = get_logger(name=__name__)
 
 
 def _get_a_using_eir_experiments() -> Iterable[AutoDocExperimentInfo]:
@@ -137,11 +150,45 @@ def get_h_survival_analysis_experiments() -> Iterable[AutoDocExperimentInfo]:
 def get_i_scaling_experiments() -> Iterable[AutoDocExperimentInfo]:
     a_experiments = a_streaming_data.get_experiments()
     b_experiments = b_scaling_compute.get_experiments()
+    c_experiments = c_scaling_diffusion.get_experiments()
 
     return chain(
         a_experiments,
         b_experiments,
+        c_experiments,
     )
+
+
+def generate_performance_report(root_dir, output_dir):
+    if not os.path.exists(root_dir):
+        logger.error(f"Error: Root directory '{root_dir}' does not exist.")
+        return
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    logger.info(f"Collecting performance data from {root_dir}...")
+
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    output_file = os.path.join(output_dir, f"{current_date}.json")
+
+    experiment_data = collect_performance_data(root_dir=root_dir)
+
+    report = {
+        "metadata": {
+            "num_experiments": len(experiment_data),
+            "date_generated": datetime.datetime.now().isoformat(),
+        },
+        "experiments": experiment_data,
+    }
+
+    report_content = generate_report(data=report, output_format="json")
+
+    with open(output_file, "w") as f:
+        f.write(report_content)
+
+    logger.info(f"Performance report generated at {output_file}")
+    logger.info(f"Found {len(experiment_data)} experiments with valid metrics.")
 
 
 def parse_args():
@@ -153,6 +200,21 @@ def parse_args():
         help="Comma-separated list of experiment groups to run (e.g., 'a,b,c'). "
         "Valid groups: a, b, c, d, e, f, g, h, i. "
         "If not specified, all experiments will be run.",
+    )
+    parser.add_argument(
+        "--generate-report",
+        action="store_true",
+        help="Generate performance report after running experiments",
+    )
+    parser.add_argument(
+        "--root-dir",
+        default="eir_tutorials/tutorial_runs",
+        help="Root directory containing the tutorial runs",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="docs/doc_data",
+        help="Directory to save the performance report",
     )
     return parser.parse_args()
 
@@ -225,3 +287,6 @@ if __name__ == "__main__":
 
     generate_timm_api_info.run_all()
     generate_hf_sequence_info.run_all()
+
+    if args.generate_report:
+        generate_performance_report(root_dir=args.root_dir, output_dir=args.output_dir)

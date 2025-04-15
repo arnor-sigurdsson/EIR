@@ -1,0 +1,33 @@
+input_info:
+  input_source: ws://localhost:8000/ws
+  input_name: caption
+  input_type: sequence
+
+input_type_info:
+  max_length: 64
+  split_on: " "
+  sampling_strategy_if_longer: "uniform"
+  min_freq: 2
+
+model_config:
+  embedding_dim: 256
+  model_init_config:
+    num_layers: 6
+
+
+tensor_broker_config:
+  message_configs:
+    - name: caption_fine_details
+      layer_path: input_modules.caption.feature_extractor.transformer_encoder.layers.5
+      cache_tensor: true
+      layer_cache_target: "output"
+
+    - name: caption_mid_features
+      layer_path: input_modules.caption.feature_extractor.transformer_encoder.layers.2
+      cache_tensor: true
+      layer_cache_target: "output"
+
+    - name: caption_global
+      layer_path: input_modules.caption.feature_extractor.transformer_encoder.layers.0
+      cache_tensor: true
+      layer_cache_target: "input"

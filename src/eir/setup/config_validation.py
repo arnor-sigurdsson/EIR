@@ -6,8 +6,14 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from eir.setup import schemas
-from eir.setup.schema_modules.output_schemas_array import ArrayOutputTypeConfig
-from eir.setup.schema_modules.output_schemas_image import ImageOutputTypeConfig
+from eir.setup.schema_modules.output_schemas_array import (
+    ArrayOutputSamplingConfig,
+    ArrayOutputTypeConfig,
+)
+from eir.setup.schema_modules.output_schemas_image import (
+    ImageOutputSamplingConfig,
+    ImageOutputTypeConfig,
+)
 from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 
@@ -103,6 +109,28 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                         "array model type 'cnn'. Please check the model type for "
                         f"output '{name}'."
                     )
+
+                if loss == "diffusion":
+                    time_steps = output_config.output_type_info.diffusion_time_steps
+                    assert time_steps is not None
+
+                    sampling_config = output_config.sampling_config
+                    if sampling_config is None:
+                        continue
+
+                    assert isinstance(sampling_config, ArrayOutputSamplingConfig)
+
+                    inference_steps = sampling_config.diffusion_inference_steps
+
+                    if inference_steps > time_steps:
+                        raise ValueError(
+                            "Diffusion loss requires setting the number of "
+                            "inference steps to be less than or equal to the "
+                            "number of diffusion time steps. Please check the "
+                            f"output '{name}'. Got inference_steps={inference_steps} "
+                            f"and diffusion_time_steps={time_steps}."
+                        )
+
             case ImageOutputTypeConfig(_, _, loss, _):
                 model_type = output_config.model_config.model_type
                 if loss == "diffusion" and model_type not in ("cnn",):
@@ -111,6 +139,28 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                         "image model type 'cnn'. Please check the model type for "
                         f"output '{name}'."
                     )
+
+                if loss == "diffusion":
+                    time_steps = output_config.output_type_info.diffusion_time_steps
+                    assert time_steps is not None
+
+                    sampling_config = output_config.sampling_config
+                    if sampling_config is None:
+                        continue
+
+                    assert isinstance(sampling_config, ImageOutputSamplingConfig)
+
+                    inference_steps = sampling_config.diffusion_inference_steps
+
+                    if inference_steps > time_steps:
+                        raise ValueError(
+                            "Diffusion loss requires setting the number of "
+                            "inference steps to be less than or equal to the "
+                            "number of diffusion time steps. Please check the "
+                            f"output '{name}'. Got inference_steps={inference_steps} "
+                            f"and diffusion_time_steps={time_steps}."
+                        )
+
             case SurvivalOutputTypeConfig(
                 time_column, event_column, num_durations, loss_function, _, _
             ):

@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/c_sequence_output/03_image_captioning/saved_models/03_image_captioning_checkpoint_11000_perf-average=-1.4740.pt
+--model-path eir_tutorials/tutorial_runs/c_sequence_output/03_image_captioning/saved_models/03_image_captioning_checkpoint_11000_perf-average=-1.5061.pt

@@ -489,6 +489,7 @@ def get_test_array_base_output_inits(
             "output_inner_key": "test_array",
         },
         "model_config": {"model_type": "lcl"},
+        "sampling_config": {"diffusion_inference_steps": 50},
     }
 
     return test_target_init_kwargs
@@ -516,6 +517,7 @@ def get_test_image_base_output_inits(
         "model_config": {
             "model_type": "cnn",
         },
+        "sampling_config": {"diffusion_inference_steps": 50},
     }
 
     return test_target_init_kwargs

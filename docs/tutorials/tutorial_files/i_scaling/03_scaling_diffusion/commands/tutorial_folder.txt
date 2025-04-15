@@ -1,0 +1,7 @@
+eir_tutorials/i_scaling/03_scaling_diffusion
+└── conf
+    ├── fusion.yaml
+    ├── globals.yaml
+    ├── inputs_caption.yaml
+    ├── inputs_image_cnn.yaml
+    └── output_image.yaml

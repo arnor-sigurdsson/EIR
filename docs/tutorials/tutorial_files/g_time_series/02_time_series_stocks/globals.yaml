@@ -8,7 +8,7 @@ evaluation_checkpoint:
   n_saved_models: 1
   sample_interval: 500
 optimization:
-  lr: 0.0005
+  lr: 0.001
   optimizer: adabelief
 visualization_logging:
   plot_skip_steps: 500
