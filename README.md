@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="LICENSE" alt="License">
-        <img src="https://img.shields.io/badge/License-APGL-5B2D5B.svg" /></a>
+        <img src="https://img.shields.io/badge/License-Apache_2.0-5B2D5B.svg" />
   
   <a href="https://github.com/arnor-sigurdsson/EIR#citation" alt="Citation">
         <img src="https://img.shields.io/badge/Papers-View%20Here-5F9EA0.svg" /></a>
