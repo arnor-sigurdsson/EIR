@@ -390,7 +390,7 @@ def plot_cox_risk_stratification(
     plt.title("Risk Stratification: Predicted vs Actual Survival")
     plt.grid(True, alpha=0.3)
     plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-    plt.tight_layout()
+
     plt.savefig(f"{output_folder}/cox_risk_stratification.pdf", bbox_inches="tight")
     plt.close()
 
@@ -537,7 +537,7 @@ def plot_discrete_risk_stratification(
     plt.title("Risk Stratification: Predicted vs Actual Survival")
     plt.grid(True, alpha=0.3)
     plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-    plt.tight_layout()
+
     plt.savefig(
         f"{output_folder}/discrete_risk_stratification.pdf",
         bbox_inches="tight",

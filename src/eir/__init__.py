@@ -3,7 +3,11 @@ __version__ = "0.19.0"
 import re
 import warnings
 from dataclasses import dataclass
-from typing import Optional, Protocol, TextIO
+from typing import Protocol, TextIO
+
+from eir.visualization.style import apply_style
+
+apply_style()
 
 
 class ShowWarningProtocol(Protocol):

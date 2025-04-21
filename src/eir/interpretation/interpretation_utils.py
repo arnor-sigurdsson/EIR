@@ -170,7 +170,6 @@ def plot_attributions_bar(
         errorbar=("ci", 95),
     )
 
-    plt.tight_layout()
     sns_figure: plt.Figure | plt.SubFigure | None = ax.get_figure()
     assert isinstance(sns_figure, plt.Figure)
     assert sns_figure is not None

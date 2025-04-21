@@ -27,6 +27,7 @@ from matplotlib.ticker import MaxNLocator
 
 from eir.train_utils import metrics
 from eir.utils.logging import get_logger
+from eir.visualization.style import COLORS
 
 if TYPE_CHECKING:
     from eir.train_utils.evaluation import PerformancePlotConfig
@@ -40,40 +41,34 @@ def add_series_to_axis(
     skiprows: int,
     ax_plot_kwargs: dict | None = None,
 ) -> plt.Axes:
-    if ax_plot_kwargs is None:
-        ax_plot_kwargs = {}
+    ax_plot_kwargs = ax_plot_kwargs or {}
     series_cut = series[series.index > skiprows]
 
     xlim_upper = series_cut.shape[0] + skiprows
     xticks = np.arange(1 + skiprows, xlim_upper + 1)
 
-    if ax_plot_kwargs is None:
-        ax_plot_kwargs = {}
+    if "label" in ax_plot_kwargs and ax_plot_kwargs["label"] == "Train":
+        defaults = {
+            "color": COLORS["secondary"],
+            "alpha": 0.7,
+            "linewidth": 1.0,
+            "zorder": 2,
+        }
+        for k, v in defaults.items():
+            ax_plot_kwargs.setdefault(k, v)
 
     ax_object.plot(
         xticks,
         np.asarray(series_cut.values),
-        zorder=1,
-        alpha=0.5,
-        linewidth=0.8,
         **ax_plot_kwargs,
     )
 
-    lines_to_legend: list[plt.Line2D] = []
-    for line in ax_object.lines:
-        line_label = line.get_label()
-        assert isinstance(line_label, str)
-
-        if not line_label.startswith("_"):
-            lines_to_legend.append(line)
-
-    labels_to_legend: list[str] = []
-    for line in lines_to_legend:
-        line_label = line.get_label()
-        assert isinstance(line_label, str)
-        labels_to_legend.append(line_label)
-
-    ax_object.legend(lines_to_legend, labels_to_legend)
+    ax_object.legend(
+        loc="best",
+        frameon=True,
+        framealpha=0.9,
+        fancybox=True,
+    )
 
     return ax_object
 
@@ -83,7 +78,7 @@ def generate_validation_curve_from_series(
     title_extra: str = "",
     skiprows: int = 200,
 ) -> tuple[plt.Figure | None, plt.Axes | None]:
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8, 5))
 
     valid_series_cut = series[series.index > skiprows]
 
@@ -99,38 +94,53 @@ def generate_validation_curve_from_series(
         )
         return None, None
 
-    xlim_upper = valid_series_cut.index.max()
-
     values = np.asarray(valid_series_cut.values)
 
     validation_xticks = valid_series_cut.index
     lines = ax.plot(
         validation_xticks,
         values,
-        c="red",
-        linewidth=0.8,
+        color=COLORS["primary"],
+        linewidth=1.2,
         alpha=1.0,
         label=f"Validation (best: {extreme_valid_value:.4g} at {extreme_valid_idx})",
-        zorder=0,
+        zorder=3,
     )
 
-    ax.axhline(y=extreme_valid_value, linewidth=0.4, c="red", linestyle="dashed")
-
-    ax.set(title=title_extra)
+    ax.axhline(
+        y=extreme_valid_value,
+        linewidth=0.8,
+        color=COLORS["primary"],
+        linestyle="dashed",
+        alpha=0.7,
+        zorder=2,
+    )
 
     ax.set_xlabel("Iteration")
     y_label = _parse_metrics_colname(column_name=str(valid_series_cut.name))
     ax.set_ylabel(y_label)
 
+    xlim_upper = valid_series_cut.index.max()
     ax.set_xlim(left=skiprows + 1, right=xlim_upper)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     if xlim_upper > 1e4:
         ax.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
 
+    name_lower = str(valid_series_cut.name).lower()
+    enforce_limits_matches = ["auc", "ap-macro", "mcc", "acc", "pcc", "r2"]
+    should_enforce = any(i in name_lower for i in enforce_limits_matches)
+    if should_enforce:
+        bottom: float | None = 0.0
+        if name_lower in ("pcc", "r2"):
+            bottom = None
+        ax.set_ylim(bottom, 1.00)
+
+    ax.grid(True, linestyle="--", alpha=0.3, zorder=1)
+    ax.set_axisbelow(True)
+
     labels = [str(line.get_label()) for line in lines]
     ax.legend(lines, labels)
-
-    plt.grid()
+    ax.set_title(f"{title_extra}", fontweight="bold")
 
     return fig, ax
 
@@ -259,31 +269,71 @@ def generate_regression_prediction_plot(
     *args,
     **kwargs,
 ):
-    fig, ax = plt.subplots()
-    y_true = transformer.inverse_transform(y_true.reshape(-1, 1))
-    y_outp = transformer.inverse_transform(y_outp.reshape(-1, 1))
+    fig, ax = plt.subplots(figsize=(4, 4))
+
+    y_true = transformer.inverse_transform(y_true.reshape(-1, 1)).flatten()
+    y_outp = transformer.inverse_transform(y_outp.reshape(-1, 1)).flatten()
 
     r2 = metrics.calc_r2(outputs=y_outp, labels=y_true)
     pcc = metrics.calc_pcc(outputs=y_outp, labels=y_true)
 
-    ax.scatter(x=y_outp, y=y_true, edgecolors=(0, 0, 0), alpha=0.2, s=10)
-    ax.text(
-        x=0.05,
-        y=0.95,
-        s=f"R2 = {r2:.4g}, PCC = {pcc:.4g}",
-        ha="left",
-        va="top",
-        transform=ax.transAxes,
+    ax.scatter(
+        x=y_outp,
+        y=y_true,
+        color=COLORS["primary"],
+        alpha=0.4,
+        s=12,
+        edgecolors=None,
+        marker="o",
+        label="Data points",
     )
 
-    ax.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], "k--", lw=2)
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("Measured")
-    ax.set(title=title_extra)
+    min_val = min(y_true.min(), y_outp.min())
+    max_val = max(y_true.max(), y_outp.max())
+    ax.plot(
+        [min_val, max_val],
+        [min_val, max_val],
+        color=COLORS["dark_gray"],
+        linestyle="--",
+        linewidth=1.2,
+        label="Perfect prediction",
+    )
+
+    metrics_text = f"$R^2 = {r2:.3f}$\n$\\mathrm{{PCC}} = {pcc:.3f}$"
+
+    ax.text(
+        0.05,
+        0.95,
+        metrics_text,
+        transform=ax.transAxes,
+        verticalalignment="top",
+        bbox={
+            "boxstyle": "round",
+            "facecolor": "white",
+            "alpha": 0.8,
+            "edgecolor": COLORS["light_gray"],
+            "pad": 0.5,
+        },
+    )
+
+    ax.set_xlabel("Predicted value")
+    ax.set_ylabel("Measured value")
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    ax.legend(frameon=True, framealpha=0.9, loc="lower right")
+
+    if title_extra:
+        ax.set_title(title_extra)
 
     plt.tight_layout()
-    plt.savefig(outfolder / "regression_predictions.pdf")
+
+    plt.savefig(outfolder / "regression_predictions.pdf", bbox_inches="tight")
+
     plt.close("all")
+
+    return fig, ax
 
 
 def generate_binary_roc_curve(
@@ -308,7 +358,6 @@ def generate_binary_roc_curve(
     plt.title(f"ROC curve – {title_extra}")
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
 
-    plt.tight_layout()
     plt.savefig(outfolder / "bin_roc_curve.pdf")
     plt.close("all")
 
@@ -340,7 +389,6 @@ def generate_binary_pr_curve(
     plt.title(f"Precision-Recall curve – {title_extra}")
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
 
-    plt.tight_layout()
     plt.savefig(outfolder / "bin_pr_curve.pdf")
     plt.close("all")
 
@@ -386,7 +434,6 @@ def generate_binary_prediction_distribution(
     ax.set_xlabel(f"Score of class {classes[1]}")
     ax.set_title(title_extra + " Score Distribution")
 
-    plt.tight_layout()
     plt.savefig(outfolder / "positive_prediction_distribution.pdf")
     plt.close("all")
 
@@ -469,7 +516,6 @@ def generate_multi_class_roc_curve(
     plt.title(f"ROC curve – {title_extra}", fontsize=20)
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
-    plt.tight_layout()
     plt.savefig(outfolder / "mc_roc_curve.pdf")
     plt.close("all")
 
@@ -541,7 +587,6 @@ def generate_multi_class_pr_curve(
     plt.title(f"Precision-Recall curve – {title_extra}", fontsize=20)
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
-    plt.tight_layout()
     plt.savefig(outfolder / "mc_pr_curve.pdf")
     plt.close("all")
 
@@ -600,9 +645,6 @@ def generate_confusion_matrix(
 
     plt.setp(ax.get_yticklabels(), fontsize=tick_label_font_size)
 
-    fig = plt.gcf()
-
-    fig.tight_layout()
     plt.savefig(outfolder / "confusion_matrix.pdf")
     plt.close("all")
 
@@ -639,7 +681,7 @@ def generate_all_training_curves(
                 ax_object=axis_object,
                 series=train_series,
                 skiprows=plot_skip_steps,
-                ax_plot_kwargs={"label": "Train", "c": "orange"},
+                ax_plot_kwargs={"label": "Train"},
             )
 
         fname_identifier = _parse_metrics_colname(column_name=str(valid_series.name))

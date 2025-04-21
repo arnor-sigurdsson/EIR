@@ -162,7 +162,6 @@ def plot_snp_manhattan_plots(
         ax.set_ylabel("Attribution")
 
         ax.set_title(f"{label_name}{title_extra}")
-        plt.tight_layout()
 
         out_path = outfolder / f"manhattan/{label_name}_manhattan.png"
         ensure_path_exists(path=out_path)

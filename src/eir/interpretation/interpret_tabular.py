@@ -411,7 +411,6 @@ def plot_tabular_categorical_attributions(
     ax.set_xticks(ax.get_xticks())
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
 
-    plt.tight_layout()
     name = f"categorical_attributions_{feature_name_to_plot}_{class_name}.pdf"
     plt.savefig(
         str(attribution_output_folder / name),
@@ -505,7 +504,6 @@ def plot_tabular_continuous_attribution(
         rotation="vertical",
     )
 
-    plt.tight_layout()
     name = f"continuous_attributions_{class_name}.pdf"
     plt.savefig(
         str(attribution_output_folder / name),
