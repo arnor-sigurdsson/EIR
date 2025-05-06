@@ -14,6 +14,49 @@ COLORS = {
     "dark_gray": "#555555",
 }
 
+
+CLASS_COLORS = [
+    # Okabe-Ito palette
+    "#0072B2",  # Blue
+    "#D55E00",  # Orange
+    "#009E73",  # Green
+    "#CC79A7",  # Pink
+    "#56B4E9",  # Light blue
+    "#E69F00",  # Yellow
+    "#F0E442",  # Light yellow
+    # IBM colorblind-friendly palette
+    "#648FFF",  # Blue 2
+    "#785EF0",  # Purple
+    "#DC267F",  # Magenta
+    "#FE6100",  # Orange 2
+    "#FFB000",  # Gold
+    # Tol Muted palette (colorblind-friendly)
+    "#44AA99",  # Cyan
+    "#117733",  # Forest green
+    "#999933",  # Olive
+    "#DDCC77",  # Sand
+    "#CC6677",  # Rose
+    "#882255",  # Wine
+    "#332288",  # Indigo
+]
+
+
+def get_class_visuals(n_classes: int) -> tuple[list[str], list[str]]:
+    colors = []
+    line_styles = []
+
+    styles = ["-", "--", "-.", ":"]
+
+    for i in range(n_classes):
+        colors.append(CLASS_COLORS[i % len(CLASS_COLORS)])
+        if n_classes > len(CLASS_COLORS):
+            line_styles.append(styles[(i // len(CLASS_COLORS)) % len(styles)])
+        else:
+            line_styles.append("-")
+
+    return colors, line_styles
+
+
 color_cycler = cycler(
     color=[
         COLORS["primary"],
