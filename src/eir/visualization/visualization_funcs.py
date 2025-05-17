@@ -685,36 +685,55 @@ def generate_confusion_matrix(
         cmap = sns.color_palette("rocket", as_cmap=True)
 
     if not title_extra:
-        if normalize:
-            title_extra = "Normalized confusion matrix"
-        else:
-            title_extra = "Confusion matrix, without normalization"
+        title_extra = "Normalized Confusion Matrix" if normalize else "Confusion Matrix"
 
-    conf_mat = confusion_matrix(y_true=y_true, y_pred=y_outp, normalize=normalize)
+    conf_mat = confusion_matrix(
+        y_true=y_true,
+        y_pred=y_outp,
+        normalize=normalize,
+    )
 
     classes = classes[unique_labels(y_true, y_outp)]
-    classes_wrapped = ["\n".join(wrap(c, 20)) for c in classes]
+
+    wrap_length = max(10, min(20, 50 // len(classes)))
+    classes_wrapped = ["\n".join(wrap(c, wrap_length)) for c in classes]
 
     df_cm = pd.DataFrame(conf_mat, index=classes_wrapped, columns=classes_wrapped)
 
-    width = len(classes) * 1.25
-    height = len(classes) * 1.00
+    width = max(6, min(16, len(classes) * 1.0))
+    height = max(5, min(14, len(classes) * 0.9))
     fig, ax = plt.subplots(figsize=(width, height))
 
-    tick_label_font_size = min(len(classes) * 2, 14)
-    annot_font_size = int(tick_label_font_size * 1.5)
-    annot_kwargs = {"fontsize": annot_font_size}
-    fmt = "d" if not normalize else ".2g"
-    sns.heatmap(data=df_cm, annot=True, fmt=fmt, annot_kws=annot_kwargs, cmap=cmap)
+    tick_label_font_size = max(6, min(12, 18 - len(classes) * 0.5))
+    annot_font_size = max(7, min(14, 18 - len(classes) * 0.4))
 
-    label_fontsize = annot_font_size
-    ax.set_title(title_extra, fontsize=label_fontsize)
-    ax.set_ylabel("True Label", fontsize=label_fontsize)
-    ax.set_xlabel("Predicted Label", fontsize=label_fontsize)
+    fmt = ".1%" if normalize else "d"
+
+    sns.heatmap(
+        data=df_cm,
+        annot=True,
+        fmt=fmt,
+        cmap=cmap,
+        linewidths=0.5,
+        linecolor="white",
+        cbar=True,
+        square=True,
+        annot_kws={"fontsize": annot_font_size},
+        vmin=0,
+        vmax=1.0 if normalize else None,
+    )
+
+    ax.set_title(
+        f"{title_extra}",
+        fontsize=annot_font_size + 2,
+        fontweight="bold",
+    )
+    ax.set_ylabel("True Label", fontsize=annot_font_size + 1, fontweight="bold")
+    ax.set_xlabel("Predicted Label", fontsize=annot_font_size + 1, fontweight="bold")
 
     color_bar = ax.collections[0].colorbar
     assert color_bar is not None
-    color_bar.ax.tick_params(labelsize=label_fontsize)
+    color_bar.ax.tick_params(labelsize=tick_label_font_size)
 
     plt.setp(
         ax.get_xticklabels(),
@@ -723,11 +742,26 @@ def generate_confusion_matrix(
         rotation_mode="anchor",
         fontsize=tick_label_font_size,
     )
-
     plt.setp(ax.get_yticklabels(), fontsize=tick_label_font_size)
 
-    plt.savefig(outfolder / "confusion_matrix.pdf")
+    for i in range(len(classes)):
+        ax.add_patch(
+            plt.Rectangle(
+                (i, i),
+                1,
+                1,
+                fill=False,
+                edgecolor="white",
+                lw=1.5,
+            )
+        )
+
+    plt.savefig(
+        outfolder / "confusion_matrix.pdf", bbox_inches="tight", transparent=True
+    )
     plt.close("all")
+
+    return fig, ax
 
 
 def generate_all_training_curves(
