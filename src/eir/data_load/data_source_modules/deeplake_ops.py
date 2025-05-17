@@ -1,5 +1,4 @@
 import warnings
-from collections.abc import Generator
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -40,7 +39,7 @@ def load_deeplake_dataset(data_source: str) -> deeplake.ReadOnlyDataset:
 
 def get_deeplake_input_source_iterable(
     deeplake_dataset: deeplake.ReadOnlyDataset, inner_key: str
-) -> Generator[deeplake.Column | deeplake.ColumnView]:
+) -> Any:
     columns = {col.name for col in deeplake_dataset.schema.columns}
 
     existence_col = f"{inner_key}_exists"
@@ -148,7 +147,7 @@ def is_deeplake_sample_missing(
     columns: set[str],
 ) -> bool:
     if existence_col in columns:
-        is_missing = not row[existence_col].item()
+        is_missing = not row[existence_col].item()  # type: ignore
         return is_missing
 
     return False
