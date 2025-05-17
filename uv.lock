@@ -626,16 +626,16 @@ wheels = [
 
 [[package]]
 name = "deeplake"
-version = "4.1.4"
+version = "4.2.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/21/dd1b876dee0e9741d8d018ce19d8e0c8ae2e07f0b0bf073a1633f7c4fcf8/deeplake-4.1.4-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:70076abeb037d8b4bf954be1adfa2d7ef427b4b0e56c678ebb685bb12660adc0", size = 15474292, upload-time = "2025-01-15T22:15:57.877Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/c7/3d93b981cb263920a6bc5506a33cfa2101182100d5fbf1740ca7a754b2cf/deeplake-4.1.4-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:d3804cf87f5cc5a2d4ee3435c26ab2fccc29a27bbe70fd7c0b41d3313cb91d9a", size = 14716334, upload-time = "2025-01-15T22:16:03.506Z" },
-    { url = "https://files.pythonhosted.org/packages/3b/b9/9c2e5f24e8750cf8a34edff9518b21264c07b56cefcd5b5af26737415917/deeplake-4.1.4-cp313-cp313-manylinux2014_aarch64.whl", hash = "sha256:297bc29372554979079d69a27abdf9b56d818da37c7fa9a5afb39cd3aa4cf33f", size = 16542756, upload-time = "2025-01-15T22:16:07.623Z" },
-    { url = "https://files.pythonhosted.org/packages/ad/24/94a6b58805afe652a198d49097c9493c963dcb391a865e5c83e89bdf5759/deeplake-4.1.4-cp313-cp313-manylinux2014_x86_64.whl", hash = "sha256:ac0ce94cbe74f6ce5bd80a2bf1fe062bb09c4c5d5d213245751a755011dad6dd", size = 17321048, upload-time = "2025-01-15T22:16:12.914Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/b2/7e8e8b5ed122bc5e71f06f6fd42d19e4f548177eaf2969080278c33486da/deeplake-4.2.4-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:c22faa8e39cc9b94189ffc1af738159c6ee9cf17f77b194ed810a3a8b71247df", size = 16489784, upload-time = "2025-05-13T13:59:22.867Z" },
+    { url = "https://files.pythonhosted.org/packages/97/6b/84b223d5557dfb9cbc3484a8f4df5e4e3e3f7e6e07f1f6e7fcbd23e02cbc/deeplake-4.2.4-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:061331ed057c72556cdab3706b8b44143f25be355f2f4974bdeb7e9f198d3f16", size = 15677129, upload-time = "2025-05-13T13:59:27.062Z" },
+    { url = "https://files.pythonhosted.org/packages/82/51/927c14d8a64c376c52edcdcd075af17b761ecf032d502d0f09df78707185/deeplake-4.2.4-cp313-cp313-manylinux2014_aarch64.whl", hash = "sha256:2d23a71690bd214aad5c291f487d307b679524cf3ac9d504a0485831a460de7b", size = 18301557, upload-time = "2025-05-13T13:59:32.271Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/9b/5b4aa7be84adecfa50571fcf26e781de239f0c2dd02088c9ccdbad5bdc42/deeplake-4.2.4-cp313-cp313-manylinux2014_x86_64.whl", hash = "sha256:e13612c1781a1363117f0b705b74117568648d8aac86a55219fb214bd36eb1e3", size = 19235950, upload-time = "2025-05-13T13:59:37.731Z" },
 ]
 
 [[package]]
@@ -806,7 +806,7 @@ requires-dist = [
     { name = "colorama", specifier = ">=0.4.4" },
     { name = "configargparse", specifier = ">=1.7" },
     { name = "datasets", specifier = ">=3.2.0" },
-    { name = "deeplake", specifier = "==4.1.4" },
+    { name = "deeplake", specifier = ">=4.2.4" },
     { name = "diffusers", specifier = ">=0.33.1" },
     { name = "einops", specifier = ">=0.8.0" },
     { name = "fastapi", specifier = ">=0.115.4" },
