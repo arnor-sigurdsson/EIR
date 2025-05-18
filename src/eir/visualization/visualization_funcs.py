@@ -450,35 +450,57 @@ def generate_binary_prediction_distribution(
     roc_auc = metrics.calc_roc_auc_ovo(outputs=y_outp, labels=y_true)
 
     classes = transformer.classes_
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    class_colors = [COLORS["primary"], COLORS["secondary"]]
 
     for class_index, class_name in zip(range(2), classes, strict=False):
         cur_class_mask = np.argwhere(y_true == class_index)
-        cur_probabilities = y_outp[cur_class_mask, 1]
+        cur_probabilities = y_outp[cur_class_mask, 1].flatten()
 
-        ax.hist(cur_probabilities, rwidth=0.90, label=class_name, alpha=0.5)
+        ax.hist(
+            cur_probabilities,
+            rwidth=0.90,
+            label=f"{class_name} (n={len(cur_probabilities)})",
+            alpha=0.6,
+            color=class_colors[class_index],
+            edgecolor="black",
+            linewidth=0.75,
+        )
 
-    ax.legend(loc="upper left")
+    ax.legend(
+        loc="upper left",
+        frameon=True,
+        framealpha=0.9,
+    )
+
     props = {
         "boxstyle": "round",
-        "facecolor": "none",
-        "alpha": 0.25,
+        "facecolor": "white",
+        "alpha": 0.8,
         "edgecolor": "gray",
     }
     ax.text(
-        0.80,
         0.95,
-        f"AUC: {roc_auc:0.4g}",
+        0.95,
+        f"AUC: {roc_auc:0.4f}",
         transform=ax.transAxes,
         verticalalignment="top",
+        horizontalalignment="right",
         bbox=props,
     )
+
+    ax.grid(True, linestyle="--", alpha=0.3, zorder=0)
+    ax.set_axisbelow(True)
+
     ax.set_ylabel("Frequency")
-    ax.set_xlabel(f"Score of class {classes[1]}")
-    ax.set_title(title_extra + " Score Distribution")
+    ax.set_xlabel(f"Score of class '{classes[1]}'")
+    ax.set_title(f"{title_extra} Score Distribution", fontweight="bold")
 
     plt.savefig(outfolder / "positive_prediction_distribution.pdf")
     plt.close("all")
+
+    return fig, ax
 
 
 def generate_multi_class_roc_curve(
