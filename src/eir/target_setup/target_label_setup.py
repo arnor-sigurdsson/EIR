@@ -726,7 +726,7 @@ def build_deeplake_available_pointer_iterator(
 
         id_ = row["ID"]
 
-        yield id_, int(int_pointer)
+        yield id_, int(int_pointer)  # type: ignore
 
 
 def gather_all_ids_from_output_configs(

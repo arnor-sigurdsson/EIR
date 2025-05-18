@@ -472,7 +472,7 @@ def build_deeplake_available_id_iterator(
 
         id_ = row["ID"]
 
-        yield id_
+        yield id_  # type: ignore
 
 
 @lru_cache

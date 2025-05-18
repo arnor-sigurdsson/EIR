@@ -25,7 +25,7 @@ def _load_deeplake_sample(
         warnings.simplefilter("ignore")
         sample_data = deeplake_ds[deeplake_ds_index][inner_key]
 
-    return sample_data
+    return sample_data  # type: ignore
 
 
 def process_tensor_to_length(

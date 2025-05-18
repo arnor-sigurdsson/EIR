@@ -27,6 +27,7 @@ from matplotlib.ticker import MaxNLocator
 
 from eir.train_utils import metrics
 from eir.utils.logging import get_logger
+from eir.visualization.style import COLORS, get_class_visuals
 
 if TYPE_CHECKING:
     from eir.train_utils.evaluation import PerformancePlotConfig
@@ -40,40 +41,34 @@ def add_series_to_axis(
     skiprows: int,
     ax_plot_kwargs: dict | None = None,
 ) -> plt.Axes:
-    if ax_plot_kwargs is None:
-        ax_plot_kwargs = {}
+    ax_plot_kwargs = ax_plot_kwargs or {}
     series_cut = series[series.index > skiprows]
 
     xlim_upper = series_cut.shape[0] + skiprows
     xticks = np.arange(1 + skiprows, xlim_upper + 1)
 
-    if ax_plot_kwargs is None:
-        ax_plot_kwargs = {}
+    if "label" in ax_plot_kwargs and ax_plot_kwargs["label"] == "Train":
+        defaults = {
+            "color": COLORS["secondary"],
+            "alpha": 0.7,
+            "linewidth": 1.0,
+            "zorder": 2,
+        }
+        for k, v in defaults.items():
+            ax_plot_kwargs.setdefault(k, v)
 
     ax_object.plot(
         xticks,
         np.asarray(series_cut.values),
-        zorder=1,
-        alpha=0.5,
-        linewidth=0.8,
         **ax_plot_kwargs,
     )
 
-    lines_to_legend: list[plt.Line2D] = []
-    for line in ax_object.lines:
-        line_label = line.get_label()
-        assert isinstance(line_label, str)
-
-        if not line_label.startswith("_"):
-            lines_to_legend.append(line)
-
-    labels_to_legend: list[str] = []
-    for line in lines_to_legend:
-        line_label = line.get_label()
-        assert isinstance(line_label, str)
-        labels_to_legend.append(line_label)
-
-    ax_object.legend(lines_to_legend, labels_to_legend)
+    ax_object.legend(
+        loc="best",
+        frameon=True,
+        framealpha=0.9,
+        fancybox=True,
+    )
 
     return ax_object
 
@@ -83,7 +78,7 @@ def generate_validation_curve_from_series(
     title_extra: str = "",
     skiprows: int = 200,
 ) -> tuple[plt.Figure | None, plt.Axes | None]:
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8, 5))
 
     valid_series_cut = series[series.index > skiprows]
 
@@ -99,38 +94,53 @@ def generate_validation_curve_from_series(
         )
         return None, None
 
-    xlim_upper = valid_series_cut.index.max()
-
     values = np.asarray(valid_series_cut.values)
 
     validation_xticks = valid_series_cut.index
     lines = ax.plot(
         validation_xticks,
         values,
-        c="red",
-        linewidth=0.8,
+        color=COLORS["primary"],
+        linewidth=1.2,
         alpha=1.0,
         label=f"Validation (best: {extreme_valid_value:.4g} at {extreme_valid_idx})",
-        zorder=0,
+        zorder=3,
     )
 
-    ax.axhline(y=extreme_valid_value, linewidth=0.4, c="red", linestyle="dashed")
-
-    ax.set(title=title_extra)
+    ax.axhline(
+        y=extreme_valid_value,
+        linewidth=0.8,
+        color=COLORS["primary"],
+        linestyle="dashed",
+        alpha=0.7,
+        zorder=2,
+    )
 
     ax.set_xlabel("Iteration")
     y_label = _parse_metrics_colname(column_name=str(valid_series_cut.name))
     ax.set_ylabel(y_label)
 
+    xlim_upper = valid_series_cut.index.max()
     ax.set_xlim(left=skiprows + 1, right=xlim_upper)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     if xlim_upper > 1e4:
         ax.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
 
+    name_lower = str(valid_series_cut.name).lower()
+    enforce_limits_matches = ["auc", "ap-macro", "mcc", "acc", "pcc", "r2"]
+    should_enforce = any(i in name_lower for i in enforce_limits_matches)
+    if should_enforce:
+        bottom: float | None = 0.0
+        if name_lower in ("pcc", "r2"):
+            bottom = None
+        ax.set_ylim(bottom, 1.00)
+
+    ax.grid(True, linestyle="--", alpha=0.3, zorder=1)
+    ax.set_axisbelow(True)
+
     labels = [str(line.get_label()) for line in lines]
     ax.legend(lines, labels)
-
-    plt.grid()
+    ax.set_title(f"{title_extra}", fontweight="bold")
 
     return fig, ax
 
@@ -259,31 +269,69 @@ def generate_regression_prediction_plot(
     *args,
     **kwargs,
 ):
-    fig, ax = plt.subplots()
-    y_true = transformer.inverse_transform(y_true.reshape(-1, 1))
-    y_outp = transformer.inverse_transform(y_outp.reshape(-1, 1))
+    fig, ax = plt.subplots(figsize=(4, 4))
+
+    y_true = transformer.inverse_transform(y_true.reshape(-1, 1)).flatten()
+    y_outp = transformer.inverse_transform(y_outp.reshape(-1, 1)).flatten()
 
     r2 = metrics.calc_r2(outputs=y_outp, labels=y_true)
     pcc = metrics.calc_pcc(outputs=y_outp, labels=y_true)
 
-    ax.scatter(x=y_outp, y=y_true, edgecolors=(0, 0, 0), alpha=0.2, s=10)
-    ax.text(
-        x=0.05,
-        y=0.95,
-        s=f"R2 = {r2:.4g}, PCC = {pcc:.4g}",
-        ha="left",
-        va="top",
-        transform=ax.transAxes,
+    ax.scatter(
+        x=y_outp,
+        y=y_true,
+        color=COLORS["primary"],
+        alpha=0.4,
+        s=12,
+        edgecolors=None,
+        marker="o",
+        label="Data points",
     )
 
-    ax.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], "k--", lw=2)
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("Measured")
-    ax.set(title=title_extra)
+    min_val = min(y_true.min(), y_outp.min())
+    max_val = max(y_true.max(), y_outp.max())
+    ax.plot(
+        [min_val, max_val],
+        [min_val, max_val],
+        color=COLORS["dark_gray"],
+        linestyle="--",
+        linewidth=1.2,
+        label="Perfect prediction",
+    )
 
-    plt.tight_layout()
-    plt.savefig(outfolder / "regression_predictions.pdf")
+    metrics_text = f"$R^2 = {r2:.3f}$\n$\\mathrm{{PCC}} = {pcc:.3f}$"
+
+    ax.text(
+        0.05,
+        0.95,
+        metrics_text,
+        transform=ax.transAxes,
+        verticalalignment="top",
+        bbox={
+            "boxstyle": "round",
+            "facecolor": "white",
+            "alpha": 0.8,
+            "edgecolor": COLORS["light_gray"],
+            "pad": 0.5,
+        },
+    )
+
+    ax.set_xlabel("Predicted value")
+    ax.set_ylabel("Measured value")
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    ax.legend(frameon=True, framealpha=0.9, loc="lower right")
+
+    if title_extra:
+        ax.set_title(title_extra)
+
+    plt.savefig(outfolder / "regression_predictions.pdf", bbox_inches="tight")
+
     plt.close("all")
+
+    return fig, ax
 
 
 def generate_binary_roc_curve(
@@ -294,23 +342,46 @@ def generate_binary_roc_curve(
     *args,
     **kwargs,
 ):
+    fig, ax = plt.subplots(figsize=(7, 5))
+
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     fpr, tpr, _ = roc_curve(y_true_bin, y_outp[:, 1])
     roc_auc = metrics.calc_roc_auc_ovo(outputs=y_outp, labels=y_true)
 
-    plt.plot(fpr, tpr, lw=2, label=f"(area = {roc_auc:0.4g})")
+    ax.plot(
+        fpr,
+        tpr,
+        lw=2,
+        color=COLORS["primary"],
+        label=f"ROC curve (AUC = {roc_auc:.3f})",
+    )
 
-    plt.plot([0, 1], [0, 1], "k--", lw=2)
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.title(f"ROC curve – {title_extra}")
-    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
+    ax.plot(
+        [0, 1],
+        [0, 1],
+        linestyle="--",
+        lw=1.5,
+        color=COLORS["dark_gray"],
+        label="Random classifier",
+    )
 
-    plt.tight_layout()
-    plt.savefig(outfolder / "bin_roc_curve.pdf")
+    ax.set_xlim((0.0, 1.0))
+    ax.set_ylim((0.0, 1.05))
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    if title_extra:
+        ax.set_title(f"ROC Curve – {title_extra}")
+
+    ax.legend(loc="lower right", frameon=True, framealpha=0.8)
+
+    plt.savefig(outfolder / "bin_roc_curve.pdf", bbox_inches="tight")
     plt.close("all")
+
+    return fig, ax
 
 
 def generate_binary_pr_curve(
@@ -321,28 +392,48 @@ def generate_binary_pr_curve(
     *args,
     **kwargs,
 ):
+    fig, ax = plt.subplots(figsize=(7, 5))
+
     y_true_bin = label_binarize(y_true, classes=[0, 1])
     precision, recall, _ = precision_recall_curve(y_true_bin, y_outp[:, 1])
     average_precision = metrics.calc_average_precision(outputs=y_outp, labels=y_true)
 
-    plt.step(
+    ax.step(
         recall,
         precision,
         where="post",
-        label=f"(area = {average_precision:0.4g})",
+        color=COLORS["primary"],
         lw=2,
+        label=f"PR curve (AP = {average_precision:.3f})",
     )
 
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel("Recall")
-    plt.ylabel("Precision")
-    plt.title(f"Precision-Recall curve – {title_extra}")
-    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), prop={"size": 8})
+    no_skill = len(y_true_bin[y_true_bin == 1]) / len(y_true_bin)
+    ax.plot(
+        [0, 1],
+        [no_skill, no_skill],
+        linestyle="--",
+        color=COLORS["dark_gray"],
+        lw=1.5,
+        label="Random classifier",
+    )
 
-    plt.tight_layout()
-    plt.savefig(outfolder / "bin_pr_curve.pdf")
+    ax.set_xlim((0.0, 1.0))
+    ax.set_ylim((0.0, 1.05))
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    if title_extra:
+        ax.set_title(f"Precision-Recall Curve – {title_extra}")
+
+    ax.legend(loc="lower left", frameon=True, framealpha=0.8)
+
+    plt.savefig(outfolder / "bin_pr_curve.pdf", bbox_inches="tight")
     plt.close("all")
+
+    return fig, ax
 
 
 def generate_binary_prediction_distribution(
@@ -359,36 +450,57 @@ def generate_binary_prediction_distribution(
     roc_auc = metrics.calc_roc_auc_ovo(outputs=y_outp, labels=y_true)
 
     classes = transformer.classes_
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    class_colors = [COLORS["primary"], COLORS["secondary"]]
 
     for class_index, class_name in zip(range(2), classes, strict=False):
         cur_class_mask = np.argwhere(y_true == class_index)
-        cur_probabilities = y_outp[cur_class_mask, 1]
+        cur_probabilities = y_outp[cur_class_mask, 1].flatten()
 
-        ax.hist(cur_probabilities, rwidth=0.90, label=class_name, alpha=0.5)
+        ax.hist(
+            cur_probabilities,
+            rwidth=0.90,
+            label=f"{class_name} (n={len(cur_probabilities)})",
+            alpha=0.6,
+            color=class_colors[class_index],
+            edgecolor="black",
+            linewidth=0.75,
+        )
 
-    ax.legend(loc="upper left")
+    ax.legend(
+        loc="upper left",
+        frameon=True,
+        framealpha=0.9,
+    )
+
     props = {
         "boxstyle": "round",
-        "facecolor": "none",
-        "alpha": 0.25,
+        "facecolor": "white",
+        "alpha": 0.8,
         "edgecolor": "gray",
     }
     ax.text(
-        0.80,
         0.95,
-        f"AUC: {roc_auc:0.4g}",
+        0.95,
+        f"AUC: {roc_auc:0.4f}",
         transform=ax.transAxes,
         verticalalignment="top",
+        horizontalalignment="right",
         bbox=props,
     )
-    ax.set_ylabel("Frequency")
-    ax.set_xlabel(f"Score of class {classes[1]}")
-    ax.set_title(title_extra + " Score Distribution")
 
-    plt.tight_layout()
+    ax.grid(True, linestyle="--", alpha=0.3, zorder=0)
+    ax.set_axisbelow(True)
+
+    ax.set_ylabel("Frequency")
+    ax.set_xlabel(f"Score of class '{classes[1]}'")
+    ax.set_title(f"{title_extra} Score Distribution", fontweight="bold")
+
     plt.savefig(outfolder / "positive_prediction_distribution.pdf")
     plt.close("all")
+
+    return fig, ax
 
 
 def generate_multi_class_roc_curve(
@@ -400,6 +512,8 @@ def generate_multi_class_roc_curve(
     *args,
     **kwargs,
 ):
+    fig, ax = plt.subplots(figsize=(7, 5))
+
     fpr: dict[int | str, np.ndarray] = {}
     tpr: dict[int | str, np.ndarray] = {}
     roc_auc: dict[int, float] = {}
@@ -424,12 +538,10 @@ def generate_multi_class_roc_curve(
 
     all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
 
-    # Then interpolate all ROC curves at this points
     mean_tpr = np.zeros_like(all_fpr)
     for i in range(n_classes):
         mean_tpr += np.interp(all_fpr, fpr[i], tpr[i])
 
-    # Finally average it and compute AUC
     mean_tpr /= n_classes
 
     fpr["macro"] = all_fpr
@@ -438,40 +550,57 @@ def generate_multi_class_roc_curve(
         outputs=y_outp, labels=y_true, average="macro"
     )
 
-    plt.figure(figsize=(12, 8))
-
-    plt.plot(
+    ax.plot(
         fpr["macro"],
         tpr["macro"],
-        label=f"macro-average ROC curve (area = {roc_auc_macro:0.4g})",
-        color="navy",
+        label=f"Macro-average (AUC = {roc_auc_macro:.3f})",
+        color=COLORS["accent"],
         linestyle=":",
-        linewidth=4,
+        linewidth=2.5,
     )
 
-    colors = iter(plt.get_cmap("tab20", n_classes)(np.arange(n_classes)))
-    for i, color in zip(range(n_classes), colors, strict=False):
-        plt.plot(
+    colors, line_styles = get_class_visuals(n_classes=n_classes)
+
+    for i in range(n_classes):
+        class_name = str(transformer.inverse_transform([i])[0])
+        class_count = np.count_nonzero(y_true == i)
+
+        ax.plot(
             fpr[i],
             tpr[i],
-            color=color,
-            lw=2,
-            label=f"{transformer.inverse_transform([i])[0]} "
-            f"({np.count_nonzero(y_true == i)}) "
-            f"(area = {roc_auc[i]:0.4g})",
+            color=colors[i],
+            linestyle=line_styles[i],
+            lw=1.5,
+            label=f"{class_name} (n={class_count}, AUC={roc_auc[i]:.3f})",
         )
 
-    plt.plot([0, 1], [0, 1], "k--", lw=2)
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel("False Positive Rate", fontsize=14)
-    plt.ylabel("True Positive Rate", fontsize=14)
-    plt.title(f"ROC curve – {title_extra}", fontsize=20)
-    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    ax.plot([0, 1], [0, 1], color=COLORS["dark_gray"], linestyle="--", lw=1.5)
+    ax.set_xlim((0.0, 1.0))
+    ax.set_ylim((0.0, 1.05))
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
 
-    plt.tight_layout()
-    plt.savefig(outfolder / "mc_roc_curve.pdf")
+    if title_extra:
+        ax.set_title(f"ROC Curves – {title_extra}")
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    legend = ax.legend(
+        loc="lower left" if n_classes <= 8 else "center left",
+        frameon=True,
+        framealpha=0.9,
+        fontsize=8 if n_classes > 6 else 9,
+        title_fontsize=9,
+    )
+
+    legend.get_frame().set_facecolor("white")
+    legend.get_frame().set_edgecolor(COLORS["light_gray"])
+
+    plt.savefig(outfolder / "mc_roc_curve.pdf", bbox_inches="tight")
     plt.close("all")
+
+    return fig, ax
 
 
 def generate_multi_class_pr_curve(
@@ -483,6 +612,8 @@ def generate_multi_class_pr_curve(
     *args,
     **kwargs,
 ):
+    fig, ax = plt.subplots(figsize=(7, 5))
+
     precision: dict[int | str, np.ndarray] = {}
     recall: dict[int | str, np.ndarray] = {}
 
@@ -504,7 +635,6 @@ def generate_multi_class_pr_curve(
         )
         average_precision[i] = average_precision_score(y_true_bin[:, i], y_outp[:, i])
 
-    # A "micro-average": quantifying score on all classes jointly
     precision["micro"], recall["micro"], _ = precision_recall_curve(
         y_true_bin.ravel(), y_outp.ravel()
     )
@@ -512,38 +642,56 @@ def generate_multi_class_pr_curve(
         outputs=y_outp, labels=y_true, average="micro"
     )
 
-    plt.figure(figsize=(12, 8))
-
-    plt.plot(
+    ax.plot(
         recall["micro"],
         precision["micro"],
-        color="gold",
-        lw=2,
-        label=f"Micro-Average Precision-Recall (area = {average_precision_micro:0.4g})",
+        color=COLORS["accent"],
+        lw=2.5,
+        linestyle=":",
+        label=f"Micro-average (AP = {average_precision_micro:.3f})",
     )
 
-    colors = iter(plt.get_cmap("tab20", n_classes)(np.arange(n_classes)))
-    for i, color in zip(range(n_classes), colors, strict=False):
-        plt.plot(
+    colors, line_styles = get_class_visuals(n_classes=n_classes)
+
+    for i in range(n_classes):
+        class_name = str(transformer.inverse_transform([i])[0])
+        class_count = np.count_nonzero(y_true == i)
+
+        ax.plot(
             recall[i],
             precision[i],
-            color=color,
-            lw=2,
-            label=f"{transformer.inverse_transform([i])[0]} "
-            f"({np.count_nonzero(y_true == i)}) "
-            f"(area = {average_precision[i]:0.4g})",
+            color=colors[i],
+            linestyle=line_styles[i],
+            lw=1.5,
+            label=f"{class_name} (n={class_count}, AP={average_precision[i]:.3f})",
         )
 
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel("Recall", fontsize=14)
-    plt.ylabel("Precision", fontsize=14)
-    plt.title(f"Precision-Recall curve – {title_extra}", fontsize=20)
-    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    ax.set_xlim((0.0, 1.0))
+    ax.set_ylim((0.0, 1.05))
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
 
-    plt.tight_layout()
-    plt.savefig(outfolder / "mc_pr_curve.pdf")
+    if title_extra:
+        ax.set_title(f"Precision-Recall Curves – {title_extra}")
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    legend = ax.legend(
+        loc="lower left" if n_classes <= 8 else "center left",
+        frameon=True,
+        framealpha=0.9,
+        fontsize=8 if n_classes > 6 else 9,
+        title_fontsize=9,
+    )
+
+    legend.get_frame().set_facecolor("white")
+    legend.get_frame().set_edgecolor(COLORS["light_gray"])
+
+    plt.savefig(outfolder / "mc_pr_curve.pdf", bbox_inches="tight")
     plt.close("all")
+
+    return fig, ax
 
 
 def generate_confusion_matrix(
@@ -559,36 +707,55 @@ def generate_confusion_matrix(
         cmap = sns.color_palette("rocket", as_cmap=True)
 
     if not title_extra:
-        if normalize:
-            title_extra = "Normalized confusion matrix"
-        else:
-            title_extra = "Confusion matrix, without normalization"
+        title_extra = "Normalized Confusion Matrix" if normalize else "Confusion Matrix"
 
-    conf_mat = confusion_matrix(y_true=y_true, y_pred=y_outp, normalize=normalize)
+    conf_mat = confusion_matrix(
+        y_true=y_true,
+        y_pred=y_outp,
+        normalize=normalize,
+    )
 
     classes = classes[unique_labels(y_true, y_outp)]
-    classes_wrapped = ["\n".join(wrap(c, 20)) for c in classes]
+
+    wrap_length = max(10, min(20, 50 // len(classes)))
+    classes_wrapped = ["\n".join(wrap(c, wrap_length)) for c in classes]
 
     df_cm = pd.DataFrame(conf_mat, index=classes_wrapped, columns=classes_wrapped)
 
-    width = len(classes) * 1.25
-    height = len(classes) * 1.00
+    width = max(6, min(16, len(classes) * 1.0))
+    height = max(5, min(14, len(classes) * 0.9))
     fig, ax = plt.subplots(figsize=(width, height))
 
-    tick_label_font_size = min(len(classes) * 2, 14)
-    annot_font_size = int(tick_label_font_size * 1.5)
-    annot_kwargs = {"fontsize": annot_font_size}
-    fmt = "d" if not normalize else ".2g"
-    sns.heatmap(data=df_cm, annot=True, fmt=fmt, annot_kws=annot_kwargs, cmap=cmap)
+    tick_label_font_size = max(6, min(12, 18 - len(classes) * 0.5))
+    annot_font_size = max(7, min(14, 18 - len(classes) * 0.4))
 
-    label_fontsize = annot_font_size
-    ax.set_title(title_extra, fontsize=label_fontsize)
-    ax.set_ylabel("True Label", fontsize=label_fontsize)
-    ax.set_xlabel("Predicted Label", fontsize=label_fontsize)
+    fmt = ".1%" if normalize else "d"
+
+    sns.heatmap(
+        data=df_cm,
+        annot=True,
+        fmt=fmt,
+        cmap=cmap,
+        linewidths=0.5,
+        linecolor="white",
+        cbar=True,
+        square=True,
+        annot_kws={"fontsize": annot_font_size},
+        vmin=0,
+        vmax=1.0 if normalize else None,
+    )
+
+    ax.set_title(
+        f"{title_extra}",
+        fontsize=annot_font_size + 2,
+        fontweight="bold",
+    )
+    ax.set_ylabel("True Label", fontsize=annot_font_size + 1, fontweight="bold")
+    ax.set_xlabel("Predicted Label", fontsize=annot_font_size + 1, fontweight="bold")
 
     color_bar = ax.collections[0].colorbar
     assert color_bar is not None
-    color_bar.ax.tick_params(labelsize=label_fontsize)
+    color_bar.ax.tick_params(labelsize=tick_label_font_size)
 
     plt.setp(
         ax.get_xticklabels(),
@@ -597,14 +764,26 @@ def generate_confusion_matrix(
         rotation_mode="anchor",
         fontsize=tick_label_font_size,
     )
-
     plt.setp(ax.get_yticklabels(), fontsize=tick_label_font_size)
 
-    fig = plt.gcf()
+    for i in range(len(classes)):
+        ax.add_patch(
+            plt.Rectangle(
+                (i, i),
+                1,
+                1,
+                fill=False,
+                edgecolor="white",
+                lw=1.5,
+            )
+        )
 
-    fig.tight_layout()
-    plt.savefig(outfolder / "confusion_matrix.pdf")
+    plt.savefig(
+        outfolder / "confusion_matrix.pdf", bbox_inches="tight", transparent=True
+    )
     plt.close("all")
+
+    return fig, ax
 
 
 def generate_all_training_curves(
@@ -639,7 +818,7 @@ def generate_all_training_curves(
                 ax_object=axis_object,
                 series=train_series,
                 skiprows=plot_skip_steps,
-                ax_plot_kwargs={"label": "Train", "c": "orange"},
+                ax_plot_kwargs={"label": "Train"},
             )
 
         fname_identifier = _parse_metrics_colname(column_name=str(valid_series.name))

@@ -34,6 +34,13 @@ if TYPE_CHECKING:
     from eir.train import Experiment
 
 
+def my_visualize_image_attr_multiple(*args, **kwargs):
+    with plt.rc_context(
+        {"figure.constrained_layout.use": False, "figure.autolayout": False}
+    ):
+        return visualize_image_attr_multiple(*args, **kwargs)
+
+
 def analyze_image_input_attributions(
     experiment: Union[
         "Experiment",
@@ -88,7 +95,7 @@ def analyze_image_input_attributions(
         raw_input = raw_input.transpose(1, 2, 0)
         attributions = attributions.transpose(1, 2, 0)
 
-        figure, _ = visualize_image_attr_multiple(
+        figure, _ = my_visualize_image_attr_multiple(
             attr=attributions,
             original_image=raw_input,
             methods=["original_image", "heat_map"],
