@@ -624,16 +624,16 @@ wheels = [
 
 [[package]]
 name = "deeplake"
-version = "4.2.4"
+version = "4.2.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/b2/7e8e8b5ed122bc5e71f06f6fd42d19e4f548177eaf2969080278c33486da/deeplake-4.2.4-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:c22faa8e39cc9b94189ffc1af738159c6ee9cf17f77b194ed810a3a8b71247df", size = 16489784, upload-time = "2025-05-13T13:59:22.867Z" },
-    { url = "https://files.pythonhosted.org/packages/97/6b/84b223d5557dfb9cbc3484a8f4df5e4e3e3f7e6e07f1f6e7fcbd23e02cbc/deeplake-4.2.4-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:061331ed057c72556cdab3706b8b44143f25be355f2f4974bdeb7e9f198d3f16", size = 15677129, upload-time = "2025-05-13T13:59:27.062Z" },
-    { url = "https://files.pythonhosted.org/packages/82/51/927c14d8a64c376c52edcdcd075af17b761ecf032d502d0f09df78707185/deeplake-4.2.4-cp313-cp313-manylinux2014_aarch64.whl", hash = "sha256:2d23a71690bd214aad5c291f487d307b679524cf3ac9d504a0485831a460de7b", size = 18301557, upload-time = "2025-05-13T13:59:32.271Z" },
-    { url = "https://files.pythonhosted.org/packages/5e/9b/5b4aa7be84adecfa50571fcf26e781de239f0c2dd02088c9ccdbad5bdc42/deeplake-4.2.4-cp313-cp313-manylinux2014_x86_64.whl", hash = "sha256:e13612c1781a1363117f0b705b74117568648d8aac86a55219fb214bd36eb1e3", size = 19235950, upload-time = "2025-05-13T13:59:37.731Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/66/9f619213c9e617d4b88eaac4b32eed67f68ffa02298d1470b6303baba072/deeplake-4.2.5-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:b0646b36f3bb09687b2d7ce43b212f0bc538d8e71926ed75cf3c2994ee3ea7f9", size = 16617891, upload-time = "2025-05-19T09:55:32.533Z" },
+    { url = "https://files.pythonhosted.org/packages/af/dc/e1340a9d8186236a4f09dd7490feba9657d71c021b42b08069a2310f3cb5/deeplake-4.2.5-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:ed5ac8ecdaca3332be88a820aca54589c9087c47598bcca7e34684e69f5e696b", size = 15788243, upload-time = "2025-05-19T09:55:35.938Z" },
+    { url = "https://files.pythonhosted.org/packages/29/fa/ea2ebfa658bace70dde7aa047189a74013ae4e847a09d892dcaf85a723cd/deeplake-4.2.5-cp313-cp313-manylinux2014_aarch64.whl", hash = "sha256:d7c32f7b69328356ee3cfb5a63e039df9db1df592503e4e9195983351798bbc6", size = 18400801, upload-time = "2025-05-19T09:55:39.905Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/f4/77f51fff6c75fd7b41e30d2ce52fbc5596b17785a7be8a30b92dc8c83ed0/deeplake-4.2.5-cp313-cp313-manylinux2014_x86_64.whl", hash = "sha256:ae7eed5ebed1ed2c5ac4023f07b66a4b5ef392a9f4f5f3a8b42043577ad60583", size = 19360526, upload-time = "2025-05-19T09:55:43.728Z" },
 ]
 
 [[package]]
@@ -1095,7 +1095,7 @@ wheels = [
 
 [[package]]
 name = "huggingface-hub"
-version = "0.31.2"
+version = "0.31.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
@@ -1106,9 +1106,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3b/7b/09ab792c463975fcd0a81f459b5e900057dabbbc274ff253bb28d58ebfce/huggingface_hub-0.31.2.tar.gz", hash = "sha256:7053561376ed7f6ffdaecf09cc54d70dc784ac6315fa4bb9b93e19662b029675", size = 403025, upload-time = "2025-05-13T09:45:43.617Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/05/a0/7445e07427a917399db619e3c7383de3cd723c20d3b3a8a527a096c49a44/huggingface_hub-0.31.4.tar.gz", hash = "sha256:5a7bc710b9f9c028aee5b1476867b4ec5c1b92f043cb364d5fdc54354757e4ce", size = 407736, upload-time = "2025-05-19T09:37:13.73Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/83/81/a8fd9c226f7e3bc8918f1e456131717cb38e93f18ccc109bf3c8471e464f/huggingface_hub-0.31.2-py3-none-any.whl", hash = "sha256:8138cd52aa2326b4429bb00a4a1ba8538346b7b8a808cdce30acb6f1f1bdaeec", size = 484230, upload-time = "2025-05-13T09:45:41.977Z" },
+    { url = "https://files.pythonhosted.org/packages/33/c7/852d4473788cfd7d79b73951244b87a6d75fdac296c90aeb5e85dbb2fb5e/huggingface_hub-0.31.4-py3-none-any.whl", hash = "sha256:4f70704760296cc69b612916056e9845f5490a33782b924fc531767967acc15d", size = 489319, upload-time = "2025-05-19T09:37:11.506Z" },
 ]
 
 [[package]]
