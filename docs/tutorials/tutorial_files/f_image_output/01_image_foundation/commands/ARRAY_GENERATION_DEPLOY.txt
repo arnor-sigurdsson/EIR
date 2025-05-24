@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/f_image_output/01_image_foundation/saved_models/01_image_foundation_checkpoint_36500_perf-average=0.9751.pt
+--model-path eir_tutorials/tutorial_runs/f_image_output/01_image_foundation/saved_models/01_image_foundation_checkpoint_36000_perf-average=0.9742.pt

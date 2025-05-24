@@ -1,2 +1,2 @@
 eirserve \
---model-path eir_tutorials/tutorial_runs/g_time_series/02_time_series_stocks_diffusion/saved_models/02_time_series_stocks_diffusion_checkpoint_19000_perf-average=0.9681.pt
+--model-path eir_tutorials/tutorial_runs/g_time_series/02_time_series_stocks_diffusion/saved_models/02_time_series_stocks_diffusion_checkpoint_9500_perf-average=0.9670.pt

@@ -1,0 +1,13 @@
+basic_experiment:
+  dataloader_workers: 0
+  memory_dataset: true
+  n_epochs: 25
+  output_folder: eir_tutorials/tutorial_runs/a_using_eir/tutorial_04_imdb_run
+  valid_size: 0.1
+evaluation_checkpoint:
+  checkpoint_interval: 500
+  n_saved_models: 1
+  sample_interval: 500
+training_control:
+  early_stopping_patience: 5
+  mixing_alpha: 0.2
