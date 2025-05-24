@@ -101,7 +101,7 @@ def generate_validation_curve_from_series(
         validation_xticks,
         values,
         color=COLORS["primary"],
-        linewidth=1.2,
+        linewidth=1.35,
         alpha=1.0,
         label=f"Validation (best: {extreme_valid_value:.4g} at {extreme_valid_idx})",
         zorder=3,
@@ -717,7 +717,7 @@ def generate_confusion_matrix(
 
     classes = classes[unique_labels(y_true, y_outp)]
 
-    wrap_length = max(10, min(20, 50 // len(classes)))
+    wrap_length = max(20, min(20, 50 // len(classes)))
     classes_wrapped = ["\n".join(wrap(c, wrap_length)) for c in classes]
 
     df_cm = pd.DataFrame(conf_mat, index=classes_wrapped, columns=classes_wrapped)
@@ -764,7 +764,7 @@ def generate_confusion_matrix(
         rotation_mode="anchor",
         fontsize=tick_label_font_size,
     )
-    plt.setp(ax.get_yticklabels(), fontsize=tick_label_font_size)
+    plt.setp(ax.get_yticklabels(), rotation=0, fontsize=tick_label_font_size)
 
     for i in range(len(classes)):
         ax.add_patch(

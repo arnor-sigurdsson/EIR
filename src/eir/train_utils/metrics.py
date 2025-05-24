@@ -337,7 +337,9 @@ def average_performances_across_tasks(
         cur_metric_func = performance_calculation_functions[column_type]
 
         cur_value = cur_metric_func(
-            metric_dict=metric_dict, output_name=output_name, column_name=column_name
+            metric_dict=metric_dict,
+            output_name=output_name,
+            column_name=column_name,
         )
 
         if not np.isnan(cur_value):
