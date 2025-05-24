@@ -92,11 +92,11 @@ def get_streaming_generation_experiment() -> AutoDocExperimentInfo:
             "figures/training_curve_LOSS.pdf",
         ),
         (
-            "samples/500/auto/0_generated.txt",
+            "samples/1000/auto/0_generated.txt",
             "figures/auto_generated_iter_500.txt",
         ),
         (
-            "samples/500/manual/1_generated.txt",
+            "samples/1000/manual/1_generated.txt",
             "figures/manual_generated_iter_500.txt",
         ),
         (
@@ -161,7 +161,7 @@ def get_sft_from_pretrained_experiment() -> AutoDocExperimentInfo:
             "figures/sft_pretrained_training_curve_LOSS.pdf",
         ),
         (
-            "samples/500/auto/0_generated.txt",
+            "samples/1000/auto/0_generated.txt",
             "figures/sft_pretrained_auto_generated_iter_500.txt",
         ),
         (

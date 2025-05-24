@@ -743,7 +743,7 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_2 = get_time_series_stocks_transformer_serve_experiment()
     exp_3 = get_time_series_stocks_02_one_shot(target_iteration=20000)
     exp_4 = get_time_series_stocks_serve_experiment_one_shot()
-    exp_5 = get_time_series_stocks_03_diffusion(target_iteration=15000)
+    exp_5 = get_time_series_stocks_03_diffusion(target_iteration=14000)
     exp_6 = get_time_series_stocks_serve_experiment_diffusion()
 
     return [

@@ -102,13 +102,13 @@ def get_image_captioning_02_image_and_text() -> AutoDocExperimentInfo:
     for i in range(10):
         mapping.append(
             (
-                f"samples/11000/auto/{i}_generated.txt",
+                f"samples/10000/auto/{i}_generated.txt",
                 f"figures/auto_generated_{i}_iter_11000_caption.txt",
             )
         )
         mapping.append(
             (
-                f"samples/11000/auto/{i}_inputs/image_captioning.png",
+                f"samples/10000/auto/{i}_inputs/image_captioning.png",
                 f"figures/auto_input_{i}_iter_11000_image.png",
             )
         )
