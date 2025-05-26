@@ -6,9 +6,9 @@ build-backend = "hatchling.build"
 name = "eir-dl"
 version = "0.20.1"
 description = "Deep learning framework for genomics and multi-modal data"
-license = { text = "AGPLv3" }
+license = { text = "Apache-2.0" }
 authors = [
-    { name = "Arnor Sigurdsson" }
+    { name = "Arnór Ingi Sigurðsson" }
 ]
 requires-python = ">=3.13.0,<3.14"
 dependencies = [
