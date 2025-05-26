@@ -9,7 +9,7 @@ author = "Arnor Sigurdsson"
 
 copyright = f"{datetime.now().year}, {author}"
 
-html_logo = "source/_static/img/EIR_logo_white.png"
+html_logo = "source/_static/img/EIR_logo_white.svg"
 html_theme_options = {
     "logo_only": True,
 }
