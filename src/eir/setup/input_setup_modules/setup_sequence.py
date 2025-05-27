@@ -452,6 +452,14 @@ class TokenizerWrapper:
         self.is_pretokenized = is_pretokenized
 
     def __call__(self, input_text: str | Sequence[str]) -> Sequence[str]:
+        if not input_text or (
+            isinstance(input_text, list | tuple) and len(input_text) == 0
+        ):
+            return []
+
+        if isinstance(input_text, str) and input_text.strip() == "":
+            return []
+
         tokens = self.tokenizer.encode(
             sequence=input_text,
             is_pretokenized=self.is_pretokenized,
