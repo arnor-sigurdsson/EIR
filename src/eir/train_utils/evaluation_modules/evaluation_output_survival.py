@@ -469,7 +469,7 @@ def plot_discrete_risk_stratification(
     risk_scores = predicted_probs.mean(axis=1)
 
     risk_percentiles = [75, 50, 25]
-    risk_thresholds = np.percentile(risk_scores, [25, 50, 75])
+    risk_thresholds: np.ndarray = np.percentile(risk_scores, [25, 50, 75])
 
     colors = ["tab:orange", "tab:green", "tab:red"]
     group_labels = ["Low Risk (75%)", "Median Risk", "High Risk (25%)"]

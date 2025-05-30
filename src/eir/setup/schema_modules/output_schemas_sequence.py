@@ -16,9 +16,17 @@ class SequenceOutputTypeConfig:
         for the training. If this is not passed in, the framework will automatically
         build the vocabulary from the training data. Passing in a vocabulary file is
         therefore useful if (a) you want to manually specify / limit the vocabulary used
-        and/or (b) you want to save time by pre-computing the vocabulary. The
-        expected format is a json file with an array of tokens, e.g. {"<bos>": 0,
-        "<unk>": 1, "<mask>": 2, "<pad>": 3, "<eos>": 4, "a": 5, ...}.
+        and/or (b) you want to save time by pre-computing the vocabulary.
+
+        Here, there are two formats supported:
+
+        - A ``.json`` file containing a dictionary with the vocabulary as keys and
+         the corresponding token IDs as values. For example:
+         ``{"the": 0, "cat": 1, "sat": 2, "on": 3, "the": 4, "mat": 5}``
+
+        - A ``.json`` file with the results of training and saving the vocabulary of
+         a Huggingface BPE tokenizer. This is the file create by calling
+         ``hf_tokenizer.save()``. This is only valid when using the ``bpe`` tokenizer.
 
     :param max_length:
         Maximum length to truncate/pad sequences to. This can be an integer or the
@@ -52,7 +60,7 @@ class SequenceOutputTypeConfig:
         Which language rules the tokenizer should apply when tokenizing the raw data.
 
     :param adaptive_tokenizer_max_vocab_size:
-        If using an adaptive tokenizer ("bpe"), this parameter controls the maximum
+        If using an adaptive tokenizer (``"bpe"``), this parameter controls the maximum
         size of the vocabulary.
 
     :param sequence_operation:

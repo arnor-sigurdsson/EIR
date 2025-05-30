@@ -80,6 +80,26 @@ class StreamingDataset(IterableDataset):
         max_consecutive_timeouts: int = 3,
         heartbeat_interval: float = 30.0,
     ):
+        """
+        Streaming dataset client that connects to a WebSocket data server.
+
+        The server (external) this module interacts with MUST implement these endpoints:
+        - handshake: {"type": "handshake", "version": "1.0"}
+          -> {"type": "handshake", "version": "1.0"}
+        - getInfo: {"type": "getInfo"}
+          -> {"type": "info", "payload": <DatasetInfo>}
+        - getData: {"type": "getData", "payload": {"batch_size": N}}
+          -> {"type": "data", "payload": [...]}
+        - reset: {"type": "reset"}
+          -> {"type": "resetConfirmation", "payload": {...}}
+        - heartbeat: {"type": "heartbeat"} -> {"type": "heartbeat"}
+
+        Optional endpoints:
+        - setValidationIds: {"type": "setValidationIds",
+          "payload": {"validation_ids": [...]}}
+        - status: {"type": "status"} -> {"type": "status", "payload": {...}}
+        """
+
         super().__init__()
         self.websocket_url = websocket_url
         self.inputs = inputs

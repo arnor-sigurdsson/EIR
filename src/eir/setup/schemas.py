@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import Literal, Union
 
 from eir.models.fusion.fusion_attention import AttentionFusionConfig
 from eir.models.fusion.fusion_identity import IdentityConfig
@@ -39,10 +39,6 @@ from eir.setup.schema_modules.output_schemas_sequence import (
 from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.setup.schema_modules.tensor_broker_schemas import TensorBrokerConfig
-from eir.setup.setup_utils import get_all_optimizer_names
-
-if TYPE_CHECKING:
-    from eir.train_utils.metrics import al_cat_metric_choices, al_con_metric_choices
 
 al_input_configs = Sequence["InputConfig"]
 al_output_configs = Sequence["OutputConfig"]
@@ -56,7 +52,48 @@ al_input_type_info = Union[
     "ArrayInputDataConfig",
 ]
 
-al_optimizers = tuple(Literal[i] for i in get_all_optimizer_names())
+al_base_optimizer_choices = Literal[
+    "sgdm",
+    "adam",
+    "adamw",
+    "adahessian",
+    "adabelief",
+    "adabeliefw",
+]
+
+
+al_cat_metric_choices = Sequence[
+    Literal[
+        "mcc",
+        "acc",
+        "roc-auc-macro",
+        "ap-macro",
+        "f1-macro",
+        "precision-macro",
+        "recall-macro",
+        "cohen-kappa",
+    ]
+]
+al_con_metric_choices = Sequence[
+    Literal[
+        "r2",
+        "pcc",
+        "loss",
+        "rmse",
+        "mae",
+        "mape",
+        "explained-variance",
+    ]
+]
+
+all_survival_metric_choices = Sequence[
+    Literal[
+        "c-index",
+        "ibs",
+        "td-cindex",
+        "td-auc",
+    ]
+]
 
 al_feature_extractor_configs = (
     OmicsModelConfig
@@ -143,9 +180,7 @@ class BasicExperimentConfig:
         Number of workers for multiprocess training and validation data loading.
 
     :param device:
-        DEPRECATED: Use AcceleratorConfig.hardware instead.
-        Device to run the training on (e.g. 'cuda:0' / 'cpu' / 'mps'). 'mps' is
-        currently experimental, and might not work for all models.
+        DEPRECATED: Use ``AcceleratorConfig.hardware`` instead.
 
     :param memory_dataset:
         Whether to load all sample into memory during training.
@@ -177,7 +212,7 @@ class GlobalModelConfig:
 
     :param strict_pretrained_loading:
         Whether to enforce that the loaded pretrained model exactly the same
-        architecture as the current model. If False, will only load the layers that
+        architecture as the current model. If ``False``, will only load the layers that
         match between the two models.
     """
 
@@ -209,7 +244,7 @@ class OptimizationConfig:
         Weight decay.
 
     :param gradient_clipping:
-        Max norm used for gradient clipping, with p=2.
+        Max norm used for gradient clipping, with ``p=2``.
 
     :param gradient_accumulation_steps:
         Number of steps to use for gradient accumulation.
@@ -218,7 +253,7 @@ class OptimizationConfig:
         Gradient noise to inject during training.
     """
 
-    optimizer: str = "adamw"
+    optimizer: al_base_optimizer_choices = "adamw"
     lr: float = 3e-04
     lr_lb: float = 0.0
     b1: float = 0.9
@@ -232,31 +267,30 @@ class OptimizationConfig:
 @dataclass
 class LRScheduleConfig:
     """
-    :param find_lr:
-        Whether to perform a range test of different learning rates, with the lower
-        limit being what is passed in for the --lr flag. Produces a plot and exits
-        with status 0 before training if this flag is active.
-
     :param lr_schedule:
-        Whether to use cyclical, cosine or reduce on plateau learning rate schedule.
-        Otherwise, keeps same learning rate
+        Whether to use "same" "cyclical", "cosine" or "reduce on plateau" learning
+        rate schedule. The "reduce on plateau" schedule will reduce the learning rate
+        when the validation performance does not improve for a number of steps.
 
     :param lr_plateau_patience:
-        Number of validation performance steps without improvement over best
-        performance before reducing LR (only relevant when --lr_schedule is 'plateau'.
+        Number of validation performance steps without improvement over the best
+        performance before reducing LR (only relevant when ``lr_schedule`` is
+        ``"plateau"``.
 
     :param lr_plateau_factor:
-        Factor to reduce LR when running with plateau schedule.
+        Factor to reduce LR when running with a plateau schedule.
 
     :param warmup_steps:
         How many steps to use in warmup. If not set, will automatically compute the
         number of steps if using an adaptive optimizer, otherwise use 2000.
 
     :param plot_lr_schedule:
-        Whether to run LR search, plot the results and exit with status 0.
+        Whether to plot the learning rate schedule expected during training, useful
+        to e.g. visualize the effect of warmup and "cosine" / "cyclical" schedules.
+        Not relevant when using the "plateau" schedule, since the LR is not fixed
+        beforehand.
     """
 
-    find_lr: bool = False
     lr_schedule: Literal["cycle", "plateau", "same", "cosine"] = "plateau"
     lr_plateau_patience: int = 10
     lr_plateau_factor: float = 0.2
@@ -268,8 +302,8 @@ class LRScheduleConfig:
 class TrainingControlConfig:
     """
     :param early_stopping_patience:
-        Number of validation performance steps without improvement over best
-        performance before terminating run.
+        Number of validation performance steps without improvement over the best
+        performance before terminating the run.
 
     :param early_stopping_buffer:
         Number of iterations to run before activating early stopping checks, useful
@@ -279,10 +313,14 @@ class TrainingControlConfig:
         Target column to apply weighted sampling on, relevant for supervised
         (tabular) targets.
         Only applies to categorical columns.
-        Passing in 'all' here will use an average of all the target columns.
+        Passing in ``- 'all'`` (note this is still passed in as an array, just
+        containing a single string) here will use an average of all the
+        categorical target columns to compute the weights.
 
     :param mixing_alpha:
         Alpha parameter used for mixing (higher means more mixing).
+        See `Mixup: Beyond Empirical
+        Risk Minimization <https://arxiv.org/abs/1710.09412>`_ for details.
     """
 
     early_stopping_patience: int = 10
@@ -294,27 +332,29 @@ class TrainingControlConfig:
 @dataclass
 class EvaluationCheckpointConfig:
     """
-    :param sample_interval:
-        Iteration interval to perform validation and possibly attribution analysis
-         if set.
+        :param sample_interval:
+            Iteration interval to perform validation and possibly attribution analysis
+            if set.
 
     :param saved_result_detail_level:
-        Level of detail to save in the results file. Higher levels will save more
-        information, but will take up more space and might be slow especially
-        when using many tabular targets. The details are as follows
-        (each step skips a level of detail in addition to the previous):
-        - 5: The default, save all metrics and plots.
-        - 4: Skip validation plots and generated samples under the 'samples' folder.
-        - 3: Skip plots for individual targets.
-        - 2: Skip individual target plots (e.g. R2 training curve for regression
-        targets).
-        - 1: Skip individual target metrics (including loss).
+            Level of detail to save in the results file. Higher levels will save more
+            information, but will take up more space and might be slow especially
+            when using many tabular targets. The details are as follows
+            (each step skips a level of detail in addition to the previous):
 
-    :param checkpoint_interval:
-        Iteration interval to checkpoint (i.e. save) model.
+            - ``5``: The default, save all metrics and plots.
+            - ``4``: Skip validation plots and generated samples under the
+              ``/samples`` folder.
+            - ``3``: Skip plots for individual targets.
+            - ``2``: Skip individual target plots (e.g. R2 training curve for regression
+              targets).
+            - ``1``: Skip individual target metrics (including loss).
 
-    :param n_saved_models:
-        Number of top N models to saved during training.
+        :param checkpoint_interval:
+            Iteration interval to checkpoint (i.e. save) model.
+
+        :param n_saved_models:
+            Number of top N models to saved during training.
     """
 
     sample_interval: int = 200
@@ -339,13 +379,13 @@ class AttributionAnalysisConfig:
     :param attributions_every_sample_factor:
         Controls whether the attributions / feature importance
         values are computed at every
-        sample interval (=1), every other sample interval (=2), etc.
+        sample interval (set to ``1``), every other sample interval (set to ``2``), etc.
         Useful when computing the attributions takes a long time, and
         we don't want to do it every time we evaluate.
 
     :param attribution_background_samples:
         Number of samples to use for the background in attribution / feature importance
-         computations.
+        computations.
     """
 
     compute_attributions: bool = False
@@ -360,38 +400,40 @@ class SupervisedMetricsConfig:
 
     :param cat_metrics:
         Which metrics to calculate for categorical targets.
-        If not set, will use the default metrics for the task type.
 
     :param con_metrics:
         Which metrics to calculate for continuous targets.
-        If not set, will use the default metrics for the task type.
 
     :param cat_averaging_metrics:
         Which metrics to use for averaging categorical targets. If not set, will use
-        the default metrics for the task type.
+        the average of MCC, ROC-AUC and AP.
 
     :param con_averaging_metrics:
-        Which metrics to use for averaging continuous targets. If not set, will use
-        the default metrics for the task type.
+        Which metrics to use for averaging continuous targets. If not set,
+        will use the average of 1.0-LOSS, PCC and R2.
     """
 
-    cat_metrics: "al_cat_metric_choices" = ("mcc", "acc", "roc-auc-macro", "ap-macro")
-    con_metrics: "al_con_metric_choices" = ("r2", "pcc", "loss")
+    cat_metrics: al_cat_metric_choices = ("mcc", "acc", "roc-auc-macro", "ap-macro")
+    con_metrics: al_con_metric_choices = ("r2", "pcc", "loss")
 
-    cat_averaging_metrics: Optional["al_cat_metric_choices"] = None
-    con_averaging_metrics: Optional["al_con_metric_choices"] = None
+    cat_averaging_metrics: al_cat_metric_choices | None = None
+    con_averaging_metrics: al_con_metric_choices | None = None
 
 
 @dataclass
 class VisualizationLoggingConfig:
     """
     :param plot_skip_steps:
-        How many iterations to skip in plots.
+        How many iterations to skip in plots. Useful to get a zoomed-in view of the
+        training process after the initial 'burn-in' period.
+
     :param no_pbar:
-        Whether to not use progress bars. Useful when stdout/stderr is written to files.
+        Whether to not use progress bars. Useful when stdout/stderr is
+        written to files.
+
     :param log_level:
-        Logging level to use. Can be one of 'debug', 'info', 'warning', 'error',
-         'critical'.
+        Logging level to use. Can be one of ``'debug'``, ``'info'``,
+        ``'warning'``, ``'error'``, ``'critical'``.
     """
 
     plot_skip_steps: int = 200
@@ -404,16 +446,15 @@ class DataPreparationConfig:
     """
     :param streaming_setup_samples:
         Number of samples to use during streaming setup (e.g., for training tokenizers).
-        If None, will use all available samples.
+        If ``None``, uses all available samples.
 
     :param streaming_batch_size:
-        Batch size to use during streaming setup. If None, will use the training
+        Batch size to use during streaming setup. If ``None``, uses the training
         batch size.
     """
 
     streaming_setup_samples: int = 10000
     streaming_batch_size: int | None = None
-    streaming_steps_per_epoch: int = 10000
 
 
 @dataclass
@@ -423,26 +464,27 @@ class AcceleratorConfig:
 
     :param hardware:
         The hardware accelerator to use.
-        Options include 'cpu', 'cuda', 'mps', 'tpu', etc.
+        Options include ``'cpu'``, ``'cuda'``, ``'mps'``, ``'tpu'``, etc.
 
     :param precision:
         Numerical precision for training.
-        Options include '32-true', '16-mixed', 'bf16-mixed', etc.
+        Options include ``'32-true'``, ``'16-mixed'``, ``'bf16-mixed'``, etc.
         Using mixed precision can significantly speed up training on supported hardware.
 
     :param strategy:
         The parallelization strategy to use. Common options:
-        - 'dp': Data Parallelism
-        - 'ddp': Distributed Data Parallelism
-        - 'ddp_spawn': Distributed Data Parallelism with spawn
-        - 'deepspeed': DeepSpeed
-        - 'fsdp': Fully Sharded Data Parallelism
-        - 'auto': Automatically choose the best strategy based on the
-            hardware available.
+
+        - ``'dp'``: Data Parallelism
+        - ``'ddp'``: Distributed Data Parallelism
+        - ``'ddp_spawn'``: Distributed Data Parallelism with spawn
+        - ``'deepspeed'``: DeepSpeed
+        - ``'fsdp'``: Fully Sharded Data Parallelism
+        - ``'auto'``: Automatically choose the best strategy based on the
+          hardware available.
 
     :param devices:
         Number of devices to use or specific device indices.
-        Can be an integer (e.g., 4 for 4 GPUs) or a list of indices (e.g., [0, 1]).
+        Can be an integer (e.g., 4 for 4 GPUs) or a list of indices (e.g., ``[0, 1]``).
 
     :param num_nodes:
         Number of compute nodes to use for distributed training.
@@ -559,16 +601,17 @@ class InputConfig:
 class InputDataConfig:
     """
     :param input_source:
-        Where on the filesystem to locate the input.
+        Where on the filesystem to locate the input. Altenratively,
+        a websocket URL to connect to for streaming data.
 
     :param input_name:
-        Name to identify the input.
+        Name to identify the input. These must be unique across all inputs.
 
     :param input_type:
         Type of the input.
 
     :param input_inner_key:
-        Inner key to use for the input. Only used when input_source is a deeplake
+        Inner key to use for the input. Only used when ``input_source`` is a deeplake
         dataset.
     """
 
@@ -582,11 +625,12 @@ class InputDataConfig:
 class OmicsInputDataConfig:
     """
     :param snp_file:
-        Path to the relevant ``.bim`` file, used for attribution analysis.
+        Path to the relevant ``.bim`` file, used for attribution analysis. If not
+        computing attributions, this can be set to ``None``.
 
     :param subset_snps_file:
         Path to a file with corresponding SNP IDs to subset from the main
-        arrays for the modelling. Requires the ``snp_file`` parameter to
+        arrays for the modeling. Requires the ``snp_file`` parameter to
         be passed in.
 
     :param na_augment_alpha:
@@ -594,19 +638,23 @@ class OmicsInputDataConfig:
         A value is sampled from a beta distribution, and the sampled value is used
         to set a percentage of the SNPs to be 'missing'.
 
-        The alpha (α) parameter of the beta distribution, influencing the shape of the
+        The alpha (α) parameter of the beta distribution influences the shape of the
         distribution towards 1. Higher values of alpha (compared to beta) bias the
         distribution to sample larger percentages of SNPs to be set as 'missing',
         leading to a higher likelihood of missingness.
+
         Conversely, lower values of alpha (compared to beta) result in sampling lower
         percentages, thus reducing the probability and extent of missingness.
+
         For example, setting alpha to 1.0 and beta to 5.0 will skew the distribution
         towards lower percentages of missingness, since beta is significantly larger.
         Setting alpha to 5.0 and beta to 1.0 will skew the distribution towards higher
         percentages of missingness, since alpha is significantly larger.
-        Examples:
-        - alpha = 1.0, beta = 9.0:  μ=E(X)=0.05, σ=SD(X)=0.0476 (avg 5% missing)
-        - alpha = 1.0, beta = 4.0:  μ=E(X)=0.2, σ=SD(X)=0.1633 (avg 20% missing)
+
+        **Examples:**
+
+        - ``alpha = 1.0, beta = 9.0``: μ=E(X)=0.05, σ=SD(X)=0.0476 (avg 5% missing)
+        - ``alpha = 1.0, beta = 4.0``: μ=E(X)=0.2, σ=SD(X)=0.1633 (avg 20% missing)
 
     :param na_augment_beta:
         Used to control the extent of missing data augmentation in the omics data.
@@ -617,6 +665,7 @@ class OmicsInputDataConfig:
         distribution towards 0. Higher values of beta (compared to alpha) bias the
         distribution to sample smaller percentages of SNPs to be set as 'missing',
         leading to a lower likelihood and extent of missingness.
+
         Conversely, lower values of beta (compared to alpha) result in sampling
         larger percentages, thus increasing the probability and extent of missingness.
 
@@ -625,16 +674,20 @@ class OmicsInputDataConfig:
         A value is sampled from a beta distribution, and the sampled value is used to
         determine the percentage of the SNPs to be shuffled.
 
-        The alpha (α) parameter of the beta distribution, influencing the shape of
+        The alpha (α) parameter of the beta distribution influences the shape of
         the distribution towards 1. Higher values of alpha (compared to beta) bias
         the distribution to sample larger percentages of SNPs to be shuffled, leading
-        to a higher likelihood of extensive shuffling. Conversely, lower values of
-        alpha (compared to beta) result in sampling lower percentages, thus reducing
-        the extent of shuffling. Setting alpha to a significantly larger value than
-        beta will skew the distribution towards higher percentages of shuffling.
-        Examples:
-        - alpha = 1.0, beta = 9.0:  μ=E(X)=0.05, σ=SD(X)=0.0476 (avg 5% shuffled)
-        - alpha = 1.0, beta = 4.0:  μ=E(X)=0.2, σ=SD(X)=0.1633 (avg 20% shuffled)
+        to a higher likelihood of extensive shuffling.
+
+        Conversely, lower values of alpha (compared to beta) result in sampling lower
+        percentages, thus reducing the extent of shuffling. Setting alpha to a
+        significantly larger value than beta will skew the distribution towards higher
+        percentages of shuffling.
+
+        **Examples:**
+
+        - ``alpha = 1.0, beta = 9.0``: μ=E(X)=0.05, σ=SD(X)=0.0476 (avg 5% shuffled)
+        - ``alpha = 1.0, beta = 4.0``: μ=E(X)=0.2, σ=SD(X)=0.1633 (avg 20% shuffled))
 
     :param shuffle_augment_beta:
         Used to control the extent of shuffling data augmentation in the omics data.
@@ -656,7 +709,7 @@ class OmicsInputDataConfig:
         set >0.0 in the global configuration.
 
     :param modality_dropout_rate:
-        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        Dropout rate to apply to the modality, e.g., ``0.2`` means that 20% of the time,
         this modality will be dropped out during training.
     """
 
@@ -691,7 +744,7 @@ class TabularInputDataConfig:
         set >0.0 in the global configuration.
 
     :param modality_dropout_rate:
-        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        Dropout rate to apply to the modality, e.g., ``0.2`` means that 20% of the time,
         this modality will be dropped out during training.
     """
 
@@ -744,17 +797,20 @@ class SequenceInputDataConfig:
 
     :param split_on:
         Which token to split the sequence on to generate separate tokens for the
-        vocabulary.
+        vocabulary. Setting this to ``None`` will split on every character in the
+        sequence.
 
     :param tokenizer:
-        Which tokenizer to use. Relevant if modelling on language, but not as much when
+        Which tokenizer to use. Relevant if modeling on language, but not as much when
         doing it on other arbitrary sequences.
 
     :param tokenizer_language:
         Which language rules the tokenizer should apply when tokenizing the raw data.
+        Only relevant when using a tokenizer that supports language-specific rules,
+        such as ``spacy`` (which you have to install separately).
 
     :param adaptive_tokenizer_max_vocab_size:
-        If using an adaptive tokenizer ("bpe"), this parameter controls the maximum
+        If using an adaptive tokenizer (``"bpe"``), this parameter controls the maximum
         size of the vocabulary.
 
     :param mixing_subtype:
@@ -762,7 +818,7 @@ class SequenceInputDataConfig:
         set >0.0 in the global configuration.
 
     :param modality_dropout_rate:
-        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        Dropout rate to apply to the modality, e.g., ``0.2`` means that 20% of the time,
         this modality will be dropped out during training.
     """
 
@@ -784,7 +840,7 @@ class BasicPretrainedConfig:
     :param model_path:
         Path save model from an EIR training run to load. Note that currently this
         only supports if it's in a folder from an EIR training run, as the current
-        prototype functionality uses that to e.g. find configuration from the
+        prototype functionality uses that to e.g., find configuration from the
         pretrained model run.
 
     :param load_module_name:
@@ -800,9 +856,9 @@ class BasicPretrainedConfig:
 class BasicInterpretationConfig:
     """
     :param interpretation_sampling_strategy:
-        How to sample sequences for attribution analysis. `first_n` always grabs the
+        How to sample sequences for attribution analysis. ``first_n`` always grabs the
         same first n values from the beginning of the dataset to interpret, while
-        `random_sample` will sample uniformly from the whole dataset without
+        ``random_sample`` will sample uniformly from the whole dataset without
         replacement.
 
     :param num_samples_to_interpret:
@@ -810,9 +866,9 @@ class BasicInterpretationConfig:
 
     :param manual_samples_to_interpret:
         IDs of samples to always interpret, irrespective of
-        `interpretation_sampling_strategy` and `num_samples_to_interpret`. A caveat
+        ``interpretation_sampling_strategy`` and ``num_samples_to_interpret``. A caveat
         here is that they must be present in the dataset that is being interpreted
-        (e.g. validation / test dataset), meaning that adding IDs here that happen to
+        (e.g., validation / test dataset), meaning that adding IDs here that happen to
         be in the training dataset will not work.
     """
 
@@ -826,16 +882,16 @@ class ByteInputDataConfig:
     """
     :param byte_encoding:
         Which byte encoding to use when reading the binary data, currently only
-        support uint8.
+        support ``"uint8"``.
 
     :param max_length:
         Maximum length to truncate/pad sequences to. While in sequence models this
-        generally refers to words, here we are referring to number of bytes.
+        generally refers to words, here we are referring to the number of bytes.
 
     :param sampling_strategy_if_longer:
         Controls how sequences are truncated if they are longer than the specified
         ``max_length`` parameter. Using 'from_start' will always truncate from the
-        beginning of the byte sequence, ensuring the the samples will always be the same
+        beginning of the byte sequence, ensuring the samples will always be the same
         during training. Setting this parameter to ``uniform`` will uniformly sample
         a slice of a given sample sequence during training. Note that for consistency,
         the validation/test set samples always use the ``from_start`` setting when
@@ -846,7 +902,7 @@ class ByteInputDataConfig:
         set >0.0 in the global configuration.
 
     :param modality_dropout_rate:
-        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        Dropout rate to apply to the modality, e.g., ``0.2`` means that 20% of the time,
         this modality will be dropped out during training.
     """
 
@@ -861,7 +917,7 @@ class ByteInputDataConfig:
 class ImageInputDataConfig:
     """
     :param auto_augment:
-        Setting this to True will use TrivialAugment Wide augmentation.
+        Setting this to ``True`` will use TrivialAugment Wide augmentation.
 
     :param size:
         Target size of the images for training.  If size is a sequence like
@@ -870,42 +926,44 @@ class ImageInputDataConfig:
 
     :param resize_approach:
         The method used for resizing the images. Options are:
-        - "resize": Directly resize the image to the target size.
-        - "randomcrop": Resize the image to a larger size than the target and then
-        apply a random crop to the target size.
-        - "centercrop": Resize the image to a larger size than the target and then
-        apply a center crop to the target size.
+
+        - ``resize``: Directly resize the image to the target size.
+        - ``randomcrop``: Resize the image to a larger size than the target and then
+          apply a random crop to the target size.
+        - ``centercrop``: Resize the image to a larger size than the target and then
+          apply a center crop to the target size.
 
     :param adaptive_normalization_max_samples:
         If using adaptive normalization (channel),
         how many samples to use to compute the normalization parameters.
-        If None, will use all samples.
+        If ``None``, uses all samples.
 
     :param mean_normalization_values:
         Average channel values to normalize images with. This can be a sequence matching
-        the number of channels, or None. If None and using a pretrained model, the
-        values used for the model pretraining will be used. If None and training from
-        scratch, will iterate over training data and compute the running average
+        the number of channels, or ``None``. If ``None`` and using a pretrained model,
+        the values used for the model pretraining will be used. If ``None`` and training
+        from scratch, will iterate over training data and compute the running average
         per channel.
 
     :param stds_normalization_values:
         Standard deviation channel values to normalize images with. This can be a
-        sequence mathing the number of channels, or None. If None and using a
+        sequence mathing the number of channels, or ``None``. If ``None`` and using a
         pretrained model, the values used for the model pretraining will be used.
-        If None and training from scratch, will iterate over training data and compute
-        the running average per channel.
+        If ``None`` and training from scratch, will iterate over training data and
+        compute the running average per channel.
 
     :param mode:
         An explicit mode to convert loaded images to. Useful when working with
         input data with a mixed number of channels, or you want to convert
         images to a specific mode.
         Options are
-        - "RGB": Red, Green, Blue (channels=3)
-        - "L": Grayscale (channels=1)
-        - "RGBA": Red, Green, Blue, Alpha (channels=4)
+
+        - ``RGB``: Red, Green, Blue (channels=3)
+        - ``L``: Grayscale (channels=1)
+        - ``RGBA``: Red, Green, Blue, Alpha (channels=4)
 
     :param num_channels:
-        Number of channels in the images. If None, will try to infer the number of
+        Number of channels in the images. If ``None``, tries to infer the number of
         channels from a random image in the training data. Useful when known
         ahead of time how many channels the images have, will raise an error if
         an image with a different number of channels is encountered.
@@ -915,7 +973,7 @@ class ImageInputDataConfig:
         set >0.0 in the global configuration.
 
     :param modality_dropout_rate:
-        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        Dropout rate to apply to the modality, e.g., ``0.2`` means that 20% of the time,
         this modality will be dropped out during training.
     """
 
@@ -939,7 +997,7 @@ class ArrayInputDataConfig:
         set >0.0 in the global configuration.
 
     :param modality_dropout_rate:
-        Dropout rate to apply to the modality, e.g. 0.2 means that 20% of the time,
+        Dropout rate to apply to the modality, e.g., ``0.2`` means that 20% of the time,
         this modality will be dropped out during training.
 
     :param normalization:
@@ -952,7 +1010,7 @@ class ArrayInputDataConfig:
     :param adaptive_normalization_max_samples:
         If using adaptive normalization (channel / element),
         how many samples to use to compute the normalization parameters.
-        If None, will use all samples.
+        If ``None``, uses all samples.
     """
 
     mixing_subtype: Literal["mixup"] = "mixup"
@@ -988,7 +1046,7 @@ class FusionConfig:
 class OutputInfoConfig:
     """
     :param output_source:
-        Where on the filesystem to locate the output (if applicable)
+        Where on the filesystem to locate the output (if applicable).
 
     :param output_name:
         Name to identify the output.

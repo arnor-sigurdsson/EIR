@@ -68,6 +68,18 @@ Visualization and Logging Configuration
 .. autoclass:: eir.setup.schemas.VisualizationLoggingConfig
    :members:
 
+Data Preparation Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.DataPreparationConfig
+   :members:
+
+Acceleration Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: eir.setup.schemas.AcceleratorConfig
+   :members:
+
 Input Configurations
 --------------------
 
@@ -224,6 +236,10 @@ Output Type Configuration
 .. autoclass:: eir.setup.schema_modules.output_schemas_sequence.SequenceOutputTypeConfig
 
 .. autoclass:: eir.setup.schema_modules.output_schemas_array.ArrayOutputTypeConfig
+
+.. autoclass:: eir.setup.schema_modules.output_schemas_image.ImageOutputTypeConfig
+
+.. autoclass:: eir.setup.schema_modules.output_schemas_survival.SurvivalOutputTypeConfig
 
 Output Module Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

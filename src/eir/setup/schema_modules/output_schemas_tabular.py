@@ -29,7 +29,7 @@ class TabularOutputTypeConfig:
         Label smoothing to apply to categorical targets.
 
     :param cat_loss_name:
-        Loss function to use for categorical targets. If using `BCEWithLogitsLoss`,
+        Loss function to use for categorical targets. If using ``BCEWithLogitsLoss``,
         the targets should all be binary.
 
     :param con_loss_name:
