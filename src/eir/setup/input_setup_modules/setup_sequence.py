@@ -201,7 +201,7 @@ def get_sequence_input_objects_from_input(
     if is_pretrained_tokenizer:
         # here we delegate to the __call__ logic of HFTokenizerWrapper
         assert isinstance(tokenizer, HFTokenizerWrapper)
-        encode_func = tokenizer
+        encode_func = tokenizer  # THIS RAISES type error
     else:
         encode_func = get_tokenizer_encode_func(
             tokenizer=tokenizer,
@@ -215,7 +215,7 @@ class HFTokenizerWrapper:
     def __init__(self, base_tokenizer):
         self.tokenizer = base_tokenizer
 
-    def __call__(self, text, *args, **kwargs):
+    def __call__(self, text, *args, **kwargs) -> Sequence[int]:
         encoded = self.tokenizer.encode(text)
         return encoded
 

@@ -1,5 +1,5 @@
 import reprlib
-from collections.abc import Generator, Sequence
+from collections.abc import Generator, Iterator, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -437,7 +437,7 @@ def gather_ids_from_data_source(
     data_source: Path,
     validate: bool = True,
 ) -> tuple[str, ...]:
-    iterator: Generator[str] | Generator[Path]
+    iterator: Iterator[str] | Iterator[Path]
     if is_deeplake_dataset(data_source=str(data_source)):
         iterator = build_deeplake_available_id_iterator(
             data_source=data_source,
@@ -482,8 +482,8 @@ def gather_ids_from_tabular_file(file_path: Path) -> tuple[str, ...]:
     return all_ids
 
 
-def get_file_path_iterator(data_source: Path, validate: bool = True) -> Generator[Path]:
-    def _file_iterator(file_path: Path):
+def get_file_path_iterator(data_source: Path, validate: bool = True) -> Iterator[Path]:
+    def _file_iterator(file_path: Path) -> Iterator[Path]:
         with open(str(file_path)) as infile:
             for line in infile:
                 path = Path(line.strip())
