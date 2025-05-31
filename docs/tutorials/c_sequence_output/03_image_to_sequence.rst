@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-03 - Image to Sequence: Image Captioning
-========================================
+Image to Sequence: Image Captioning
+===================================
 
 In this tutorial, we will utilize ``EIR`` for image-to-sequence tasks.
 Image to Sequence (img-to-seq) models are a type of models that convert an

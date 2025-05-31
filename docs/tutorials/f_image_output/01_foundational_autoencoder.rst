@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-01 – Building a Simple Image Autoencoder
-======================================================
+Building a Simple Image Autoencoder
+===================================
 
 In this tutorial, we will explore the `EIR` for image output tasks,
 specifically focusing simple autoencoder.

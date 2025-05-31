@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-08 – Training on arrays with CNN, LCL, and Transformer Models
-=============================================================
+Training on arrays with CNN, LCL, and Transformer Models
+========================================================
 
 In this tutorial, we will be looking at the built in support
 for training models on structured arrays in ``EIR``. Here, structured

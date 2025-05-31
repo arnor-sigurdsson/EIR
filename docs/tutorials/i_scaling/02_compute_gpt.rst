@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-02 – Scaling Compute: Training a BabyGPT
-========================================
+Scaling Compute: Training a BabyGPT
+===================================
 
 In this tutorial, we will examine how we can scale up `EIR` to train a baby version
 of the GPT model, streaming data from the FineWeb dataset for model training.

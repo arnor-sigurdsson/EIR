@@ -332,29 +332,29 @@ class TrainingControlConfig:
 @dataclass
 class EvaluationCheckpointConfig:
     """
-        :param sample_interval:
-            Iteration interval to perform validation and possibly attribution analysis
-            if set.
+    :param sample_interval:
+        Iteration interval to perform validation and possibly attribution analysis
+        if set.
 
     :param saved_result_detail_level:
-            Level of detail to save in the results file. Higher levels will save more
-            information, but will take up more space and might be slow especially
-            when using many tabular targets. The details are as follows
-            (each step skips a level of detail in addition to the previous):
+        Level of detail to save in the results file. Higher levels will save more
+        information, but will take up more space and might be slow especially
+        when using many tabular targets. The details are as follows
+        (each step skips a level of detail in addition to the previous):
 
-            - ``5``: The default, save all metrics and plots.
-            - ``4``: Skip validation plots and generated samples under the
-              ``/samples`` folder.
-            - ``3``: Skip plots for individual targets.
-            - ``2``: Skip individual target plots (e.g. R2 training curve for regression
-              targets).
-            - ``1``: Skip individual target metrics (including loss).
+        - ``5``: The default, save all metrics and plots.
+        - ``4``: Skip validation plots and generated samples under the
+          ``/samples`` folder.
+        - ``3``: Skip plots for individual targets.
+        - ``2``: Skip individual target plots (e.g. R2 training curve for regression
+          targets).
+        - ``1``: Skip individual target metrics (including loss).
 
-        :param checkpoint_interval:
-            Iteration interval to checkpoint (i.e. save) model.
+    :param checkpoint_interval:
+        Iteration interval to checkpoint (i.e. save) model.
 
-        :param n_saved_models:
-            Number of top N models to saved during training.
+    :param n_saved_models:
+        Number of top N models to saved during training.
     """
 
     sample_interval: int = 200

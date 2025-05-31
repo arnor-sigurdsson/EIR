@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-06 – Training on binary data
-============================
+Training on binary data
+=======================
 
 Today, for this tutorial,
 we will be training deep learning

@@ -3,15 +3,18 @@
 .. role:: raw-html(raw)
     :format: html
 
-02 - Creating and Using a Mini Foundation Model
-===============================================
+Creating and Using a Mini Foundation Model
+==========================================
 
 In this tutorial, we will explore how to create custom foundation models using ``EIR``.
 Here we use the term "foundation model" as a fancy way of saying we pretrain a model
 for one task, and then use it or parts of it as a building block for other tasks.
 
 We'll be working with three different datasets
-—IMDB reviews, COCO 2017 images, and CIFAR-10 images.
+
+* IMDB reviews
+* COCO 2017 images
+* CIFAR-10 images
 
 The overall goal is as follows:
 

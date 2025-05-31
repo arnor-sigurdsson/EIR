@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-07 – Multimodal Training: Combining Tabular, Text, and Image
-============================================================
+Multimodal Training: Combining Tabular, Text, and Image
+=======================================================
 
 Here, we will be exploring
 multi-modal training. That is,

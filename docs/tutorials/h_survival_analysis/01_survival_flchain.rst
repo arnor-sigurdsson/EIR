@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-01 – Survival Analysis: Free Light Chain Analysis
-=================================================
+Survival Analysis: Free Light Chain Analysis
+============================================
 
 In this tutorial, we will explore using `EIR` for survival analysis tasks,
 specifically focusing on predicting survival outcomes based

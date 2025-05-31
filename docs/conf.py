@@ -5,7 +5,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.abspath("../eir"))
 
 project = "EIR"
-author = "Arnor Sigurdsson"
+author = "Arnór Ingi Sigurðsson"
 
 copyright = f"{datetime.now().year}, {author}"
 

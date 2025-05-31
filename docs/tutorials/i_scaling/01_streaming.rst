@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-01 – Streaming Data: Training with FineWeb
-==========================================
+Streaming Data: Training with FineWeb
+=====================================
 
 In this tutorial, we will explore `EIR`'s built-in support for training with streaming data.
 Streaming allows us to train models on datasets that are too large to fit in memory

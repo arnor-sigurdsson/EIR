@@ -1,7 +1,7 @@
 .. _01-genotype-tutorial:
 
-01 – Genotype Tutorial: Ancestry Prediction
-===========================================
+Genotype Tutorial: Ancestry Prediction
+======================================
 
 A - Setup
 ^^^^^^^^^
@@ -304,24 +304,7 @@ have the actual predictions, and no true labels:
    :file: ../tutorial_files/a_using_eir/01_basic_tutorial/csv_preview_unknown.html
 
 
-D - Applying to your own data (e.g. UK Biobank)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Thank you for reading this far! Hopefully this tutorial introduced you well enough to
-the framework so you can apply it to your own data. For that, you will have to process
-it first (see: `plink pipelines`_). Then you will have to set the relevant paths for the
-inputs (e.g. ``input_source``, ``snp_file``) and outputs
-(e.g. ``output_source``, ``target_cat_columns`` or ``target_con_columns``
-if you have continuous targets).
-
-However, when moving to large scale data such as the UK Biobank, the configurations we used
-on the ancestry toy data in this tutorial will likely not be sufficient. For example,
-the learning rate is likely too high. For this, we specifically designed the
-`EIR-auto-GP`_ project, which focuses on allow you to quickly train deep learning models
-for genomic prediction.
-
-
-E - Serving
+D - Serving
 ^^^^^^^^^^^
 
 In this final section, we demonstrate serving our trained model
@@ -343,6 +326,15 @@ Here is an example of the command:
 
 .. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/commands/GLN_1_DEPLOY.txt
     :language: console
+
+.. note::
+    After serving the model, you can access the automatically generated
+    OpenAPI documentation at ``http://localhost:8000/docs`` to explore and
+    interact with the API endpoints. Additionally ``http://localhost:8000/info``
+    provides some basic information about intput/output data specifications.
+    There is also a UI available at ``http://localhost:8000/redoc`` for an
+    alternative view of the API documentation.
+
 
 Sending Requests
 """"""""""""""""
@@ -372,3 +364,22 @@ Here are some examples of responses from the server for a set of inputs:
 .. literalinclude:: ../tutorial_files/a_using_eir/01_basic_tutorial/serve_results/predictions.json
     :language: json
     :caption: predictions.json
+
+E - Applying to your own data (e.g. UK Biobank)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Thank you for reading this far! Hopefully this tutorial introduced you well enough to
+the framework so you can apply it to your own genetic data.
+For that, you will have to process
+it first (see: `plink pipelines`_). Then you will have to set the relevant paths for the
+inputs (e.g. ``input_source``, ``snp_file``) and outputs
+(e.g. ``output_source``, ``target_cat_columns`` or ``target_con_columns``
+if you have continuous targets).
+
+However, when moving to large scale data such as the UK Biobank, the configurations we used
+on the ancestry toy data in this tutorial will likely not be sufficient. For example,
+the learning rate is likely too high. For this, we specifically designed the
+`EIR-auto-GP`_ project, which focuses on allow you to quickly train deep learning models
+for genomic prediction.
+
+If you made it this far, thank you for reading!

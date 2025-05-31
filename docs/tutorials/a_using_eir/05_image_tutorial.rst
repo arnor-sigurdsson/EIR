@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-05 – Image Tutorial: Hot Dog or Not?
-====================================
+Image Tutorial: Hot Dog or Not?
+===============================
 
 In this tutorial,
 we will be using ``EIR``
