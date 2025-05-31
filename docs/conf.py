@@ -5,16 +5,18 @@ from datetime import datetime
 sys.path.insert(0, os.path.abspath("../eir"))
 
 project = "EIR"
-author = "Arnor Sigurdsson"
+author = "Arnór Ingi Sigurðsson"
 
 copyright = f"{datetime.now().year}, {author}"
 
 html_logo = "source/_static/img/EIR_logo_white.svg"
 html_theme_options = {
     "logo_only": True,
+    "navigation_depth": 3,
 }
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["source/_static"]
+
 
 extensions = [
     "sphinx.ext.napoleon",

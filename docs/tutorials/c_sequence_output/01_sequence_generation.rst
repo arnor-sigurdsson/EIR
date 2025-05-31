@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-01 – Sequence Generation: Generating Movie Reviews
-==================================================
+Sequence Generation: Generating Movie Reviews
+=============================================
 
 In this tutorial,
 we will look into the built-in support in `EIR` for sequence generation tasks

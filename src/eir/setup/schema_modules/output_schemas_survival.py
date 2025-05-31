@@ -15,7 +15,7 @@ class SurvivalOutputTypeConfig:
 
     :param event_column:
         The name of the column in the label file that indicates whether an event
-        occurred (1) or the observation was censored (0).
+        occurred (``1``) or the observation was censored (``0``).
 
     :param num_durations:
         The number of discrete time intervals to use in the model. This determines the

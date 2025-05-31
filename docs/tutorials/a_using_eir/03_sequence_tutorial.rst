@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-03 – Sequence Tutorial: Movie Reviews and Peptides
-==================================================
+Sequence Tutorial: Movie Reviews and Peptides
+=============================================
 
 In this tutorial,
 we will be training models

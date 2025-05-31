@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-02 – Time Series: 3 Approaches to Stock Price Prediction
-========================================================
+Time Series: 3 Approaches to Stock Price Prediction
+===================================================
 
 In this tutorial, we will explore using ``EIR`` for time series prediction tasks,
 focusing on stock price forecasting. We'll work with stock market data and implement

@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-03 – Scaling Diffusion: Image Generation from Text
-==================================================
+Scaling Diffusion: Image Generation from Text
+=============================================
 
 In this tutorial, we will explore how to scale diffusion models to generate images from text captions
 using `EIR`. We'll train a model on artistic images with their descriptions,

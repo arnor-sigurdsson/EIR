@@ -27,6 +27,7 @@ class ArrayOutputTypeConfig:
 
     :param diffusion_beta_schedule:
         Scheduler type to use for the diffusion process. Options are:
+
         - ``linear``
         - ``scaled_linear``
         - ``squaredcos_cap_v2``
@@ -70,13 +71,14 @@ class ArrayOutputSamplingConfig:
 
     :param diffusion_sampler:
         The type of scheduler to use for the diffusion process. Options are:
+
         - ``ddpm``
         - ``ddim``
         - ``dpm_solver``
 
     :param diffusion_eta:
         Parameter that controls the amount of noise added during the sampling process.
-        Only used when diffusion_scheduler_type is "ddim".
+        Only used when ``diffusion_scheduler_type`` is ``"ddim"``.
     """
 
     manual_inputs: Sequence[dict[str, str]] = ()

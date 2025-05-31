@@ -1,7 +1,7 @@
 .. _02-tabular-tutorial:
 
-02 – Tabular Tutorial: Nonlinear Poker Hands
-============================================
+Tabular Tutorial: Nonlinear Poker Hands
+=======================================
 
 A - Setup
 ^^^^^^^^^

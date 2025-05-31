@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-01 – Array Output: Building a Simple Autoencoder for MNIST Digit Generation
-===========================================================================
+Array Output: Building a Simple Autoencoder for MNIST Digit Generation
+======================================================================
 
 In this tutorial,
 we will explore the capabilities of `EIR` for array output tasks,

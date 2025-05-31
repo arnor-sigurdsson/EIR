@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-04 – Established Architectures and Pretrained Models
-====================================================
+Established Architectures and Pretrained Models
+===============================================
 
 In this tutorial,
 we will be seeing,

@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-03 – Image Output: MNIST Diffusion Models
-=========================================
+Image Output: MNIST Diffusion Models
+====================================
 
 In this tutorial, we will explore diffusion models using `EIR`,
 focusing on generating MNIST digits.

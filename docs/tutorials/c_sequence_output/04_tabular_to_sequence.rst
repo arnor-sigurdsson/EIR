@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-04 - Tabular to Sequence: Protein Sequence Generation
-=====================================================
+Tabular to Sequence: Protein Sequence Generation
+================================================
 
 In this tutorial, we'll employ ``EIR`` for sequence generation conditioned
 on tabular data. Specifically, we will be generating protein sequences conditioned

@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-01 – Time Series: Power Consumption Prediction
-==============================================
+Time Series: Power Consumption Prediction
+=========================================
 
 In this tutorial, we will explore using `EIR` for time series prediction tasks,
 specifically focusing on power consumption forecasting. We'll work with both

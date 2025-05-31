@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-02 - Sequence to Sequence: Spanish to English Translation
-=========================================================
+Sequence to Sequence: Spanish to English Translation
+====================================================
 
 In this tutorial, we will use ``EIR`` for sequence-to-sequence tasks.
 Sequence to Sequence (seq-to-seq) models are a type of models that transform an

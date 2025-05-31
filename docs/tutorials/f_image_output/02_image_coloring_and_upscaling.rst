@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-02 – Colorization and Super-Resolution
-====================================================
+Colorization and Super-Resolution
+=================================
 
 In this tutorial, we will explore advanced image processing tasks using `EIR`,
 focusing on image colorization, super-resolution, and combining both techniques.

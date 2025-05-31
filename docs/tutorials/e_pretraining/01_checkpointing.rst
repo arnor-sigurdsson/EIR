@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-01 – Pretraining, Checkpointing and Continued Training
-======================================================
+Pretraining, Checkpointing and Continued Training
+=================================================
 
 In this tutorial,
 we will be looking at how to use EIR to create pretrained models,

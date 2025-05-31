@@ -3,8 +3,8 @@
 .. role:: raw-html(raw)
     :format: html
 
-02 – Survival Analysis: Cox Proportional Hazards Model
-======================================================
+Survival Analysis: Cox Proportional Hazards Model
+=================================================
 
 In this tutorial, we will explore using a Cox Proportional Hazards model for survival analysis
 with `EIR`. We'll use the same Free Light Chain dataset as in the previous tutorial, but this

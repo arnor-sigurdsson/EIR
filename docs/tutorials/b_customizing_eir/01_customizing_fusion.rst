@@ -1,6 +1,6 @@
 .. _01-customizing-fusion-tutorial:
 
-01 – Customizing EIR: Customized Fusion Tutorial
+Customizing EIR: Customized Fusion Tutorial
 ==================================================
 
 A - Setup
