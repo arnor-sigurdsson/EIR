@@ -3,6 +3,8 @@
 Configuration API Reference
 ===========================
 
+**Searching for specific configurations?** Use the search bar at the top-left of the page.
+
 Configuration guide organized by theme.
 
 .. contents::

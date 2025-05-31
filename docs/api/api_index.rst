@@ -7,6 +7,8 @@ Reference documentation for configuring and extending the EIR framework.
 for hands-on examples,
 then return here for detailed configuration options.
 
+**Searching for specific configurations?** Use the search bar at the top-left of the page.
+
 Configuration Reference
 -----------------------
 
