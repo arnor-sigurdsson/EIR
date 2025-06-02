@@ -80,7 +80,7 @@ EIR allows for training and evaluating various deep-learning models directly fro
 - Establishing baselines to compare against other methods.
 - Fitting on data sources such as large-scale genomics, where DL implementations are not commonly available.
 
-If you are an ML/DL researcher developing new models, etc., it might not fit your use case. However, it might provide a quick baseline for comparison to the cool stuff you are developing, and there is some degree of [customization](https://eir.readthedocs.io/en/stable/tutorials/tutorial_index.html#customizing-eir) possible.
+If you are an ML/DL researcher developing new models, etc., it might not fit your use case. However, it might provide a quick baseline for comparison to the cool stuff you are developing, and there is some degree of [customization](https://eir.readthedocs.io/en/stable/tutorials/b_customizing_eir/01_customizing_fusion.html) possible.
 
 ## Features
 
@@ -110,7 +110,7 @@ If you are an ML/DL researcher developing new models, etc., it might not fit you
   - Capabilities for [scaling compute resources](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/02_compute_gpt.html) to train larger language models like GPT variants.
 
 
-- [Many more settings](https://eir.readthedocs.io/en/stable/api_reference.html) and configurations (e.g., augmentation, regularization, optimizers) available.
+- [Many more settings](https://eir.readthedocs.io/en/stable/api/api_index.html) and configurations (e.g., augmentation, regularization, optimizers) available.
 
 ## Supported Inputs and Outputs
 
