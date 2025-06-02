@@ -127,7 +127,15 @@ def generate_validation_curve_from_series(
         ax.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
 
     name_lower = str(valid_series_cut.name).lower()
-    enforce_limits_matches = ["auc", "ap-macro", "mcc", "acc", "pcc", "r2"]
+    enforce_limits_matches = [
+        "auc",
+        "ap-macro",
+        "mcc",
+        "acc",
+        "pcc",
+        "r2",
+        "c-index",
+    ]
     should_enforce = any(i in name_lower for i in enforce_limits_matches)
     if should_enforce:
         bottom: float | None = 0.0

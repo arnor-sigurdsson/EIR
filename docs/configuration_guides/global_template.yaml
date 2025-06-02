@@ -1,0 +1,51 @@
+# Global Configuration Template
+
+# Basic experiment setup (required)
+basic_experiment:
+  output_folder: "results/my_experiment" # Where to save results (required)
+  n_epochs: 25                           # Number of training epochs
+  batch_size: 64                         # Training batch size
+  # valid_size: 0.1                      # Validation set size (fraction or count)
+  # memory_dataset: true                 # Load all data into memory (faster for small datasets)
+  # dataloader_workers: 0                # Number of data loading workers (0 for single-threaded)
+
+# Evaluation and checkpointing (recommended)
+evaluation_checkpoint:
+  checkpoint_interval: 200               # Save model every N iterations
+  sample_interval: 200                   # Evaluate on validation set every N iterations
+  # n_saved_models: 1                    # Keep top N best models
+
+# Optimization settings (customize as needed)
+# optimization:
+#   lr: 0.001                            # Learning rate
+#   optimizer: "adamw"                   # Optimizer: adamw, adam, adabelief, sgdm
+
+# Learning rate scheduling (optional)
+# lr_schedule:
+#   lr_schedule: "plateau"               # plateau, cosine, cycle, same
+#   # lr_plateau_patience: 10            # Reduce LR after N validations without improvement
+
+# Training control and regularization (optional)
+# training_control:
+#   early_stopping_patience: 10         # Stop after N validations without improvement
+#   # early_stopping_buffer: 2000       # Min iterations before early stopping kicks in
+
+# Feature importance analysis (optional but useful)
+# attribution_analysis:
+#   compute_attributions: true           # Compute feature importance scores
+#   max_attributions_per_class: 512     # Max samples per class for attribution analysis
+#   # attributions_every_sample_factor: 4 # Compute attributions every Nth evaluation
+
+# Performance and hardware (for advanced users)
+# model:
+#   compile_model: true                  # Compile model for faster training (PyTorch 2.0+)
+
+# accelerator:
+#   hardware: "auto"                     # auto, cpu, cuda, mps
+#   precision: "32-true"                 # 32-true, 16-mixed, bf16-mixed for speed
+#   # devices: "auto"                    # Number of GPUs or specific device IDs
+#   # strategy: "auto"                   # auto, ddp, fsdp for multi-GPU
+
+# Logging and visualization (optional)
+# visualization_logging:
+#   plot_skip_steps: 200                 # Skip first N steps in training plots

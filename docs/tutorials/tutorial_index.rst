@@ -1,5 +1,5 @@
-Supervised Learning
-===================
+Tutorials: Supervised Learning
+==============================
 
 Learn the fundamentals of EIR with classification and regression tasks.
 
@@ -26,8 +26,8 @@ Advanced Techniques
     a_using_eir/04_pretrained_sequence_tutorial
     a_using_eir/07_multimodal_tutorial
 
-Generative Modeling
-===================
+Tutorials: Generative Modeling
+==============================
 
 Learn to generate new data with EIR's generative capabilities.
 
@@ -66,8 +66,8 @@ Generate multi-dimensional data and build autoencoders.
 
     d_array_output/01_autoencoder
 
-Specialized Applications
-========================
+Tutorials: Specialized Applications
+===================================
 
 Domain-specific tutorials for specialized use cases.
 
@@ -93,8 +93,8 @@ Model time-to-event data and survival probabilities.
     h_survival_analysis/01_survival_flchain
     h_survival_analysis/02_survival_flchain_cox
 
-Advanced Topics
-===============
+Tutorials: Advanced Topics
+==========================
 
 Streaming, scaling, and customization.
 
