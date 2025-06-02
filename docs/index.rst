@@ -132,6 +132,7 @@ Documentation
     tutorials/tutorial_index
     user_guides/user_guides_index
     api/api_index
+    configuration_guides/guides_index
     license
     acknowledgements
 
