@@ -105,6 +105,10 @@ class SimpleLCLModel(nn.Module):
 @dataclass
 class LCLModelConfig:
     """
+    This is what the ``"genome-local-net"`` model refers to. See
+    https://academic.oup.com/nar/article/51/12/e67/7177885 for more details on
+    the model architecture.
+
     Note that when using the automatic network setup, kernel widths will get expanded
     to ensure that the feature representations become smaller as they are propagated
     through the network.
