@@ -22,6 +22,10 @@ then return here for copy-paste configurations and optimization guidance.
 **Looking for specific options?** See the full :doc:`../api/api_reference`
 for comprehensive parameter documentation.
 
+.. note::
+    This section is currently as work in progress.
+    Expect more guides to be added over time.
+
 Global Configuration Template
 -----------------------------
 
@@ -41,3 +45,4 @@ Input Data Templates
    :maxdepth: 1
 
    inputs/genomics_guide
+   inputs/sequence_guide
