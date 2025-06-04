@@ -1,3 +1,5 @@
+.. _user-guides-index:
+
 User Guides
 ===========
 

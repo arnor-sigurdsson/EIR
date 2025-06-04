@@ -1,10 +1,11 @@
 EIR
 ===
 
-``EIR`` is a framework for
+EIR is a framework for
 supervised modelling,
-sequence generation and
-array generation
+sequence generation,
+survival analysis, and
+image/array generation
 on genotype, tabular, sequence, image, array, and binary input data.
 It is designed to provide
 a high-level, yet modular API
@@ -19,6 +20,10 @@ and pre-processing required to train a model.
     :align: center
 
 |
+
+.. contents::
+   :local:
+   :depth: 1
 
 TL;DR - Just Show Me How It Works
 ---------------------------------
@@ -36,6 +41,29 @@ for an example that covers:
 **Estimated time:** 15-20 minutes
 
 Or browse the :doc:`tutorials/tutorial_index` to see examples for your specific data type.
+
+How to Navigate This Documentation
+----------------------------------
+
+The documentation is not designed to be read from start to finish,
+so feel free to jump around and explore the sections that interest you.
+
+Generally we do recommend starting with either:
+
+* :ref:`01-genotype-tutorial` for a complete end-to-end example, or
+* :ref:`how-eir-works` for an overview of the framework's design and general architecture.
+
+Then, you can for example explore the following sections:
+
+* :ref:`tutorials_index` for various tutorials ranging from
+  supervised learning with a single modality,
+  to multi-modal generative modelling and serving.
+* :ref:`configuration_guides` for kind of a mix between cheat-sheets and more in-depth
+  guides focusing on specific configurations
+  (e.g., a boilerplate ``globals.yaml`` file) or data types
+  (e.g., how to configure EIR for genomic data).
+* :ref:`api-reference` for a complete reference of all configuration options.
+* :ref:`user-guides-index` for various user guides, tips and tricks.
 
 Installation
 ------------
@@ -118,17 +146,13 @@ EIR automatically detects and uses GPU acceleration when available.
 No additional configuration is required if you have a CUDA-compatible setup
 with PyTorch GPU support. It should also work with MPS on macOS.
 
-Quick Start
------------
-
-**Ready to start?** Follow the :ref:`01-genotype-tutorial` for a complete walkthrough.
-
 Documentation
 -------------
 
 .. toctree::
     :maxdepth: 2
 
+    design/design
     tutorials/tutorial_index
     user_guides/user_guides_index
     api/api_index

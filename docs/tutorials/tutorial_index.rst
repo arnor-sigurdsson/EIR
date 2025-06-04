@@ -1,3 +1,5 @@
+.. _tutorials_index:
+
 Tutorials: Supervised Learning
 ==============================
 
