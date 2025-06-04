@@ -1,10 +1,11 @@
 EIR
 ===
 
-``EIR`` is a framework for
+EIR is a framework for
 supervised modelling,
-sequence generation and
-array generation
+sequence generation,
+survival analysis, and
+image/array generation
 on genotype, tabular, sequence, image, array, and binary input data.
 It is designed to provide
 a high-level, yet modular API
