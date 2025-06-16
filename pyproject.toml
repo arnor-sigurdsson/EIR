@@ -49,7 +49,7 @@ dependencies = [
     "polars>=1.27.0",
     "diffusers>=0.33.1",
     "deeplake==4.2.6",
-    "torch==2.7",
+    "torch==2.7.1",
 ]
 
 [project.scripts]
