@@ -203,7 +203,7 @@ def streamline_values_for_transformers(
 def transform_label_df(
     df_labels: pl.DataFrame,
     label_transformers: al_label_transformers,
-    impute_missing: bool,
+    missing_already_imputed: bool,
 ) -> pl.DataFrame:
     expr = []
 
@@ -211,7 +211,7 @@ def transform_label_df(
         series_values = df_labels.get_column(column_name).to_numpy()
         transform_func = transformer_instance.transform
 
-        if impute_missing:
+        if missing_already_imputed:
             series_values_streamlined = streamline_values_for_transformers(
                 transformer=transformer_instance,
                 values=series_values,
@@ -852,12 +852,12 @@ def _process_train_and_label_dfs(
     df_train_final = transform_label_df(
         df_labels=df_labels_train_no_nan,
         label_transformers=fit_label_transformers,
-        impute_missing=impute_missing,
+        missing_already_imputed=impute_missing,
     )
     df_valid_final = transform_label_df(
         df_labels=df_labels_valid_no_nan,
         label_transformers=fit_label_transformers,
-        impute_missing=impute_missing,
+        missing_already_imputed=impute_missing,
     )
 
     return df_train_final, df_valid_final, fit_label_transformers

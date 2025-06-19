@@ -149,7 +149,7 @@ def parse_labels_for_predict(
     df_labels_test = transform_label_df(
         df_labels=df_labels_test,
         label_transformers=label_transformers,
-        impute_missing=False,
+        missing_already_imputed=False,
     )
 
     return df_labels_test
