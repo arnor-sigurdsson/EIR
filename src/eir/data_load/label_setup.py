@@ -205,6 +205,12 @@ def transform_label_df(
     label_transformers: al_label_transformers,
     missing_already_imputed: bool,
 ) -> pl.DataFrame:
+    """
+    We have the missing_already_imputed flag because sometimes we want to keep
+    NULL values as they are w/o modifying them in any way. For example when dealing
+    with target labels, other parts of the codebase use this to e.g. know we
+    should not be computing metrics / losses on these NULL values.
+    """
     expr = []
 
     for column_name, transformer_instance in label_transformers.items():
