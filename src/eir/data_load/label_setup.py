@@ -70,10 +70,6 @@ def set_up_train_and_valid_tabular_data(
     impute_missing: bool = False,
     do_transform_labels: bool = True,
 ) -> Labels:
-    """
-    Splits and does split based processing (e.g. scaling validation set with training
-    set for regression) on the labels.
-    """
     if len(tabular_file_info.con_columns) + len(tabular_file_info.cat_columns) < 1:
         raise ValueError(f"No label columns specified in {tabular_file_info}.")
 
@@ -92,6 +88,8 @@ def set_up_train_and_valid_tabular_data(
         train_ids=list(train_ids),
         valid_ids=list(valid_ids),
     )
+    del df_labels
+
     pre_check_label_df(df=df_labels_train, name="Training DataFrame")
     pre_check_label_df(df=df_labels_valid, name="Validation DataFrame")
     check_train_valid_df_sync(
@@ -270,12 +268,14 @@ def get_label_parsing_wrapper(
 
 
 def _validate_df(df: pl.DataFrame) -> None:
-    duplicate_counts = (
-        df.group_by("ID").agg(pl.count().alias("count")).filter(pl.col("count") > 1)
-    )
-
-    if duplicate_counts.height > 0:
-        duplicated_ids = duplicate_counts.select("ID").limit(10).to_series().to_list()
+    if df.select(pl.col("ID").is_duplicated()).sum().item():
+        duplicated_ids = (
+            df.filter(pl.col("ID").is_duplicated())
+            .get_column("ID")
+            .unique()
+            .head(10)
+            .to_list()
+        )
         duplicated_indices_str = ", ".join(map(str, duplicated_ids))
         raise ValueError(
             f"Found duplicated indices in the dataframe. "
