@@ -32,6 +32,7 @@ Supervised modelling, sequence generation, image generation, array output and su
 
 ## What's New
 
+- **June 2025**: Overhaul, expand and restructure [documenation](https://eir.readthedocs.io/en/stable/index.html)
 - **April 2025**: More scaling related tutorials
   - [Scaling Diffusion: Image Generation from Text](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/03_diffusion.html) - Exploring artistic styles from historical collections
   - [Supervised Fine Tuning of GPT Style Model](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/02_compute_gpt.html#e-supervised-fine-tuning-from-a-pretrained-model) - Fine tuning a pre-trained model for instruction following
