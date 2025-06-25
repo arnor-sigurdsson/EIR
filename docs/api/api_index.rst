@@ -3,7 +3,7 @@ API
 
 Reference documentation for configuring and extending the EIR framework.
 
-**New to EIR?** Start with :doc:`../tutorials/tutorial_index`
+**New to EIR?** Start with :ref:`Tutorials <tutorials_index>`
 for hands-on examples,
 then return here for detailed configuration options.
 

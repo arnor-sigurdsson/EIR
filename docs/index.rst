@@ -40,7 +40,7 @@ for an example that covers:
 
 **Estimated time:** 15-20 minutes
 
-Or browse the :doc:`tutorials/tutorial_index` to see examples for your specific data type.
+Or browse the :ref:`Tutorials <tutorials_index>` to see examples for your specific data type.
 
 How to Navigate This Documentation
 ----------------------------------
@@ -55,7 +55,7 @@ Generally we do recommend starting with either:
 
 Then, you can for example explore the following sections:
 
-* :ref:`tutorials_index` for various tutorials ranging from
+* :ref:`Tutorials <tutorials_index>` for various tutorials ranging from
   supervised learning with a single modality,
   to multi-modal generative modelling and serving.
 * :ref:`configuration_guides` for kind of a mix between cheat-sheets and more in-depth
