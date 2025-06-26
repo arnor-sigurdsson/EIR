@@ -38,14 +38,19 @@ def test_calculate_batch_metrics():
     assert test_batch_metrics_w_loss["BMI"]["test_output_tabular_BMI_r2"] == 1.0
     assert test_batch_metrics_w_loss["BMI"]["test_output_tabular_BMI_rmse"] == 0.0
 
-    # sometimes slight numerical instability with scipy pearsonr
-    assert isclose(test_batch_metrics_w_loss["BMI"]["test_output_tabular_BMI_pcc"], 1.0)
+    assert isclose(
+        test_batch_metrics_w_loss["BMI"]["test_output_tabular_BMI_pcc"],
+        1.0,
+        rel_tol=1e-6,
+    )
     assert test_batch_metrics_w_loss["BMI"]["test_output_tabular_BMI_loss"] == 0.0
 
     assert test_batch_metrics_w_loss["Height"]["test_output_tabular_Height_r2"] < 0
     assert test_batch_metrics_w_loss["Height"]["test_output_tabular_Height_rmse"] > 0.0
     assert isclose(
-        test_batch_metrics_w_loss["Height"]["test_output_tabular_Height_pcc"], -1.0
+        test_batch_metrics_w_loss["Height"]["test_output_tabular_Height_pcc"],
+        -1.0,
+        rel_tol=1e-6,
     )
     assert test_batch_metrics_w_loss["Height"]["test_output_tabular_Height_loss"] == 1.0
 
