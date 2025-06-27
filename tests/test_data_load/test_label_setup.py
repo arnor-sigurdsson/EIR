@@ -212,7 +212,7 @@ def test_transform_all_labels_in_sample_targets_only(
     transformed_df = label_setup.transform_label_df(
         df_labels=df_test_labels,
         label_transformers=target_transformers,
-        impute_missing=False,
+        missing_already_imputed=False,
     )
 
     transformed_sample_labels = transformed_df.filter(pl.col("ID") == test_input_key)
@@ -258,7 +258,7 @@ def test_transform_all_labels_in_sample_with_extra_con(
     df_test_labels_transformed = label_setup.transform_label_df(
         df_labels=df_test_labels,
         label_transformers=label_transformers,
-        impute_missing=False,
+        missing_already_imputed=False,
     )
 
     dtlt = df_test_labels_transformed

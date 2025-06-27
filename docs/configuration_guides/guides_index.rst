@@ -18,7 +18,7 @@ these are meant to:
 This is not meant to be super comprehensive by e.g. discussing all available models,
 we will focus n the "most common" ones.
 
-**New to EIR?** Start with :doc:`../tutorials/tutorial_index` for guided walkthroughes,
+**New to EIR?** Start with :ref:`Tutorials <tutorials_index>` for guided walkthroughes,
 then return here for copy-paste configurations and optimization guidance.
 
 **Looking for specific options?** See the full :doc:`../api/api_reference`

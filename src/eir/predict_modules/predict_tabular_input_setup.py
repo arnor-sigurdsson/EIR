@@ -107,7 +107,7 @@ def get_input_labels_for_predict(
     df_labels_test_final = transform_label_df(
         df_labels=df_labels_test_no_na,
         label_transformers=loaded_fit_label_transformers,
-        impute_missing=True,
+        missing_already_imputed=True,
     )
 
     labels_data_object = PredictInputLabels(

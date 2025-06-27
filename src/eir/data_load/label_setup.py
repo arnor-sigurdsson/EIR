@@ -70,10 +70,6 @@ def set_up_train_and_valid_tabular_data(
     impute_missing: bool = False,
     do_transform_labels: bool = True,
 ) -> Labels:
-    """
-    Splits and does split based processing (e.g. scaling validation set with training
-    set for regression) on the labels.
-    """
     if len(tabular_file_info.con_columns) + len(tabular_file_info.cat_columns) < 1:
         raise ValueError(f"No label columns specified in {tabular_file_info}.")
 
@@ -92,6 +88,8 @@ def set_up_train_and_valid_tabular_data(
         train_ids=list(train_ids),
         valid_ids=list(valid_ids),
     )
+    del df_labels
+
     pre_check_label_df(df=df_labels_train, name="Training DataFrame")
     pre_check_label_df(df=df_labels_valid, name="Validation DataFrame")
     check_train_valid_df_sync(
@@ -205,15 +203,21 @@ def streamline_values_for_transformers(
 def transform_label_df(
     df_labels: pl.DataFrame,
     label_transformers: al_label_transformers,
-    impute_missing: bool,
+    missing_already_imputed: bool,
 ) -> pl.DataFrame:
+    """
+    We have the missing_already_imputed flag because sometimes we want to keep
+    NULL values as they are w/o modifying them in any way. For example when dealing
+    with target labels, other parts of the codebase use this to e.g. know we
+    should not be computing metrics / losses on these NULL values.
+    """
     expr = []
 
     for column_name, transformer_instance in label_transformers.items():
         series_values = df_labels.get_column(column_name).to_numpy()
         transform_func = transformer_instance.transform
 
-        if impute_missing:
+        if missing_already_imputed:
             series_values_streamlined = streamline_values_for_transformers(
                 transformer=transformer_instance,
                 values=series_values,
@@ -270,12 +274,14 @@ def get_label_parsing_wrapper(
 
 
 def _validate_df(df: pl.DataFrame) -> None:
-    duplicate_counts = (
-        df.group_by("ID").agg(pl.count().alias("count")).filter(pl.col("count") > 1)
-    )
-
-    if duplicate_counts.height > 0:
-        duplicated_ids = duplicate_counts.select("ID").limit(10).to_series().to_list()
+    if df.select(pl.col("ID").is_duplicated()).sum().item():
+        duplicated_ids = (
+            df.filter(pl.col("ID").is_duplicated())
+            .get_column("ID")
+            .unique()
+            .head(10)
+            .to_list()
+        )
         duplicated_indices_str = ", ".join(map(str, duplicated_ids))
         raise ValueError(
             f"Found duplicated indices in the dataframe. "
@@ -852,12 +858,12 @@ def _process_train_and_label_dfs(
     df_train_final = transform_label_df(
         df_labels=df_labels_train_no_nan,
         label_transformers=fit_label_transformers,
-        impute_missing=impute_missing,
+        missing_already_imputed=impute_missing,
     )
     df_valid_final = transform_label_df(
         df_labels=df_labels_valid_no_nan,
         label_transformers=fit_label_transformers,
-        impute_missing=impute_missing,
+        missing_already_imputed=impute_missing,
     )
 
     return df_train_final, df_valid_final, fit_label_transformers

@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import pandas as pd
+import polars as pl
 
 from eir.setup import schemas
 from eir.setup.schema_modules.output_schemas_array import (
@@ -194,7 +194,7 @@ def validate_tabular_source(
     expected_columns: Sequence[str],
     name: str,
 ) -> None:
-    header = pd.read_csv(source_to_check, nrows=0).columns.tolist()
+    header = pl.read_csv(source_to_check, n_rows=0).columns
     if "ID" not in header:
         raise ValueError(
             f"{name} file {source_to_check} does not contain a column named 'ID'. "
@@ -208,14 +208,9 @@ def validate_tabular_source(
             f"Please check the input file."
         )
 
-    series_ids = pd.read_csv(
-        filepath_or_buffer=source_to_check,
-        usecols=["ID"],
-        engine="pyarrow",
-        dtype_backend="pyarrow",
-    ).squeeze()
-    if not series_ids.is_unique:
-        non_unique = series_ids[series_ids.duplicated()].tolist()
+    df_ids = pl.read_csv(source_to_check, columns=["ID"])
+    if df_ids["ID"].n_unique() != df_ids.height:
+        non_unique = df_ids.filter(pl.col("ID").is_duplicated())["ID"].to_list()
         raise ValueError(
             f"{name} file {source_to_check} contains non-unique"
             f" IDs: {reprlib.repr(non_unique)}. "
