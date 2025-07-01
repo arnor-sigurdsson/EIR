@@ -1,0 +1,40 @@
+sequenceDiagram
+    participant Client as "EIR-Client (Gatherer)"
+    participant Server
+
+    Note over Client: Assumes a connection (Phase 1)<br/>is already established.
+
+    Client->>Server: 1. Send Message: {"type": "status"}
+    activate Server
+    Server-->>Client: 2. Respond: {"type": "status", "payload": {current_status}}
+    deactivate Server
+
+    Client->>Server: 3. Send Message: {"type": "getInfo"}
+    activate Server
+    Server-->>Client: 4. Respond: {"type": "info", "payload": {dataset_info}}
+    deactivate Server
+
+    loop While samples are needed
+        Client->>Server: 5. Send Message: {"type": "getData", "payload": {batch_size}}
+        activate Server
+        Server-->>Client: 6. Respond: {"type": "data", "payload": [samples...]}
+        deactivate Server
+        Note over Client: Processes and saves<br/>each sample locally.
+    end
+
+    Client->>Server: 7. Send Message: {"type": "reset"}
+    activate Server
+    Server-->>Client: 8. Respond: {"type": "resetConfirmation"}
+    deactivate Server
+
+    Client->>Server: 9. Send Message: {"type": "status"}
+    activate Server
+    Server-->>Client: 10. Respond: {"type": "status", "payload": {new_status}}
+    deactivate Server
+
+    Note over Client: After gathering data,<br>EIR determines which samples<br>to use for validation.
+
+    Client->>Server: 11. Send Message: {"type": "setValidationIds", "payload": {"validation_ids": [...]}}
+    activate Server
+    Server-->>Client: 12. Respond: {"type": "validationIdsConfirmation"}
+    deactivate Server

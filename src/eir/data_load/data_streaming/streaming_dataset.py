@@ -22,6 +22,9 @@ from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
 from eir.data_load.data_preparation_modules.output_preparation_wrappers import (
     prepare_outputs_memory,
 )
+from eir.data_load.data_streaming.streaming_dataset_utils import (
+    validate_server_protocol,
+)
 from eir.data_load.data_utils import Sample
 from eir.predict_modules.predict_tabular_input_setup import (
     ComputedPredictTabularInputInfo,
@@ -129,6 +132,7 @@ class StreamingDataset(IterableDataset):
             protocol_version=PROTOCOL_VERSION,
         )
         self.ws = self.connection_context.__enter__()
+        validate_server_protocol(ws=self.ws)
 
         if self.ws:
             try:

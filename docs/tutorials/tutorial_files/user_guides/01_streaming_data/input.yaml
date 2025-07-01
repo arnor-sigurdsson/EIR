@@ -1,0 +1,17 @@
+input_info:
+  input_source: ws://localhost:8000/ws
+  input_name: text_input
+  input_type: sequence
+
+input_type_info:
+  max_length: 64
+  split_on: null
+  tokenizer: "bpe"
+  adaptive_tokenizer_max_vocab_size: 512
+  sampling_strategy_if_longer: "uniform"
+  min_freq: 1
+
+model_config:
+  embedding_dim: 64
+  model_init_config:
+    num_layers: 2

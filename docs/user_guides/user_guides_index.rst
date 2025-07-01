@@ -6,4 +6,5 @@ User Guides
 .. toctree::
     :maxdepth: 2
 
-    streaming
+    streaming_implementation
+    streaming_data_types

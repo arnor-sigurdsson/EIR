@@ -1,0 +1,5 @@
+eirtrain \
+--global_configs eir_tutorials/user_guides/01_streaming_data/globals.yaml \
+--input_configs eir_tutorials/user_guides/01_streaming_data/input.yaml \
+--fusion_configs eir_tutorials/user_guides/01_streaming_data/fusion.yaml \
+--output_configs eir_tutorials/user_guides/01_streaming_data/output.yaml

@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant Client as EIR-Client
+    participant Server
+
+    Client->>Server: 1. Initiate WebSocket Connection
+
+    Client->>Server: 2. Send Message: {"type": "handshake", "version": "1.0"}
+    activate Server
+    Note right of Server: 3. Receive message and<br/>validate protocol version
+    Server-->>Client: 4. Respond: {"type": "handshake", "version": "1.0"}
+    deactivate Server
+
+    Note over Client,Server: Connection is now established and ready for use.
+

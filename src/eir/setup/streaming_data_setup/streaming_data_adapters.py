@@ -14,6 +14,9 @@ from aislib.misc_utils import ensure_path_exists
 from PIL import Image
 from tqdm import tqdm
 
+from eir.data_load.data_streaming.streaming_dataset_utils import (
+    validate_server_protocol,
+)
 from eir.serve_modules.serve_network_utils import deserialize_array, deserialize_image
 from eir.setup.config import Configs
 from eir.setup.schemas import InputConfig, OutputConfig
@@ -88,6 +91,8 @@ class StreamDataGatherer:
             websocket_url=self.websocket_url,
             protocol_version=PROTOCOL_VERSION,
         ) as ws:
+            validate_server_protocol(ws=ws)
+
             self.get_dataset_info(ws=ws)
 
             total_samples = 0
@@ -187,6 +192,13 @@ class StreamDataGatherer:
                 )
             )
 
+            # The reason we have handling of two messages here is that there might
+            # be multiple clients connected to the server. If *we* are the ones
+            # sending the reset command, we will receive a confirmation message that
+            # our command specifically was sent successfully. However, it might
+            # also be that another client sent a reset command at some point,
+            # in which the server will both (a) send a confirmation to the client
+            # that sent the command and (b) broadcast a reset message to all clients.
             for _ in range(2):
                 reset_message = receive_with_timeout(websocket_=ws)
 
@@ -584,4 +596,4 @@ def setup_and_gather_streaming_data(
         return None
     except ValueError as e:
         logger.error(f"Invalid streaming setup: {str(e)}")
-        return None
+        raise e

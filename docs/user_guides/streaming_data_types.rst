@@ -1,144 +1,15 @@
-.. _streaming-data-guide:
+.. _streaming-data-types:
 
 .. role:: raw-html(raw)
     :format: html
 
-Streaming Data Guide
+Streaming Data Types
 ====================
 
-This guide covers EIR's streaming data functionality,
-which allows for real-time data streaming during training.
-The guide focuses on how to implement a compatible
-WebSocket server that can stream data to EIR.
+This guide is intended as a reference guide
+for adding support for different data types
+when streaming. For
 
-Overview
---------
-
-EIR includes built-in support
-for receiving streaming data via WebSocket connections.
-To use this functionality, you only need to:
-
-1. Implement a WebSocket server that follows EIR's protocol specification
-2. Point to your server's WebSocket address in EIR's configuration files
-
-For example,
-to use streaming data in EIR,
-you would simply specify the WebSocket URL in your configuration:
-
-.. code-block:: yaml
-
-    output_info:
-      output_source: ws://localhost:8000/ws
-      output_name: text_output
-      output_type: sequence
-
-EIR will automatically handle the connection, data receiving, and processing.
-
-Protocol Specification
-----------------------
-
-To be compatible with EIR, your WebSocket server must implement the following protocol:
-
-Message Structure
-^^^^^^^^^^^^^^^^^
-
-All messages use JSON format:
-
-.. code-block:: python
-
-    {
-        "type": str,    # Message type
-        "payload": Any  # Message payload
-    }
-
-Required Message Types
-^^^^^^^^^^^^^^^^^^^^^^
-
-1. ``handshake``
-   - First message exchanged after connection
-   - Server must verify protocol version
-
-2. ``getInfo``
-   - Returns dataset information including shapes and types
-   - Required for EIR to set up proper data processing
-
-3. ``getData``
-   - Returns batches of data samples
-   - Must handle batch_size parameter
-
-Example Server Implementation
------------------------------
-
-Here's a minimal example of a compatible server using FastAPI:
-
-.. code-block:: python
-
-    from fastapi import FastAPI, WebSocket
-    import numpy as np
-    import base64
-
-    app = FastAPI()
-    PROTOCOL_VERSION = "1.0"  # Must match EIR's version
-
-    class ConnectionManager:
-        async def connect(self, websocket: WebSocket):
-            await websocket.accept()
-            handshake = await websocket.receive_json()
-            if handshake["type"] != "handshake" or handshake["version"] != PROTOCOL_VERSION:
-                await websocket.close()
-                return False
-            return True
-
-    manager = ConnectionManager()
-
-    @app.websocket("/ws")
-    async def websocket_endpoint(websocket: WebSocket):
-        if not await manager.connect(websocket):
-            return
-
-        try:
-            while True:
-                data = await websocket.receive_json()
-
-                if data["type"] == "getInfo":
-                    # Example: Define your dataset structure
-                    # See below in the tutorial for more details on what to include
-                    # for different modalities
-                    info = {
-                        "inputs": {
-                            "sequence_data": {
-                                "type": "sequence"
-                            }
-                        },
-                        "outputs": {
-                            "text_output": {
-                                "type": "sequence"
-                            }
-                        }
-                    }
-                    await websocket.send_json({
-                        "type": "info",
-                        "payload": info
-                    })
-
-                elif data["type"] == "getData":
-                    batch_size = data["payload"]["batch_size"]
-                    # Example: Generate/fetch your data
-                    # See below in the tutorial for more details on what structure to use
-                    # for different modalities
-                    batch = [
-                        {
-                            "inputs": {"sequence_data": "example input"},
-                            "target_labels": {"text_output": "example output"},
-                            "sample_id": "unique_id"
-                        }
-                        for _ in range(batch_size)
-                    ]
-
-                    await websocket.send_json({
-                        "type": "data",
-                        "payload": batch
-                    })
 
 Data Format Specifications
 --------------------------
