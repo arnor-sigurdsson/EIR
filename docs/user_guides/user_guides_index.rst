@@ -8,3 +8,4 @@ User Guides
 
     streaming_implementation
     streaming_data_types
+    frequently_asked_questions
