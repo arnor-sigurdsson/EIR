@@ -44,6 +44,7 @@ from docs.doc_modules.serving_experiments import (
     AutoDocServingInfo,
     make_serving_tutorial_data,
 )
+from docs.doc_modules.user_guides import a_streaming_hands_on
 from docs.doc_scripts.doc_performance_report import (
     collect_performance_data,
     generate_report,
@@ -159,6 +160,14 @@ def get_i_scaling_experiments() -> Iterable[AutoDocExperimentInfo]:
     )
 
 
+def get_user_guide_experiments() -> Iterable[AutoDocExperimentInfo]:
+    a_experiments = a_streaming_hands_on.get_experiments()
+
+    return chain(
+        a_experiments,
+    )
+
+
 def generate_performance_report(root_dir, output_dir):
     if not os.path.exists(root_dir):
         logger.error(f"Error: Root directory '{root_dir}' does not exist.")
@@ -223,7 +232,9 @@ if __name__ == "__main__":
     args = parse_args()
 
     if args.experiments is None:
-        run_a = run_b = run_c = run_d = run_e = run_f = run_g = run_h = run_i = True
+        run_a = run_b = run_c = run_d = run_e = run_f = run_g = run_h = run_i = (
+            run_ug
+        ) = True
     else:
         experiment_ids = args.experiments.split(",")
         run_a = "a" in experiment_ids
@@ -235,6 +246,7 @@ if __name__ == "__main__":
         run_g = "g" in experiment_ids
         run_h = "h" in experiment_ids
         run_i = "i" in experiment_ids
+        run_ug = "ug" in experiment_ids
 
     experiments = []
 
@@ -273,6 +285,10 @@ if __name__ == "__main__":
     if run_i:
         i_scaling_experiments = get_i_scaling_experiments()
         experiments.append(i_scaling_experiments)
+
+    if run_ug:
+        user_guide_experiments = get_user_guide_experiments()
+        experiments.append(user_guide_experiments)
 
     experiment_iter = chain.from_iterable(experiments)
     for experiment in experiment_iter:

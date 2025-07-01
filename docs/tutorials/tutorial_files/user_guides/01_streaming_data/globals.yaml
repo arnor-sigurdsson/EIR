@@ -1,0 +1,15 @@
+basic_experiment:
+  batch_size: 32
+  memory_dataset: true
+  n_epochs: 100
+  output_folder: eir_tutorials/tutorial_runs/user_guides/01_streaming
+  valid_size: 500
+  dataloader_workers: 0
+data_preparation:
+  streaming_setup_samples: 1000
+evaluation_checkpoint:
+  checkpoint_interval: 500
+  n_saved_models: 1
+  sample_interval: 500
+visualization_logging:
+  plot_skip_steps: 500

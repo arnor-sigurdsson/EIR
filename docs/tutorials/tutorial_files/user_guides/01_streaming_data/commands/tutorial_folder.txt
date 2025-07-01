@@ -1,0 +1,5 @@
+eir_tutorials/user_guides/01_streaming_data
+├── fusion.yaml
+├── globals.yaml
+├── input.yaml
+└── output.yaml

@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant Client as "EIR-Client (Trainer)"
+    participant Server
+
+    Note over Client: Assumes a connection (Phase 1)<br>is already established.
+
+    loop For each training step
+        Note over Client: Model requests a<br>new batch of data.
+        Client->>Server: 1. Send Message: {"type": "getData", "payload": {batch_size}}
+        activate Server
+        Server-->>Client: 2. Respond: {"type": "data", "payload": [samples...]}
+        deactivate Server
+        Note over Client: 3. Processes data and feeds it<br>to the model for training.
+    end
+
+    Note over Client,Server: Training completes or is stopped.
