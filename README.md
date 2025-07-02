@@ -33,7 +33,9 @@ Supervised modelling, sequence generation, image generation, array output and su
 ## What's New
 
 
-- **July 2025**: Added [Streaming Data Hands-On Guide](https://eir.readthedocs.io/en/stable/user_guides/streaming_implementation.html)
+- **July 2025**: More docs added
+  - [Frequently Asked Questions](https://eir.readthedocs.io/en/stable/user_guides/frequently_asked_questions.html)
+  - [Streaming Data Hands-On Guide](https://eir.readthedocs.io/en/stable/user_guides/streaming_implementation.html)
 - **June 2025**: Overhaul, expand and restructure [documenation](https://eir.readthedocs.io/en/stable/index.html)
 - **April 2025**: More scaling related tutorials
   - [Scaling Diffusion: Image Generation from Text](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/03_diffusion.html) - Exploring artistic styles from historical collections
