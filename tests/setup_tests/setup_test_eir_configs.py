@@ -61,7 +61,7 @@ def get_test_inputs_inits(
     test_path: Path,
     input_config_dicts: Sequence[dict],
     split_to_test: bool,
-    source: Literal["local", "deeplake"],
+    source: Literal["local"],
     extra_kwargs: dict | None = None,
 ) -> Sequence[dict]:
     if extra_kwargs is None:
@@ -98,7 +98,7 @@ def get_test_outputs_inits(
     test_path: Path,
     output_configs_dicts: Sequence[dict],
     split_to_test: bool,
-    source: Literal["local", "deeplake"],
+    source: Literal["local"],
 ) -> Sequence[dict]:
     inits = []
 
@@ -169,7 +169,7 @@ def get_input_test_init_base_func_map() -> dict[str, Callable]:
 
 def _inject_train_source_path(
     test_path: Path,
-    source: Literal["local", "deeplake"],
+    source: Literal["local"],
     local_name: Literal["omics", "sequence", "image", "array"],
     split_to_test: bool,
 ) -> Path:
@@ -178,11 +178,6 @@ def _inject_train_source_path(
 
         if split_to_test:
             input_source = input_source / "train_set"
-
-    elif source == "deeplake":
-        input_source = test_path / "deeplake"
-        if split_to_test:
-            input_source = test_path / "deeplake_train_set"
 
     else:
         raise ValueError(f"Source {source} not supported.")
@@ -194,7 +189,7 @@ def get_test_omics_input_init(
     test_path: Path,
     split_to_test: bool,
     init_dict: dict,
-    source: Literal["local", "deeplake"],
+    source: Literal["local"],
     *args,
     **kwargs,
 ) -> dict:
@@ -210,7 +205,6 @@ def get_test_omics_input_init(
             "input_source": str(input_source),
             "input_name": "test_genotype",
             "input_type": "omics",
-            "input_inner_key": "test_genotype",
         },
         "input_type_info": {
             "na_augment_alpha": 1.0,
@@ -251,7 +245,7 @@ def get_test_tabular_input_init(
 def get_test_sequence_input_init(
     test_path: Path,
     split_to_test: bool,
-    source: Literal["local", "deeplake"],
+    source: Literal["local"],
     extra_kwargs: dict,
     *args,
     **kwargs,
@@ -275,7 +269,6 @@ def get_test_sequence_input_init(
             "input_source": str(input_source),
             "input_name": "test_sequence",
             "input_type": "sequence",
-            "input_inner_key": "test_sequence",
         },
         "input_type_info": {
             "max_length": "max",
@@ -324,7 +317,7 @@ def get_test_bytes_input_init(
 def get_test_image_input_init(
     test_path: Path,
     split_to_test: bool,
-    source: Literal["local", "deeplake"],
+    source: Literal["local"],
     *args,
     **kwargs,
 ) -> dict:
@@ -340,7 +333,6 @@ def get_test_image_input_init(
             "input_source": str(input_source),
             "input_name": "test_image",
             "input_type": "image",
-            "input_inner_key": "test_image",
         },
         "input_type_info": {
             "auto_augment": False,
@@ -363,7 +355,7 @@ def get_test_image_input_init(
 def get_test_array_input_init(
     test_path: Path,
     split_to_test: bool,
-    source: Literal["local", "deeplake"],
+    source: Literal["local"],
     *args,
     **kwargs,
 ) -> dict:
@@ -379,7 +371,6 @@ def get_test_array_input_init(
             "input_source": str(input_source),
             "input_name": "test_array",
             "input_type": "array",
-            "input_inner_key": "test_array",
         },
         "model_config": {"model_type": "cnn"},
     }
@@ -441,7 +432,7 @@ def get_test_tabular_base_output_inits(
 def get_test_sequence_base_output_inits(
     test_path: Path,
     split_to_test: bool,
-    source: Literal["local", "deeplake"],
+    source: Literal["local"],
 ) -> dict:
     output_source = _inject_train_source_path(
         test_path=test_path,
@@ -455,7 +446,6 @@ def get_test_sequence_base_output_inits(
             "output_name": "test_output_sequence",
             "output_type": "sequence",
             "output_source": str(output_source),
-            "output_inner_key": "test_sequence",
         },
         "output_type_info": {
             "max_length": 32,
@@ -472,7 +462,7 @@ def get_test_sequence_base_output_inits(
 def get_test_array_base_output_inits(
     test_path: Path,
     split_to_test: bool,
-    source: Literal["local", "deeplake"],
+    source: Literal["local"],
 ) -> dict:
     output_source = _inject_train_source_path(
         test_path=test_path,
@@ -486,7 +476,6 @@ def get_test_array_base_output_inits(
             "output_name": "test_output_array",
             "output_type": "array",
             "output_source": str(output_source),
-            "output_inner_key": "test_array",
         },
         "model_config": {"model_type": "lcl"},
         "sampling_config": {"diffusion_inference_steps": 50},
@@ -498,7 +487,7 @@ def get_test_array_base_output_inits(
 def get_test_image_base_output_inits(
     test_path: Path,
     split_to_test: bool,
-    source: Literal["local", "deeplake"],
+    source: Literal["local"],
 ) -> dict:
     output_source = _inject_train_source_path(
         test_path=test_path,
@@ -512,7 +501,6 @@ def get_test_image_base_output_inits(
             "output_name": "test_output_image",
             "output_type": "image",
             "output_source": str(output_source),
-            "output_inner_key": "test_image",
         },
         "model_config": {
             "model_type": "cnn",

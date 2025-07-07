@@ -11,11 +11,6 @@ from torchvision import transforms
 from torchvision.transforms import Compose
 from torchvision.transforms.functional import to_tensor
 
-from eir.data_load.data_source_modules.deeplake_ops import (
-    get_deeplake_input_source_iterable,
-    is_deeplake_dataset,
-    load_deeplake_dataset,
-)
 from eir.models.input.image.image_models import ImageModelConfig
 from eir.models.output.array.array_output_modules import ArrayOutputModuleConfig
 from eir.setup import schemas
@@ -74,14 +69,12 @@ def set_up_computed_image_input_object(
     if not num_channels and not image_mode:
         num_channels = infer_num_image_channels(
             data_source=input_config.input_info.input_source,
-            deeplake_inner_key=input_config.input_info.input_inner_key,
         )
 
     num_channels = get_num_channels_wrapper(
         image_mode=image_mode,
         num_channels=num_channels,
         source=input_config.input_info.input_source,
-        deeplake_inner_key=input_config.input_info.input_inner_key,
     )
 
     data_dimension = DataDimensions(
@@ -97,7 +90,6 @@ def set_up_computed_image_input_object(
     if normalization_stats is None:
         normalization_stats = get_image_normalization_values(
             source=input_config.input_info.input_source,
-            inner_key=input_config.input_info.input_inner_key,
             model_config=model_config,
             mean_normalization_values=iti.mean_normalization_values,
             stds_normalization_values=iti.stds_normalization_values,
@@ -129,7 +121,6 @@ def get_num_channels_wrapper(
     image_mode: str | None,
     num_channels: int | None,
     source: str,
-    deeplake_inner_key: str | None,
 ) -> int:
     if image_mode and num_channels:
         raise ValueError(
@@ -145,7 +136,6 @@ def get_num_channels_wrapper(
 
     num_channels = infer_num_image_channels(
         data_source=source,
-        deeplake_inner_key=deeplake_inner_key,
     )
     return num_channels
 
@@ -168,24 +158,13 @@ def get_num_channels_from_image_mode(image_mode: str | None) -> int:
     return channels
 
 
-def infer_num_image_channels(data_source: str, deeplake_inner_key: str | None) -> int:
-    if is_deeplake_dataset(data_source=data_source):
-        assert deeplake_inner_key is not None
-        deeplake_ds = load_deeplake_dataset(data_source=data_source)
-        deeplake_iter = get_deeplake_input_source_iterable(
-            deeplake_dataset=deeplake_ds,
-            inner_key=deeplake_inner_key,
-        )
-        test_image_array = next(deeplake_iter)
-        data_pointer = (
-            f"[deeplake dataset {data_source}, input {deeplake_inner_key}, "
-            f"image ID: {deeplake_ds['ID']}]"
-        )
-    else:
-        test_file = next(Path(data_source).iterdir())
-        test_image = default_image_loader(path=str(test_file))
-        test_image_array = np.array(test_image)
-        data_pointer = test_file.name
+def infer_num_image_channels(data_source: str) -> int:
+    # TODO: Possibly make recursive
+    test_file = next(Path(data_source).iterdir())
+
+    test_image = default_image_loader(path=str(test_file))
+    test_image_array = np.array(test_image)
+    data_pointer = test_file.name
 
     num_channels = 1 if test_image_array.ndim == 2 else test_image_array.shape[-1]
 
@@ -214,7 +193,6 @@ class ImageNormalizationStats:
 
 def get_image_normalization_values(
     source: str,
-    inner_key: str | None,
     model_config: ImageModelConfig | ArrayOutputModuleConfig,
     mean_normalization_values: Sequence[float] | torch.Tensor | None,
     stds_normalization_values: Sequence[float] | torch.Tensor | None,
@@ -270,7 +248,6 @@ def get_image_normalization_values(
     else:
         if not means or not stds:
             input_source = source
-            deeplake_inner_key = inner_key
             logger.info(
                 "Not using an external pretrained model "
                 "and no mean and standard deviation "
@@ -279,29 +256,12 @@ def get_image_normalization_values(
                 input_source,
             )
 
-            if is_deeplake_dataset(data_source=input_source):
-                deeplake_ds = load_deeplake_dataset(data_source=input_source)
-                assert deeplake_inner_key is not None
-                image_iter = get_deeplake_input_source_iterable(
-                    deeplake_dataset=deeplake_ds,
-                    inner_key=deeplake_inner_key,
-                )
-                numpy_iter = (i for i in image_iter)
+            file_iterator = Path(input_source).rglob("*")
+            image_iterator = (default_image_loader(str(f)) for f in file_iterator)
+            if image_mode:
+                image_iterator = (i.convert(image_mode) for i in image_iterator)
 
-                if image_mode:
-                    image_iter = (Image.fromarray(i) for i in numpy_iter)
-                    image_iter = (i.convert(image_mode) for i in image_iter)
-                    numpy_iter = (np.array(i) for i in image_iter)
-
-                tensor_iterator = (to_tensor(i).float() for i in numpy_iter)
-
-            else:
-                file_iterator = Path(input_source).rglob("*")
-                image_iterator = (default_image_loader(str(f)) for f in file_iterator)
-                if image_mode:
-                    image_iterator = (i.convert(image_mode) for i in image_iterator)
-
-                tensor_iterator = (to_tensor(i) for i in image_iterator)
+            tensor_iterator = (to_tensor(i) for i in image_iterator)
 
             tensor_iterator = _get_maybe_truncated_tensor_iterator(
                 tensor_iterator=tensor_iterator,

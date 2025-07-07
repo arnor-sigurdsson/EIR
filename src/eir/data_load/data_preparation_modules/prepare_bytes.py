@@ -4,33 +4,18 @@ import numpy as np
 import torch
 
 from eir.data_load.data_preparation_modules.common import (
-    _load_deeplake_sample,
     process_tensor_to_length,
 )
-from eir.data_load.data_source_modules import deeplake_ops
 from eir.setup.input_setup_modules.setup_bytes import ComputedBytesInputInfo
 from eir.setup.schemas import ByteInputDataConfig
 
 
 def bytes_load_wrapper(
     data_pointer: Path | int,
-    input_source: str,
     dtype: str,
-    deeplake_inner_key: str | None = None,
 ) -> np.ndarray:
-    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
-        assert deeplake_inner_key is not None
-        assert isinstance(data_pointer, int)
-        bytes_data = _load_deeplake_sample(
-            data_pointer=data_pointer,
-            input_source=input_source,
-            inner_key=deeplake_inner_key,
-        )
-        assert isinstance(bytes_data, np.ndarray)
-        bytes_data = bytes_data.astype(dtype=dtype)
-    else:
-        assert isinstance(data_pointer, str | Path)
-        bytes_data = np.fromfile(file=data_pointer, dtype=dtype)
+    assert isinstance(data_pointer, str | Path)
+    bytes_data = np.fromfile(file=data_pointer, dtype=dtype)
 
     return bytes_data
 

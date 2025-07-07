@@ -96,7 +96,6 @@ def get_sequence_input_objects_from_output(
 
     vocab = setup_sequence.init_vocab(
         source=output_config.output_info.output_source,
-        inner_key=output_config.output_info.output_inner_key,
         tokenizer_name=output_type_info.tokenizer,
         split_on=output_type_info.split_on,
         vocab_file=output_type_info.vocab_file,

@@ -7,7 +7,6 @@ import polars as pl
 from sklearn.preprocessing import KBinsDiscretizer, StandardScaler
 
 from eir.data_load import label_setup
-from eir.data_load.data_source_modules.deeplake_ops import is_deeplake_dataset
 from eir.data_load.label_setup import (
     TabularFileInfo,
     al_label_transformers,
@@ -195,7 +194,6 @@ def get_target_labels_for_testing(
     )
 
     for output_config in output_configs:
-        output_source = output_config.output_info.output_source
         output_type_info = output_config.output_type_info
         output_name = output_config.output_info.output_name
         logger.info(f"Setting up target labels for {output_name}.")
@@ -225,7 +223,6 @@ def get_target_labels_for_testing(
                     output_name=output_name,
                     ids=ids,
                     output_config=output_config,
-                    output_source=output_source,
                     per_modality_missing_ids=per_modality_missing_ids,
                     test_labels_df=test_labels_df,
                 )
@@ -323,7 +320,6 @@ def process_array_or_image_output_for_testing(
     output_name: str,
     ids: Sequence[str],
     output_config: Any,
-    output_source: str,
     per_modality_missing_ids: dict[str, set[str]],
     test_labels_df: pl.DataFrame,
 ) -> pl.DataFrame:
@@ -338,11 +334,10 @@ def process_array_or_image_output_for_testing(
     )
     per_modality_missing_ids[output_name] = cur_missing_ids
 
-    is_deeplake = is_deeplake_dataset(data_source=output_source)
     col_name = f"{output_name}__{output_name}"
 
-    polars_dtype: type[pl.Int64] | type[pl.Utf8]
-    polars_dtype = pl.Int64 if is_deeplake else pl.Utf8
+    polars_dtype: type[pl.Utf8]
+    polars_dtype = pl.Utf8
 
     test_labels_df = update_labels_df(
         master_df=test_labels_df,
@@ -434,12 +429,10 @@ def _set_up_predict_file_target_labels(
 ) -> PredictTargetLabels:
     output_name = output_config.output_info.output_name
     output_source = output_config.output_info.output_source
-    output_inner_key = output_config.output_info.output_inner_key
 
     id_to_data_pointer_mapping = gather_data_pointers_from_data_source(
         data_source=Path(output_source),
         validate=True,
-        output_inner_key=output_inner_key,
     )
 
     values = [id_to_data_pointer_mapping.get(id_, None) for id_ in ids]

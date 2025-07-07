@@ -49,7 +49,6 @@ def set_up_image_output(
         image_mode=image_mode,
         num_channels=num_channels,
         source=output_info.output_source,
-        deeplake_inner_key=output_info.output_inner_key,
     )
 
     data_dimensions = DataDimensions(
@@ -68,7 +67,6 @@ def set_up_image_output(
     if normalization_stats is None:
         normalization_stats = get_image_normalization_values(
             source=output_config.output_info.output_source,
-            inner_key=output_config.output_info.output_inner_key,
             model_config=model_config,
             mean_normalization_values=oti.mean_normalization_values,
             stds_normalization_values=oti.stds_normalization_values,

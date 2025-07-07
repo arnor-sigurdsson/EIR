@@ -3,11 +3,6 @@ from pathlib import Path
 
 import numpy as np
 
-from eir.data_load.data_source_modules.deeplake_ops import (
-    get_deeplake_input_source_iterable,
-    is_deeplake_dataset,
-    load_deeplake_dataset,
-)
 from eir.data_load.label_setup import get_file_path_iterator
 
 
@@ -29,23 +24,14 @@ class DataDimensions:
 
 def get_data_dimension_from_data_source(
     data_source: Path,
-    deeplake_inner_key: str | None = None,
 ) -> DataDimensions:
     """
     TODO: Make more dynamic / robust. Also weird to say "width" for a 1D vector.
     """
 
-    if is_deeplake_dataset(data_source=str(data_source)):
-        assert deeplake_inner_key is not None, data_source
-        deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
-        deeplake_iter = get_deeplake_input_source_iterable(
-            deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
-        )
-        shape = next(deeplake_iter).shape
-    else:
-        iterator = get_file_path_iterator(data_source=data_source)
-        path = next(iterator)
-        shape = np.load(file=path).shape
+    iterator = get_file_path_iterator(data_source=data_source)
+    path = next(iterator)
+    shape = np.load(file=path).shape
 
     extra_dims: tuple[int, ...] = ()
     if len(shape) == 1:
@@ -69,24 +55,10 @@ def get_data_dimension_from_data_source(
 
 def get_dtype_from_data_source(
     data_source: Path,
-    deeplake_inner_key: str | None = None,
 ) -> np.dtype:
-    if is_deeplake_dataset(data_source=str(data_source)):
-        msg = "Deeplake inner key is required for Deeplake datasets"
-        assert deeplake_inner_key is not None, msg
-
-        deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
-        deeplake_iter = get_deeplake_input_source_iterable(
-            deeplake_dataset=deeplake_ds,
-            inner_key=deeplake_inner_key,
-        )
-        sample = next(deeplake_iter)
-        assert isinstance(sample, np.ndarray)
-        data_type = sample.dtype
-    else:
-        iterator = get_file_path_iterator(data_source=data_source)
-        path = next(iterator)
-        data_type = np.load(file=path).dtype
+    iterator = get_file_path_iterator(data_source=data_source)
+    path = next(iterator)
+    data_type = np.load(file=path).dtype
 
     return data_type
 

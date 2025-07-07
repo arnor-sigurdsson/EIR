@@ -1,5 +1,5 @@
 import reprlib
-from collections.abc import Generator, Iterator, Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -17,11 +17,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 from tqdm import tqdm
 
-from eir.data_load.data_source_modules.deeplake_ops import (
-    is_deeplake_dataset,
-    is_deeplake_sample_missing,
-    load_deeplake_dataset,
-)
 from eir.setup.schemas import InputConfig
 from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.train_utils.utils import get_seed
@@ -444,12 +439,8 @@ def gather_ids_from_data_source(
     validate: bool = True,
 ) -> tuple[str, ...]:
     iterator: Iterator[str] | Iterator[Path]
-    if is_deeplake_dataset(data_source=str(data_source)):
-        iterator = build_deeplake_available_id_iterator(
-            data_source=data_source,
-            inner_key="ID",
-        )
-    elif data_source.suffix == ".csv":
+
+    if data_source.suffix == ".csv":
         ids = gather_ids_from_tabular_file(file_path=data_source)
         iterator = (str(i) for i in ids)
     else:
@@ -460,25 +451,6 @@ def gather_ids_from_data_source(
     all_ids = tuple(i for i in tqdm(iterator, desc="Progress"))
 
     return all_ids
-
-
-def build_deeplake_available_id_iterator(
-    data_source: Path, inner_key: str
-) -> Generator[str]:
-    deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
-    columns = {col.name for col in deeplake_ds.schema.columns}
-    existence_col = f"{inner_key}_exists"
-    for row in deeplake_ds:
-        if is_deeplake_sample_missing(
-            row=row,
-            existence_col=existence_col,
-            columns=columns,
-        ):
-            continue
-
-        id_ = row["ID"]
-
-        yield id_  # type: ignore
 
 
 @lru_cache
@@ -502,7 +474,7 @@ def get_file_path_iterator(data_source: Path, validate: bool = True) -> Iterator
                 yield path
 
     if data_source.is_dir():
-        return data_source.rglob("*")
+        return (p for p in data_source.rglob("*") if p.is_file())
     if data_source.is_file():
         return _file_iterator(file_path=data_source)
 

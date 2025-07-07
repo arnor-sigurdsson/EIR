@@ -7,27 +7,14 @@ from eir.data_load.data_augmentation import (
     make_random_omics_columns_missing,
     shuffle_random_omics_columns,
 )
-from eir.data_load.data_preparation_modules.common import _load_deeplake_sample
-from eir.data_load.data_source_modules import deeplake_ops
 
 
 def omics_load_wrapper(
     data_pointer: Path | str | int,
-    input_source: str,
     subset_indices: np.ndarray | None,
-    deeplake_inner_key: str | None = None,
 ) -> np.ndarray:
-    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
-        assert deeplake_inner_key is not None
-        assert isinstance(data_pointer, int)
-        genotype_array_raw = _load_deeplake_sample(
-            data_pointer=data_pointer,
-            input_source=input_source,
-            inner_key=deeplake_inner_key,
-        )
-    else:
-        assert isinstance(data_pointer, str | Path)
-        genotype_array_raw = np.load(str(data_pointer))
+    assert isinstance(data_pointer, str | Path)
+    genotype_array_raw = np.load(str(data_pointer))
 
     assert isinstance(genotype_array_raw, np.ndarray)
 

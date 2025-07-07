@@ -5,10 +5,8 @@ import numpy as np
 import torch
 
 from eir.data_load.data_preparation_modules.common import (
-    _load_deeplake_sample,
     process_tensor_to_length,
 )
-from eir.data_load.data_source_modules import deeplake_ops
 from eir.setup.input_setup_modules.setup_sequence import (
     ComputedSequenceInputInfo,
     al_encode_funcs,
@@ -22,23 +20,13 @@ def sequence_load_wrapper(
     input_source: str,
     split_on: str | None,
     encode_func: al_encode_funcs,
-    deeplake_inner_key: str | None = None,
 ) -> np.ndarray:
     """
     In the case of .csv input sources, we have already loaded and tokenized the data.
     """
 
     split_func = get_sequence_split_function(split_on=split_on)
-    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
-        assert deeplake_inner_key is not None
-        assert isinstance(data_pointer, int)
-        content = _load_deeplake_sample(
-            data_pointer=data_pointer,
-            input_source=input_source,
-            inner_key=deeplake_inner_key,
-        )
-        assert isinstance(content, str)
-    elif input_source.endswith(".csv"):
+    if input_source.endswith(".csv"):
         assert isinstance(data_pointer, np.ndarray)
         return data_pointer
     else:

@@ -38,8 +38,6 @@ def prepare_outputs_disk(
 
     for output_name, output in outputs.items():
         output_object = output_objects[output_name]
-        output_source = output_object.output_config.output_info.output_source
-        deeplake_inner_key = output_object.output_config.output_info.output_inner_key
 
         output_prepared: dict[str, torch.Tensor | int | float]
         match output_object:
@@ -47,8 +45,6 @@ def prepare_outputs_disk(
                 data_pointer = output[output_name]
                 loaded_array = array_load_wrapper(
                     data_pointer=data_pointer,
-                    input_source=output_source,
-                    deeplake_inner_key=deeplake_inner_key,
                 )
                 array_prepared = prepare_array_data(
                     array_data=loaded_array,
@@ -62,9 +58,7 @@ def prepare_outputs_disk(
                 data_pointer = output[output_name]
                 loaded_image = image_load_wrapper(
                     data_pointer=data_pointer,
-                    input_source=output_source,
                     image_mode=output_type_info.mode,
-                    deeplake_inner_key=deeplake_inner_key,
                 )
                 image_prepared = prepare_image_data(
                     image_input_object=output_object,
@@ -134,11 +128,7 @@ def get_output_data_loading_hooks(
     mapping = {}
 
     for output_name, output_object in outputs.items():
-        output_info = output_object.output_config.output_info
-        common_kwargs = {
-            "input_source": output_info.output_source,
-            "deeplake_inner_key": output_info.output_inner_key,
-        }
+        common_kwargs: dict[str, Any] = {}
 
         match output_object:
             case ComputedArrayOutputInfo():

@@ -36,7 +36,7 @@ def _get_sequence_test_specific_fusion_configs() -> dict:
         {
             "task_type": "multi",
             "modalities": ("sequence",),
-            "source": "deeplake",
+            "source": "local",
         },
     ],
     indirect=True,

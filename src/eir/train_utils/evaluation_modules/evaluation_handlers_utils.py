@@ -389,7 +389,6 @@ def prepare_manual_sample_data(
     prepared_inputs: dict[str, torch.Tensor | dict[str, torch.Tensor]] = {}
     for name, data in sample_inputs.items():
         input_object = input_objects[name]
-        input_info = input_object.input_config.input_info
         input_type_info = input_object.input_config.input_type_info
 
         match input_object:
@@ -397,9 +396,7 @@ def prepare_manual_sample_data(
                 assert isinstance(input_type_info, OmicsInputDataConfig)
                 array_raw = omics_load_wrapper(
                     data_pointer=data,
-                    input_source=input_info.input_source,
                     subset_indices=input_object.subset_indices,
-                    deeplake_inner_key=input_info.input_inner_key,
                 )
 
                 array_prepared = prepare_one_hot_omics_data(
@@ -434,10 +431,8 @@ def prepare_manual_sample_data(
             case ComputedBytesInputInfo():
                 assert isinstance(input_type_info, ByteInputDataConfig)
                 bytes_data = bytes_load_wrapper(
-                    input_source=input_info.input_source,
                     data_pointer=data,
                     dtype=input_type_info.byte_encoding,
-                    deeplake_inner_key=input_info.input_inner_key,
                 )
                 prepared_bytes_input = prepare_bytes_data(
                     bytes_input_object=input_object,
@@ -452,8 +447,6 @@ def prepare_manual_sample_data(
                 image_data = image_load_wrapper(
                     data_pointer=data,
                     image_mode=input_type_info.mode,
-                    input_source=input_info.input_source,
-                    deeplake_inner_key=input_info.input_inner_key,
                 )
                 prepared_image_data = prepare_image_data(
                     image_input_object=input_object,
@@ -477,9 +470,7 @@ def prepare_manual_sample_data(
             case ComputedArrayInputInfo():
                 assert isinstance(input_type_info, ArrayInputDataConfig)
                 array_data = array_load_wrapper(
-                    input_source=input_info.input_source,
                     data_pointer=data,
-                    deeplake_inner_key=input_info.input_inner_key,
                 )
                 prepared_array_data = prepare_array_data(
                     array_data=array_data,

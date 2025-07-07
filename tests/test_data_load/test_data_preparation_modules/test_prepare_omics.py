@@ -84,7 +84,6 @@ def test_load_omics_array_from_disk(subset_indices: None | Sequence[int]):
         autospec=True,
     ):
         loaded = prepare_omics.omics_load_wrapper(
-            input_source="fake",
             data_pointer="fake",
             subset_indices=subset_indices,
         )

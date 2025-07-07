@@ -27,11 +27,6 @@ from transformers.tokenization_utils_base import (
     TextInput,
 )
 
-from eir.data_load.data_source_modules.deeplake_ops import (
-    get_deeplake_input_source_iterable,
-    is_deeplake_dataset,
-    load_deeplake_dataset,
-)
 from eir.models.input.sequence.transformer_models import SequenceModelConfig
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import get_default_sequence_specials
@@ -186,7 +181,6 @@ def get_sequence_input_objects_from_input(
 
     vocab = init_vocab(
         source=input_config.input_info.input_source,
-        inner_key=input_config.input_info.input_inner_key,
         tokenizer_name=input_type_info.tokenizer,
         split_on=input_type_info.split_on,
         vocab_file=input_type_info.vocab_file,
@@ -225,7 +219,6 @@ class HFTokenizerWrapper:
 
 def init_vocab(
     source: str,
-    inner_key: str | None,
     tokenizer_name: str | None,
     split_on: str | None,
     vocab_file: str | None,
@@ -248,7 +241,6 @@ def init_vocab(
             split_on=split_on,
             gathered_stats=gathered_stats,
             vocab_file=vocab_file,
-            deeplake_inner_key=inner_key,
         )
         tokenized_vocab_iter = get_tokenized_vocab_iterator(
             vocab_iterator=vocab_iter,
@@ -323,7 +315,6 @@ def get_tokenizer(
             split_on=input_type_info.split_on,
             gathered_stats=gathered_stats,
             vocab_file=input_type_info.vocab_file,
-            deeplake_inner_key=input_config.input_info.input_inner_key,
         )
 
         vocab_file = input_type_info.vocab_file
@@ -715,7 +706,6 @@ def get_vocab_iterator(
     split_on: str | None,
     gathered_stats: "GatheredSequenceStats",
     vocab_file: str | None = None,
-    deeplake_inner_key: str | None = None,
 ) -> Generator[Sequence[str]]:
     """
     Note: When using a vocabulary file, we explicitly expect one token per line,
@@ -733,7 +723,6 @@ def get_vocab_iterator(
             data_source=input_source,
             split_on=split_on,
             gathered_stats=gathered_stats,
-            deeplake_inner_key=deeplake_inner_key,
         )
     else:
         logger.info(
@@ -783,20 +772,10 @@ def yield_tokens_from_source(
     data_source: str,
     split_on: str | None,
     gathered_stats: GatheredSequenceStats,
-    deeplake_inner_key: str | None = None,
 ):
     data_source_path = Path(data_source)
 
-    if is_deeplake_dataset(data_source=str(data_source_path)):
-        assert deeplake_inner_key is not None
-        yield from yield_tokens_from_deeplake_dataset(
-            data_source=data_source_path,
-            split_on=split_on,
-            gathered_stats=gathered_stats,
-            inner_key=deeplake_inner_key,
-        )
-
-    elif data_source_path.is_dir():
+    if data_source_path.is_dir():
         iterator = tqdm(Path(data_source).iterdir(), desc="Vocabulary Setup")
         for file in iterator:
             preserve_full = split_on is None
@@ -816,33 +795,6 @@ def yield_tokens_from_source(
         )
 
     return gathered_stats
-
-
-def yield_tokens_from_deeplake_dataset(
-    data_source: Path,
-    split_on: str | None,
-    gathered_stats: GatheredSequenceStats,
-    inner_key: str,
-) -> Generator[Sequence[str]]:
-    deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
-    deeplake_iter = get_deeplake_input_source_iterable(
-        deeplake_dataset=deeplake_ds,
-        inner_key=inner_key,
-    )
-
-    split_func = get_sequence_split_function(split_on=split_on)
-
-    for sample in deeplake_iter:
-        cur_sequence = str(sample)
-        cur_line = split_func(cur_sequence)
-
-        cur_length = len(cur_line)
-        gathered_stats.total_count += len(cur_line)
-
-        if cur_length > gathered_stats.max_length:
-            gathered_stats.max_length = cur_length
-
-        yield cur_line
 
 
 def yield_tokens_from_file(

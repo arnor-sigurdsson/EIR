@@ -14,11 +14,6 @@ import polars as pl
 from sklearn.preprocessing import KBinsDiscretizer
 from tqdm import tqdm
 
-from eir.data_load.data_source_modules.deeplake_ops import (
-    is_deeplake_dataset,
-    is_deeplake_sample_missing,
-    load_deeplake_dataset,
-)
 from eir.data_load.label_setup import (
     Labels,
     TabularFileInfo,
@@ -368,11 +363,10 @@ def process_array_or_image_output(
     )
     per_modality_missing_ids[output_name] = cur_missing_ids
 
-    is_deeplake = is_deeplake_dataset(data_source=output_source)
     col_name = f"{output_name}__{output_name}"
 
-    polars_dtype: type[pl.Int64] | type[pl.Utf8]
-    polars_dtype = pl.Int64 if is_deeplake else pl.Utf8
+    polars_dtype: type[pl.Utf8]
+    polars_dtype = pl.Utf8
 
     train_labels_df = update_labels_df(
         master_df=train_labels_df,
@@ -634,12 +628,10 @@ def set_up_file_target_labels(
     """
     output_name = output_config.output_info.output_name
     output_source = output_config.output_info.output_source
-    output_name_inner_key = output_config.output_info.output_inner_key
 
     id_to_data_pointer_mapping = gather_data_pointers_from_data_source(
         data_source=Path(output_source),
         validate=True,
-        output_inner_key=output_name_inner_key,
     )
 
     train_values = [id_to_data_pointer_mapping.get(id_, None) for id_ in train_ids]
@@ -679,25 +671,17 @@ def gather_torch_null_missing_ids(labels: pl.DataFrame, output_name: str) -> set
 def gather_data_pointers_from_data_source(
     data_source: Path,
     validate: bool = True,
-    output_inner_key: str | None = None,
 ) -> dict[str, str | int]:
     """
     Disk: ID -> file path
     Deeplake: ID -> integer index
     """
     iterator: Generator[tuple[str, str]] | Generator[tuple[str, int]]
-    if is_deeplake_dataset(data_source=str(data_source)):
-        assert output_inner_key is not None
-        iterator = build_deeplake_available_pointer_iterator(
-            data_source=data_source,
-            inner_key=output_inner_key,
-        )
-    else:
-        iterator_base = get_file_path_iterator(
-            data_source=data_source,
-            validate=validate,
-        )
-        iterator = ((f.stem, str(f)) for f in iterator_base)
+    iterator_base = get_file_path_iterator(
+        data_source=data_source,
+        validate=validate,
+    )
+    iterator = ((f.stem, str(f)) for f in iterator_base)
 
     logger.debug("Gathering data pointers from %s.", data_source)
     id_to_pointer_mapping = {}
@@ -708,25 +692,6 @@ def gather_data_pointers_from_data_source(
         id_to_pointer_mapping[id_] = pointer
 
     return id_to_pointer_mapping
-
-
-def build_deeplake_available_pointer_iterator(
-    data_source: Path, inner_key: str
-) -> Generator[tuple[str, int]]:
-    deeplake_ds = load_deeplake_dataset(data_source=str(data_source))
-    columns = {col.name for col in deeplake_ds.schema.columns}
-    existence_col = f"{inner_key}_exists"
-    for int_pointer, row in enumerate(deeplake_ds):
-        if is_deeplake_sample_missing(
-            row=row,
-            existence_col=existence_col,
-            columns=columns,
-        ):
-            pass
-
-        id_ = row["ID"]
-
-        yield id_, int(int_pointer)  # type: ignore
 
 
 def gather_all_ids_from_output_configs(

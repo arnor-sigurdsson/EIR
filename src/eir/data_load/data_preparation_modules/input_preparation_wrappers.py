@@ -56,7 +56,6 @@ def prepare_inputs_disk(
         input_object = inputs_objects[input_name]
         input_source = input_object.input_config.input_info.input_source
         input_type_info = input_object.input_config.input_type_info
-        deeplake_inner_key = input_object.input_config.input_info.input_inner_key
 
         drop_rate = _get_modality_drop_rate(input_type_info=input_type_info)
         should_skip = _should_skip_modality(
@@ -70,9 +69,7 @@ def prepare_inputs_disk(
         match input_object:
             case ComputedOmicsInputInfo():
                 array_raw = omics_load_wrapper(
-                    input_source=input_source,
                     data_pointer=data_pointer,
-                    deeplake_inner_key=deeplake_inner_key,
                     subset_indices=input_object.subset_indices,
                 )
 
@@ -93,7 +90,6 @@ def prepare_inputs_disk(
                 sequence_tokenized = sequence_load_wrapper(
                     data_pointer=data_pointer,
                     input_source=input_source,
-                    deeplake_inner_key=deeplake_inner_key,
                     split_on=input_type_info.split_on,
                     encode_func=input_object.encode_func,
                 )
@@ -109,8 +105,6 @@ def prepare_inputs_disk(
                 bytes_data = bytes_load_wrapper(
                     data_pointer=data_pointer,
                     dtype=input_type_info.byte_encoding,
-                    input_source=input_source,
-                    deeplake_inner_key=deeplake_inner_key,
                 )
                 input_prepared = prepare_bytes_data(
                     bytes_input_object=input_object,
@@ -122,10 +116,8 @@ def prepare_inputs_disk(
                 input_type_info = input_object.input_config.input_type_info
                 assert isinstance(input_type_info, ImageInputDataConfig)
                 image_data = image_load_wrapper(
-                    input_source=input_source,
                     data_pointer=data_pointer,
                     image_mode=input_type_info.mode,
-                    deeplake_inner_key=deeplake_inner_key,
                 )
                 input_prepared = prepare_image_data(
                     image_input_object=input_object,
@@ -135,9 +127,7 @@ def prepare_inputs_disk(
 
             case ComputedArrayInputInfo():
                 array_data = array_load_wrapper(
-                    input_source=input_source,
                     data_pointer=data_pointer,
-                    deeplake_inner_key=deeplake_inner_key,
                 )
                 input_prepared = prepare_array_data(
                     array_data=array_data,
@@ -263,10 +253,7 @@ def get_input_data_loading_hooks(
     mapping = {}
 
     for input_name, input_object in inputs.items():
-        common_kwargs = {
-            "input_source": input_object.input_config.input_info.input_source,
-            "deeplake_inner_key": input_object.input_config.input_info.input_inner_key,
-        }
+        common_kwargs: dict[str, Any] = {}
 
         match input_object:
             case ComputedOmicsInputInfo():
@@ -303,9 +290,14 @@ def get_input_data_loading_hooks(
                 input_type_info = input_object.input_config.input_type_info
                 assert isinstance(input_type_info, SequenceInputDataConfig)
 
+                sequence_kwargs = {
+                    "input_source": input_object.input_config.input_info.input_source,
+                }
+                sequence_kwargs = {**common_kwargs, **sequence_kwargs}
+
                 inner_function = typed_partial_for_hook(
                     sequence_load_wrapper,
-                    **common_kwargs,
+                    **sequence_kwargs,
                     split_on=input_type_info.split_on,
                     encode_func=input_object.encode_func,
                 )
