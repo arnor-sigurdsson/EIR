@@ -9,7 +9,6 @@ model_config:
     stochastic_depth_p: 0.1
   model_type: mlp_residual
 output_info:
-  output_inner_key: null
   output_name: output_survival
   output_source: ws://localhost:8000/ws
   output_type: survival
