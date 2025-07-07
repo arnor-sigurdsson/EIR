@@ -297,9 +297,8 @@ When an entire modality is missing for a sample (e.g., no image for a specific I
 
 .. code-block:: text
 
-   # images folder
+   # images folder, note that sample2 is missing
    sample1.jpg
-   sample2.jpg
    sample3.jpg
 
 EIR will automatically handle the NaN values in Feature2/Feature3 and the missing image for sample2.
