@@ -626,20 +626,6 @@ wheels = [
 ]
 
 [[package]]
-name = "deeplake"
-version = "4.2.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/2e/f8af7d1c7ec898c0852161affdb7a8b99366068b265253c22a5212a5f308/deeplake-4.2.6-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:87261b082906cf52af1b8b7ebea7dd83862b7fc061f2972a73c642601dadebd3", size = 29491712, upload-time = "2025-05-22T16:23:49.999Z" },
-    { url = "https://files.pythonhosted.org/packages/e7/d2/82844dc4e55216802c34d1761c51101d1e7d5e8deb768ef48abc79f5c727/deeplake-4.2.6-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:c74fa1588b3fad586ba0ddf0bfabfb19dacfd2ea5fac930f4be8a9429469bd5d", size = 28843520, upload-time = "2025-05-22T16:23:56.116Z" },
-    { url = "https://files.pythonhosted.org/packages/54/76/7e4dbeb561c27429f21dd8229f9f4c51f04c6f4e5ad92680c54a65bbd30b/deeplake-4.2.6-cp313-cp313-manylinux2014_aarch64.whl", hash = "sha256:5eeaaaf2f5a758bce07084389d129a12ef336b7068a7f3b1bb135308c059fc45", size = 31239396, upload-time = "2025-05-22T16:24:02.378Z" },
-    { url = "https://files.pythonhosted.org/packages/7b/77/8a4cb3504d4deb1755cac876ec60bd2fdf7e699da8dde75e55398d5fc9fe/deeplake-4.2.6-cp313-cp313-manylinux2014_x86_64.whl", hash = "sha256:0a94e04f09b93564ad66601b3a94d2917bb669f3c79be5a258c9591e92fb0966", size = 32227762, upload-time = "2025-05-22T16:24:08.42Z" },
-]
-
-[[package]]
 name = "defusedxml"
 version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -737,7 +723,6 @@ dependencies = [
     { name = "colorama" },
     { name = "configargparse" },
     { name = "datasets" },
-    { name = "deeplake" },
     { name = "diffusers" },
     { name = "einops" },
     { name = "fastapi" },
@@ -807,7 +792,6 @@ requires-dist = [
     { name = "colorama", specifier = ">=0.4.4" },
     { name = "configargparse", specifier = ">=1.7" },
     { name = "datasets", specifier = ">=3.2.0" },
-    { name = "deeplake", specifier = "==4.2.6" },
     { name = "diffusers", specifier = ">=0.33.1" },
     { name = "einops", specifier = ">=0.8.0" },
     { name = "fastapi", specifier = ">=0.115.4" },
