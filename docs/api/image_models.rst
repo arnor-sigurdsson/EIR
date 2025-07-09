@@ -110,6 +110,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.fasternet.FasterNet
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.fastvit.FastVit
    :members:
    :exclude-members: forward
@@ -170,7 +174,15 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.mobilenetv5.MobileNetV5
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.mvitv2.MultiScaleVit
+   :members:
+   :exclude-members: forward
+
+.. autoclass:: timm.models.naflexvit.NaFlexVitCfg
    :members:
    :exclude-members: forward
 
@@ -239,6 +251,18 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :exclude-members: forward
 
 .. autoclass:: timm.models.sequencer.Sequencer2d
+   :members:
+   :exclude-members: forward
+
+.. autoclass:: timm.models.shvit.SHViT
+   :members:
+   :exclude-members: forward
+
+.. autoclass:: timm.models.starnet.StarNet
+   :members:
+   :exclude-members: forward
+
+.. autoclass:: timm.models.swiftformer.SwiftFormer
    :members:
    :exclude-members: forward
 

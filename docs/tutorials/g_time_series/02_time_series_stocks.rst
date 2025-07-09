@@ -31,7 +31,7 @@ Here's a brief overview of the data preparation process:
 
 4. The dataset is split into training (95%) and testing (5%) sets.
 
-5. The prepared data is saved in both CSV format and as `DeepLake <https://github.com/activeloopai/deeplake>`__ datasets.
+5. The prepared data is saved in CSV format for sequence-based models and streamed as arrays for array-based models.
 
 So, each sequence in our dataset represents 64 consecutive days of closing stock prices for a particular company.
 The prices are discretized into 256 bins, with each number in the sequence representing a bin.
@@ -55,16 +55,15 @@ This sequence represents Cisco's (CSCO) stock prices starting from December 23, 
     and testing.
 
 .. note::
-    We save the data in these two different formats as the sequence based transformer
-    models read the CSV format, whereas the one-shot and diffusion models read arrays
-    from the DeepLake dataset. Therefore, the data is effectively being duplicated,
-    but, as DeepLake here is just storing the sequences converted to arrays. We could
-    also have saved the arrays as ``.npy`` files on disk, but we chose DeepLake here
-    for demonstration purposes, as it can be useful e.g. for large datasets where
-    storing a large number of files on disk can be troublesome. When using DeepLake,
-    the expected format is that each sample has an "ID" tensor (unique per sample) and
-    a data tensor, which can be arbitrarily named (see example below in the input
-    configurations for the one-shot and diffusion models).
+    We prepare the data in two different formats: CSV format for the sequence-based transformer
+    models and streaming arrays for the one-shot and diffusion models. For the array-based models,
+    we use :ref:`EIR's streaming functionality <i-scaling-streaming-data>` which allows us to
+    serve array data through a WebSocket server. This approach is particularly useful when dealing
+    with large numbers of array files, as storing hundreds of thousands of individual ``.npy`` files
+    on disk can be problematic on many systems (especially laptops with limited file handles or
+    when using network storage). The streaming approach also provides more flexibility in data
+    loading and can handle real-time data scenarios. For more details on implementing streaming
+    servers, see the :ref:`streaming-data-guide`.
 
 To download the data, `use this link. <https://drive.google.com/file/d/1aIbYbd33yystchj5eZfCQHE3-NhMubu4>`__
 
@@ -137,6 +136,45 @@ Let's look at some example predictions:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Next, let's configure and train a one-shot prediction model for stock prices.
+This model uses :ref:`EIR's streaming functionality <i-scaling-streaming-data>` to receive
+array data through a WebSocket connection.
+
+.. note::
+    If the streaming functionality is seeming like a bit of an overkill for this,
+    you can also parse the CSV files directly and save the data as
+    ``.npy`` files in a folder. Then instead of pointing to the WebSocket server in
+    the configuration, you can point to the folder containing the ``.npy`` files.
+
+Setting Up the Streaming Server
+"""""""""""""""""""""""""""""""
+
+Before training the one-shot prediction model, we need to start a streaming server
+that will provide the array data to EIR. Here's the implementation of our streaming server:
+
+.. literalinclude:: ../../doc_modules/g_time_series/array_streamer.py
+    :language: python
+    :caption: array_streamer.py
+
+Save this code in a file named ``array_streamer.py``. This server reads the stock data
+from the CSV file and streams it as base64-encoded
+arrays through a WebSocket connection. It implements EIR's streaming protocol.
+
+Before starting training, first start the streaming server in a separate terminal:
+
+.. code-block:: console
+
+    python -m array_streamer
+
+The server will start on ``ws://localhost:8000/ws`` by default. You should see output
+indicating that the server is loading the stock data and is ready to accept connections.
+
+.. note::
+    The streaming server must be running before you start the EIR training process.
+    Keep this terminal window open during training, as EIR will continuously request
+    data from the server.
+
+Training the One-shot Prediction Model
+""""""""""""""""""""""""""""""""""""""
 
 Here are the key configuration files:
 
@@ -147,10 +185,6 @@ Here are the key configuration files:
 .. literalinclude:: ../tutorial_files/g_time_series/02_time_series_stocks/input_array_prior.yaml
     :language: yaml
     :caption: input_array_prior.yaml
-
-.. note::
-    Note how we are here using the ``input_inner_key`` argument for the ``input_info``,
-    but this refers to the data name in the DeepLake dataset.
 
 .. literalinclude:: ../tutorial_files/g_time_series/02_time_series_stocks/output_array.yaml
     :language: yaml
@@ -184,6 +218,37 @@ Let's look at some example predictions:
 ^^^^^^^^^^^^^^^^^^
 
 Finally, let's configure and train a diffusion model for stock price prediction.
+Like the one-shot model, this also uses streaming to receive array data.
+
+Setting Up the Streaming Server for Diffusion
+""""""""""""""""""""""""""""""""""""""""""""""
+
+For the diffusion model, we need to start the streaming server with the ``--diffusion`` flag
+to enable diffusion mode. This configures the server to provide both input and target output arrays
+as inputs to the model, which is required for the diffusion training process.
+
+Start the streaming server for diffusion in a separate terminal:
+
+.. code-block:: console
+
+    python -m array_streamer --diffusion
+
+The ``--diffusion`` flag tells the server to include the target output arrays as additional inputs
+alongside the original input arrays. During diffusion training, EIR will apply noise to these
+target arrays internally as part of the diffusion process (it knows how to do this
+because they are linked via the ``input_name`` and ``output_name`` both being
+``"stock_output"`` in the ``input_array_diffusion.yaml``
+and ``output_array_diffusion.yaml`` configuration files).
+
+.. note::
+    If you already have the streaming server running from the one-shot model training,
+    you'll need to stop it first and restart it with the ``--diffusion`` flag.
+
+Training the Diffusion Model
+""""""""""""""""""""""""""""
+
+Training the Diffusion Model
+""""""""""""""""""""""""""""
 
 Here are the key configuration files:
 
@@ -321,13 +386,15 @@ We've covered:
 
 1. Working with stock market data
 2. Configuring and training three different models:
+
    - Transformer-based model
    - One-shot prediction model
    - Diffusion model
-3. Visualizing training progress and model predictions
-4. Serving the trained models as web services
-5. Interacting with the served models using Python
-6. Analyzing and visualizing model predictions, including uncertainty estimates
+3. Using EIR's streaming functionality for efficient array data handling
+4. Visualizing training progress and model predictions
+5. Serving the trained models as web services
+6. Interacting with the served models using Python
+7. Analyzing and visualizing model predictions, including uncertainty estimates
 
 
 If you made it this far, thank you for reading! We hope this tutorial was helpful

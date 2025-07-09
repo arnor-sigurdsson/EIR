@@ -380,6 +380,8 @@ However, when moving to large scale data such as the UK Biobank, the configurati
 on the ancestry toy data in this tutorial will likely not be sufficient. For example,
 the learning rate is likely too high. For this, we specifically designed the
 `EIR-auto-GP`_ project, which focuses on allow you to quickly train deep learning models
-for genomic prediction.
+for genomic prediction. Additionally, you can have a look at the :ref:`genomics-guide`
+for some more information on the parameters that are relevant for genomic data and
+how do adapt the configurations to your own data.
 
 If you made it this far, thank you for reading!

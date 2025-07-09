@@ -12,8 +12,8 @@ eir_tutorials/g_time_series/02_time_series_stocks
 │   ├── output_array.yaml
 │   └── output.yaml
 └── data
-    ├── deeplake_test
-    ├── deeplake_train
+    ├── stock_combined_test.csv
+    ├── stock_combined_train.csv
     ├── stock_input_sequences.csv
     ├── stock_output_sequences.csv
     ├── stock_test_input_sequences.csv

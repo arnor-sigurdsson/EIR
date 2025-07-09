@@ -1,8 +1,7 @@
 input_info:
-  input_source: eir_tutorials/g_time_series/02_time_series_stocks/data/deeplake_train
+  input_source: ws://localhost:8000/ws
   input_name: stock_input
   input_type: array
-  input_inner_key: input_array
 
 input_type_info:
   adaptive_normalization_max_samples: 100000
