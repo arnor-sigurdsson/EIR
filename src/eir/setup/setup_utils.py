@@ -1,7 +1,6 @@
 from collections.abc import Iterable, Sequence
 
 import torch
-from torch_optimizer import _NAME_OPTIM_MAP
 from tqdm import tqdm
 from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
@@ -163,15 +162,6 @@ def get_base_optimizer_names() -> set:
     }
 
     return base_names
-
-
-def get_all_optimizer_names() -> Sequence[str]:
-    external_optimizers = set(_NAME_OPTIM_MAP.keys())
-    base_optimizers = get_base_optimizer_names()
-    all_optimizers = set.union(base_optimizers, external_optimizers)
-    all_optimizers_list = sorted(all_optimizers)
-
-    return all_optimizers_list
 
 
 def get_all_hf_model_names() -> Sequence[str]:

@@ -398,10 +398,6 @@ def hook_default_model_forward(
     return state_updates
 
 
-def get_amp_context_manager(device_type: str) -> autocast:
-    return autocast(device_type=device_type)
-
-
 def hook_default_optimizer_backward(
     experiment: "Experiment", state: dict, *args, **kwargs
 ) -> dict:

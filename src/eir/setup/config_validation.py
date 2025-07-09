@@ -22,6 +22,10 @@ if TYPE_CHECKING:
 
 
 def validate_train_configs(configs: "Configs") -> None:
+    validate_global_input_config_sync(
+        global_config=configs.global_config, input_configs=configs.input_configs
+    )
+
     validate_input_configs(input_configs=configs.input_configs)
     validate_output_configs(output_configs=configs.output_configs)
 
