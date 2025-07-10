@@ -149,21 +149,53 @@ Setting Up the Streaming Server
 """""""""""""""""""""""""""""""
 
 Before training the one-shot prediction model, we need to start a streaming server
-that will provide the array data to EIR. Here's the implementation of our streaming server:
+that will provide the array data to EIR. Following the pattern established in the
+:ref:`streaming implementation guide <streaming-implementation-guide>`, the streaming
+server is implemented as a modular Python package with two main components:
 
-.. literalinclude:: ../../doc_modules/g_time_series/array_streamer.py
+**1. Stock Data Manager (stock_data_manager.py)**
+
+This module contains the ``StockDataManager`` class that handles data loading,
+batch generation, and state management:
+
+.. literalinclude:: ../../doc_modules/g_time_series/stock_data_manager.py
     :language: python
-    :caption: array_streamer.py
+    :caption: stock_data_manager.py
 
-Save this code in a file named ``array_streamer.py``. This server reads the stock data
-from the CSV file and streams it as base64-encoded
-arrays through a WebSocket connection. It implements EIR's streaming protocol.
+**2. Stock Streamer (stock_streamer.py)**
 
-Before starting training, first start the streaming server in a separate terminal:
+This module contains the complete WebSocket server implementation, including the
+FastAPI application, WebSocket endpoint handling, and command-line interface:
+
+.. literalinclude:: ../../doc_modules/g_time_series/stock_streamer.py
+    :language: python
+    :caption: stock_streamer.py
+
+
+.. note::
+    This streaming server is designed as a **template** for implementing your own
+    EIR-compatible streaming servers. The code includes ``DATASET-SPECIFIC``
+    comments to help you understand which parts need customization
+    for your own datasets versus which parts implement the standard EIR protocol.
+
+**3. Package Initialization (__init__.py)**
+
+This file makes the streaming server a proper Python package (it can be empty):
+
+.. literalinclude:: ../../doc_modules/g_time_series/__init__.py
+    :language: python
+    :caption: __init__.py
+
+The streaming server reads stock data from the CSV file and streams it as base64-encoded
+arrays through a WebSocket connection, implementing EIR's streaming protocol.
+
+Before starting training, first start the streaming server in a separate terminal.
+Create a directory called ``streaming_server`` and save the three files above in it,
+then run:
 
 .. code-block:: console
 
-    python -m array_streamer
+    python -m streaming_server.stock_streamer
 
 The server will start on ``ws://localhost:8000/ws`` by default. You should see output
 indicating that the server is loading the stock data and is ready to accept connections.
@@ -231,7 +263,7 @@ Start the streaming server for diffusion in a separate terminal:
 
 .. code-block:: console
 
-    python -m array_streamer --diffusion
+    python -m streaming_server.stock_streamer --diffusion
 
 The ``--diffusion`` flag tells the server to include the target output arrays as additional inputs
 alongside the original input arrays. During diffusion training, EIR will apply noise to these
@@ -243,9 +275,6 @@ and ``output_array_diffusion.yaml`` configuration files).
 .. note::
     If you already have the streaming server running from the one-shot model training,
     you'll need to stop it first and restart it with the ``--diffusion`` flag.
-
-Training the Diffusion Model
-""""""""""""""""""""""""""""
 
 Training the Diffusion Model
 """"""""""""""""""""""""""""

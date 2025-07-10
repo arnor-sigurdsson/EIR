@@ -33,7 +33,7 @@ TUTORIAL_NAME = TN = "02_time_series_stocks"
 
 
 def run_with_streaming_server(command: list[str], is_diffusion: bool) -> Path:
-    server_path = f"docs.doc_modules.{CR}.array_streamer"
+    server_path = f"docs.doc_modules.{CR}.stock_streamer"
 
     globals_file = next(i for i in command if "globals" in i)
     globals_dict = load_yaml_config(config_path=globals_file)
