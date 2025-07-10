@@ -1,5 +1,7 @@
 import base64
 import json
+import subprocess
+import time
 from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
@@ -21,13 +23,43 @@ from docs.doc_modules.serving_experiments import (
     build_request_example_module_from_function,
 )
 from docs.doc_modules.utils import add_model_path_to_command
-from eir.data_load.data_source_modules.deeplake_ops import (
-    is_deeplake_dataset,
-    load_deeplake_dataset,
-)
+from eir.setup.config_setup_modules.config_setup_utils import load_yaml_config
+from eir.utils.logging import get_logger
+
+logger = get_logger(name=__name__)
 
 CONTENT_ROOT = CR = get_content_root()
 TUTORIAL_NAME = TN = "02_time_series_stocks"
+
+
+def run_with_streaming_server(command: list[str], is_diffusion: bool) -> Path:
+    server_path = f"docs.doc_modules.{CR}.stock_streamer"
+
+    globals_file = next(i for i in command if "globals" in i)
+    globals_dict = load_yaml_config(config_path=globals_file)
+    run_folder = Path(globals_dict["basic_experiment"]["output_folder"])
+
+    if run_folder.exists():
+        return run_folder
+
+    server_command = ["python", "-m", server_path]
+    if is_diffusion:
+        server_command.append("--diffusion")
+    server_process = subprocess.Popen(
+        server_command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    logger.info("Streaming server process starting...")
+
+    try:
+        time.sleep(10)
+        subprocess.run(args=command, check=True)
+    finally:
+        server_process.terminate()
+        server_process.wait(timeout=5)
+
+    return run_folder
 
 
 def get_time_series_stocks_01_transformer(
@@ -162,6 +194,7 @@ def get_time_series_stocks_02_one_shot(
         command=command,
         files_to_copy_mapping=mapping,
         post_run_functions=(plot_generated_time_series,),
+        run_command_wrapper=partial(run_with_streaming_server, is_diffusion=False),
     )
 
     return ade
@@ -222,6 +255,7 @@ def get_time_series_stocks_03_diffusion(
         command=command,
         files_to_copy_mapping=mapping,
         post_run_functions=(plot_generated_time_series,),
+        run_command_wrapper=partial(run_with_streaming_server, is_diffusion=True),
     )
 
     return ade
@@ -347,7 +381,9 @@ def get_time_series_stocks_serve_experiment_one_shot() -> AutoDocServingInfo:
 
     server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
-    test_input_deeplake = f"eir_tutorials/{CR}/02_time_series_stocks/data/deeplake_test"
+    test_input_csv = (
+        f"eir_tutorials/{CR}/02_time_series_stocks/data/stock_combined_test.csv"
+    )
     test_output_csv = (
         f"eir_tutorials/{CR}/02_time_series_stocks/data/stock_test_output_sequences.csv"
     )
@@ -355,8 +391,8 @@ def get_time_series_stocks_serve_experiment_one_shot() -> AutoDocServingInfo:
     repeat = 5
     num_sequences = 10
 
-    ids, example_requests = generate_example_requests_arrays(
-        input_dataset=Path(test_input_deeplake),
+    ids, example_requests = generate_example_requests_arrays_from_csv(
+        input_csv=Path(test_input_csv),
         num_sequences=num_sequences,
         repeat=repeat,
     )
@@ -400,7 +436,9 @@ def get_time_series_stocks_serve_experiment_diffusion() -> AutoDocServingInfo:
 
     server_command = ["eirserve", "--model-path", "FILL_MODEL"]
 
-    test_input_deeplake = f"eir_tutorials/{CR}/02_time_series_stocks/data/deeplake_test"
+    test_input_csv = (
+        f"eir_tutorials/{CR}/02_time_series_stocks/data/stock_combined_test.csv"
+    )
     test_output_csv = (
         f"eir_tutorials/{CR}/02_time_series_stocks/data/stock_test_output_sequences.csv"
     )
@@ -408,8 +446,8 @@ def get_time_series_stocks_serve_experiment_diffusion() -> AutoDocServingInfo:
     repeat = 5
     num_sequences = 10
 
-    ids, example_requests = generate_example_requests_arrays(
-        input_dataset=Path(test_input_deeplake),
+    ids, example_requests = generate_example_requests_arrays_from_csv(
+        input_csv=Path(test_input_csv),
         num_sequences=num_sequences,
         repeat=repeat,
     )
@@ -584,17 +622,14 @@ def generate_example_requests(
     return ids, [example_requests]
 
 
-def generate_example_requests_arrays(
-    input_dataset: Path,
+def generate_example_requests_arrays_from_csv(
+    input_csv: Path,
     num_sequences: int = 10,
     repeat: int = 5,
 ) -> tuple[list[str], list[list[dict[str, str]]]]:
-    assert is_deeplake_dataset(data_source=str(input_dataset))
+    df = pd.read_csv(input_csv, index_col="ID")
 
-    deeplake_ds = load_deeplake_dataset(data_source=str(input_dataset))
-
-    n_samples = len(deeplake_ds)
-    random_rows = np.random.choice(n_samples, size=num_sequences, replace=False)
+    random_rows = df.sample(n=num_sequences)
 
     example_requests = []
     ids = []
@@ -602,12 +637,12 @@ def generate_example_requests_arrays(
     output_array_placeholder = np.zeros((64,), dtype=np.float32)
     cur_placeholder_base64 = encode_array_to_base64(array_np=output_array_placeholder)
 
-    for idx in random_rows:
-        sample = deeplake_ds[int(idx)]
-
-        cur_id = sample["ID"]
-        cur_arr = sample["input_array"].astype(np.float32)
-        cur_arr_base64 = encode_array_to_base64(array_np=cur_arr)
+    for _, row in random_rows.iterrows():
+        cur_id = row.name
+        input_array = np.array(
+            [int(x) for x in row["InputSequence"].split(" ")], dtype=np.float32
+        )
+        cur_arr_base64 = encode_array_to_base64(array_np=input_array)
 
         for _cur_repeat in range(repeat):
             example_requests.append(

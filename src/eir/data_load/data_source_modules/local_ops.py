@@ -24,7 +24,8 @@ def get_file_sample_id_iterator_basic(
     ids_to_keep: None | set[str],
 ) -> Generator[tuple[str, Path]]:
     base_file_iterator = get_file_path_iterator(
-        data_source=Path(data_source), validate=False
+        data_source=Path(data_source),
+        validate=False,
     )
 
     for file in base_file_iterator:

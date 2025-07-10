@@ -1,3 +1,5 @@
+.. _genomics-guide:
+
 Genomics Guide
 ==============
 

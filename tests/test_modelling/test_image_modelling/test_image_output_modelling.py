@@ -34,7 +34,7 @@ def _get_output_image_data_parameters() -> Sequence[dict]:
     parameters = []
 
     cur_base = deepcopy(base)
-    for source in ["local", "deeplake"]:
+    for source in ["local"]:
         cur_base["source"] = source
         parameters.append(cur_base)
 
@@ -294,9 +294,6 @@ def _image_output_test_check_wrapper(
             assert mse < mse_threshold
 
             did_check = True
-
-            # due to deeplake arrays not storing 0s but as very small numbers
-            matching_input_array[matching_input_array < 1e-8] = 0.0
 
             # Skip if all 0s or diffusion
             if matching_input_array.sum() == 0 or is_diffusion:

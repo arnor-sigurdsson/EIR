@@ -1,8 +1,7 @@
 output_info:
-  output_source: eir_tutorials/g_time_series/02_time_series_stocks/data/deeplake_train
+  output_source: ws://localhost:8000/ws
   output_name: stock_output
   output_type: array
-  output_inner_key: output_array
 
 output_type_info:
   normalization: channel

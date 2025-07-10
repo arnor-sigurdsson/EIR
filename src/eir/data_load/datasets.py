@@ -33,7 +33,6 @@ from eir.data_load.data_preparation_modules.output_preparation_wrappers import (
 from eir.data_load.data_preparation_modules.prepare_tabular import (
     add_tabular_data_to_df,
 )
-from eir.data_load.data_source_modules import deeplake_ops
 from eir.data_load.data_source_modules.local_ops import (
     add_sequence_data_from_csv_to_df,
     get_file_sample_id_iterator_basic,
@@ -348,7 +347,6 @@ def add_data_to_df(
     for input_name, input_object in inputs.items():
         input_info = input_object.input_config.input_info
         input_source = input_info.input_source
-        input_inner_key = input_info.input_inner_key
 
         match input_object:
             case ComputedTabularInputInfo() | ComputedPredictTabularInputInfo():
@@ -378,7 +376,6 @@ def add_data_to_df(
                     input_df=input_df,
                     ids_to_keep=ids_to_keep,
                     data_loading_hook=data_loading_hooks[input_name],
-                    deeplake_input_inner_key=input_inner_key,
                 )
 
     return input_df
@@ -577,18 +574,7 @@ def _add_data_to_df_wrapper(
     input_df: pl.DataFrame,
     ids_to_keep: None | set[str],
     data_loading_hook: InputHookOutput,
-    deeplake_input_inner_key: str | None = None,
 ) -> pl.DataFrame:
-    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
-        assert deeplake_input_inner_key is not None
-        return deeplake_ops.add_deeplake_data_to_df(
-            input_source=input_source,
-            input_name=input_name,
-            input_df=input_df,
-            ids_to_keep=ids_to_keep,
-            deeplake_input_inner_key=deeplake_input_inner_key,
-            data_loading_hook=data_loading_hook,
-        )
     return _add_file_data_to_df(
         input_source=input_source,
         input_df=input_df,

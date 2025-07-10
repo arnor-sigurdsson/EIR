@@ -176,10 +176,6 @@ def save_batch(output_dir: Path, batch_data: np.ndarray, batch_num: int) -> None
     np.save(str(batch_file), batch_data)
 
 
-def get_batch_files(batch_dir: Path) -> list[Path]:
-    return sorted(batch_dir.glob("batch_*.npy"))
-
-
 def load_samples_for_viz(
     batch_dir: Path,
     max_samples: int | None = None,

@@ -3,6 +3,7 @@ basic_experiment:
   memory_dataset: false
   n_epochs: 20
   output_folder: eir_tutorials/tutorial_runs/g_time_series/02_time_series_stocks_one_shot
+  valid_size: 2000
 evaluation_checkpoint:
   checkpoint_interval: 500
   n_saved_models: 1
@@ -11,4 +12,6 @@ optimization:
   lr: 0.0005
   optimizer: adabelief
 visualization_logging:
-  plot_skip_steps: 500
+  plot_skip_steps: 2000
+data_preparation:
+  streaming_setup_samples: 20000

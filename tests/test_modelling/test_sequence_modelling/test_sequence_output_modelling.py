@@ -38,12 +38,6 @@ seed_everything(seed=0)
             "split_to_test": True,
             "source": "local",
         },
-        {
-            "task_type": "multi",
-            "modalities": ("sequence",),
-            "split_to_test": True,
-            "source": "deeplake",
-        },
     ],
     indirect=True,
 )

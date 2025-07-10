@@ -144,7 +144,6 @@ def _build_sequence_input_config_from_output(
         input_source=output_info.output_source,
         input_type=output_info.output_type,
         input_name=output_info.output_name,
-        input_inner_key=output_info.output_inner_key,
     )
 
     input_type_info = _build_matched_input_type_info(

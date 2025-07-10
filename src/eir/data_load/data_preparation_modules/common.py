@@ -1,31 +1,7 @@
-import warnings
 from typing import Literal
 
-import numpy as np
 import torch
 from torch.nn.functional import pad
-
-from eir.data_load.data_source_modules import deeplake_ops
-
-
-def _load_deeplake_sample(
-    data_pointer: int,
-    input_source: str,
-    inner_key: str,
-) -> np.ndarray | str:
-    """
-    Deeplake warns about indexing directly into a DS, vs. random access. For now, we'll
-    use this random access pattern here as we have to be able to connect to other
-    data sources (which might be outside deeplake).
-    """
-    assert inner_key is not None
-    deeplake_ds = deeplake_ops.load_deeplake_dataset(data_source=input_source)
-    deeplake_ds_index = data_pointer
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        sample_data = deeplake_ds[deeplake_ds_index][inner_key]
-
-    return sample_data  # type: ignore
 
 
 def process_tensor_to_length(

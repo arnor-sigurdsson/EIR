@@ -15,7 +15,6 @@ from eir.predict_modules.predict_attributions import compute_predict_attribution
 from eir.setup import config
 from eir.setup.input_setup_modules.common import DataDimensions
 from eir.target_setup.target_label_setup import get_tabular_target_file_infos
-from tests.conftest import get_system_info
 from tests.setup_tests.fixtures_create_experiment import ModelTestConfig
 from tests.test_predict_modules.test_predict_config import (
     setup_test_namespace_for_matched_config_test,
@@ -132,11 +131,6 @@ def grab_best_model_path(saved_models_folder: Path):
 
 
 def _get_predict_test_data_parametrization() -> list[dict[str, Any]]:
-    """
-    We skip the deeplake tests in the GHA Linux host, as for some reason it raises
-    a SIGKILL (-9).
-    """
-
     params = [
         {
             "task_type": "multi",
@@ -152,29 +146,6 @@ def _get_predict_test_data_parametrization() -> list[dict[str, Any]]:
             "extras": {"array_dims": 1},
         }
     ]
-
-    in_gha, platform = get_system_info()
-
-    if in_gha and platform == "Linux":
-        return params
-
-    deeplake_params = [
-        {
-            "task_type": "multi",
-            "split_to_test": True,
-            "modalities": (
-                "omics",
-                "sequence",
-                "image",
-                "array",
-            ),
-            "manual_test_data_creator": lambda: "test_predict",
-            "source": "deeplake",
-            "extras": {"array_dims": 1},
-        }
-    ]
-
-    params += deeplake_params
 
     return params
 

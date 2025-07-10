@@ -41,7 +41,6 @@ def set_up_array_output(
     if data_dimensions is None:
         data_dimensions = get_data_dimension_from_data_source(
             data_source=Path(output_config.output_info.output_source),
-            deeplake_inner_key=output_config.output_info.output_inner_key,
         )
 
     output_type_info = output_config.output_type_info
@@ -50,7 +49,6 @@ def set_up_array_output(
     if normalization_stats is None and output_type_info.normalization is not None:
         normalization_stats = get_array_normalization_values(
             source=output_config.output_info.output_source,
-            inner_key=output_config.output_info.output_inner_key,
             normalization=output_type_info.normalization,
             data_dimensions=data_dimensions,
             max_samples=output_type_info.adaptive_normalization_max_samples,
@@ -59,7 +57,6 @@ def set_up_array_output(
     if dtype is None:
         dtype = get_dtype_from_data_source(
             data_source=Path(output_config.output_info.output_source),
-            deeplake_inner_key=output_config.output_info.output_inner_key,
         )
 
     if diffusion_config is None and output_type_info.loss == "diffusion":

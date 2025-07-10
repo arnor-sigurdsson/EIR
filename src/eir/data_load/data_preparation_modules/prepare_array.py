@@ -3,27 +3,14 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from eir.data_load.data_preparation_modules.common import _load_deeplake_sample
-from eir.data_load.data_source_modules import deeplake_ops
 from eir.setup.input_setup_modules.setup_array import ArrayNormalizationStats
 
 
 def array_load_wrapper(
     data_pointer: Path | int,
-    input_source: str,
-    deeplake_inner_key: str | None = None,
 ) -> np.ndarray:
-    if deeplake_ops.is_deeplake_dataset(data_source=input_source):
-        assert deeplake_inner_key is not None
-        assert isinstance(data_pointer, int)
-        array_data = _load_deeplake_sample(
-            data_pointer=data_pointer,
-            input_source=input_source,
-            inner_key=deeplake_inner_key,
-        )
-    else:
-        assert isinstance(data_pointer, str | Path), data_pointer
-        array_data = np.load(str(data_pointer))
+    assert isinstance(data_pointer, str | Path), data_pointer
+    array_data = np.load(str(data_pointer))
 
     assert isinstance(array_data, np.ndarray)
     return array_data

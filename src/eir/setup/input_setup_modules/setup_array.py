@@ -5,11 +5,6 @@ from typing import Literal, Optional
 import numpy as np
 import torch
 
-from eir.data_load.data_source_modules.deeplake_ops import (
-    get_deeplake_input_source_iterable,
-    is_deeplake_dataset,
-    load_deeplake_dataset,
-)
 from eir.setup import schemas
 from eir.setup.input_setup_modules.common import (
     DataDimensions,
@@ -46,7 +41,6 @@ def set_up_array_input_object(
     if data_dimensions is None:
         data_dimensions = get_data_dimension_from_data_source(
             data_source=Path(input_config.input_info.input_source),
-            deeplake_inner_key=input_config.input_info.input_inner_key,
         )
 
     input_type_info = input_config.input_type_info
@@ -55,7 +49,6 @@ def set_up_array_input_object(
     if normalization_stats is None and input_type_info.normalization is not None:
         normalization_stats = get_array_normalization_values(
             source=input_config.input_info.input_source,
-            inner_key=input_config.input_info.input_inner_key,
             normalization=input_type_info.normalization,
             data_dimensions=data_dimensions,
             max_samples=input_type_info.adaptive_normalization_max_samples,
@@ -64,7 +57,6 @@ def set_up_array_input_object(
     if dtype is None:
         dtype = get_dtype_from_data_source(
             data_source=Path(input_config.input_info.input_source),
-            deeplake_inner_key=input_config.input_info.input_inner_key,
         )
 
     array_input_info = ComputedArrayInputInfo(
@@ -87,26 +79,15 @@ class ArrayNormalizationStats:
 
 def get_array_normalization_values(
     source: str,
-    inner_key: str | None,
     normalization: Literal["element", "channel"] | None,
     data_dimensions: DataDimensions,
     max_samples: int | None,
 ) -> ArrayNormalizationStats:
     input_source = source
-    deeplake_inner_key = inner_key
 
-    if is_deeplake_dataset(data_source=input_source):
-        deeplake_ds = load_deeplake_dataset(data_source=input_source)
-        assert deeplake_inner_key is not None
-        ds_iter = get_deeplake_input_source_iterable(
-            deeplake_dataset=deeplake_ds,
-            inner_key=deeplake_inner_key,
-        )
-        tensor_iterator = (torch.from_numpy(i).float() for i in ds_iter)
-    else:
-        file_iterator = Path(input_source).rglob("*")
-        np_iterator = (np.load(str(i)) for i in file_iterator)
-        tensor_iterator = (torch.from_numpy(i).float() for i in np_iterator)
+    file_iterator = Path(input_source).rglob("*")
+    np_iterator = (np.load(str(i)) for i in file_iterator)
+    tensor_iterator = (torch.from_numpy(i).float() for i in np_iterator)
 
     tensor_iterator = (i.reshape(data_dimensions.full_shape()) for i in tensor_iterator)
 

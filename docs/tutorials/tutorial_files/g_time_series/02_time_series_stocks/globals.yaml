@@ -3,6 +3,7 @@ basic_experiment:
   memory_dataset: true
   n_epochs: 20
   output_folder: eir_tutorials/tutorial_runs/g_time_series/02_time_series_stocks_transformer
+  valid_size: 2000
 evaluation_checkpoint:
   checkpoint_interval: 500
   n_saved_models: 1

@@ -229,8 +229,6 @@ def _array_output_test_check_wrapper(
 
                 if not (matching_input_array.sum() == 0 or is_diffusion):
                     matching_input_array = matching_input_array.copy()
-                    # due to deeplake arrays not storing 0s but as very small numbers
-                    matching_input_array[matching_input_array < 1e-8] = 0.0
 
                     cosine_similarity = 1 - cosine(
                         u=matching_input_array.ravel().astype(np.float32),

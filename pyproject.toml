@@ -29,7 +29,6 @@ dependencies = [
     "ipython>=8.29.0",
     "timm>=1.0.7",
     "captum>=0.7.0",
-    "aioboto3>=13.1.0",
     "termcolor>=2.4.0",
     "tokenizers>=0.21.0",
     "pyarrow>=18.0.0",
@@ -48,7 +47,6 @@ dependencies = [
     "lightning>=2.5.0.post0",
     "polars>=1.27.0",
     "diffusers>=0.33.1",
-    "deeplake==4.2.6",
     "torch==2.7.1",
 ]
 
@@ -128,7 +126,6 @@ combine-as-imports = true
 "train.py" = ["E402"]
 "target_setup_utils.py" = ["N803"]
 "interpretation.py" = ["E402"]
-"deeplake_ops.py" = ["E402"]
 "label_setup.py" = ["E402"]
 "tests/*" = ["S101"]
 "setup_targets_test_data.py" = ["SIM115"]
