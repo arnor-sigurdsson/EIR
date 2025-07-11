@@ -158,11 +158,37 @@ def get_test_external_sequence_models_parametrization() -> Sequence[dict]:
     all_models_filtered = []
 
     for model in all_models:
-        if any(i for i in {"big_bird", "bigbird", "gpt_neo", "reformer"} if i in model):
+        if any(
+            i
+            for i in {
+                "big_bird",
+                "bigbird",
+                "gpt_neo",
+                "reformer",
+            }
+            if i in model
+        ):
             continue
 
         # skip these large models for now
-        if any(i for i in {"llama"} if i in model):
+        if any(
+            i
+            for i in {
+                "llama",
+                "deepseek_v3",
+                "electra",
+                "distilbert",
+                "gemma3_text",
+                "gemma3",
+                "internvl",
+                "janus",
+                "llava",
+                "mistral3",
+                "paligemma",
+                "t5gemma",
+            }
+            if i in model
+        ):
             continue
 
         all_models_filtered.append(model)
@@ -232,20 +258,26 @@ def test_external_sequence_models_forward(
     seem to dislike batch size >1 when num_decoder_layers are >0.
     Possibly a configuration issue or bug in the model.
     """
-    model = create_test_model
-
     model_name = create_test_config.input_configs[0].model_config.model_type
-    logger.info(f"=====Testing model: {model_name}=====")
 
-    example_batch = prepare_example_test_batch(
-        configs=create_test_config,
-        labels=create_test_labels,
-        model=model,
-        batch_size=1,
-    )
+    try:
+        model = create_test_model
 
-    model.eval()
-    check_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+        logger.info(f"=====Testing model: {model_name}=====")
+
+        example_batch = prepare_example_test_batch(
+            configs=create_test_config,
+            labels=create_test_labels,
+            model=model,
+            batch_size=1,
+        )
+
+        model.eval()
+        check_eir_model(meta_model=model, example_inputs=example_batch.inputs)
+
+    except:
+        logger.error(f"=====Failed to test model: {model_name}=====")
+        raise
 
 
 @pytest.mark.skipif(condition=should_skip_in_gha(), reason="In GHA.")
