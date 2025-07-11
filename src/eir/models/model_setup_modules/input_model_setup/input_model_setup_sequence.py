@@ -213,9 +213,14 @@ def _get_pretrained_hf_sequence_feature_extractor_objects(
         feature_extractor=feature_extractor,
         pool=pool,
     )
+    embeddings = pretrained_model_embeddings
+    if embeddings is not None:
+        assert isinstance(embeddings, nn.Embedding), (
+            "Expected embeddings to be an Embedding instance."
+        )
     objects_for_wrapper = SequenceModelObjectsForWrapperModel(
         feature_extractor=pretrained_model,
-        embeddings=pretrained_model_embeddings,
+        embeddings=embeddings,
         embedding_dim=pretrained_embedding_dim,
         external=True,
         known_out_num_features=known_out_features.num_features,

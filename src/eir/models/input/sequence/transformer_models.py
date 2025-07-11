@@ -294,6 +294,9 @@ def _get_feature_extractor_forward(
     pool: Literal["avg"] | Literal["max"] | None = None,
 ) -> SimpleFeatureExtractorForwardProtocol | HFFeatureExtractorForwardProtocol:
     if is_hf_model:
+        assert isinstance(feature_extractor, PreTrainedModel), (
+            "Expected feature_extractor to be a PreTrainedModel instance."
+        )
         return get_hf_transformer_forward(
             feature_extractor_=feature_extractor,
             input_length=input_length,

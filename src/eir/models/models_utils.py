@@ -240,6 +240,9 @@ def get_output_dimensions_for_input(
         test_input = torch.randn(*input_shape)
 
         if hf_model:
+            assert isinstance(module_copy, PreTrainedModel), (
+                "Expected module_copy to be a PreTrainedModel instance."
+            )
             hf_forward = get_hf_transformer_forward(
                 feature_extractor_=module_copy,
                 input_length=input_shape[1],
