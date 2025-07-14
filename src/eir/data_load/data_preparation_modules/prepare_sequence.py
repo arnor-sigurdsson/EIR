@@ -68,7 +68,8 @@ def prepare_sequence_data(
 
     padding_token = getattr(sio.tokenizer, "pad_token", "<pad>")
     padding_token_parsed = parse_padding_token_encode_func_input(
-        split_on=input_type_info.split_on, padding_token=padding_token
+        split_on=input_type_info.split_on,
+        padding_token=padding_token,
     )
     padding_value = sio.encode_func(padding_token_parsed)[0]
     cur_tokens_padded = process_tensor_to_length(
@@ -83,7 +84,7 @@ def prepare_sequence_data(
 
 def parse_padding_token_encode_func_input(
     split_on: str | None, padding_token: str
-) -> Sequence[str] | str:
+) -> list[str] | str:
     parsed_token: Sequence[str] | str
 
     parsed_token = padding_token if split_on is None else [padding_token]

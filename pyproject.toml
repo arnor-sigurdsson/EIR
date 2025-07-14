@@ -25,7 +25,6 @@ dependencies = [
     "adabelief-pytorch>=0.2.0",
     "aislib>=0.3.0",
     "colorama>=0.4.4",
-    "transformers==4.50.3",
     "ipython>=8.29.0",
     "timm>=1.0.7",
     "captum>=0.7.0",
@@ -48,6 +47,7 @@ dependencies = [
     "polars>=1.27.0",
     "diffusers>=0.33.1",
     "torch==2.7.1",
+    "transformers>=4.53.2",
 ]
 
 [project.scripts]
