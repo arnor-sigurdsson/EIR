@@ -4,12 +4,6 @@ from typing import Dict, Generator, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
-from PIL import Image
-from timm.models._registry import _model_pretrained_cfgs
-from torchvision import transforms
-from torchvision.transforms import Compose
-from torchvision.transforms.functional import to_tensor
-
 from eir.data_load.data_source_modules.deeplake_ops import (
     get_deeplake_input_source_iterable,
     is_deeplake_dataset,
@@ -17,10 +11,16 @@ from eir.data_load.data_source_modules.deeplake_ops import (
 )
 from eir.models.input.image.image_models import ImageModelConfig
 from eir.models.output.array.array_output_modules import ArrayOutputModuleConfig
-from eir.setup import schemas
 from eir.setup.input_setup_modules.common import DataDimensions
 from eir.setup.setup_utils import ChannelBasedRunningStatistics, collect_stats
 from eir.utils.logging import get_logger
+from PIL import Image
+from timm.models._registry import _model_pretrained_cfgs
+from torchvision import transforms
+from torchvision.transforms import Compose
+from torchvision.transforms.functional import to_tensor
+
+from eir.setup import schemas
 
 logger = get_logger(name=__name__)
 
@@ -188,13 +188,13 @@ def infer_num_image_channels(
     else:
         test_file = next(Path(data_source).iterdir())
         test_image = default_image_loader(path=str(test_file))
-        test_image_array = np.array(test_image)
+        test_image_array = np.array(test_image)  # type: ignore
         data_pointer = test_file.name
 
-    if test_image_array.ndim == 2:
+    if test_image_array.ndim == 2:  # type: ignore
         num_channels = 1
     else:
-        num_channels = test_image_array.shape[-1]
+        num_channels = test_image_array.shape[-1]  # type: ignore
 
     logger.info(
         "Inferring number of channels from source %s (using %s) as: %d",
@@ -297,9 +297,13 @@ def get_image_normalization_values(
                 numpy_iter = (i for i in image_iter)
 
                 if image_mode:
-                    image_iter = (Image.fromarray(i) for i in numpy_iter)
-                    image_iter = (i.convert(image_mode) for i in image_iter)
-                    numpy_iter = (np.array(i) for i in image_iter)
+                    image_iter = (
+                        Image.fromarray(i) for i in numpy_iter
+                    )  # type: ignore
+                    image_iter = (
+                        i.convert(image_mode) for i in image_iter
+                    )  # type: ignore
+                    numpy_iter = (np.array(i) for i in image_iter)  # type: ignore
 
                 tensor_iterator = (to_tensor(i).float() for i in numpy_iter)
 

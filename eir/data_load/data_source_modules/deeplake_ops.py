@@ -55,7 +55,7 @@ def get_deeplake_input_source_iterable(
 
         value = row[inner_key]
 
-        yield value
+        yield value  # type: ignore
 
 
 def add_deeplake_data_to_df(
@@ -150,7 +150,7 @@ def is_deeplake_sample_missing(
     columns: set[str],
 ) -> bool:
     if existence_col in columns:
-        is_missing = not row[existence_col].item()
+        is_missing = not row[existence_col].item()  # type: ignore
         return is_missing
 
     return False

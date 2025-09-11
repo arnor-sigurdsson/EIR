@@ -20,10 +20,6 @@ import numpy as np
 import polars as pl
 
 pl.enable_string_cache()
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
-from tqdm import tqdm
-
 from eir.data_load.data_source_modules.deeplake_ops import (
     is_deeplake_dataset,
     is_deeplake_sample_missing,
@@ -33,6 +29,9 @@ from eir.setup.schemas import InputConfig
 from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.train_utils.utils import get_seed
 from eir.utils.logging import get_logger
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
+from tqdm import tqdm
 
 logger = get_logger(name=__name__, tqdm_compatible=True)
 
@@ -483,7 +482,7 @@ def build_deeplake_available_id_iterator(
 
         id_ = row["ID"]
 
-        yield id_
+        yield id_  # type: ignore
 
 
 @lru_cache()

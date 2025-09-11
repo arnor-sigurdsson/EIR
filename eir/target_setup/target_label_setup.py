@@ -17,9 +17,6 @@ from typing import (
 
 import numpy as np
 import polars as pl
-from sklearn.preprocessing import KBinsDiscretizer
-from tqdm import tqdm
-
 from eir.data_load.data_source_modules.deeplake_ops import (
     is_deeplake_dataset,
     is_deeplake_sample_missing,
@@ -35,11 +32,14 @@ from eir.data_load.label_setup import (
     set_up_train_and_valid_tabular_data,
 )
 from eir.experiment_io.label_transformer_io import save_transformer_set
-from eir.setup import schemas
 from eir.setup.schema_modules.output_schemas_survival import SurvivalOutputTypeConfig
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.target_setup.target_setup_utils import IdentityTransformer
 from eir.utils.logging import get_logger
+from sklearn.preprocessing import KBinsDiscretizer
+from tqdm import tqdm
+
+from eir.setup import schemas
 
 if TYPE_CHECKING:
     from eir.train import Hooks
@@ -741,7 +741,7 @@ def build_deeplake_available_pointer_iterator(
 
         id_ = row["ID"]
 
-        yield id_, int(int_pointer)
+        yield id_, int(int_pointer)  # type: ignore
 
 
 def gather_all_ids_from_output_configs(

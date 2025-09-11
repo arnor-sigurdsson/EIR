@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import numpy as np
-
 from eir.data_load.data_source_modules.deeplake_ops import (
     get_deeplake_input_source_iterable,
     is_deeplake_dataset,
@@ -42,7 +41,7 @@ def get_data_dimension_from_data_source(
         deeplake_iter = get_deeplake_input_source_iterable(
             deeplake_dataset=deeplake_ds, inner_key=deeplake_inner_key
         )
-        shape = next(deeplake_iter).shape
+        shape = next(deeplake_iter).shape  # type: ignore
     else:
         iterator = get_file_path_iterator(data_source=data_source)
         path = next(iterator)
