@@ -1162,30 +1162,36 @@ files = [
 
 [[package]]
 name = "deeplake"
-version = "4.1.16"
+version = "4.2.6"
 description = "Data Lake for Multi-Modal AI Search"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "deeplake-4.1.16-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:67826f59d09f25758aa46617c3c995a36ab618d8c2e3c1786502fe0f07912d27"},
-    {file = "deeplake-4.1.16-cp310-cp310-manylinux2014_aarch64.whl", hash = "sha256:f818f2a2ccaae094adfbf693bf63baff651b873740dd33ad17e4b9d4945f9080"},
-    {file = "deeplake-4.1.16-cp310-cp310-manylinux2014_x86_64.whl", hash = "sha256:cd40e0a5bfc07a42b9bc169b8d3e806f6dc21f39811575e5bcdd544fbecf3670"},
-    {file = "deeplake-4.1.16-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:17e682925aa2cb232f5f036bee7041294c5ce5ee4cf3aac2a2f2af92442d084b"},
-    {file = "deeplake-4.1.16-cp311-cp311-manylinux2014_aarch64.whl", hash = "sha256:722c2946a1b53dfbd89a7aec1ed34a1eac3012a271a80ba7d5a8ea61d5d64377"},
-    {file = "deeplake-4.1.16-cp311-cp311-manylinux2014_x86_64.whl", hash = "sha256:3a7c6e8f23ffba33978b776ff582f23887fc6c82ace537ef7c0a77df826c0642"},
-    {file = "deeplake-4.1.16-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:ad547be641364b544b48f66a3683fbe2e29861eaeed7282a5c41d253a97504a6"},
-    {file = "deeplake-4.1.16-cp312-cp312-manylinux2014_aarch64.whl", hash = "sha256:f202f427770af28741df79db7f2e05048748f8357f119ac9d73586bae4f413c2"},
-    {file = "deeplake-4.1.16-cp312-cp312-manylinux2014_x86_64.whl", hash = "sha256:ba58f086c90b522ef2529fc0a9738b3896a6bb70e9b869f92fc613c094a7a7b7"},
-    {file = "deeplake-4.1.16-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:e055a493f67c9e71f9ddf370d26eb2fbd0a1d0a87753a2366429126a8d23dae5"},
-    {file = "deeplake-4.1.16-cp313-cp313-manylinux2014_aarch64.whl", hash = "sha256:a43fb1f12254dcc9a652e9acfc6aee93e491f5047acdcd49ac5ee5208e4283f3"},
-    {file = "deeplake-4.1.16-cp313-cp313-manylinux2014_x86_64.whl", hash = "sha256:40819f41bb1162437404f8fddde906beaadc9a64039b81d5858a9e4ca7181f18"},
-    {file = "deeplake-4.1.16-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:c04e39e8bbb6878381d31c6bff81fcdab16427c3b8dda155d4f009c0ff5dabd1"},
-    {file = "deeplake-4.1.16-cp38-cp38-manylinux2014_aarch64.whl", hash = "sha256:ca2bd00277f6796508828bf326b45c1cf058f5f3ef43c1da783a654cb2e143a2"},
-    {file = "deeplake-4.1.16-cp38-cp38-manylinux2014_x86_64.whl", hash = "sha256:ffc28bd7ebd2bd693ba00a96530e1927508eb632cba38c22684787210b880a85"},
-    {file = "deeplake-4.1.16-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:6cee1c33b0c57887f995dede1db641f043da3949314c31e7de0893025f63bd35"},
-    {file = "deeplake-4.1.16-cp39-cp39-manylinux2014_aarch64.whl", hash = "sha256:8d40a466ffca8600e1c9c7253aa69af815326e4560e23111ec77aa4ea9d26b7a"},
-    {file = "deeplake-4.1.16-cp39-cp39-manylinux2014_x86_64.whl", hash = "sha256:f684a69dde77d58adb787e9d1ca0cb3da04614587d729e56ff904653f6c202d2"},
+    {file = "deeplake-4.2.6-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:5a11de3b6b7c3a93614b861bdc2da8e5f4cb206b3585bcef1d627f9e1ab11f55"},
+    {file = "deeplake-4.2.6-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:32f35fdc2b01fb90e2c6f5e492d8bb109edd6360fb4163a7a6a3b14ec6844d55"},
+    {file = "deeplake-4.2.6-cp310-cp310-manylinux2014_aarch64.whl", hash = "sha256:33e9b4efdf183bc2a56c65876e1ad11f37f671d361c6c25bafc65d61ee61ad06"},
+    {file = "deeplake-4.2.6-cp310-cp310-manylinux2014_x86_64.whl", hash = "sha256:c8190bd01ffc03296866254a176cb0e8511ee008142669eb8812bfbf9667b5aa"},
+    {file = "deeplake-4.2.6-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:328727ee45d1f079a890ecc11f22d659087f7bed34d216a5d2ef40b9362d8b96"},
+    {file = "deeplake-4.2.6-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:2f1ff20f591514f2b19b6e18945af06056bfe5da4675051256dedfcc17a96da0"},
+    {file = "deeplake-4.2.6-cp311-cp311-manylinux2014_aarch64.whl", hash = "sha256:3c5863c3b0ec7a259c1832b83852797a47a2dc62ece4d715a1e2fa5e54b97515"},
+    {file = "deeplake-4.2.6-cp311-cp311-manylinux2014_x86_64.whl", hash = "sha256:ab6f50d97eb76258deb84ad311bbddc18ac734f14a71838d76e4f69a511ab4d8"},
+    {file = "deeplake-4.2.6-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:669cbde9368fa7e317412ce9d73d6b6f6b03c0621d8401b26197dfc5af03cab6"},
+    {file = "deeplake-4.2.6-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:aba1bb6065b88da56ecb3b0ee8238d945199396ef9edce79722015922311a745"},
+    {file = "deeplake-4.2.6-cp312-cp312-manylinux2014_aarch64.whl", hash = "sha256:37fbac99588c30c3cf5991db1d5e2e22701ff06598bcc578d72650ecfff215bd"},
+    {file = "deeplake-4.2.6-cp312-cp312-manylinux2014_x86_64.whl", hash = "sha256:cd4d02edcfa33ff2df63a90a52e2484270ae80bf62e8f5456c446cb9947d67dd"},
+    {file = "deeplake-4.2.6-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:87261b082906cf52af1b8b7ebea7dd83862b7fc061f2972a73c642601dadebd3"},
+    {file = "deeplake-4.2.6-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:c74fa1588b3fad586ba0ddf0bfabfb19dacfd2ea5fac930f4be8a9429469bd5d"},
+    {file = "deeplake-4.2.6-cp313-cp313-manylinux2014_aarch64.whl", hash = "sha256:5eeaaaf2f5a758bce07084389d129a12ef336b7068a7f3b1bb135308c059fc45"},
+    {file = "deeplake-4.2.6-cp313-cp313-manylinux2014_x86_64.whl", hash = "sha256:0a94e04f09b93564ad66601b3a94d2917bb669f3c79be5a258c9591e92fb0966"},
+    {file = "deeplake-4.2.6-cp38-cp38-macosx_10_12_x86_64.whl", hash = "sha256:f7eb5e7895ddd10c3a859ffe0d5f037d27e8a3584da14bc3a13be16c5cb9adfc"},
+    {file = "deeplake-4.2.6-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:28156cc748f5107f1ef961a0065be1fd372d6a16c983bc0909e227e71c79b142"},
+    {file = "deeplake-4.2.6-cp38-cp38-manylinux2014_aarch64.whl", hash = "sha256:b9998b613bc2d5c62da5b78ab5d26e9c3cda3ec69daf2b30d14921e38d78f849"},
+    {file = "deeplake-4.2.6-cp38-cp38-manylinux2014_x86_64.whl", hash = "sha256:e4f68764b219a79b776175555e1bab7e454f5c7acb1357adad6f0ade489817ed"},
+    {file = "deeplake-4.2.6-cp39-cp39-macosx_10_12_x86_64.whl", hash = "sha256:b2add390cd6de284806bb629d12c08c3a2ecd0a14698ccd2b35f9d308e9c7f2d"},
+    {file = "deeplake-4.2.6-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:7e2016422f296b4d15eeb4d769e3e5794bac1bcd242ae40c0228418fce03e517"},
+    {file = "deeplake-4.2.6-cp39-cp39-manylinux2014_aarch64.whl", hash = "sha256:f4d485607f79c716782b96bc9dbd2ae961247acc187cf04a8e31a352c59da6b2"},
+    {file = "deeplake-4.2.6-cp39-cp39-manylinux2014_x86_64.whl", hash = "sha256:bf20f621bd9b1bbc33e35ed81b6c79ca8230a965cf127b3cf6d91221bc31540a"},
 ]
 
 [package.dependencies]
@@ -6455,4 +6461,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12.0,<3.13"
-content-hash = "409658f44c3848847fc110ef2c44d5c5b001b591af41ceb8e58cacb7472c34f2"
+content-hash = "90ed4c08c8365f169046aa93e6f0bfa8405c4624c246abd891d9548450fc1c93"
