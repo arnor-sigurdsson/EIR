@@ -16,6 +16,11 @@ from typing import (
     Union,
 )
 
+try:
+    from typing import TypedDict
+except ImportError:
+    from typing_extensions import TypedDict
+
 import matplotlib.pyplot as plt
 import torch
 from aislib.pytorch_modules import Swish
@@ -357,7 +362,7 @@ def stack_list_of_output_target_dicts(
 
     output_names = list(list_of_target_batch_dicts[0].keys())
 
-    aggregated_batches: dict[str, dict[str, list[torch.Tensor]]] = {
+    aggregated_batches: Dict[str, Dict[str, List[torch.Tensor]]] = {
         output_name: {} for output_name in output_names
     }
 
@@ -372,9 +377,9 @@ def stack_list_of_output_target_dicts(
                     aggregated_batches[output_name][target_name].append(target_tensor)
 
     stacked_outputs: "al_training_labels_target" = {}
-    for output_name, output_dict in aggregated_batches.items():
-        cur_stacked_outputs = {
-            key: torch.cat(list_of_tensors, dim=0)
+    for output_name, output_dict in aggregated_batches.items():  # type: ignore[assignment]
+        cur_stacked_outputs: Dict[str, torch.Tensor] = {
+            key: torch.cat(list_of_tensors, dim=0)  # type: ignore[call-overload]
             for key, list_of_tensors in output_dict.items()
             if list_of_tensors
         }
@@ -399,14 +404,14 @@ def _stack_list_of_batch_dicts(
         return {}
 
     input_names = list(list_of_batch_dicts[0].keys())
-    aggregated_batches: dict[str, list[torch.Tensor]] = {key: [] for key in input_names}
+    aggregated_batches: Dict[str, List[torch.Tensor]] = {key: [] for key in input_names}
 
     for batch in list_of_batch_dicts:
         for input_name, tensor in batch.items():
             if input_name in aggregated_batches:
                 aggregated_batches[input_name].append(tensor)
 
-    stacked_inputs = {
+    stacked_inputs: Dict[str, torch.Tensor] = {
         key: torch.cat(list_of_tensors, dim=0)
         for key, list_of_tensors in aggregated_batches.items()
         if list_of_tensors
@@ -416,11 +421,11 @@ def _stack_list_of_batch_dicts(
 
 
 class ParamGroup(TypedDict):
-    params: list[nn.Parameter]
+    params: List[nn.Parameter]
     weight_decay: float
 
 
-def add_wd_to_model_params(model: nn.Module, wd: float) -> list[ParamGroup]:
+def add_wd_to_model_params(model: nn.Module, wd: float) -> List[ParamGroup]:
     """
     We want to skip adding weight decay to learnable activation parameters so as
     not to bias them towards 0.
@@ -436,7 +441,7 @@ def add_wd_to_model_params(model: nn.Module, wd: float) -> list[ParamGroup]:
 
     param_list = []
     for name, param in model.named_parameters():
-        cur_dict: dict[str, nn.Parameter | float]
+        cur_dict: Dict[str, Union[nn.Parameter, float]]
         cur_dict = {"params": param}
 
         if "act_" in name:
@@ -446,7 +451,7 @@ def add_wd_to_model_params(model: nn.Module, wd: float) -> list[ParamGroup]:
 
         param_list.append(cur_dict)
 
-    return param_list
+    return param_list  # type: ignore[return-value]
 
 
 def _check_named_modules(model: nn.Module):
