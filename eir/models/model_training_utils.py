@@ -377,7 +377,8 @@ def stack_list_of_output_target_dicts(
                     aggregated_batches[output_name][target_name].append(target_tensor)
 
     stacked_outputs: "al_training_labels_target" = {}
-    for output_name, output_dict in aggregated_batches.items():  # type: ignore[assignment]
+    ab = aggregated_batches
+    for output_name, output_dict in ab.items():  # type: ignore[assignment]
         cur_stacked_outputs: Dict[str, torch.Tensor] = {
             key: torch.cat(list_of_tensors, dim=0)  # type: ignore[call-overload]
             for key, list_of_tensors in output_dict.items()
