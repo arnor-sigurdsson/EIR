@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 import torch.multiprocessing
 
-from eir.models.models_utils import log_model
+from eir.models.models_utils import log_model, prepare_example_batch_for_torchview
 from eir.train_utils.accelerator import setup_accelerator
 
 multiprocessing.set_start_method("spawn", force=True)
@@ -214,9 +214,18 @@ def get_default_experiment(
         model=model,
         device=torch.device(gc.be.device),
     )
+    example_batch = prepare_example_batch_for_torchview(
+        input_objects=inputs_as_dict,
+        output_objects=outputs_as_dict,
+        model=model,
+        device=gc.be.device,
+    )
+
     log_model(
         model=model,
-        structure_file=run_folder / "model_info.txt",
+        structure_file=run_folder / "model_architecture" / "model_info.txt",
+        example_batch=example_batch,
+        diagram_file=run_folder / "model_architecture" / "model_diagram.pdf",
     )
 
     criteria = get_criteria(

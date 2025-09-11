@@ -48,6 +48,7 @@ dependencies = [
     "diffusers>=0.33.1",
     "torch==2.7.1",
     "transformers>=4.53.2",
+    "torchview>=0.2.6",
 ]
 
 [project.scripts]
@@ -90,6 +91,7 @@ dev = [
     "pytest-split>=0.10.0",
     "deptry>=0.23.0",
     "ruff>=0.3.0",
+    "psutil>=7.0.0",
 ]
 
 [tool.ruff]
