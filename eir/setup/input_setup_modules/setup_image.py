@@ -294,15 +294,15 @@ def get_image_normalization_values(
                     deeplake_dataset=deeplake_ds,
                     inner_key=deeplake_inner_key,
                 )
-                numpy_iter = (i for i in image_iter)
+                numpy_iter = (i for i in image_iter)  # type: ignore
 
                 if image_mode:
                     image_iter = (
-                        Image.fromarray(i) for i in numpy_iter
-                    )  # type: ignore
+                        Image.fromarray(i) for i in numpy_iter  # type: ignore
+                    )
                     image_iter = (
-                        i.convert(image_mode) for i in image_iter
-                    )  # type: ignore
+                        i.convert(image_mode) for i in image_iter  # type: ignore
+                    )
                     numpy_iter = (np.array(i) for i in image_iter)  # type: ignore
 
                 tensor_iterator = (to_tensor(i).float() for i in numpy_iter)
