@@ -349,12 +349,12 @@ def stack_list_of_output_target_dicts(
                     aggregated_batches[output_name][target_name].append(target_tensor)
 
     stacked_outputs: al_training_labels_target = {}
-    for output_name, output_dict in aggregated_batches.items():
-        cur_stacked_outputs = {
-            key: torch.cat(list_of_tensors, dim=0)
-            for key, list_of_tensors in output_dict.items()
-            if list_of_tensors
-        }
+    for output_name, tensors_dict in aggregated_batches.items():
+        cur_stacked_outputs: dict[str, torch.Tensor] = {}
+        for key, list_of_tensors in tensors_dict.items():
+            if list_of_tensors:
+                cur_stacked_outputs[key] = torch.cat(list_of_tensors, dim=0)
+
         if cur_stacked_outputs:
             stacked_outputs[output_name] = cur_stacked_outputs
 
