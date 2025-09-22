@@ -329,34 +329,34 @@ def stack_list_of_output_target_dicts(
                     }
                                                             with obs as rows in tensors
     """
+    if not list_of_target_batch_dicts:
+        return {}
 
-    output_names = list_of_target_batch_dicts[0].keys()
+    output_names = list(list_of_target_batch_dicts[0].keys())
+
     aggregated_batches: dict[str, dict[str, list[torch.Tensor]]] = {
         output_name: {} for output_name in output_names
     }
+
     for output_name in output_names:
-        cur_output_targets = list_of_target_batch_dicts[0][output_name]
-        for target_name in cur_output_targets:
+        for target_name in list_of_target_batch_dicts[0].get(output_name, {}):
             aggregated_batches[output_name][target_name] = []
 
     for batch in list_of_target_batch_dicts:
-        assert set(batch.keys()) == output_names
-
-        for output_name in batch:
-            cur_output_batch = batch[output_name]
-            for target_name in cur_output_batch:
-                cur_column_batch = cur_output_batch[target_name]
-                cur_batch_value = list(cur_column_batch)
-
-                aggregated_batches[output_name][target_name] += cur_batch_value
+        for output_name, output_dict in batch.items():
+            for target_name, target_tensor in output_dict.items():
+                if target_name in aggregated_batches[output_name]:
+                    aggregated_batches[output_name][target_name].append(target_tensor)
 
     stacked_outputs: al_training_labels_target = {}
-    for output_name, output_dict in aggregated_batches.items():
-        cur_stacked_outputs = {
-            key: _do_stack(list_of_elements=list_of_elements)
-            for key, list_of_elements in output_dict.items()
-        }
-        stacked_outputs[output_name] = cur_stacked_outputs
+    for output_name, tensors_dict in aggregated_batches.items():
+        cur_stacked_outputs: dict[str, torch.Tensor] = {}
+        for key, list_of_tensors in tensors_dict.items():
+            if list_of_tensors:
+                cur_stacked_outputs[key] = torch.cat(list_of_tensors, dim=0)
+
+        if cur_stacked_outputs:
+            stacked_outputs[output_name] = cur_stacked_outputs
 
     return stacked_outputs
 
@@ -372,35 +372,24 @@ def _stack_list_of_batch_dicts(
                         'input_2': torch.Tensor(...),
                     }
     """
+    if not list_of_batch_dicts:
+        return {}
 
-    target_columns = list_of_batch_dicts[0].keys()
-    aggregated_batches: dict[str, list[torch.Tensor]] = {
-        key: [] for key in target_columns
-    }
+    input_names = list(list_of_batch_dicts[0].keys())
+    aggregated_batches: dict[str, list[torch.Tensor]] = {key: [] for key in input_names}
 
     for batch in list_of_batch_dicts:
-        assert set(batch.keys()) == target_columns
-
-        for column in batch:
-            cur_column_batch = batch[column]
-            aggregated_batches[column] += list(cur_column_batch)
+        for input_name, tensor in batch.items():
+            if input_name in aggregated_batches:
+                aggregated_batches[input_name].append(tensor)
 
     stacked_inputs = {
-        key: _do_stack(list_of_elements=list_of_elements)
-        for key, list_of_elements in aggregated_batches.items()
+        key: torch.cat(list_of_tensors, dim=0)
+        for key, list_of_tensors in aggregated_batches.items()
+        if list_of_tensors
     }
 
     return stacked_inputs
-
-
-def _do_stack(
-    list_of_elements: list[torch.Tensor],
-) -> torch.Tensor:
-    # check that they're all the same type
-    list_types = {type(i) for i in list_of_elements}
-    assert len(list_types) == 1
-
-    return torch.stack(list_of_elements)
 
 
 class ParamGroup(TypedDict):
