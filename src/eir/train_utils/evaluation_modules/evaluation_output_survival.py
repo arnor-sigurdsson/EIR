@@ -21,9 +21,12 @@ from eir.train_utils.metrics import (
     filter_survival_missing_targets,
     general_torch_to_numpy,
 )
+from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from eir.train import Experiment
+
+logger = get_logger(name=__name__)
 
 
 def save_survival_evaluation_results_wrapper(
@@ -299,6 +302,16 @@ def calculate_cox_survival_probs(
     return survival_probs
 
 
+def catch_and_log_exceptions(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in {func.__name__}: {e}")
+
+    return wrapper
+
+
 def plot_cox_survival_curves(
     times: np.ndarray,
     events: np.ndarray,
@@ -334,6 +347,7 @@ def plot_cox_survival_curves(
     plt.close()
 
 
+@catch_and_log_exceptions
 def plot_cox_risk_stratification(
     times: np.ndarray,
     events: np.ndarray,
@@ -372,18 +386,30 @@ def plot_cox_risk_stratification(
 
     mask_low = risk_scores <= risk_thresholds[0]
     mask_low = mask_low.squeeze()
-    kmf.fit(times[mask_low], events[mask_low], label="KM Low Risk (actual)")
-    kmf.plot_survival_function(color="tab:orange")
 
     mask_med = (risk_scores > risk_thresholds[0]) & (risk_scores <= risk_thresholds[2])
     mask_med = mask_med.squeeze()
-    kmf.fit(times[mask_med], events[mask_med], label="KM Median Risk (actual)")
-    kmf.plot_survival_function(color="tab:green")
 
     mask_high = risk_scores > risk_thresholds[2]
     mask_high = mask_high.squeeze()
-    kmf.fit(times[mask_high], events[mask_high], label="KM High Risk (actual)")
-    kmf.plot_survival_function(color="tab:red")
+
+    if np.sum(mask_low) > 0:
+        kmf.fit(times[mask_low], events[mask_low], label="KM Low Risk (actual)")
+        kmf.plot_survival_function(color="tab:orange")
+    else:
+        logger.warning("Warning: Low risk group is empty")
+
+    if np.sum(mask_med) > 0:
+        kmf.fit(times[mask_med], events[mask_med], label="KM Median Risk (actual)")
+        kmf.plot_survival_function(color="tab:green")
+    else:
+        logger.warning("Warning: Median risk group is empty")
+
+    if np.sum(mask_high) > 0:
+        kmf.fit(times[mask_high], events[mask_high], label="KM High Risk (actual)")
+        kmf.plot_survival_function(color="tab:red")
+    else:
+        logger.warning("Warning: High risk group is empty")
 
     plt.xlabel("Time")
     plt.ylabel("Survival Probability")
@@ -424,6 +450,7 @@ def plot_cox_individual_curves(
     plt.close()
 
 
+@catch_and_log_exceptions
 def plot_discrete_survival_curves(
     times: np.ndarray,
     events: np.ndarray,
@@ -493,6 +520,10 @@ def plot_discrete_risk_stratification(
         # High risk (bottom 25% survival probability)
         else:
             mask = risk_scores <= risk_thresholds[0]
+
+        if np.sum(mask) == 0:
+            logger.warning(f"Warning: {label} group is empty, skipping plot.")
+            continue
 
         mean_pred = predicted_probs[mask].mean(axis=0)
         plt.step(
