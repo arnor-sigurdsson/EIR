@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 import torch
 import torch.nn.functional as F
@@ -149,7 +149,7 @@ class AttentionFusionModule(nn.Module):
         else:
             total = 0
             for projection_layer in self.projection_layers.values():
-                total += projection_layer.num_out_features
+                total += cast(int, projection_layer.num_out_features)
             return total
 
     @property

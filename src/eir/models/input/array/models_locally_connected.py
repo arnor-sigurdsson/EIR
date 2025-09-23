@@ -7,6 +7,7 @@ from typing import (
     Literal,
     Protocol,
     Union,
+    cast,
 )
 
 import torch
@@ -270,7 +271,8 @@ class LCLModel(nn.Module):
 
     @property
     def num_out_features(self) -> int:
-        return self.lcl_blocks[-1].out_features
+        last_block = self.lcl_blocks[-1]
+        return cast(int, last_block.out_features)
 
     @property
     def output_shape(self) -> tuple[int, ...]:
