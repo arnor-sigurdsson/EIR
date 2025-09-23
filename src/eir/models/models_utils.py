@@ -273,33 +273,39 @@ def _save_model_diagram(
 ) -> None:
     diagram_file.parent.mkdir(parents=True, exist_ok=True)
 
-    model_graph = draw_graph(
-        model=model,
-        input_data=example_batch,
-        save_graph=False,
-        filename=str(diagram_file.with_suffix("")),
-        depth=4,
-        expand_nested=True,
-        hide_module_functions=True,
-        hide_inner_tensors=True,
-        roll=False,
-        collect_attributes=False,
-    )
-    model_graph.visual_graph.render(format="pdf")
+    try:
+        model_graph = draw_graph(
+            model=model,
+            input_data=example_batch,
+            save_graph=False,
+            filename=str(diagram_file.with_suffix("")),
+            depth=4,
+            expand_nested=True,
+            hide_module_functions=True,
+            hide_inner_tensors=True,
+            roll=False,
+            collect_attributes=False,
+        )
+        model_graph.visual_graph.render(format="pdf")
+    except Exception as e:
+        logger.warning("Could not create simple model diagram: %s", e)
 
-    model_graph = draw_graph(
-        model=model,
-        input_data=example_batch,
-        save_graph=False,
-        filename=str(diagram_file.with_suffix("")) + "_detailed",
-        depth=6,
-        expand_nested=True,
-        hide_module_functions=True,
-        hide_inner_tensors=False,
-        roll=False,
-        collect_attributes=False,
-    )
-    model_graph.visual_graph.render(format="pdf")
+    try:
+        model_graph = draw_graph(
+            model=model,
+            input_data=example_batch,
+            save_graph=False,
+            filename=str(diagram_file.with_suffix("")) + "_detailed",
+            depth=6,
+            expand_nested=True,
+            hide_module_functions=True,
+            hide_inner_tensors=False,
+            roll=False,
+            collect_attributes=False,
+        )
+        model_graph.visual_graph.render(format="pdf")
+    except Exception as e:
+        logger.warning("Could not create detailed model diagram: %s", e)
 
 
 def prepare_example_batch_for_torchview(
