@@ -1010,11 +1010,12 @@ class UncertaintyMultiTaskLoss(nn.Module):
         name: str,
         loss_value: torch.Tensor,
     ) -> torch.Tensor:
-        log_var = getattr(self, f"log_var_{name}")
+        log_var = getattr(self, f"log_var_{name}").to(device=loss_value.device)
         scalar = 2.0 if name in self.target_cat_columns else 1.0
+        scalar_tensor = torch.tensor(scalar, device=loss_value.device)
 
         precision = torch.exp(-log_var)
-        loss = scalar * torch.sum(precision * loss_value + log_var)
+        loss = scalar_tensor * torch.sum(precision * loss_value + log_var)
 
         return loss
 
