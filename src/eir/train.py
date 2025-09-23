@@ -226,6 +226,7 @@ def get_default_experiment(
         structure_file=run_folder / "model_architecture" / "model_info.txt",
         example_batch=example_batch,
         diagram_file=run_folder / "model_architecture" / "model_diagram.pdf",
+        do_save_diagram=gc.vl.save_model_diagram,
     )
 
     criteria = get_criteria(

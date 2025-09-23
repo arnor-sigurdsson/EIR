@@ -92,7 +92,8 @@ class ResidualMLPOutputModule(nn.Module):
 
     def forward(self, inputs: torch.Tensor) -> dict[str, torch.Tensor]:
         output_modules_out = calculate_module_dict_outputs(
-            input_=inputs, module_dict=self.multi_task_branches
+            input_=inputs,
+            module_dict=self.multi_task_branches,
         )
 
         return output_modules_out
