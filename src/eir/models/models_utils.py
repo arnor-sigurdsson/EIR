@@ -271,21 +271,35 @@ def _save_model_diagram(
     example_batch: dict[str, dict[str, torch.Tensor]],
     diagram_file: Path,
 ) -> None:
-    try:
-        diagram_file.parent.mkdir(parents=True, exist_ok=True)
-        model_graph = draw_graph(
-            model=model,
-            input_data=example_batch,
-            save_graph=False,
-            filename=str(diagram_file.with_suffix("")),
-            depth=3,
-            expand_nested=True,
-            collect_attributes=False,
-        )
-        model_graph.visual_graph.render(format="pdf")
-        logger.info(f"Model diagram saved to {diagram_file}")
-    except Exception as e:
-        logger.warning(f"Failed to generate model diagram: {e}")
+    diagram_file.parent.mkdir(parents=True, exist_ok=True)
+
+    model_graph = draw_graph(
+        model=model,
+        input_data=example_batch,
+        save_graph=False,
+        filename=str(diagram_file.with_suffix("")),
+        depth=4,
+        expand_nested=True,
+        hide_module_functions=True,
+        hide_inner_tensors=True,
+        roll=False,
+        collect_attributes=False,
+    )
+    model_graph.visual_graph.render(format="pdf")
+
+    model_graph = draw_graph(
+        model=model,
+        input_data=example_batch,
+        save_graph=False,
+        filename=str(diagram_file.with_suffix("")) + "_detailed",
+        depth=6,
+        expand_nested=True,
+        hide_module_functions=True,
+        hide_inner_tensors=False,
+        roll=False,
+        collect_attributes=False,
+    )
+    model_graph.visual_graph.render(format="pdf")
 
 
 def prepare_example_batch_for_torchview(
