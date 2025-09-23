@@ -137,6 +137,7 @@ def prep_modelling_test_configs(
         structure_file=run_folder / "model_architecture" / "model_info.txt",
         example_batch=example_batch,
         diagram_file=run_folder / "model_architecture" / "model_diagram.pdf",
+        do_save_diagram=False,
     )
 
     serialize_all_input_transformers(inputs_dict=inputs_as_dict, run_folder=run_folder)
