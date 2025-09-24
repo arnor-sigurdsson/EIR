@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import torch
 from sympy import Symbol
@@ -277,7 +277,8 @@ class CNNModel(nn.Module):
         self.size_after_conv_h = size_after_conv_h
         self.data_size_after_conv = size_after_conv_w * size_after_conv_h
 
-        self.no_out_channels = self.conv[-1].out_channels
+        last_conv_layer = self.conv[-1]
+        self.no_out_channels = cast(int, last_conv_layer.out_channels)
 
         self.final_layer = (
             nn.Sequential(
@@ -295,7 +296,9 @@ class CNNModel(nn.Module):
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        return self.conv[0].conv_1.weight
+        first_block = self.conv[0]
+        conv_1 = cast(nn.Module, first_block.conv_1)
+        return cast(torch.Tensor, conv_1.weight)
 
     @property
     def num_out_features(self) -> int:

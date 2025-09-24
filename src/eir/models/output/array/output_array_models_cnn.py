@@ -564,7 +564,8 @@ class CNNPassThroughUpscaleModel(nn.Module):
             if name == self.output_name or name.startswith("__extras_"):
                 continue
 
-            cur_cross_attention: nn.ModuleList = self.ca_layers[name]
+            cur_cross_attention = self.ca_layers[name]
+            assert isinstance(cur_cross_attention, nn.ModuleList)
             for block in cur_cross_attention:
                 out = block(input=out, context=input_tensor)
 
