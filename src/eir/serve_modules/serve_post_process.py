@@ -294,7 +294,7 @@ def _process_discrete_survival_prediction(
     output_object: ComputedSurvivalOutputInfo,
     cur_model_outputs: dict[str, torch.Tensor],
 ) -> dict:
-    processed_outputs: dict[str, dict[str, Any]] = {}
+    processed_outputs: dict[str, Any] = {}
 
     output_type_info = output_object.output_config.output_type_info
     assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
@@ -321,7 +321,7 @@ def _process_cox_survival_prediction(
     output_object: ComputedSurvivalOutputInfo,
     cur_model_outputs: dict[str, torch.Tensor],
 ) -> dict:
-    processed_outputs: dict[str, dict[str, Any]] = {}
+    processed_outputs: dict[str, Any] = {}
 
     output_type_info = output_object.output_config.output_type_info
     assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
