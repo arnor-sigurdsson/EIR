@@ -124,9 +124,20 @@ def prep_modelling_test_configs(
     )
 
     run_folder = get_run_folder(output_folder=gc.be.output_folder)
+
+    example_batch = eir.models.models_utils.prepare_example_batch_for_torchview(
+        input_objects=inputs_as_dict,
+        output_objects=outputs_as_dict,
+        model=model,
+        device=gc.be.device,
+    )
+
     eir.models.models_utils.log_model(
         model=model,
-        structure_file=run_folder / "model_info.txt",
+        structure_file=run_folder / "model_architecture" / "model_info.txt",
+        example_batch=example_batch,
+        diagram_file=run_folder / "model_architecture" / "model_diagram.pdf",
+        do_save_diagram=False,
     )
 
     serialize_all_input_transformers(inputs_dict=inputs_as_dict, run_folder=run_folder)

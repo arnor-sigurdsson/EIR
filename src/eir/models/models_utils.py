@@ -10,6 +10,7 @@ from typing import (
 
 import torch
 from torch import nn
+from torchview import draw_graph
 from transformers import PreTrainedModel
 
 from eir.models.input.sequence.transformer_models import get_hf_transformer_forward
@@ -17,6 +18,8 @@ from eir.models.layers.mlp_layers import MLPResidualBlock
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
+    from eir.setup.input_setup import al_input_objects_as_dict
+    from eir.setup.output_setup import al_output_objects_as_dict
     from eir.setup.output_setup_modules.tabular_output_setup import (
         al_num_outputs_per_target,
     )
@@ -263,12 +266,60 @@ def get_output_dimensions_for_input(
         return output_shape
 
 
+def _save_model_diagram(
+    model: nn.Module,
+    example_batch: dict[str, dict[str, torch.Tensor]],
+    diagram_file: Path,
+) -> None:
+    diagram_file.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        model_graph = draw_graph(
+            model=model,
+            input_data=example_batch,
+            save_graph=False,
+            filename=str(diagram_file.with_suffix("")),
+            depth=10,
+            expand_nested=True,
+            hide_module_functions=True,
+            hide_inner_tensors=True,
+            roll=False,
+            collect_attributes=False,
+        )
+        model_graph.visual_graph.render(format="pdf")
+    except Exception as e:
+        logger.warning("Could not create simple model diagram: %s", e)
+
+
+def prepare_example_batch_for_torchview(
+    input_objects: "al_input_objects_as_dict",
+    output_objects: "al_output_objects_as_dict",
+    model: nn.Module,
+    device: str,
+    batch_size: int = 2,
+) -> dict[str, dict[str, torch.Tensor]]:
+    from eir.models.tensor_broker.tensor_broker import prepare_example_test_batch
+
+    batch = prepare_example_test_batch(
+        input_objects=input_objects,
+        output_objects=output_objects,
+        model=model,
+        device=device,
+        batch_size=batch_size,
+    )
+
+    return {"inputs": batch.inputs}
+
+
 def log_model(
     model: nn.Module,
+    do_save_diagram: bool,
     structure_file: Path | None,
     verbose: bool = False,
     parameter_file: str | None = None,
     context: str = "Starting Training",
+    example_batch: dict[str, dict[str, torch.Tensor]] | None = None,
+    diagram_file: Path | None = None,
 ) -> None:
     no_params = sum(p.numel() for p in model.parameters())
     no_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -280,6 +331,7 @@ def log_model(
     logger.info(model_summary)
 
     if structure_file:
+        structure_file.parent.mkdir(parents=True, exist_ok=True)
         with open(structure_file, "w") as structure_handle:
             structure_handle.write(str(model))
 
@@ -296,7 +348,18 @@ def log_model(
         logger.info(layer_summary)
 
     if parameter_file:
-        with open(parameter_file, "w") as f:
+        parameter_path = Path(parameter_file)
+        parameter_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(parameter_path, "w") as f:
             f.write(model_summary)
             if verbose:
                 f.write(layer_summary)
+
+    if do_save_diagram:
+        assert example_batch is not None
+        assert diagram_file is not None
+        _save_model_diagram(
+            model=model,
+            example_batch=example_batch,
+            diagram_file=diagram_file,
+        )

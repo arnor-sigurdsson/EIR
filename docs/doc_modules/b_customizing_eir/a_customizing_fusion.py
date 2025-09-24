@@ -107,6 +107,7 @@ def modify_experiment(experiment: train.Experiment) -> train.Experiment:
     eir.models.models_utils.log_model(
         model=my_model,
         structure_file=Path(output_folder, "model_info.txt"),
+        do_save_diagram=False,
     )
 
     return my_experiment

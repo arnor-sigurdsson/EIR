@@ -72,7 +72,12 @@ def get_model(
             pretrained_checkpoint=global_config.m.pretrained_checkpoint,
         )
         apply_weight_tying(model=loaded_meta_model)
-        log_model(model=loaded_meta_model, structure_file=None, context="Loaded model")
+        log_model(
+            model=loaded_meta_model,
+            structure_file=None,
+            context="Loaded model",
+            do_save_diagram=global_config.vl.save_model_diagram,
+        )
 
         compiled_model: al_meta_model
         if global_config.m.compile_model:

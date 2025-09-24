@@ -434,11 +434,16 @@ class VisualizationLoggingConfig:
     :param log_level:
         Logging level to use. Can be one of ``'debug'``, ``'info'``,
         ``'warning'``, ``'error'``, ``'critical'``.
+
+    :param save_model_diagram:
+        Whether to save a diagram of the model architecture to a file in the
+        experiment output folder.
     """
 
     plot_skip_steps: int = 200
     no_pbar: bool = False
     log_level: Literal["debug", "info", "warning", "error", "critical"] = "info"
+    save_model_diagram: bool = False
 
 
 @dataclass
