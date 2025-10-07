@@ -28,6 +28,7 @@ def get_projection_layer(
     to_shape_no_batch: torch.Size,
     cache_fusion_type: al_broker_fusion_types,
     projection_type: al_broker_projection_types,
+    kernel_width_divisible_by: int | None = None,
 ) -> tuple[nn.Module, torch.Size]:
     """
     We have the cache_fusion_type input (currently mostly unused) and we return the
@@ -64,6 +65,7 @@ def get_projection_layer(
                 target_dimension=to_shape_no_batch.numel(),
                 projection_layer_type=projection_type,  # type: ignore
                 lcl_diff_tolerance=0,
+                kernel_width_divisible_by=kernel_width_divisible_by,
             )
             projection_layers.append(projection_layer)
             projected_shape = to_shape_no_batch
@@ -74,6 +76,7 @@ def get_projection_layer(
                 target_dimension=to_shape_no_batch.numel(),
                 projection_layer_type="lcl",  # type: ignore
                 lcl_diff_tolerance=0,
+                kernel_width_divisible_by=kernel_width_divisible_by,
             )
             projected_shape = to_shape_no_batch
 

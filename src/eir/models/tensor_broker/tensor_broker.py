@@ -356,6 +356,7 @@ def get_tensor_broker(
                         to_shape_no_batch=to_shape_no_batch,
                         cache_fusion_type=tmc.cache_fusion_type,
                         projection_type=tmc.projection_type,
+                        kernel_width_divisible_by=tmc.kernel_width_divisible_by,
                     )
                     have_been_used_from_cache.add(from_name)
 
