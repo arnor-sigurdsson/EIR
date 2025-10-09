@@ -2,7 +2,6 @@ import math
 from typing import Literal
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 
 from eir.models.fusion.seq_out_fusion_attention import CrossAttention
@@ -91,20 +90,68 @@ class GatedSumFusionLayer(nn.Module):
         self.input_shape = input_shape
         self.context_shape = context_shape
 
-        input_init = torch.Tensor([math.log(initial_input_bias)])
-        projected_init = torch.Tensor([math.log(1 - initial_input_bias)])
-        self.gate_input = nn.Parameter(input_init, requires_grad=True)
-        self.gate_projected = nn.Parameter(projected_init, requires_grad=True)
+        ndim = len(input_shape)
+        if ndim == 1:
+            self.feature_axis = 1
+            num_features = input_shape[0]
+        elif ndim == 2:
+            self.feature_axis = 2
+            num_features = input_shape[1]
+        elif ndim == 3:
+            self.feature_axis = 1
+            num_features = input_shape[0]
+        else:
+            raise ValueError(
+                f"Unsupported input_shape ndim={ndim}. Expected 1, 2 or 3 "
+                "(excluding batch dimension)."
+            )
+
+        if not (0.0 < initial_input_bias < 1.0):
+            raise ValueError("initial_input_bias must be in (0, 1).")
+
+        eps = 1e-6
+        p = min(max(initial_input_bias, eps), 1.0 - eps)
+        bias_val = math.log(p / (1.0 - p))
+
+        tensor_ndim = len(input_shape) + 1
+        gate_shape = [1] * tensor_ndim
+        gate_shape[self.feature_axis] = num_features
+
+        self.gate_param = nn.Parameter(
+            torch.full(gate_shape, bias_val, dtype=torch.float32),
+            requires_grad=True,
+        )
 
     def forward(
         self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
     ) -> torch.Tensor:
-        gates = F.softmax(torch.stack([self.gate_input, self.gate_projected]), dim=0)
+        if input_tensor.shape != projected_context_tensor.shape:
+            raise ValueError(
+                f"Shape mismatch: input {input_tensor.shape} vs "
+                f"context {projected_context_tensor.shape}"
+            )
 
-        scaled_input = input_tensor * gates[0]
-        scaled_projected = projected_context_tensor * gates[1]
+        if self.feature_axis == 2 and input_tensor.ndim != 3:
+            raise ValueError(
+                f"Expected 3D tensor for sequence-like input, got {input_tensor.ndim}D."
+            )
+        if self.feature_axis == 1 and input_tensor.ndim not in (2, 4):
+            raise ValueError(
+                f"Expected 2D or 4D tensor for feature/channel input, got "
+                f"{input_tensor.ndim}D."
+            )
 
-        return scaled_input + scaled_projected
+        expected_features = input_tensor.shape[self.feature_axis]
+        if expected_features != self.gate_param.shape[self.feature_axis]:
+            raise ValueError(
+                f"Gate size {self.gate_param.shape[self.feature_axis]} does not "
+                f"match feature dimension {expected_features}."
+            )
+
+        gate = torch.sigmoid(self.gate_param)
+
+        output = (1.0 - gate) * projected_context_tensor + gate * input_tensor
+        return output
 
 
 class ConcatenationFusionLayer(nn.Module):
