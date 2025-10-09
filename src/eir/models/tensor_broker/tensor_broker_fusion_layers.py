@@ -122,6 +122,13 @@ class GatedSumFusionLayer(nn.Module):
             requires_grad=True,
         )
 
+    def extra_repr(self) -> str:
+        return (
+            f"input_shape={tuple(self.input_shape)}, "
+            f"gate_shape={tuple(self.gate_param.shape)}, "
+            f"feature_axis={self.feature_axis}"
+        )
+
     def forward(
         self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
     ) -> torch.Tensor:
