@@ -71,8 +71,13 @@ def get_projection_layer(
             projected_shape = to_shape_no_batch
 
         case "lcl+mlp_residual":
+            input_dim = from_shape_no_batch.numel()
+
+            norm_layer = nn.RMSNorm(normalized_shape=input_dim)
+            act_layer = nn.GELU()
+
             lcl_projection_layer = get_1d_projection_layer(
-                input_dimension=from_shape_no_batch.numel(),
+                input_dimension=input_dim,
                 target_dimension=to_shape_no_batch.numel(),
                 projection_layer_type="lcl",  # type: ignore
                 lcl_diff_tolerance=0,
@@ -88,6 +93,8 @@ def get_projection_layer(
                 stochastic_depth_p=0.0,
             )
 
+            projection_layers.append(norm_layer)
+            projection_layers.append(act_layer)
             projection_layers.append(lcl_projection_layer)
             projection_layers.append(mlp_residual_block)
 
