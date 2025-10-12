@@ -132,29 +132,6 @@ class GatedSumFusionLayer(nn.Module):
     def forward(
         self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
     ) -> torch.Tensor:
-        if input_tensor.shape != projected_context_tensor.shape:
-            raise ValueError(
-                f"Shape mismatch: input {input_tensor.shape} vs "
-                f"context {projected_context_tensor.shape}"
-            )
-
-        if self.feature_axis == 2 and input_tensor.ndim != 3:
-            raise ValueError(
-                f"Expected 3D tensor for sequence-like input, got {input_tensor.ndim}D."
-            )
-        if self.feature_axis == 1 and input_tensor.ndim not in (2, 4):
-            raise ValueError(
-                f"Expected 2D or 4D tensor for feature/channel input, got "
-                f"{input_tensor.ndim}D."
-            )
-
-        expected_features = input_tensor.shape[self.feature_axis]
-        if expected_features != self.gate_param.shape[self.feature_axis]:
-            raise ValueError(
-                f"Gate size {self.gate_param.shape[self.feature_axis]} does not "
-                f"match feature dimension {expected_features}."
-            )
-
         gate = torch.sigmoid(self.gate_param)
 
         output = (1.0 - gate) * projected_context_tensor + gate * input_tensor
