@@ -19,6 +19,7 @@ from torch_optimizer import get as get_custom_opt
 
 from eir.models.model_training_utils import add_wd_to_model_params
 from eir.setup.setup_utils import get_base_optimizer_names
+from eir.train_utils.muon_adamw import MuonAdamW
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -118,6 +119,7 @@ def get_base_optimizers_dict() -> dict[str, type[Optimizer]]:
         "adahessian": AdaHessian,
         "adabelief": partial(AdaBelief, print_change_log=False),
         "adabeliefw": partial(AdaBelief, weight_decouple=True, print_change_log=False),
+        "muonadamw": MuonAdamW,
     }
     assert set(base_optimizers) == get_base_optimizer_names()
     return base_optimizers
@@ -134,7 +136,7 @@ def _get_constructor_arguments(
 
     all_extras = {
         "betas": (global_config.opt.b1, global_config.opt.b2),
-        "momentum": 0.9,
+        "momentum": 0.95,
         "amsgrad": False,
     }
     accepted_args = signature(optimizer_class).parameters.keys()

@@ -159,6 +159,7 @@ def get_base_optimizer_names() -> set:
         "adahessian",
         "adabelief",
         "adabeliefw",
+        "muonadamw",
     }
 
     return base_names
