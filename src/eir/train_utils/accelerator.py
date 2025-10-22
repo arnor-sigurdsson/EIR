@@ -13,8 +13,8 @@ def setup_accelerator(configs: Configs) -> Fabric:
     original_hardware = gc.accelerator.hardware
 
     if torch.cuda.is_available() and (original_hardware in ["cuda", "gpu", "auto"]):
-        torch.backends.cuda.matmul.fp32_precision = "tf32"
-        torch.backends.cudnn.fp32_precision = "tf32"
+        torch.backends.cuda.matmul.fp32_precision = "tf32"  # type: ignore[attr-defined]
+        torch.backends.cudnn.fp32_precision = "tf32"  # type: ignore[attr-defined]
         logger.info(
             "Set float32 matmul/cuDNN precision to 'tf32' for Tensor Core optimization"
         )
