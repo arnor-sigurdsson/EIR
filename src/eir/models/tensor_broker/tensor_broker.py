@@ -331,7 +331,7 @@ def get_tensor_broker(
             if tmc.use_from_cache:
                 for from_name in tmc.use_from_cache:
                     from_path, cache_target = have_been_cached_mapping[from_name]
-                    message_name = f"{to_name}: {from_path}>>>{to_path}"
+                    message_name = f"{from_name}>>>{to_name}: {from_path}>>>{to_path}"
                     # . is not allowed in layer names in Torch
                     message_name = message_name.replace(".", "--")
 
