@@ -18,7 +18,7 @@ class MuonAdamW(Optimizer):
         betas: tuple[float, float] = (0.9, 0.999),
         weight_decay: float = 0.0,
         momentum: float = 0.95,
-        muon_filter: Callable[[torch.nn.Parameter], bool] | None = None,
+        muon_filter: Callable[[torch.nn.Parameter | torch.Tensor], bool] | None = None,
         **kwargs,
     ) -> None:
         if muon_filter is None:
@@ -30,7 +30,12 @@ class MuonAdamW(Optimizer):
         adamw_groups = []
 
         for group in params:
-            group_params = list(group["params"])
+            group_params_raw = group["params"]
+            if isinstance(group_params_raw, torch.Tensor):
+                group_params = [group_params_raw]
+            else:
+                group_params = list(group_params_raw)
+
             force_adamw = group.get("force_adamw", False)
 
             if force_adamw:
@@ -112,7 +117,11 @@ class MuonAdamW(Optimizer):
         return groups
 
     def add_param_group(self, param_group: dict) -> None:
-        params = list(param_group["params"])
+        params_raw = param_group["params"]
+        if isinstance(params_raw, torch.Tensor):
+            params = [params_raw]
+        else:
+            params = list(params_raw)
         muon_params = [p for p in params if p.ndim == 2]
         muon_param_ids = {id(p) for p in muon_params}
         adamw_params = [p for p in params if id(p) not in muon_param_ids]

@@ -71,12 +71,17 @@ def _get_all_params_to_optimize(
 
     loss_params = []
     if isinstance(loss_callable, nn.Module):
-        loss_params = [{"params": p} for p in loss_callable.parameters()]
+        params_list = list(loss_callable.parameters())
+        if params_list:
+            loss_params = [{"params": params_list}]
 
     extra_params = []
     if extra_modules is not None:
+        all_extra_params = []
         for module in extra_modules.values():
-            extra_params = [{"params": p} for p in module.parameters()]
+            all_extra_params.extend(list(module.parameters()))
+        if all_extra_params:
+            extra_params = [{"params": all_extra_params}]
 
     return model_params + loss_params + extra_params
 
