@@ -283,7 +283,10 @@ def get_snp_cols_w_top_grads(
 
                 sum_snp_values = grads.sum(0)
 
-                top_n_idxs = sorted(np.argpartition(sum_snp_values, -n)[-n:])
+                actual_n = min(n, len(sum_snp_values))
+                top_n_idxs = sorted(
+                    np.argpartition(sum_snp_values, -actual_n)[-actual_n:]
+                )
                 top_n_idxs_np: np.ndarray = np.array(top_n_idxs)
 
                 top_snps_per_class[cls]["top_n_idxs"] = top_n_idxs_np
