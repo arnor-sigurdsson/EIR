@@ -27,7 +27,7 @@ def setup_accelerator(configs: Configs) -> Fabric:
         torch.backends.cudnn.allow_tf32 = True
 
         logger.info(
-            "Set matmul precision to 'medium' and enabled cuDNN TF32 (Legacy API)"
+            "Set matmul precision to 'high' and enabled cuDNN TF32 (Legacy API)"
         )
 
         # Intended Future Code (post-Lightning update)
