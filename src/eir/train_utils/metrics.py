@@ -989,6 +989,19 @@ class UncertaintyMultiTaskLoss(nn.Module):
         target_con_columns: list[str],
         device: str,
     ):
+        """
+        From https://arxiv.org/pdf/1705.07115
+
+        Eq(10):
+        Classification Loss ≈ (1/σ²) * L + log(σ)
+        Regression Loss = (1/(2σ²)) * L + log(σ)
+
+        Note:
+            In practice, we train the network to predict the log variance,
+            s := log(σ²), which is more stable, log_var = 2 * log(σ),
+            log σ = 0.5 * log_var.
+
+        """
         super().__init__()
 
         self.target_cat_columns = target_cat_columns
@@ -1014,6 +1027,11 @@ class UncertaintyMultiTaskLoss(nn.Module):
 
         precision = torch.exp(-log_var)
         loss = torch.sum(0.5 * precision * loss_value) + log_var
+
+        if name in self.target_cat_columns:
+            loss = precision * loss_value + 0.5 * log_var
+        elif name in self.target_con_columns:
+            loss = 0.5 * precision * loss_value + 0.5 * log_var
 
         return loss
 
