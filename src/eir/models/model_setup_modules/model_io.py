@@ -23,6 +23,7 @@ def load_model(
     state_dict_keys_to_keep: None | Sequence[str] = None,
     state_dict_key_rename: None | Sequence[tuple[str, str]] = None,
     strict_shapes: bool = True,
+    strict_loading: bool = False,
 ) -> al_meta_model:
     model = model_class(**model_init_kwargs)
 
@@ -33,6 +34,7 @@ def load_model(
         state_dict_keys_to_keep=state_dict_keys_to_keep,
         state_dict_key_rename=state_dict_key_rename,
         strict_shapes=strict_shapes,
+        strict_loading=strict_loading,
     )
 
     if test_mode:
@@ -48,6 +50,7 @@ def _load_model_weights(
     state_dict_keys_to_keep: None | Sequence[str] = None,
     state_dict_key_rename: None | Sequence[tuple[str, str]] = None,
     strict_shapes: bool = True,
+    strict_loading: bool = False,
 ) -> al_meta_model:
     loaded_weights_state_dict = torch.load(
         model_state_dict_path,
@@ -101,6 +104,33 @@ def _load_model_weights(
     no_missing = len(incompatible_keys.missing_keys)
     no_unexpected = len(incompatible_keys.unexpected_keys)
     no_incompatible_keys = no_missing + no_unexpected
+
+    if strict_loading and no_incompatible_keys > 0:
+        error_msg = (
+            f"Strict loading enabled but found {no_incompatible_keys} incompatible "
+            f"modules when loading from '{model_state_dict_path}'.\n"
+            f"Missing keys (in model but not in checkpoint): {no_missing}\n"
+            f"Unexpected keys (in checkpoint but not in model): {no_unexpected}\n"
+            f"\n"
+            f"This indicates a configuration mismatch between training and inference.\n"
+            f"Common causes:\n"
+            f"  - Different architecture flags between train/test configs\n"
+            f"  - Model definition changed since training\n"
+            f"  - Wrong checkpoint file loaded\n"
+            f"  - Config not properly synchronized\n"
+            f"\n"
+        )
+
+        if no_missing > 0:
+            error_msg += f"Missing keys: {incompatible_keys.missing_keys[:10]}...\n"
+
+        if no_unexpected > 0:
+            error_msg += (
+                f"Unexpected keys: {incompatible_keys.unexpected_keys[:10]}...\n"
+            )
+
+        raise RuntimeError(error_msg)
+
     if no_incompatible_keys > 0:
         repr_object = reprlib.Repr()
         repr_object.maxother = 256
