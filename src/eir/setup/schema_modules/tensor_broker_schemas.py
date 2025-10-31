@@ -64,6 +64,13 @@ class TensorMessageConfig:
 
     :param kernel_width_divisible_by:
         For LCL-based projections, constrain kernel width to be divisible by this value.
+
+    :param cache_dropout_p:
+        Probability of dropping cached tensor injection during training. When set to
+        a value > 0, the cached tensor will be randomly skipped during forward pass
+        with this probability during training mode. During evaluation, cache is always
+        used if available. Useful for improving robustness when auxiliary features may
+        be unavailable at inference time.
     """
 
     name: str
@@ -74,6 +81,7 @@ class TensorMessageConfig:
     cache_fusion_type: al_broker_fusion_types = "cat+conv"
     projection_type: al_broker_projection_types = "lcl"
     kernel_width_divisible_by: int | None = None
+    cache_dropout_p: float = 0.0
 
 
 @dataclass

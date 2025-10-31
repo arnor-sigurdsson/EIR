@@ -210,6 +210,7 @@ def attach_tensor_broker_module_injection(
     tensor_broker_module: nn.Module,
     tensor_cache: dict[str, CachedTensor],
     tensor_cache_key: str,
+    cache_dropout_p: float = 0.0,
 ) -> Callable[[], None]:
     def hook(
         module: nn.Module,
@@ -227,6 +228,10 @@ def attach_tensor_broker_module_injection(
                 input_tensor = input_key
             else:
                 raise ValueError("No input tensor found in args or kwargs.")
+
+        if module.training and cache_dropout_p > 0.0:
+            if torch.rand(1).item() < cache_dropout_p:
+                return args, kwargs
 
         cached_tensor = tensor_cache[tensor_cache_key].tensor
         tensor_broker_out = tensor_broker_module(input_tensor, cached_tensor)
@@ -381,6 +386,7 @@ def get_tensor_broker(
                         tensor_broker_module=fusion_layer,
                         tensor_cache=tensor_cache,
                         tensor_cache_key=from_path,
+                        cache_dropout_p=tmc.cache_dropout_p,
                     )
 
     tensor_broker_modules = tensor_broker_modules
