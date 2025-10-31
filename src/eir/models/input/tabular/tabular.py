@@ -42,11 +42,18 @@ class SimpleTabularModelConfig:
     :param fc_layer:
         Whether to add a single fully-connected layer to the model, alternative
         to looking up and passing the inputs through directly.
+
+    :param drop_prob:
+        Probability of dropping entire branch output during training. Set to 1.0
+        to completely disable learning from this input (useful for testing).
+        During eval mode, dropout is not applied.
     """
 
     l1: float = 0.00
 
     fc_layer: bool = False
+
+    drop_prob: float = 0.0
 
 
 class SimpleTabularModel(nn.Module):
@@ -78,6 +85,7 @@ class SimpleTabularModel(nn.Module):
         self.unique_label_values = unique_label_values_per_column
         self.device = device
         self.fc_layer = model_init_config.fc_layer
+        self.drop_prob = model_init_config.drop_prob
 
         self.embeddings_dict = set_up_embedding_dict(
             unique_label_values=unique_label_values_per_column
@@ -117,7 +125,13 @@ class SimpleTabularModel(nn.Module):
         return torch.cat([torch.flatten(i) for i in self.parameters()])
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        return self.layer(input)
+        output = self.layer(input)
+
+        if self.training and self.drop_prob > 0.0:
+            if torch.rand(1).item() < self.drop_prob:
+                output = output * 0.0
+
+        return output
 
 
 def set_up_embedding_dict(
