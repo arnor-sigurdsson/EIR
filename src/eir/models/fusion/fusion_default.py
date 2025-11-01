@@ -1,3 +1,4 @@
+import math
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -98,8 +99,8 @@ class SumFusionModule(nn.Module):
             output_dim = info.output_dimension
             self.input_projections[name] = nn.Sequential(
                 nn.RMSNorm(normalized_shape=output_dim),
-                nn.GELU(),
                 nn.Linear(in_features=output_dim, out_features=self.fusion_dim),
+                nn.GELU(),
             )
 
         fusion_resblocks_kwargs = {
@@ -130,11 +131,29 @@ class SumFusionModule(nn.Module):
     def forward(self, inputs: dict[str, torch.Tensor]) -> torch.Tensor:
         projected = []
         for name, tensor in inputs.items():
+            if name not in self.input_projections:
+                logger.warning(
+                    f"Input '{name}' not found in projections. Available: "
+                    f"{list(self.input_projections.keys())}"
+                )
+                continue
+
             flattened = tensor.flatten(start_dim=1)
             proj = self.input_projections[name](flattened)
             projected.append(proj)
 
+        if not projected:
+            raise ValueError(
+                "No valid modalities found in inputs. "
+                f"Received: {list(inputs.keys())}, "
+                f"Expected: {list(self.input_projections.keys())}"
+            )
+
         fused = torch.stack(projected, dim=0).sum(dim=0)
+
+        num_modalities = len(projected)
+        if num_modalities > 1:
+            fused = fused / math.sqrt(num_modalities)
 
         out = calculate_module_dict_outputs(
             input_=fused,

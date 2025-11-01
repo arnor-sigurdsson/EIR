@@ -1031,6 +1031,7 @@ class FusionConfig:
 
     model_type: Literal[
         "mlp-residual",
+        "mlp-residual-sum",
         "identity",
         "mgmoe",
         "pass-through",

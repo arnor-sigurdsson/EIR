@@ -18,6 +18,7 @@ from eir.utils.logging import get_logger
 al_fusion_model = Literal[
     "pass-through",
     "mlp-residual",
+    "mlp-residual-sum",
     "identity",
     "mgmoe",
     "attention",
