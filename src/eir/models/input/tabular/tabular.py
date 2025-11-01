@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -9,6 +9,8 @@ from typing import (
 import torch
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
+
+from eir.models.layers.mlp_layers import MLPResidualBlock
 
 if TYPE_CHECKING:
     pass
@@ -47,6 +49,15 @@ class SimpleTabularModelConfig:
         Probability of dropping entire branch output during training. Set to 1.0
         to completely disable learning from this input (useful for testing).
         During eval mode, dropout is not applied.
+
+    :param layers:
+        Number of MLP-residual blocks to add after the embedding/linear layer.
+        List format for compatibility with fusion module configs
+        (only first element used). Default is [0] (no additional blocks).
+        Useful for learning complex tabular feature interactions before fusion.
+
+    :param fc_do:
+        Dropout probability for MLP-residual blocks. Only used if layers[0] > 0.
     """
 
     l1: float = 0.00
@@ -54,6 +65,10 @@ class SimpleTabularModelConfig:
     fc_layer: bool = False
 
     drop_prob: float = 0.0
+
+    layers: list[int] = field(default_factory=lambda: [0])
+
+    fc_do: float = 0.1
 
 
 class SimpleTabularModel(nn.Module):
@@ -109,6 +124,22 @@ class SimpleTabularModel(nn.Module):
                 bias=True,
             )
 
+        if model_init_config.layers[0] > 0:
+            blocks = []
+            for _ in range(model_init_config.layers[0]):
+                blocks.append(
+                    MLPResidualBlock(
+                        in_features=self.input_dim,
+                        out_features=self.input_dim,
+                        dropout_p=model_init_config.fc_do,
+                        full_preactivation=False,
+                        stochastic_depth_p=0.0,
+                    )
+                )
+            self.mlp_blocks = nn.Sequential(*blocks)
+        else:
+            self.mlp_blocks = nn.Identity()
+
     @property
     def num_out_features(self) -> int:
         return self.input_dim
@@ -130,6 +161,8 @@ class SimpleTabularModel(nn.Module):
         if self.training and self.drop_prob > 0.0:
             if torch.rand(1).item() < self.drop_prob:
                 output = output * 0.0
+
+        output = self.mlp_blocks(output)
 
         return output
 
