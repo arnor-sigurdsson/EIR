@@ -124,6 +124,7 @@ class SimpleTabularModel(nn.Module):
                 bias=True,
             )
 
+        self.mlp_blocks: nn.Sequential | nn.Identity
         if model_init_config.layers[0] > 0:
             blocks = []
             for _ in range(model_init_config.layers[0]):
