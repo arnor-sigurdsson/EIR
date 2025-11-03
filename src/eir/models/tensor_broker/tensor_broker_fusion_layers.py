@@ -76,12 +76,30 @@ def get_fusion_layer(
                 context_shape=projected_shape,
             )
         case "additive":
-            return AdditiveFusionLayer()
+            return AdditiveFusionLayer(
+                input_shape=target_shape,
+                context_shape=projected_shape,
+            )
         case _:
             raise ValueError(f"Invalid cache_fusion_type: {cache_fusion_type}")
 
 
 class AdditiveFusionLayer(nn.Module):
+    def __init__(
+        self,
+        input_shape: torch.Size,
+        context_shape: torch.Size,
+    ):
+        super().__init__()
+        self.input_shape = input_shape
+        self.context_shape = context_shape
+
+    def extra_repr(self) -> str:
+        return (
+            f"input_shape={tuple(self.input_shape)}, "
+            f"context_shape={tuple(self.context_shape)}"
+        )
+
     def forward(
         self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
     ) -> torch.Tensor:
