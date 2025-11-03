@@ -36,7 +36,7 @@ class ProjectAndFuseLayer(nn.Module):
 def get_fusion_layer_wrapper(
     projected_shape: torch.Size,
     target_shape: torch.Size,
-    cache_fusion_type: Literal["cross-attention", "sum", "cat+conv"],
+    cache_fusion_type: Literal["cross-attention", "sum", "cat+conv", "additive"],
     projection_layer: nn.Module,
     device: str,
 ) -> ProjectAndFuseLayer:
@@ -56,7 +56,7 @@ def get_fusion_layer_wrapper(
 def get_fusion_layer(
     target_shape: torch.Size,
     projected_shape: torch.Size,
-    cache_fusion_type: Literal["cross-attention", "sum", "cat+conv"],
+    cache_fusion_type: Literal["cross-attention", "sum", "cat+conv", "additive"],
     projection_type: Literal["lcl", "lcl_residual", "cnn", "linear", "pool"] = "linear",
 ) -> nn.Module:
     match cache_fusion_type:
@@ -75,8 +75,17 @@ def get_fusion_layer(
                 input_shape=target_shape,
                 context_shape=projected_shape,
             )
+        case "additive":
+            return AdditiveFusionLayer()
         case _:
             raise ValueError(f"Invalid cache_fusion_type: {cache_fusion_type}")
+
+
+class AdditiveFusionLayer(nn.Module):
+    def forward(
+        self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
+    ) -> torch.Tensor:
+        return input_tensor + projected_context_tensor
 
 
 class GatedSumFusionLayer(nn.Module):
