@@ -158,12 +158,11 @@ class SimpleTabularModel(nn.Module):
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         output = self.layer(input)
+        output = self.mlp_blocks(output)
 
         if self.training and self.drop_prob > 0.0:
             if torch.rand(1).item() < self.drop_prob:
                 output = output * 0.0
-
-        output = self.mlp_blocks(output)
 
         return output
 
