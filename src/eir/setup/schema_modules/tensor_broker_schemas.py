@@ -6,6 +6,7 @@ al_broker_projection_types = Literal[
     "lcl",
     "lcl_residual",
     "lcl+mlp_residual",
+    "mlp_residual",
     "linear",
     "grouped_linear",
     "pool",
@@ -13,7 +14,7 @@ al_broker_projection_types = Literal[
     "interpolate",
 ]
 
-al_broker_fusion_types = Literal["cross-attention", "sum", "cat+conv"]
+al_broker_fusion_types = Literal["cross-attention", "sum", "cat+conv", "additive"]
 
 
 @dataclass
@@ -44,6 +45,7 @@ class TensorMessageConfig:
         - ``cross-attention``: Use cross-attention to combine the tensors.
         - ``sum``: Learnable gated sum to combine the tensors.
         - ``cat+conv``: Concatenate the tensors and apply a convolutional layer.
+        - ``additive``: Simple element-wise addition.
 
     :param projection_type:
         Type of projection to use when projecting the tensor to the target space.
@@ -52,6 +54,7 @@ class TensorMessageConfig:
         - ``lcl``: Locally connected layer.
         - ``lcl_residual``: Locally connected layer with residual connection.
         - ``lcl+mlp_residual``: Locally connected layer followed by MLP residual block.
+        - ``mlp_residual``: MLP residual block.
         - ``cnn``: Convolutional layer, only supports down sampling for now.
         - ``linear``: Linear layer.
         - ``pool``: Adaptive average pooling layer.
