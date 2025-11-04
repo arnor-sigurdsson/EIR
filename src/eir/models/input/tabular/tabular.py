@@ -1,3 +1,4 @@
+import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import (
@@ -60,9 +61,12 @@ class SimpleTabularModelConfig:
         Dropout probability for MLP-residual blocks. Only used if layers[0] > 0.
 
     :param fc_dim:
-        Hidden dimension for MLP-residual blocks. If None, uses input_dim.
-        When set, first block projects from input_dim to mlp_hidden_dim,
-        and subsequent blocks maintain mlp_hidden_dim.
+        Hidden dimension for MLP-residual blocks. Options:
+        - None: uses input_dim (default behavior)
+        - "auto": computes closest power of 2 to 4x input_dim
+        - int: explicit dimension
+        When set, first block projects from input_dim to fc_dim,
+        and subsequent blocks maintain fc_dim.
     """
 
     l1: float = 0.00
@@ -75,7 +79,7 @@ class SimpleTabularModelConfig:
 
     fc_do: float = 0.1
 
-    fc_dim: int | None = None
+    fc_dim: int | Literal["auto"] | None = None
 
 
 class SimpleTabularModel(nn.Module):
@@ -131,9 +135,14 @@ class SimpleTabularModel(nn.Module):
                 bias=True,
             )
 
-        mlp_hidden_dim = model_init_config.fc_dim
-        if mlp_hidden_dim is None:
+        mlp_hidden_dim: int
+        if model_init_config.fc_dim is None:
             mlp_hidden_dim = self.input_dim
+        elif model_init_config.fc_dim == "auto":
+            target = self.input_dim * 4
+            mlp_hidden_dim = 2 ** round(math.log2(target)) if target > 0 else 1
+        else:
+            mlp_hidden_dim = model_init_config.fc_dim
 
         self.mlp_blocks: nn.Sequential | nn.Identity
         if model_init_config.layers[0] > 0:
