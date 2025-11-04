@@ -163,7 +163,6 @@ def _get_default_step_function_hooks_init_kwargs(
 
         init_hook = get_hook_init_adversarial(
             adversarial_state=adversarial_state,
-            device=configs.gc.be.device,
         )
         init_kwargs["base_prepare_batch"].append(init_hook)
 
@@ -219,7 +218,6 @@ def add_l1_loss_hook_if_applicable(
 def setup_adversarial_modules(
     adversarial_config_list: list,
     model: nn.Module,
-    device: str,
 ) -> tuple[dict[str, AdversarialDisentanglementModule] | None, dict[str, Any]]:
     adversarial_cache: dict[str, torch.Tensor] = {}
     hook_handles = []
@@ -280,7 +278,6 @@ def setup_adversarial_modules(
 
 def get_hook_init_adversarial(
     adversarial_state: dict[str, Any],
-    device: str,
 ) -> Callable:
     def _hook(
         experiment: "Experiment",
@@ -292,12 +289,10 @@ def get_hook_init_adversarial(
             _, initialized_state = setup_adversarial_modules(
                 adversarial_config_list=adversarial_state["configs"],
                 model=experiment.model,
-                device=device,
             )
             adversarial_state["cache"] = initialized_state["cache"]
             adversarial_state["hook_handles"] = initialized_state["hook_handles"]
             adversarial_state["initialized"] = True
-            adversarial_state["device"] = device
 
         return {}
 

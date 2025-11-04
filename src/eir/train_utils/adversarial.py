@@ -171,7 +171,8 @@ def hook_add_adversarial_losses(
 
     adversarial_configs = adversarial_state["configs"]
     adversarial_cache = adversarial_state["cache"]
-    device = adversarial_state["device"]
+
+    device = experiment.fabric.device
 
     if adversarial_state["modules"] is None:
         logger.debug("Creating adversarial modules based on tensor shapes.")
