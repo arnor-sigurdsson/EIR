@@ -58,6 +58,11 @@ class SimpleTabularModelConfig:
 
     :param fc_do:
         Dropout probability for MLP-residual blocks. Only used if layers[0] > 0.
+
+    :param fc_dim:
+        Hidden dimension for MLP-residual blocks. If None, uses input_dim.
+        When set, first block projects from input_dim to mlp_hidden_dim,
+        and subsequent blocks maintain mlp_hidden_dim.
     """
 
     l1: float = 0.00
@@ -69,6 +74,8 @@ class SimpleTabularModelConfig:
     layers: list[int] = field(default_factory=lambda: [0])
 
     fc_do: float = 0.1
+
+    fc_dim: int | None = None
 
 
 class SimpleTabularModel(nn.Module):
@@ -124,30 +131,39 @@ class SimpleTabularModel(nn.Module):
                 bias=True,
             )
 
+        mlp_hidden_dim = model_init_config.fc_dim
+        if mlp_hidden_dim is None:
+            mlp_hidden_dim = self.input_dim
+
         self.mlp_blocks: nn.Sequential | nn.Identity
         if model_init_config.layers[0] > 0:
             blocks = []
-            for _ in range(model_init_config.layers[0]):
+            for i in range(model_init_config.layers[0]):
+                in_features = self.input_dim if i == 0 else mlp_hidden_dim
+                out_features = mlp_hidden_dim
+
                 blocks.append(
                     MLPResidualBlock(
-                        in_features=self.input_dim,
-                        out_features=self.input_dim,
+                        in_features=in_features,
+                        out_features=out_features,
                         dropout_p=model_init_config.fc_do,
                         full_preactivation=False,
                         stochastic_depth_p=0.0,
                     )
                 )
             self.mlp_blocks = nn.Sequential(*blocks)
+            self.output_dim = mlp_hidden_dim
         else:
             self.mlp_blocks = nn.Identity()
+            self.output_dim = self.input_dim
 
     @property
     def num_out_features(self) -> int:
-        return self.input_dim
+        return self.output_dim
 
     @property
     def output_shape(self) -> tuple[int, ...]:
-        return (self.input_dim,)
+        return (self.output_dim,)
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
