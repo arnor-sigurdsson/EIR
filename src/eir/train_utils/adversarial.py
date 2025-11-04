@@ -193,7 +193,7 @@ def hook_add_adversarial_losses(
             module = AdversarialDisentanglementModule(
                 embedding_dim=embedding_dim,
                 target_dim=target_dim,
-                fc_dim=adv_config.hidden_dim,
+                fc_dim=adv_config.fc_dim,
                 layers=adv_config.layers,
                 dropout_p=adv_config.dropout_p,
                 stochastic_depth_p=adv_config.stochastic_depth_p,
