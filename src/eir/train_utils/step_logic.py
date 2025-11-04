@@ -31,6 +31,10 @@ from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
 from eir.setup.output_setup import al_output_objects_as_dict
 from eir.setup.output_setup_modules.array_output_setup import ComputedArrayOutputInfo
 from eir.setup.output_setup_modules.image_output_setup import ComputedImageOutputInfo
+from eir.train_utils.adversarial import (
+    AdversarialDisentanglementModule,
+    hook_add_adversarial_losses,
+)
 from eir.train_utils.ignite_port.engine import Engine
 from eir.train_utils.metrics import (
     add_loss_to_metrics,
@@ -135,6 +139,41 @@ def _get_default_step_function_hooks_init_kwargs(
         step_function_hooks_init_kwargs=init_kwargs, configs=configs
     )
 
+    if configs.gc.adversarial_training is not None:
+        # Slightly awkward how this is set up, but the thing is that we set up the
+        # hooks only using the configs currently, without having initialized the model.
+        # However, we need to add the forward hooks to the model itself to actually
+        # pull out the tensor pair we apply the adversarial loss to. Therefore, we
+        # set up this lazy init there below, where we populate the state on the
+        # batch setup (where the model has been initialized), and then we use these
+        # actual "computed"/inferred values in the adversarial loss hook
+        logger.debug("Setting up adversarial training hooks.")
+
+        adversarial_configs_list = list(
+            configs.gc.adversarial_training.adversarial_configs
+        )
+
+        adversarial_state: dict[str, Any] = {
+            "cache": {},
+            "hook_handles": [],
+            "configs": adversarial_configs_list,
+            "modules": None,
+            "initialized": False,
+        }
+
+        init_hook = get_hook_init_adversarial(
+            adversarial_state=adversarial_state,
+            device=configs.gc.be.device,
+        )
+        init_kwargs["base_prepare_batch"].append(init_hook)
+
+        add_loss_hook = get_hook_add_adversarial_losses(
+            adversarial_state=adversarial_state,
+        )
+        init_kwargs["loss"].append(add_loss_hook)
+
+        extra_state["adversarial_state"] = adversarial_state
+
     grad_acc_steps = configs.gc.opt.gradient_accumulation_steps
     if grad_acc_steps and grad_acc_steps > 1:
         logger.debug(
@@ -175,6 +214,114 @@ def add_l1_loss_hook_if_applicable(
         step_function_hooks_init_kwargs["loss"].append(hook_add_l1_loss)
 
     return step_function_hooks_init_kwargs
+
+
+def setup_adversarial_modules(
+    adversarial_config_list: list,
+    model: nn.Module,
+    device: str,
+) -> tuple[dict[str, AdversarialDisentanglementModule] | None, dict[str, Any]]:
+    adversarial_cache: dict[str, torch.Tensor] = {}
+    hook_handles = []
+
+    all_named_modules = dict(model.named_modules())
+
+    for adv_config in adversarial_config_list:
+        if not adv_config.enabled:
+            continue
+
+        embedding_layer = model_training_utils.get_module_from_path(
+            all_named_modules=all_named_modules,
+            layer_path=adv_config.embedding_layer_path,
+            custom_error_message=f"Adversarial config '{adv_config.name}': "
+            f"embedding layer path not found",
+        )
+
+        target_layer = model_training_utils.get_module_from_path(
+            all_named_modules=all_named_modules,
+            layer_path=adv_config.target_layer_path,
+            custom_error_message=f"Adversarial config '{adv_config.name}': "
+            f"target layer path not found",
+        )
+
+        embedding_cache_key = f"{adv_config.name}_embedding"
+        target_cache_key = f"{adv_config.name}_target"
+
+        # Note that these are called on each forward, updating the
+        # adversarial cache in every iteration
+        remove_embedding_hook = model_training_utils.attach_caching_hook(
+            module=embedding_layer,
+            cache=adversarial_cache,
+            cache_key=embedding_cache_key,
+            cache_target="output",
+        )
+
+        remove_target_hook = model_training_utils.attach_caching_hook(
+            module=target_layer,
+            cache=adversarial_cache,
+            cache_key=target_cache_key,
+            cache_target="output",
+        )
+
+        hook_handles.extend([remove_embedding_hook, remove_target_hook])
+
+        logger.debug(
+            "Registered forward hooks for adversarial config '%s'",
+            adv_config.name,
+        )
+
+    adversarial_state = {
+        "cache": adversarial_cache,
+        "hook_handles": hook_handles,
+    }
+
+    return None, adversarial_state
+
+
+def get_hook_init_adversarial(
+    adversarial_state: dict[str, Any],
+    device: str,
+) -> Callable:
+    def _hook(
+        experiment: "Experiment",
+        *args,
+        **kwargs,
+    ) -> dict[str, Any]:
+        if not adversarial_state["initialized"]:
+            logger.debug("Lazy initialization of adversarial forward hooks.")
+            _, initialized_state = setup_adversarial_modules(
+                adversarial_config_list=adversarial_state["configs"],
+                model=experiment.model,
+                device=device,
+            )
+            adversarial_state["cache"] = initialized_state["cache"]
+            adversarial_state["hook_handles"] = initialized_state["hook_handles"]
+            adversarial_state["initialized"] = True
+            adversarial_state["device"] = device
+
+        return {}
+
+    return _hook
+
+
+def get_hook_add_adversarial_losses(
+    adversarial_state: dict[str, Any],
+) -> Callable:
+    def _hook(
+        experiment: "Experiment",
+        state: dict[str, Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        return hook_add_adversarial_losses(
+            experiment,
+            state,
+            adversarial_state,
+            *args,
+            **kwargs,
+        )
+
+    return _hook
 
 
 @dataclass

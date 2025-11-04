@@ -23,6 +23,7 @@ from eir.models.output.sequence.sequence_output_modules import (
     SequenceOutputModuleConfig,
 )
 from eir.models.output.tabular.tabular_output_modules import TabularOutputModuleConfig
+from eir.setup.schema_modules.adversarial_schemas import AdversarialTrainingConfig
 from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfig
 from eir.setup.schema_modules.output_schemas_array import (
     ArrayOutputSamplingConfig,
@@ -533,6 +534,7 @@ class GlobalConfig:
     data_preparation: DataPreparationConfig
     accelerator: AcceleratorConfig
     latent_sampling: LatentSamplingConfig | None = None
+    adversarial_training: AdversarialTrainingConfig | None = None
 
     be: BasicExperimentConfig = field(init=False, repr=False)
     m: GlobalModelConfig = field(init=False, repr=False)
@@ -546,6 +548,7 @@ class GlobalConfig:
     dp: DataPreparationConfig = field(init=False, repr=False)
     ac: AcceleratorConfig = field(init=False, repr=False)
     ls: LatentSamplingConfig | None = field(init=False, repr=False)
+    adv: AdversarialTrainingConfig | None = field(init=False, repr=False)
 
     def __post_init__(self):
         self.be = self.basic_experiment
@@ -560,6 +563,7 @@ class GlobalConfig:
         self.dp = self.data_preparation
         self.ac = self.accelerator
         self.ls = self.latent_sampling
+        self.adv = self.adversarial_training
 
 
 @dataclass

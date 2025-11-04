@@ -235,15 +235,20 @@ def get_default_experiment(
 
     loss_func = get_loss_callable(criteria=criteria)
 
-    extra_modules = None
+    extra_modules = {}
     if hooks.extra_state is not None:
-        extra_modules = hooks.extra_state.get("uncertainty_modules", {})
+        uncertainty_modules = hooks.extra_state.get("uncertainty_modules", {})
+        adversarial_state = hooks.extra_state.get("adversarial_state", {})
+        adversarial_modules = (
+            adversarial_state.get("modules", {}) if adversarial_state else {}
+        )
+        extra_modules = {**uncertainty_modules, **adversarial_modules}
 
     optimizer = get_optimizer(
         model=model,
         loss_callable=loss_func,
         global_config=gc,
-        extra_modules=extra_modules,
+        extra_modules=extra_modules if extra_modules else None,
     )
 
     metrics = get_default_metrics(
