@@ -31,7 +31,7 @@ def test_adversarial_module_forward():
         embedding_dim=embedding_dim,
         target_dim=target_dim,
         fc_dim=256,
-        n_hidden_layers=2,
+        layers=[2],
         dropout_p=0.1,
     )
 
@@ -53,7 +53,7 @@ def test_adversarial_module_gradient_flow():
         embedding_dim=embedding_dim,
         target_dim=target_dim,
         fc_dim=64,
-        n_hidden_layers=1,
+        layers=[2],
         dropout_p=0.0,
     )
 
@@ -80,7 +80,7 @@ def test_multiple_adversaries_shapes():
             embedding_dim=config["embedding_dim"],
             target_dim=config["target_dim"],
             fc_dim=128,
-            n_hidden_layers=2,
+            layers=[2],
         )
 
     batch_size = 4
