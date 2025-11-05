@@ -156,11 +156,21 @@ def hook_add_adversarial_losses(
 
         adversarial_state["modules"] = adversarial_modules
 
+        total_params = 0
         for module_name, module in adversarial_modules.items():
+            total_params += sum(
+                p.numel() for p in module.parameters() if p.requires_grad
+            )
             experiment.optimizer.add_param_group({"params": module.parameters()})
-            logger.info(
+            logger.debug(
                 "Added adversarial module '%s' parameters to optimizer", module_name
             )
+
+        logger.info(
+            "Added %d adversarial modules to optimizer with %d parameters",
+            len(adversarial_modules),
+            total_params,
+        )
 
     adversarial_modules = adversarial_state["modules"]
 
