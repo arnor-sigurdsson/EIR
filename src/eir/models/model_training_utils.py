@@ -517,12 +517,15 @@ def attach_caching_hook(
     cache: dict[str, torch.Tensor],
     cache_key: str,
     cache_target: Literal["input", "output"] = "output",
+    detach: bool = True,
 ) -> Callable[[], None]:
     def hook(module: nn.Module, args: tuple[torch.Tensor, ...], output: torch.Tensor):
-        if cache_target == "input":
-            cache[cache_key] = args[0].detach()
-        else:
-            cache[cache_key] = output.detach()
+        tensor = args[0] if cache_target == "input" else output
+
+        if detach:
+            tensor = tensor.detach()
+
+        cache[cache_key] = tensor
 
     handle = module.register_forward_hook(hook)
 

@@ -4,14 +4,13 @@ import torch
 from torch import nn
 
 from eir.models.layers.mlp_layers import MLPResidualBlock
-from eir.models.model_training_utils import attach_caching_hook, get_module_from_path
 from eir.models.tensor_broker.tensor_broker_projection_layers import (
     get_projection_layer,
 )
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from eir.setup.schema_modules.adversarial_schemas import AdversarialConfig
+    pass
 
 logger = get_logger(name=__name__)
 
@@ -99,61 +98,6 @@ class AdversarialDisentanglementModule(nn.Module):
 
         adv_loss = nn.functional.mse_loss(input=target_pred, target=target)
         return adv_loss
-
-
-def hook_extract_tensors_for_adversarial(
-    experiment: Any,
-    state: dict[str, Any],
-    adversarial_configs: list["AdversarialConfig"],
-    *args,
-    **kwargs,
-) -> dict[str, Any]:
-    model = experiment.model
-
-    if "adversarial_cache" not in state:
-        state["adversarial_cache"] = {}
-        state["adversarial_hooks"] = []
-
-    all_named_modules = dict(model.named_modules())
-
-    for config in adversarial_configs:
-        if not config.enabled:
-            continue
-
-        embedding_layer = get_module_from_path(
-            all_named_modules=all_named_modules,
-            layer_path=config.embedding_layer_path,
-            custom_error_message=f"Adversarial config '{config.name}': "
-            f"embedding layer path not found",
-        )
-
-        target_layer = get_module_from_path(
-            all_named_modules=all_named_modules,
-            layer_path=config.target_layer_path,
-            custom_error_message=f"Adversarial config '{config.name}': "
-            f"target layer path not found",
-        )
-
-        embedding_cache_key = f"{config.name}_embedding"
-        target_cache_key = f"{config.name}_target"
-
-        remove_embedding_hook = attach_caching_hook(
-            module=embedding_layer,
-            cache=state["adversarial_cache"],
-            cache_key=embedding_cache_key,
-            cache_target="output",
-        )
-
-        remove_target_hook = attach_caching_hook(
-            module=target_layer,
-            cache=state["adversarial_cache"],
-            cache_key=target_cache_key,
-            cache_target="output",
-        )
-
-        state["adversarial_hooks"].extend([remove_embedding_hook, remove_target_hook])
-
-    return state
 
 
 def hook_add_adversarial_losses(

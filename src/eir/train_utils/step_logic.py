@@ -247,18 +247,31 @@ def setup_adversarial_modules(
 
         # Note that these are called on each forward, updating the
         # adversarial cache in every iteration
+
+        # Important: Keep attached. The GRL-reversed gradient from the adversarial
+        # loss must be able to flow back to this "source" branch to apply
+        # the disentanglement penalty (i.e. we are updating it to actively
+        # disentangle here)
         remove_embedding_hook = model_training_utils.attach_caching_hook(
             module=embedding_layer,
             cache=adversarial_cache,
             cache_key=embedding_cache_key,
-            cache_target="output",
+            cache_target=adv_config.embedding_cache_target,
+            detach=False,
         )
 
+        # This is kind of a "firewall". Detach the target tensor to stop the
+        # adversarial loss gradient from flowing back into the branch that produced it.
+        # This ensures the target-producing branch is only trained by the
+        # main_loss, not the adversarial_loss. Otherwise, the target-producing
+        # branch would also be trained to make its output "easier" for the adversary
+        # to predict, e.g. just making the values all 1s in an extreme case.
         remove_target_hook = model_training_utils.attach_caching_hook(
             module=target_layer,
             cache=adversarial_cache,
             cache_key=target_cache_key,
-            cache_target="output",
+            cache_target=adv_config.target_cache_target,
+            detach=True,
         )
 
         hook_handles.extend([remove_embedding_hook, remove_target_hook])

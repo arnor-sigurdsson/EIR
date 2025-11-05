@@ -40,6 +40,16 @@ class AdversarialConfig:
 
     :param projection_type:
         Type of projection layer to use before the adversarial discriminator.
+
+    :param embedding_cache_target:
+        Whether to cache 'input' or 'output' of the embedding layer.
+        Default 'output' caches the layer's output activations.
+
+    :param target_cache_target:
+        Whether to cache 'input' or 'output' of the target layer.
+        Default 'output' caches the layer's output activations.
+        Consider using 'input' to capture the target signal before it's
+        processed by the target layer's transformations.
     """
 
     name: str
@@ -54,6 +64,8 @@ class AdversarialConfig:
     projection_type: Literal[
         "linear", "lcl", "lcl_residual", "mlp_residual", "grouped_linear"
     ] = "linear"
+    embedding_cache_target: Literal["input", "output"] = "output"
+    target_cache_target: Literal["input", "output"] = "output"
 
 
 @dataclass
