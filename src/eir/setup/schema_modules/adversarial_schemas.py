@@ -23,7 +23,15 @@ class AdversarialConfig:
 
     :param lambda_adv:
         Weight for the adversarial loss term. Higher values enforce stronger
-        disentanglement.
+        disentanglement. Default of 1.0 assumes main_loss and adv_loss are on
+        similar scales - this is the most important hyperparameter to tune based
+        on the relative scales of your losses.
+
+    :param warmup_steps:
+        Number of training steps over which to linearly increase lambda_adv from
+        0.0 to its final value. This warmup allows the main task to stabilize
+        before applying the full adversarial penalty. Default of 5000 is a good
+        starting point for most tasks.
 
     :param fc_dim:
         Hidden dimension for the adversarial discriminator network.
@@ -56,7 +64,8 @@ class AdversarialConfig:
     embedding_layer_path: str
     target_layer_path: str
     enabled: bool = True
-    lambda_adv: float = 0.1
+    lambda_adv: float = 1.0
+    warmup_steps: int = 5000
     fc_dim: int = 128
     layers: list[int] = field(default_factory=lambda: [2])
     dropout_p: float = 0.1

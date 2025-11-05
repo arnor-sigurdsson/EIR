@@ -139,6 +139,7 @@ def _get_default_step_function_hooks_init_kwargs(
         step_function_hooks_init_kwargs=init_kwargs, configs=configs
     )
 
+    counter_added = False
     if configs.gc.adversarial_training is not None:
         # Slightly awkward how this is set up, but the thing is that we set up the
         # hooks only using the configs currently, without having initialized the model.
@@ -169,6 +170,11 @@ def _get_default_step_function_hooks_init_kwargs(
         add_loss_hook = get_hook_add_adversarial_losses(
             adversarial_state=adversarial_state,
         )
+
+        # must come before as adversarial loss uses iteration to tune lambda warmup
+        init_kwargs["loss"].append(get_hook_iteration_counter())
+        counter_added = True
+
         init_kwargs["loss"].append(add_loss_hook)
 
         extra_state["adversarial_state"] = adversarial_state
@@ -179,7 +185,9 @@ def _get_default_step_function_hooks_init_kwargs(
             "Adding gradient accumulation hook with steps=%d.",
             configs.gc.opt.gradient_accumulation_steps,
         )
-    init_kwargs["loss"].append(get_hook_iteration_counter())
+
+    if not counter_added:
+        init_kwargs["loss"].append(get_hook_iteration_counter())
 
     return init_kwargs, extra_state
 

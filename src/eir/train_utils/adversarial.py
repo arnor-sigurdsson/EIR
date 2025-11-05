@@ -176,6 +176,8 @@ def hook_add_adversarial_losses(
 
     total_adversarial_loss = 0.0
 
+    current_iteration = state["iteration"]
+
     for adv_config in adversarial_configs:
         if not adv_config.enabled:
             continue
@@ -196,11 +198,16 @@ def hook_add_adversarial_losses(
             target=target_flat,
         )
 
-        scaled_adv_loss = adv_config.lambda_adv * adv_loss
+        warmup_factor = min(1.0, current_iteration / adv_config.warmup_steps)
+        current_lambda = adv_config.lambda_adv * warmup_factor
+        print(current_lambda)
+
+        scaled_adv_loss = current_lambda * adv_loss
 
         total_adversarial_loss = total_adversarial_loss + scaled_adv_loss
 
         state["losses"][f"adversarial_{adv_config.name}"] = adv_loss.item()
+        state["losses"][f"adversarial_{adv_config.name}_lambda"] = current_lambda
 
     state["loss"] = state["loss"] + total_adversarial_loss
 
