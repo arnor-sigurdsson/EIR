@@ -200,7 +200,6 @@ def hook_add_adversarial_losses(
 
         warmup_factor = min(1.0, current_iteration / adv_config.warmup_steps)
         current_lambda = adv_config.lambda_adv * warmup_factor
-        print(current_lambda)
 
         scaled_adv_loss = current_lambda * adv_loss
 
