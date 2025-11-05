@@ -158,7 +158,7 @@ def hook_add_adversarial_losses(
 
         for module_name, module in adversarial_modules.items():
             experiment.optimizer.add_param_group({"params": module.parameters()})
-            logger.debug(
+            logger.info(
                 "Added adversarial module '%s' parameters to optimizer", module_name
             )
 
