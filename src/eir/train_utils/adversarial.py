@@ -174,10 +174,9 @@ def hook_add_adversarial_losses(
 
     adversarial_modules = adversarial_state["modules"]
 
-    total_adversarial_loss = 0.0
-
     current_iteration = state["iteration"]
 
+    scaled_adversarial_losses = []
     for adv_config in adversarial_configs:
         if not adv_config.enabled:
             continue
@@ -203,10 +202,15 @@ def hook_add_adversarial_losses(
 
         scaled_adv_loss = current_lambda * adv_loss
 
-        total_adversarial_loss = total_adversarial_loss + scaled_adv_loss
+        scaled_adversarial_losses.append(scaled_adv_loss)
 
         state["losses"][f"adversarial_{adv_config.name}"] = adv_loss.item()
         state["losses"][f"adversarial_{adv_config.name}_lambda"] = current_lambda
+
+    if scaled_adversarial_losses:
+        total_adversarial_loss = torch.stack(scaled_adversarial_losses).mean()
+    else:
+        total_adversarial_loss = 0.0
 
     state["loss"] = state["loss"] + total_adversarial_loss
 
