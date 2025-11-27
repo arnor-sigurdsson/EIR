@@ -375,25 +375,90 @@ def make_random_omics_columns_missing(
     omics_array: torch.Tensor,
     na_augment_alpha: float = 1.0,
     na_augment_beta: float = 9.0,
+    mix_alpha: float = 1.0,
+    mix_beta: float = 1.0,
 ) -> torch.Tensor:
     if na_augment_alpha <= 0 or na_augment_beta <= 0:
-        raise ValueError("Alpha and Beta must be positive.")
+        raise ValueError("Severity alpha and beta must be positive.")
+    if mix_alpha <= 0 or mix_beta <= 0:
+        raise ValueError("Mix alpha and beta must be positive.")
 
-    dist = get_beta_distribution(alpha=na_augment_alpha, beta=na_augment_beta)
-    percentage_sampled = dist.sample().item()
+    severity_dist = get_beta_distribution(alpha=na_augment_alpha, beta=na_augment_beta)
+    mask_rate = severity_dist.sample().item()
+
+    mix_dist = get_beta_distribution(alpha=mix_alpha, beta=mix_beta)
+    mix_ratio = mix_dist.sample().item()
+
+    block_budget = mask_rate * mix_ratio
+    random_budget = mask_rate * (1 - mix_ratio)
+
+    omics_array = _apply_block_masking_to_omics(
+        omics_array=omics_array,
+        block_budget=block_budget,
+    )
+
+    omics_array = _apply_random_masking_to_omics(
+        omics_array=omics_array,
+        random_budget=random_budget,
+    )
+
+    return omics_array
+
+
+def _apply_block_masking_to_omics(
+    omics_array: torch.Tensor,
+    block_budget: float,
+) -> torch.Tensor:
+    if block_budget <= 0:
+        return omics_array
 
     n_snps = omics_array.shape[2]
-    n_to_drop = int(n_snps * percentage_sampled)
-    random_to_drop = torch.randperm(n_snps)[:n_to_drop].to(dtype=torch.long)
+    n_to_mask = int(round(n_snps * block_budget))
 
-    missing_list = [
-        False,
-        False,
-        False,
-        True,
-    ]
-    missing_arr = torch.tensor(missing_list, dtype=torch.bool).reshape(-1, 1)
-    omics_array[:, :, random_to_drop] = missing_arr
+    if n_to_mask == 0:
+        return omics_array
+
+    block_start = np.random.choice(max(1, n_snps - n_to_mask + 1))
+    block_end = block_start + n_to_mask
+
+    missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
+        -1, 1
+    )
+    omics_array[:, :, block_start:block_end] = missing_arr
+
+    return omics_array
+
+
+def _apply_random_masking_to_omics(
+    omics_array: torch.Tensor,
+    random_budget: float,
+) -> torch.Tensor:
+    if random_budget <= 0:
+        return omics_array
+
+    n_snps = omics_array.shape[2]
+    missing_pattern = torch.tensor([False, False, False, True], dtype=torch.bool).view(
+        4, 1
+    )
+    is_missing = (omics_array[0, :, :] == missing_pattern).all(dim=0)
+    unmasked_indices = (~is_missing).nonzero(as_tuple=True)[0]
+
+    if len(unmasked_indices) == 0:
+        return omics_array
+
+    n_to_mask = int(round(n_snps * random_budget))
+    n_to_mask = min(n_to_mask, len(unmasked_indices))
+
+    if n_to_mask == 0:
+        return omics_array
+
+    random_indices = torch.randperm(len(unmasked_indices))[:n_to_mask]
+    snps_to_mask = unmasked_indices[random_indices]
+
+    missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
+        -1, 1
+    )
+    omics_array[:, :, snps_to_mask] = missing_arr
 
     return omics_array
 

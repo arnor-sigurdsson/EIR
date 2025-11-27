@@ -210,7 +210,7 @@ def hook_add_adversarial_losses(
     if scaled_adversarial_losses:
         total_adversarial_loss = torch.stack(scaled_adversarial_losses).mean()
     else:
-        total_adversarial_loss = 0.0
+        total_adversarial_loss = torch.tensor(0.0, device=device)
 
     state["loss"] = state["loss"] + total_adversarial_loss
 
