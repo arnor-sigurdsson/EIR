@@ -32,14 +32,15 @@ def test_validate_no_duplicate_columns_multiple_duplicates():
         )
 
 
-def test_validate_no_duplicate_columns_case_sensitive():
+def test_validate_no_duplicate_columns_case_insensitive():
     columns = ["HDL Cholesterol", "HDL cholesterol"]
-    with pytest.raises(ValueError, match="duplicate column names") as exc_info:
+    with pytest.raises(ValueError, match="differ only in case") as exc_info:
         validate_no_duplicate_columns(
             columns=columns,
             config_type="Tabular output",
             config_name="test_output",
         )
+    assert "HDL Cholesterol" in str(exc_info.value)
     assert "HDL cholesterol" in str(exc_info.value)
 
 
@@ -59,3 +60,24 @@ def test_validate_no_duplicate_columns_single_column():
         config_type="Tabular input",
         config_name="test_input",
     )
+
+
+def test_validate_no_duplicate_columns_multiple_case_insensitive():
+    columns = ["Age", "Height", "age", "Weight", "height"]
+    with pytest.raises(ValueError, match="differ only in case"):
+        validate_no_duplicate_columns(
+            columns=columns,
+            config_type="Tabular input",
+            config_name="test_input",
+        )
+
+
+def test_validate_no_duplicate_columns_exact_takes_precedence():
+    columns = ["col1", "col1", "Col1"]
+    with pytest.raises(ValueError, match="duplicate column names") as exc_info:
+        validate_no_duplicate_columns(
+            columns=columns,
+            config_type="Tabular input",
+            config_name="test_input",
+        )
+    assert "differ only in case" not in str(exc_info.value)

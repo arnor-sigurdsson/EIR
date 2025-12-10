@@ -209,17 +209,37 @@ def validate_no_duplicate_columns(
     config_name: str,
 ) -> None:
     seen = set()
-    duplicates = []
+    exact_duplicates = []
     for col in columns:
         if col in seen:
-            duplicates.append(col)
+            exact_duplicates.append(col)
         seen.add(col)
 
-    if duplicates:
+    if exact_duplicates:
         raise ValueError(
             f"{config_type} '{config_name}' contains duplicate column names: "
-            f"{reprlib.repr(duplicates)}. "
+            f"{reprlib.repr(exact_duplicates)}. "
             f"Please remove the duplicate columns."
+        )
+
+    seen_lower = {}
+    case_insensitive_duplicates = []
+    for col in columns:
+        col_lower = col.lower()
+        if col_lower in seen_lower:
+            original = seen_lower[col_lower]
+            case_insensitive_duplicates.append((original, col))
+        else:
+            seen_lower[col_lower] = col
+
+    if case_insensitive_duplicates:
+        dup_pairs = [
+            f"'{orig}' and '{dup}'" for orig, dup in case_insensitive_duplicates
+        ]
+        raise ValueError(
+            f"{config_type} '{config_name}' contains column names that differ only "
+            f"in case: {', '.join(dup_pairs)}. "
+            f"Please use consistent casing or different names."
         )
 
 
