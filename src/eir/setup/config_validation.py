@@ -57,6 +57,11 @@ def validate_input_configs(input_configs: Sequence[schemas.InputConfig]) -> None
                 input_cat_columns, input_con_columns, _, _
             ):
                 expected_columns = list(input_cat_columns) + list(input_con_columns)
+                validate_no_duplicate_columns(
+                    columns=expected_columns,
+                    config_type="Tabular input",
+                    config_name=input_config.input_info.input_name,
+                )
                 validate_tabular_source(
                     source_to_check=input_source_path,
                     expected_columns=expected_columns,
@@ -100,6 +105,11 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                 output_source_path = Path(output_source)
 
                 expected_columns = list(target_cat_columns) + list(target_con_columns)
+                validate_no_duplicate_columns(
+                    columns=expected_columns,
+                    config_type="Tabular output",
+                    config_name=name,
+                )
                 validate_tabular_source(
                     source_to_check=output_source_path,
                     expected_columns=expected_columns,
@@ -190,6 +200,26 @@ def base_validate_output_info(output_info: schemas.OutputInfoConfig) -> None:
         raise ValueError(
             f"Output source {output_info.output_source} does not exist. "
             f"Please check the path is correct."
+        )
+
+
+def validate_no_duplicate_columns(
+    columns: Sequence[str],
+    config_type: str,
+    config_name: str,
+) -> None:
+    seen = set()
+    duplicates = []
+    for col in columns:
+        if col in seen:
+            duplicates.append(col)
+        seen.add(col)
+
+    if duplicates:
+        raise ValueError(
+            f"{config_type} '{config_name}' contains duplicate column names: "
+            f"{reprlib.repr(duplicates)}. "
+            f"Please remove the duplicate columns."
         )
 
 
