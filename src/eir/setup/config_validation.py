@@ -222,8 +222,8 @@ def validate_no_duplicate_columns(
             f"Please remove the duplicate columns."
         )
 
-    seen_lower = {}
-    case_insensitive_duplicates = []
+    seen_lower: dict[str, str] = {}
+    case_insensitive_duplicates: list[tuple[str, str]] = []
     for col in columns:
         col_lower = col.lower()
         if col_lower in seen_lower:
