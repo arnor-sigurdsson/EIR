@@ -172,6 +172,7 @@ def save_yaml_configs(
                 "latent_sampling",
                 "data_preparation",
                 "accelerator",
+                "adversarial_training",
             ]
             config_dict = {k: getattr(config_object, k) for k in main_keys}
             config_object_as_primitives = object_to_primitives(obj=config_dict)

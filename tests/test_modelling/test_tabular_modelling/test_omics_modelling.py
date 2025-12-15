@@ -1161,3 +1161,83 @@ def _check_snp_types(
         snp_type_success = (top_idxs == expected_idxs).sum() >= at_least_n
 
     return snp_type_success
+
+
+@pytest.mark.parametrize(
+    "create_test_data",
+    [
+        {
+            "task_type": "multi_task",
+            "random_samples_dropped_from_modalities": True,
+        }
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": {
+                "global_configs": {
+                    "basic_experiment": {
+                        "n_epochs": 15,
+                    },
+                    "optimization": {
+                        "lr": 1e-03,
+                    },
+                    "adversarial_training": {
+                        "adversarial_configs": [
+                            {
+                                "name": "genotype_tabular_disentangle",
+                                "enabled": True,
+                                "embedding_layer_path": "input_modules.test_genotype",
+                                "target_layer_path": "input_modules.test_tabular",
+                                "lambda_adv": 0.05,
+                                "fc_dim": 64,
+                                "layers": [2],
+                                "dropout_p": 0.1,
+                            }
+                        ]
+                    },
+                },
+                "input_configs": [
+                    {
+                        "input_info": {"input_name": "test_genotype"},
+                        "model_config": {
+                            "model_type": "linear",
+                            "model_init_config": {"l1": 2e-05},
+                        },
+                    },
+                    {
+                        "input_info": {"input_name": "test_tabular"},
+                        "input_type_info": {
+                            "input_cat_columns": ["OriginExtraCol"],
+                            "input_con_columns": ["ExtraTarget"],
+                        },
+                        "model_config": {"model_type": "tabular"},
+                    },
+                ],
+                "fusion_configs": {
+                    "model_config": {
+                        "fc_task_dim": 128,
+                        "rb_do": 0.10,
+                    },
+                },
+                "output_configs": _get_multi_task_output_configs(),
+            },
+        },
+    ],
+    indirect=True,
+)
+def test_adversarial_disentanglement(
+    prep_modelling_test_configs: tuple[train.Experiment, "ModelTestConfig"],
+):
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    check_performance_result_wrapper(
+        outputs=experiment.outputs,
+        run_path=test_config.run_path,
+        max_thresholds=(0.8, 0.8),
+    )

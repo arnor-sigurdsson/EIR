@@ -237,13 +237,16 @@ def get_default_experiment(
 
     extra_modules = None
     if hooks.extra_state is not None:
+        # Note, we do not add the adversarial modules here because they get added
+        # to the optimizer via .add_param_group(...) during the lazy init
+        # in hook_add_adversarial_losses(...).
         extra_modules = hooks.extra_state.get("uncertainty_modules", {})
 
     optimizer = get_optimizer(
         model=model,
         loss_callable=loss_func,
         global_config=gc,
-        extra_modules=extra_modules,
+        extra_modules=extra_modules if extra_modules else None,
     )
 
     metrics = get_default_metrics(

@@ -1,9 +1,11 @@
 from collections.abc import Callable, Generator, Iterable, Sequence
 from copy import copy, deepcopy
+from difflib import get_close_matches
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
+    Literal,
     Optional,
     TypedDict,
 )
@@ -459,3 +461,75 @@ def add_wd_to_model_params(model: nn.Module, wd: float) -> list[ParamGroup]:
         )
 
     return param_list
+
+
+def get_module_from_path(
+    all_named_modules: dict[str, nn.Module],
+    layer_path: str,
+    custom_error_message: str | None = None,
+    num_suggestions: int = 3,
+) -> nn.Module:
+    if layer_path in all_named_modules:
+        return all_named_modules[layer_path]
+
+    common_prefixes = ["_forward_module.", "module.", "_orig_mod."]
+    for prefix in common_prefixes:
+        prefixed_path = prefix + layer_path
+        if prefixed_path in all_named_modules:
+            logger.debug(
+                f"Found layer with wrapper prefix: '{prefixed_path}' "
+                f"(originally searched for '{layer_path}')"
+            )
+            return all_named_modules[prefixed_path]
+
+    close_matches = get_close_matches(
+        layer_path, all_named_modules.keys(), n=num_suggestions, cutoff=0.6
+    )
+
+    error_parts = []
+
+    if custom_error_message:
+        error_parts.append(f"{custom_error_message}")
+
+    error_parts.append(f"Layer path not found: '{layer_path}'")
+
+    if close_matches:
+        suggestions = "\n".join(f"  - {match}" for match in close_matches)
+        error_parts.append(f"Did you mean one of these?\n{suggestions}")
+    else:
+        error_parts.append("No close matches found.")
+
+    sample_keys = list(all_named_modules.keys())[:5]
+    if sample_keys:
+        examples = "\n".join(f"  - {k}" for k in sample_keys)
+        error_parts.append(f"Example layer paths:\n{examples}")
+        if len(all_named_modules) > 5:
+            error_parts.append(f"  ... ({len(all_named_modules) - 5} more paths)")
+
+    error_message = "\n".join(error_parts)
+    logger.error(error_message)
+
+    raise KeyError(f"Layer path '{layer_path}' not found. See logs for details.")
+
+
+def attach_caching_hook(
+    module: nn.Module,
+    cache: dict[str, torch.Tensor],
+    cache_key: str,
+    cache_target: Literal["input", "output"] = "output",
+    detach: bool = True,
+) -> Callable[[], None]:
+    def hook(module: nn.Module, args: tuple[torch.Tensor, ...], output: torch.Tensor):
+        tensor = args[0] if cache_target == "input" else output
+
+        if detach:
+            tensor = tensor.detach()
+
+        cache[cache_key] = tensor
+
+    handle = module.register_forward_hook(hook)
+
+    def remove_hook():
+        handle.remove()
+
+    return remove_hook

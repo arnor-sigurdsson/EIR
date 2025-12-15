@@ -34,6 +34,7 @@ from eir.setup.schema_modules.latent_analysis_schemas import LatentSamplingConfi
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
 from eir.setup.schemas import (
     AcceleratorConfig,
+    AdversarialTrainingConfig,
     AttributionAnalysisConfig,
     BasicExperimentConfig,
     DataPreparationConfig,
@@ -303,6 +304,20 @@ def get_global_config(global_configs: Iterable[dict]) -> GlobalConfig:
     ):
         latent_sampling = LatentSamplingConfig(**combined_config["latent_sampling"])
 
+    adversarial_training = None
+    if "adversarial_training" in combined_config and isinstance(
+        combined_config["adversarial_training"], dict
+    ):
+        from eir.setup.schema_modules.adversarial_schemas import AdversarialConfig
+
+        adv_configs_raw = combined_config["adversarial_training"].get(
+            "adversarial_configs", []
+        )
+        adv_configs = [AdversarialConfig(**cfg) for cfg in adv_configs_raw]
+        adversarial_training = AdversarialTrainingConfig(
+            adversarial_configs=adv_configs,
+        )
+
     global_config = GlobalConfig(
         basic_experiment=basic_experiment_config,
         model=model_config,
@@ -316,6 +331,7 @@ def get_global_config(global_configs: Iterable[dict]) -> GlobalConfig:
         data_preparation=data_prep_config,
         latent_sampling=latent_sampling,
         accelerator=accelerator_config,
+        adversarial_training=adversarial_training,
     )
 
     return modify_global_config(global_config)
