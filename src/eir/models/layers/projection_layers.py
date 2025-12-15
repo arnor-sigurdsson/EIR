@@ -20,6 +20,7 @@ def get_1d_projection_layer(
         "cnn",
     ] = "auto",
     lcl_diff_tolerance: int = 0,
+    kernel_width_divisible_by: int | None = None,
 ) -> LCLResidualBlock | LCL | nn.Linear | nn.Identity:
     """
     Note: These currently (and possibly will only continue to) support
@@ -34,6 +35,7 @@ def get_1d_projection_layer(
             target_dimension=target_dimension,
             layer_type="lcl_residual",
             diff_tolerance=lcl_diff_tolerance,
+            kernel_width_divisible_by=kernel_width_divisible_by,
         )
         if lcl_residual_projection is not None:
             return lcl_residual_projection
@@ -43,6 +45,7 @@ def get_1d_projection_layer(
             target_dimension=target_dimension,
             layer_type="lcl",
             diff_tolerance=lcl_diff_tolerance,
+            kernel_width_divisible_by=kernel_width_divisible_by,
         )
         if lcl_projection is not None:
             return lcl_projection
@@ -59,6 +62,7 @@ def get_1d_projection_layer(
             target_dimension=target_dimension,
             layer_type="lcl_residual",
             diff_tolerance=lcl_diff_tolerance,
+            kernel_width_divisible_by=kernel_width_divisible_by,
         )
         if layer is None:
             raise ValueError(
@@ -75,6 +79,7 @@ def get_1d_projection_layer(
             target_dimension=target_dimension,
             layer_type=projection_layer_type,
             diff_tolerance=lcl_diff_tolerance,
+            kernel_width_divisible_by=kernel_width_divisible_by,
         )
         if layer is None:
             raise ValueError(
@@ -107,6 +112,7 @@ def get_lcl_projection_layer(
     kernel_width_candidates: Sequence[int] = tuple(range(1, 16384 + 1)),
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     diff_tolerance: int = 0,
+    kernel_width_divisible_by: int | None = None,
 ) -> LCLResidualBlock | LCL | None:
     layer_class: type[LCLResidualBlock] | type[LCL]
     match layer_type:
@@ -127,6 +133,7 @@ def get_lcl_projection_layer(
         kernel_width_candidates=kernel_width_candidates,
         out_feature_sets_candidates=out_feature_sets_candidates,
         diff_tolerance=diff_tolerance,
+        kernel_width_divisible_by=kernel_width_divisible_by,
     )
 
     if solution is None:
@@ -150,6 +157,7 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
     kernel_width_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 64 + 1)),
     diff_tolerance: int = 0,
+    kernel_width_divisible_by: int | None = None,
 ) -> tuple[int, int] | None:
     best_diff = np.inf
     best_kernel_width = None
@@ -166,6 +174,10 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
         for kernel_width in kernel_width_candidates:
             if kernel_width > input_dimension:
                 continue
+
+            if kernel_width_divisible_by is not None:
+                if kernel_width % kernel_width_divisible_by != 0:
+                    continue
 
             out_features = input_dimension
             for _n in range(n_layers):

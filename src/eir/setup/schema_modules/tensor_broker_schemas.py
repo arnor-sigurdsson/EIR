@@ -5,6 +5,7 @@ from typing import Literal
 al_broker_projection_types = Literal[
     "lcl",
     "lcl_residual",
+    "lcl+mlp_residual",
     "linear",
     "grouped_linear",
     "pool",
@@ -50,6 +51,7 @@ class TensorMessageConfig:
 
         - ``lcl``: Locally connected layer.
         - ``lcl_residual``: Locally connected layer with residual connection.
+        - ``lcl+mlp_residual``: Locally connected layer followed by MLP residual block.
         - ``cnn``: Convolutional layer, only supports down sampling for now.
         - ``linear``: Linear layer.
         - ``pool``: Adaptive average pooling layer.
@@ -59,6 +61,9 @@ class TensorMessageConfig:
         - ``sequence``: Project to a 2D sequence to be e.g. used with cross-attention.
 
         If the tensor is already of the target size, no projection is performed.
+
+    :param kernel_width_divisible_by:
+        For LCL-based projections, constrain kernel width to be divisible by this value.
     """
 
     name: str
@@ -68,6 +73,7 @@ class TensorMessageConfig:
     use_from_cache: list[str] | None = None
     cache_fusion_type: al_broker_fusion_types = "cat+conv"
     projection_type: al_broker_projection_types = "lcl"
+    kernel_width_divisible_by: int | None = None
 
 
 @dataclass

@@ -28,6 +28,7 @@ def get_projection_layer(
     to_shape_no_batch: torch.Size,
     cache_fusion_type: al_broker_fusion_types,
     projection_type: al_broker_projection_types,
+    kernel_width_divisible_by: int | None = None,
 ) -> tuple[nn.Module, torch.Size]:
     """
     We have the cache_fusion_type input (currently mostly unused) and we return the
@@ -64,16 +65,23 @@ def get_projection_layer(
                 target_dimension=to_shape_no_batch.numel(),
                 projection_layer_type=projection_type,  # type: ignore
                 lcl_diff_tolerance=0,
+                kernel_width_divisible_by=kernel_width_divisible_by,
             )
             projection_layers.append(projection_layer)
             projected_shape = to_shape_no_batch
 
         case "lcl+mlp_residual":
+            input_dim = from_shape_no_batch.numel()
+
+            norm_layer = nn.RMSNorm(normalized_shape=input_dim)
+            act_layer = nn.GELU()
+
             lcl_projection_layer = get_1d_projection_layer(
-                input_dimension=from_shape_no_batch.numel(),
+                input_dimension=input_dim,
                 target_dimension=to_shape_no_batch.numel(),
                 projection_layer_type="lcl",  # type: ignore
                 lcl_diff_tolerance=0,
+                kernel_width_divisible_by=kernel_width_divisible_by,
             )
             projected_shape = to_shape_no_batch
 
@@ -85,6 +93,8 @@ def get_projection_layer(
                 stochastic_depth_p=0.0,
             )
 
+            projection_layers.append(norm_layer)
+            projection_layers.append(act_layer)
             projection_layers.append(lcl_projection_layer)
             projection_layers.append(mlp_residual_block)
 

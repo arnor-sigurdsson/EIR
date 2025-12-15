@@ -109,7 +109,6 @@ def calc_lcl_forward(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tens
     s: kernel size (width)
     o: output sets
     """
-
     summed = torch.einsum("nhw, ohw -> noh", input.squeeze(1), weight)
     flattened = summed.flatten(start_dim=1)
 
@@ -164,6 +163,8 @@ class LCLResidualBlock(nn.Module):
 
         self.out_features = self.fc_2.out_features
 
+        # generally seems to work better to always initialize to 1.0 in LCL blocks
+        # in contrast to what we do in the standard MLP blocks
         self.ls = LayerScale(dim=self.out_features, init_values=1.0)
 
         if in_features == self.out_features:
