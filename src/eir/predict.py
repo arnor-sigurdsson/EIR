@@ -344,7 +344,8 @@ def get_default_predict_experiment(
     inferred_run_folder: Path,
 ) -> PredictExperiment:
     configs_overloaded_for_predict = converge_train_and_predict_configs(
-        train_configs=loaded_train_experiment.configs, predict_cl_args=predict_cl_args
+        train_configs=loaded_train_experiment.configs,
+        predict_cl_args=predict_cl_args,
     )
 
     default_train_hooks = loaded_train_experiment.hooks

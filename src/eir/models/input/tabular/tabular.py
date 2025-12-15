@@ -1,5 +1,6 @@
+import math
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -9,6 +10,8 @@ from typing import (
 import torch
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
+
+from eir.models.layers.mlp_layers import MLPResidualBlock
 
 if TYPE_CHECKING:
     pass
@@ -42,11 +45,41 @@ class SimpleTabularModelConfig:
     :param fc_layer:
         Whether to add a single fully-connected layer to the model, alternative
         to looking up and passing the inputs through directly.
+
+    :param drop_prob:
+        Probability of dropping entire branch output during training. Set to 1.0
+        to completely disable learning from this input (useful for testing).
+        During eval mode, dropout is not applied.
+
+    :param layers:
+        Number of MLP-residual blocks to add after the embedding/linear layer.
+        List format for compatibility with fusion module configs
+        (only first element used). Default is [0] (no additional blocks).
+        Useful for learning complex tabular feature interactions before fusion.
+
+    :param fc_do:
+        Dropout probability for MLP-residual blocks. Only used if layers[0] > 0.
+
+    :param fc_dim:
+        Hidden dimension for MLP-residual blocks. Options:
+        - None: uses input_dim (default behavior)
+        - "auto": computes closest power of 2 to 4x input_dim
+        - int: explicit dimension
+        When set, first block projects from input_dim to fc_dim,
+        and subsequent blocks maintain fc_dim.
     """
 
     l1: float = 0.00
 
     fc_layer: bool = False
+
+    drop_prob: float = 0.0
+
+    layers: list[int] = field(default_factory=lambda: [0])
+
+    fc_do: float = 0.1
+
+    fc_dim: int | Literal["auto"] | None = None
 
 
 class SimpleTabularModel(nn.Module):
@@ -78,6 +111,7 @@ class SimpleTabularModel(nn.Module):
         self.unique_label_values = unique_label_values_per_column
         self.device = device
         self.fc_layer = model_init_config.fc_layer
+        self.drop_prob = model_init_config.drop_prob
 
         self.embeddings_dict = set_up_embedding_dict(
             unique_label_values=unique_label_values_per_column
@@ -101,13 +135,44 @@ class SimpleTabularModel(nn.Module):
                 bias=True,
             )
 
+        mlp_hidden_dim: int
+        if model_init_config.fc_dim is None:
+            mlp_hidden_dim = self.input_dim
+        elif model_init_config.fc_dim == "auto":
+            target = self.input_dim * 4
+            mlp_hidden_dim = 2 ** round(math.log2(target)) if target > 0 else 1
+        else:
+            mlp_hidden_dim = model_init_config.fc_dim
+
+        self.mlp_blocks: nn.Sequential | nn.Identity
+        if model_init_config.layers[0] > 0:
+            blocks = []
+            for i in range(model_init_config.layers[0]):
+                in_features = self.input_dim if i == 0 else mlp_hidden_dim
+                out_features = mlp_hidden_dim
+
+                blocks.append(
+                    MLPResidualBlock(
+                        in_features=in_features,
+                        out_features=out_features,
+                        dropout_p=model_init_config.fc_do,
+                        full_preactivation=False,
+                        stochastic_depth_p=0.0,
+                    )
+                )
+            self.mlp_blocks = nn.Sequential(*blocks)
+            self.output_dim = mlp_hidden_dim
+        else:
+            self.mlp_blocks = nn.Identity()
+            self.output_dim = self.input_dim
+
     @property
     def num_out_features(self) -> int:
-        return self.input_dim
+        return self.output_dim
 
     @property
     def output_shape(self) -> tuple[int, ...]:
-        return (self.input_dim,)
+        return (self.output_dim,)
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
@@ -117,7 +182,14 @@ class SimpleTabularModel(nn.Module):
         return torch.cat([torch.flatten(i) for i in self.parameters()])
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        return self.layer(input)
+        output = self.layer(input)
+        output = self.mlp_blocks(output)
+
+        if self.training and self.drop_prob > 0.0:
+            if torch.rand(1).item() < self.drop_prob:
+                output = output * 0.0
+
+        return output
 
 
 def set_up_embedding_dict(

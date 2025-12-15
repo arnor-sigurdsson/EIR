@@ -75,7 +75,7 @@ def _get_pre_trained_module_setup_parametrization() -> dict:
                 },
             ],
             "fusion_configs": {
-                "model_type": "mlp-residual",
+                "model_type": "mlp-residual-sum",
                 "model_config": {
                     "fc_task_dim": 128,
                     "fc_do": 0.10,

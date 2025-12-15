@@ -82,10 +82,12 @@ class SharedResidualMLPOutputModule(nn.Module):
         )
 
         self.shared_branch = nn.Sequential(shared_branch_module, final_block)
+        self.output_identity = nn.Identity()
 
     def forward(self, inputs: torch.Tensor) -> dict[str, torch.Tensor]:
         shared_out_tensor = self.shared_branch(inputs)
+        final_out_tensor = self.output_identity(shared_out_tensor)
 
-        split_outputs = torch.split(shared_out_tensor, self.target_sizes, dim=1)
+        split_outputs = torch.split(final_out_tensor, self.target_sizes, dim=1)
 
         return dict(zip(self.target_names, split_outputs, strict=False))

@@ -18,6 +18,7 @@ from eir.utils.logging import get_logger
 al_fusion_model = Literal[
     "pass-through",
     "mlp-residual",
+    "mlp-residual-sum",
     "identity",
     "mgmoe",
     "attention",
@@ -118,6 +119,7 @@ def _check_fusion_modules(
     }
     full_set = computed_set.union(pass_through_set).union({"array"})
     supported_fusion_models = {
+        "mlp-residual-sum",
         "mlp-residual",
         "mgmoe",
         "identity",
@@ -178,6 +180,8 @@ def get_fusion_class(
         return cast(type[FusionModuleProtocol], fusion_mgmoe.MGMoEModel)
     if fusion_model_type == "mlp-residual":
         return cast(type[FusionModuleProtocol], fusion_default.MLPResidualFusionModule)
+    if fusion_model_type == "mlp-residual-sum":
+        return cast(type[FusionModuleProtocol], fusion_default.SumFusionModule)
     if fusion_model_type in ("identity", "pass-through"):
         return cast(type[FusionModuleProtocol], fusion_identity.IdentityFusionModel)
     if fusion_model_type == "attention":

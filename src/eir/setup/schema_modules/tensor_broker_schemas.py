@@ -6,6 +6,7 @@ al_broker_projection_types = Literal[
     "lcl",
     "lcl_residual",
     "lcl+mlp_residual",
+    "mlp_residual",
     "linear",
     "grouped_linear",
     "pool",
@@ -13,7 +14,7 @@ al_broker_projection_types = Literal[
     "interpolate",
 ]
 
-al_broker_fusion_types = Literal["cross-attention", "sum", "cat+conv"]
+al_broker_fusion_types = Literal["cross-attention", "sum", "cat+conv", "additive"]
 
 
 @dataclass
@@ -44,6 +45,7 @@ class TensorMessageConfig:
         - ``cross-attention``: Use cross-attention to combine the tensors.
         - ``sum``: Learnable gated sum to combine the tensors.
         - ``cat+conv``: Concatenate the tensors and apply a convolutional layer.
+        - ``additive``: Simple element-wise addition.
 
     :param projection_type:
         Type of projection to use when projecting the tensor to the target space.
@@ -52,6 +54,7 @@ class TensorMessageConfig:
         - ``lcl``: Locally connected layer.
         - ``lcl_residual``: Locally connected layer with residual connection.
         - ``lcl+mlp_residual``: Locally connected layer followed by MLP residual block.
+        - ``mlp_residual``: MLP residual block.
         - ``cnn``: Convolutional layer, only supports down sampling for now.
         - ``linear``: Linear layer.
         - ``pool``: Adaptive average pooling layer.
@@ -64,6 +67,13 @@ class TensorMessageConfig:
 
     :param kernel_width_divisible_by:
         For LCL-based projections, constrain kernel width to be divisible by this value.
+
+    :param cache_dropout_p:
+        Probability of dropping cached tensor injection during training. When set to
+        a value > 0, the cached tensor will be randomly skipped during forward pass
+        with this probability during training mode. During evaluation, cache is always
+        used if available. Useful for improving robustness when auxiliary features may
+        be unavailable at inference time.
     """
 
     name: str
@@ -74,6 +84,7 @@ class TensorMessageConfig:
     cache_fusion_type: al_broker_fusion_types = "cat+conv"
     projection_type: al_broker_projection_types = "lcl"
     kernel_width_divisible_by: int | None = None
+    cache_dropout_p: float = 0.0
 
 
 @dataclass

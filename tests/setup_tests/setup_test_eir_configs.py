@@ -393,7 +393,7 @@ def get_test_base_fusion_init(model_type: str) -> Sequence[dict]:
                 }
             }
         ]
-    elif model_type in ("mlp-residual", "mgmoe"):
+    elif model_type in ("mlp-residual", "mgmoe", "mlp-residual-sum"):
         return [
             {
                 "model_config": {
