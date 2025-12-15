@@ -329,6 +329,12 @@ def get_tensor_broker(
             to_name = tmc.name
 
             if tmc.use_from_cache:
+                # For each `from_name`, a forward pre-hook is attached to
+                # the target module.
+                # If multiple hooks are attached to the same module,
+                # PyTorch executes them  sequentially in the order of registration.
+                # The output of one hook becomes the input for the next,
+                # creating a "chain of fusions"
                 for from_name in tmc.use_from_cache:
                     from_path, cache_target = have_been_cached_mapping[from_name]
                     message_name = f"{from_name}>>>{to_name}: {from_path}>>>{to_path}"

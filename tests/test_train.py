@@ -214,7 +214,7 @@ def test_get_optimizer():
         global_config=gc_sgdm,
     )
     assert isinstance(sgdm_optimizer, SGD)
-    assert sgdm_optimizer.param_groups[0]["momentum"] == 0.9
+    assert sgdm_optimizer.param_groups[0]["momentum"] == 0.95
 
 
 @pytest.mark.parametrize("create_test_data", [{"task_type": "multi"}], indirect=True)

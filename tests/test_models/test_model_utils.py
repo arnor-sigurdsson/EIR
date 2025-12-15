@@ -163,15 +163,62 @@ def test_get_model_params(create_test_util_model):
         wd=weight_decay,
     )
 
+    assert len(model_params) == 3
+
     model_params_with_decay = model_params[0]
-    model_params_no_decay = model_params[1]
+    model_params_embeddings = model_params[1]
+    model_params_no_decay = model_params[2]
 
     # the 2 linear layers
     assert len(model_params_with_decay["params"]) == 2
     assert model_params_with_decay["weight_decay"] == weight_decay
 
+    # no embeddings in this model
+    assert len(model_params_embeddings["params"]) == 0
+    assert model_params_embeddings["weight_decay"] == weight_decay
+    assert model_params_embeddings.get("force_adamw", False) is True
+
     # 2 PReLU + 2 BN Gamma + 2 BN Bias + 2 Linear Bias
     assert len(model_params_no_decay["params"]) == 8
+    assert model_params_no_decay["weight_decay"] == 0.0
+
+
+def test_get_model_params_with_embeddings():
+    class TestModelWithEmbeddings(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.embedding = nn.Embedding(100, 32)
+            self.fc_1 = nn.Linear(32, 16)
+            self.bn_1 = nn.BatchNorm1d(16)
+            self.fc_2 = nn.Linear(16, 8)
+
+        def forward(self, x):
+            return x
+
+    test_model = TestModelWithEmbeddings()
+    weight_decay = 0.05
+    model_params = model_training_utils.add_wd_to_model_params(
+        model=test_model,
+        wd=weight_decay,
+    )
+
+    assert len(model_params) == 3
+
+    model_params_with_decay = model_params[0]
+    model_params_embeddings = model_params[1]
+    model_params_no_decay = model_params[2]
+
+    # 2 linear layer weights
+    assert len(model_params_with_decay["params"]) == 2
+    assert model_params_with_decay["weight_decay"] == weight_decay
+
+    # 1 embedding weight
+    assert len(model_params_embeddings["params"]) == 1
+    assert model_params_embeddings["weight_decay"] == weight_decay
+    assert model_params_embeddings.get("force_adamw", False) is True
+
+    # 2 linear biases + 2 BN params (gamma, beta)
+    assert len(model_params_no_decay["params"]) == 4
     assert model_params_no_decay["weight_decay"] == 0.0
 
 

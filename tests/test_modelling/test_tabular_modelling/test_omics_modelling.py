@@ -291,6 +291,7 @@ def test_bce_classification(prep_modelling_test_configs):
                 "global_configs": {
                     "optimization": {
                         "lr": 1e-03,
+                        "optimizer": "muonadamw",
                     },
                 },
                 "input_configs": [

@@ -392,9 +392,19 @@ def _stack_list_of_batch_dicts(
     return stacked_inputs
 
 
-class ParamGroup(TypedDict):
+class ParamGroup(TypedDict, total=False):
     params: list[nn.Parameter]
     weight_decay: float
+    force_adamw: bool
+
+
+def _get_embedding_param_ids(model: nn.Module) -> set[int]:
+    embedding_param_ids = set()
+    for module in model.modules():
+        if isinstance(module, nn.Embedding):
+            for param in module.parameters():
+                embedding_param_ids.add(id(param))
+    return embedding_param_ids
 
 
 def add_wd_to_model_params(model: nn.Module, wd: float) -> list[ParamGroup]:
@@ -405,30 +415,44 @@ def add_wd_to_model_params(model: nn.Module, wd: float) -> list[ParamGroup]:
     Parameters with dimensionality >= 2 (weight matrices, embeddings) will have
     weight decay applied, while parameters with dimensionality < 2 (biases,
     normalization parameters) will not.
+
+    Embedding parameters are marked with force_adamw=True to ensure they use
+    AdamW in composite optimizers like MuonAdamW.
     """
     param_dict = {pn: p for pn, p in model.named_parameters() if p.requires_grad}
+    embedding_param_ids = _get_embedding_param_ids(model=model)
 
     decay_params = []
+    embedding_params = []
     no_decay_params = []
 
     for _name, param in param_dict.items():
-        if param.dim() >= 2:
+        if id(param) in embedding_param_ids:
+            embedding_params.append(param)
+        elif param.dim() >= 2:
             decay_params.append(param)
         else:
             no_decay_params.append(param)
 
     param_list = [
         ParamGroup(params=decay_params, weight_decay=wd),
+        ParamGroup(params=embedding_params, weight_decay=wd, force_adamw=True),
         ParamGroup(params=no_decay_params, weight_decay=0.0),
     ]
 
     num_decay_params = sum(p.numel() for p in decay_params)
+    num_embedding_params = sum(p.numel() for p in embedding_params)
     num_no_decay_params = sum(p.numel() for p in no_decay_params)
     if wd > 0.0:
         logger.debug(
-            f"Number of weight-decayed (wd={wd}) parameters: {num_decay_params:,} "
+            f"Number of weight-decayed parameters: {num_decay_params:,} "
             f"({len(decay_params)} tensors)"
         )
+        if embedding_params:
+            logger.debug(
+                f"Number of embedding parameters: "
+                f"{num_embedding_params:,} ({len(embedding_params)} tensors)"
+            )
         logger.debug(
             f"Number of non-decayed parameters: {num_no_decay_params:,} "
             f"({len(no_decay_params)} tensors)"

@@ -110,6 +110,23 @@ def main():
         default="train",
     )
 
+    main_parser.add_argument(
+        "--strict",
+        dest="strict_loading",
+        action="store_true",
+        default=True,
+        help="Enforce exact weight matching between checkpoint and model "
+        "(default: True). Fails if checkpoint and model architectures "
+        "don't match exactly.",
+    )
+    main_parser.add_argument(
+        "--no-strict",
+        dest="strict_loading",
+        action="store_false",
+        help="Allow partial weight loading. Use for transfer learning or when "
+        "intentionally loading a subset of weights.",
+    )
+
     predict_cl_args = main_parser.parse_args()
 
     _verify_predict_cl_args(predict_cl_args=predict_cl_args)
@@ -408,6 +425,7 @@ def get_default_predict_experiment(
         device=configs_overloaded_for_predict.gc.be.device,
         test_mode=True,
         strict_shapes=True,
+        strict_loading=predict_cl_args.strict_loading,
     )
     assert not model.training
 

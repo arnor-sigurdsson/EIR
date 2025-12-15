@@ -13,10 +13,32 @@ def setup_accelerator(configs: Configs) -> Fabric:
     original_hardware = gc.accelerator.hardware
 
     if torch.cuda.is_available() and (original_hardware in ["cuda", "gpu", "auto"]):
+        # Workaround for Lightning Fabric Incompatibility
+        # PyTorch >= 2.9 deprecated legacy precision flags, but Lightning Fabric
+        # still uses the legacy getter (torch.get_float32_matmul_precision),
+        # causing a RuntimeError if the new API is used.
+        # We must use the old API until Fabric is updated.
+        # https://github.com/Lightning-AI/pytorch-lightning/issues/21256
+
+        # 1. Legacy API for matmul (cuBLAS)
         torch.set_float32_matmul_precision("high")
+
+        # 2. Legacy API for convolutions (cuDNN)
+        torch.backends.cudnn.allow_tf32 = True
+
         logger.info(
-            "Set float32 matmul precision to 'high' for Tensor Core optimization"
+            "Set matmul precision to 'high' and enabled cuDNN TF32 (Legacy API)"
         )
+
+        # Intended Future Code (post-Lightning update)
+        # torch.backends.cuda.matmul.fp32_precision = "tf32"
+        # type: ignore[attr-defined]
+        # torch.backends.cudnn.fp32_precision = "tf32"
+        # type: ignore[attr-defined]
+        # logger.info(
+        #     "Set float32 matmul/cuDNN precision to 'tf32'
+        #     for Tensor Core optimization"
+        # )
 
     original_precision = gc.accelerator.precision
     original_strategy = gc.accelerator.strategy

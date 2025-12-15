@@ -350,6 +350,7 @@ def test_predict(
         "evaluate": True,
         "output_folder": tmp_path,
         "attribution_background_source": attribution_background_source,
+        "strict_loading": True,
     }
     all_predict_kwargs = {
         **test_predict_cl_args_files_only.__dict__,
