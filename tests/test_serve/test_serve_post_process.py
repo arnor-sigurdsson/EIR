@@ -74,6 +74,15 @@ def test_normalize_categorical_outputs():
     expected = tuple(softmax(inputs))
     assert np.allclose(result, expected)
 
+    # Binary classification
+    binary_input = torch.tensor([1.0])
+    result = _normalize_categorical_outputs(outputs=binary_input)
+    prob_class_1 = torch.sigmoid(binary_input).item()
+    prob_class_0 = 1.0 - prob_class_1
+    expected = (prob_class_0, prob_class_1)
+    assert np.allclose(result, expected)
+    assert len(result) == 2
+
 
 def test_normalize_continuous_outputs():
     mock_scaler = Mock(spec=StandardScaler)
