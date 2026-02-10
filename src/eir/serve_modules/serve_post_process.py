@@ -240,7 +240,7 @@ def _normalize_categorical_outputs(outputs: torch.Tensor) -> tuple[float, ...]:
 
 def _normalize_continuous_outputs(
     outputs: torch.Tensor, transformer: StandardScaler
-) -> tuple[float]:
+) -> tuple[float, ...]:
     cur_output_reshaped = outputs.reshape(1, -1)
     transform_func = transformer.inverse_transform
     cur_output_normalized = transform_func(cur_output_reshaped).squeeze()
