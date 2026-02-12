@@ -527,7 +527,7 @@ def _cox_ph_loss(
         loss = neg_partial_log_likelihood(
             log_hz=masked_risk_scores,
             event=masked_event,
-            time=masked_time,
+            time=masked_time.float(),
             ties_method=ties_method,
             reduction="mean",
             checks=True,
