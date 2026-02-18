@@ -52,13 +52,21 @@ class ArrayOutputWrapperModule(nn.Module):
         feature_extractor: al_output_array_models,
         output_name: str,
         target_data_dimensions: "DataDimensions",
+        num_classes: int | None = None,
     ):
         super().__init__()
         self.feature_extractor = feature_extractor
         self.output_name = output_name
         self.data_dimensions = target_data_dimensions
+        self.num_classes = num_classes
 
-        self.target_width = self.data_dimensions.num_elements()
+        n_elements = self.data_dimensions.num_elements()
+        if self.num_classes is not None:
+            self.target_width = n_elements * self.num_classes
+            assert self.data_dimensions.original_shape is not None
+            self.original_shape = self.data_dimensions.original_shape
+        else:
+            self.target_width = n_elements
         self.target_shape = self.data_dimensions.full_shape()
 
         self.projection_head = get_1d_projection_layer(
@@ -79,7 +87,10 @@ class ArrayOutputWrapperModule(nn.Module):
 
         out = out[:, : self.target_width]
 
-        out = out.reshape(-1, *self.target_shape)
+        if self.num_classes is not None:
+            out = out.reshape(-1, self.num_classes, *self.original_shape)
+        else:
+            out = out.reshape(-1, *self.target_shape)
 
         return {self.output_name: out}
 
@@ -88,9 +99,11 @@ def get_array_output_module(
     feature_extractor: al_output_array_models,
     output_name: str,
     target_data_dimensions: "DataDimensions",
+    num_classes: int | None = None,
 ) -> ArrayOutputWrapperModule:
     return ArrayOutputWrapperModule(
         feature_extractor=feature_extractor,
         output_name=output_name,
         target_data_dimensions=target_data_dimensions,
+        num_classes=num_classes,
     )

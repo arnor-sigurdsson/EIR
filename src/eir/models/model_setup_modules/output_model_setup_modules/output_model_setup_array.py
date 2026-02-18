@@ -85,10 +85,15 @@ def get_array_or_image_output_module_from_model_config(
         diffusion_time_steps=diffusion_time_steps,
     )
 
+    num_classes = None
+    if isinstance(output_object, ComputedArrayOutputInfo):
+        num_classes = output_object.num_classes
+
     array_output_module = get_array_output_module(
         feature_extractor=feature_extractor,
         output_name=output_name,
         target_data_dimensions=output_object.data_dimensions,
+        num_classes=num_classes,
     )
 
     output_module = array_output_module

@@ -16,6 +16,26 @@ def array_load_wrapper(
     return array_data
 
 
+def prepare_array_data_categorical(
+    array_data: np.ndarray,
+) -> torch.Tensor:
+    if not np.issubdtype(array_data.dtype, np.integer):
+        if not np.all(array_data == array_data.astype(int)):
+            raise ValueError(
+                f"Categorical array data must contain integer values, "
+                f"got dtype {array_data.dtype} with non-integer values."
+            )
+        array_data = array_data.astype(np.int64)
+
+    if np.any(array_data < 0):
+        raise ValueError(
+            "Categorical array data must contain non-negative integer values."
+        )
+
+    tensor = torch.from_numpy(array_data).long()
+    return tensor
+
+
 def prepare_array_data(
     array_data: np.ndarray,
     normalization_stats: ArrayNormalizationStats | None,

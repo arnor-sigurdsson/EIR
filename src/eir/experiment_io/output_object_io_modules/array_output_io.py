@@ -22,6 +22,7 @@ def load_array_output_object(serialized_output_folder: Path) -> ComputedArrayOut
     dtype_path = serialized_output_folder / "dtype.json"
     data_dimensions_path = serialized_output_folder / "data_dimensions.json"
     diffusion_path = serialized_output_folder / "diffusion.json"
+    num_classes_path = serialized_output_folder / "num_classes.json"
 
     output_config = load_output_config_from_yaml(output_config_path=config_path)
 
@@ -47,12 +48,17 @@ def load_array_output_object(serialized_output_folder: Path) -> ComputedArrayOut
             file_path=diffusion_path,
         )
 
+    num_classes = None
+    if num_classes_path.exists():
+        num_classes = json.loads(num_classes_path.read_text())
+
     loaded_object = set_up_array_output(
         output_config=output_config,
         normalization_stats=normalization_stats,
         data_dimensions=data_dimensions,
         dtype=dtype,
         diffusion_config=diffusion_config,
+        num_classes=num_classes,
     )
 
     return loaded_object

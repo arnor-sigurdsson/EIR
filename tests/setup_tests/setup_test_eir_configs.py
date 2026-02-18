@@ -141,6 +141,7 @@ def get_output_test_init_base_func_map() -> dict[str, Callable]:
         "test_output_tabular": get_test_tabular_base_output_inits,
         "test_output_copy": get_test_tabular_base_output_inits,
         "test_output_sequence": get_test_sequence_base_output_inits,
+        "test_cat_array": get_test_categorical_array_base_output_inits,
         "test_output_array": get_test_array_base_output_inits,
         "test_output_image": get_test_image_base_output_inits,
         "test_output_survival": get_test_survival_base_output_inits,
@@ -170,7 +171,7 @@ def get_input_test_init_base_func_map() -> dict[str, Callable]:
 def _inject_train_source_path(
     test_path: Path,
     source: Literal["local"],
-    local_name: Literal["omics", "sequence", "image", "array"],
+    local_name: Literal["omics", "sequence", "image", "array", "categorical_array"],
     split_to_test: bool,
 ) -> Path:
     if source == "local":
@@ -479,6 +480,34 @@ def get_test_array_base_output_inits(
         },
         "model_config": {"model_type": "lcl"},
         "sampling_config": {"diffusion_inference_steps": 50},
+    }
+
+    return test_target_init_kwargs
+
+
+def get_test_categorical_array_base_output_inits(
+    test_path: Path,
+    split_to_test: bool,
+    source: Literal["local"],
+) -> dict:
+    output_source = _inject_train_source_path(
+        test_path=test_path,
+        source=source,
+        local_name="categorical_array",
+        split_to_test=split_to_test,
+    )
+
+    test_target_init_kwargs = {
+        "output_info": {
+            "output_name": "test_cat_array",
+            "output_type": "array",
+            "output_source": str(output_source),
+        },
+        "output_type_info": {
+            "loss": "categorical",
+        },
+        "model_config": {"model_type": "lcl"},
+        "sampling_config": {},
     }
 
     return test_target_init_kwargs
