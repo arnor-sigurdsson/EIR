@@ -3,6 +3,7 @@ from torch import nn
 
 from eir.models.input.array.models_cnn import CNNResidualBlock
 from eir.models.layers.mlp_layers import MLPResidualBlock
+from eir.models.layers.norm_layers import LearnableGate
 from eir.models.layers.projection_layers import get_1d_projection_layer
 from eir.models.tensor_broker.projection_modules.cnn import (
     get_conv_params_for_dimension,
@@ -169,6 +170,34 @@ def get_projection_layer(
         case "pool":
             projection_layer = nn.AdaptiveAvgPool2d(output_size=to_shape_no_batch)
             projection_layers.append(projection_layer)
+
+            projected_shape = to_shape_no_batch
+
+        case "gated_maxpool":
+            input_dim = from_shape_no_batch.numel()
+            target_dim = to_shape_no_batch.numel()
+
+            projection_layers.append(nn.Flatten(start_dim=1))
+            projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
+            projection_layers.append(LearnableGate(dim=input_dim))
+            projection_layers.append(nn.GELU())
+            projection_layers.append(
+                nn.Unflatten(dim=1, unflattened_size=(1, input_dim))
+            )
+            projection_layers.append(nn.AdaptiveMaxPool1d(output_size=target_dim))
+            projection_layers.append(nn.Flatten(start_dim=1))
+            projection_layers.append(
+                MLPResidualBlock(
+                    in_features=target_dim,
+                    out_features=target_dim,
+                    dropout_p=0.0,
+                    full_preactivation=True,
+                    stochastic_depth_p=0.0,
+                )
+            )
+            projection_layers.append(
+                nn.Unflatten(dim=1, unflattened_size=to_shape_no_batch)
+            )
 
             projected_shape = to_shape_no_batch
 

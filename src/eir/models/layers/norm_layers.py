@@ -121,6 +121,18 @@ class RMSNorm(nn.Module):
         return out
 
 
+class LearnableGate(nn.Module):
+    def __init__(self, dim: int) -> None:
+        super().__init__()
+        self.logits = nn.Parameter(data=torch.zeros(dim), requires_grad=True)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(dim={self.logits.shape[0]})"
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x * torch.sigmoid(self.logits)
+
+
 def append_dims(t: torch.Tensor, dims: int) -> torch.Tensor:
     shape = t.shape
     return t.reshape(*shape, *((1,) * dims))

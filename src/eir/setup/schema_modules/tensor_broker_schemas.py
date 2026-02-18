@@ -10,6 +10,7 @@ al_broker_projection_types = Literal[
     "linear",
     "grouped_linear",
     "pool",
+    "gated_maxpool",
     "cnn",
     "interpolate",
 ]
@@ -58,6 +59,8 @@ class TensorMessageConfig:
         - ``cnn``: Convolutional layer, only supports down sampling for now.
         - ``linear``: Linear layer.
         - ``pool``: Adaptive average pooling layer.
+        - ``gated_maxpool``: Learnable gate + GELU + Adaptive max pooling +
+            MLP residual (sparse signal selection).
         - ``grouped_linear``: Grouped linear layer (each dimension is projected
           separately with a learnable linear layer).
         - ``interpolate``: Interpolates the tensor to the target size.
