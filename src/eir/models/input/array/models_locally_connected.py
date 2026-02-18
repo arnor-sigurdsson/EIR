@@ -240,6 +240,7 @@ class LCLModel(nn.Module):
             kernel_size=fc_0_kernel_size,
             bias=True,
         )
+        self.act_0 = nn.GELU()
 
         cutoff = dynamic_cutoff or self.model_config.cutoff
         assert isinstance(cutoff, int)
@@ -285,6 +286,7 @@ class LCLModel(nn.Module):
         out = self.flatten_fn(x=input)
 
         out = self.fc_0(out)
+        out = self.act_0(out)
         out = self.lcl_blocks(out)
 
         return out
