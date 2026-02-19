@@ -1026,12 +1026,15 @@ class UncertaintyMultiTaskLoss(nn.Module):
         log_var = getattr(self, f"log_var_{name}").to(device=loss_value.device)
 
         precision = torch.exp(-log_var)
-        loss = torch.sum(0.5 * precision * loss_value) + log_var
 
         if name in self.target_cat_columns:
             loss = precision * loss_value + 0.5 * log_var
         elif name in self.target_con_columns:
             loss = 0.5 * precision * loss_value + 0.5 * log_var
+        else:
+            raise ValueError(
+                f"Column name {name} not found in either cat or con target columns."
+            )
 
         return loss
 
