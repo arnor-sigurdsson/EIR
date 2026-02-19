@@ -100,7 +100,11 @@ def run_meta_forward(
         fused = fused_features[cur_fusion_target]
 
         corresponding_fused_features: Any
-        if isinstance(fused, dict) and output_name in fused:
+        if (
+            cur_fusion_target == "computed"
+            and isinstance(fused, dict)
+            and output_name in fused
+        ):
             corresponding_fused_features = fused[output_name]
         else:
             corresponding_fused_features = fused
