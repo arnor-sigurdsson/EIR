@@ -162,7 +162,18 @@ class WrapperModelForAttribution(nn.Module):
         cur_fusion_target = model.fusion_to_output_mapping[self.output_name]
         fused = fused_features[cur_fusion_target]
 
-        if isinstance(fused, dict) and self.output_name in fused:
+        fusion_module = model.fusion_modules[cur_fusion_target]
+
+        # MGMoE (and similar) returns a dict keyed by output group name
+        # pass-through fusion also returns a dict but keyed by input name.
+        # When an output name matches an input name (e.g. image output task),
+        # but expects to be passed a dict (i.e. not the extracted tensor),
+        # we therefore must only extract per-group outputs for per_output_group modules
+        if (
+            getattr(fusion_module, "per_output_group", False)
+            and isinstance(fused, dict)
+            and self.output_name in fused
+        ):
             fused = fused[self.output_name]
 
         output_modules_out = {}

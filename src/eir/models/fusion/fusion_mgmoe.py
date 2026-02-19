@@ -129,6 +129,10 @@ class MGMoEModel(nn.Module):
         pass
 
     @property
+    def per_output_group(self) -> bool:
+        return True
+
+    @property
     def num_out_features(self) -> int:
         return self.model_config.fc_task_dim
 

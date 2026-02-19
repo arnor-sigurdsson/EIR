@@ -52,6 +52,9 @@ class FusionModuleProtocol(Protocol):
     @property
     def num_out_features(self) -> int: ...
 
+    @property
+    def per_output_group(self) -> bool: ...
+
     def __call__(
         self, input: dict[str, FeatureExtractorOutType]
     ) -> "al_fused_features": ...
@@ -100,8 +103,15 @@ def run_meta_forward(
         fused = fused_features[cur_fusion_target]
 
         corresponding_fused_features: Any
+        fusion_module = fusion_modules[cur_fusion_target]
+
+        # MGMoE (and similar) returns a dict keyed by output group name
+        # pass-through fusion also returns a dict but keyed by input name.
+        # When an output name matches an input name (e.g. image output task),
+        # but expects to be passed a dict (i.e. not the extracted tensor),
+        # we therefore must only extract per-group outputs for per_output_group modules
         if (
-            cur_fusion_target == "computed"
+            getattr(fusion_module, "per_output_group", False)
             and isinstance(fused, dict)
             and output_name in fused
         ):
