@@ -61,10 +61,14 @@ class MGMoEModel(nn.Module):
         self,
         model_config: MGMoEModelConfig,
         fusion_in_dim: int,
+        output_group_names: Sequence[str],
         fusion_callable: al_features = default_fuse_features,
         **kwargs,
     ):
         super().__init__()
+
+        if not output_group_names:
+            raise ValueError("output_group_names must be non-empty.")
 
         self.model_config = model_config
         self.fusion_in_dim = fusion_in_dim
@@ -96,7 +100,7 @@ class MGMoEModel(nn.Module):
         )
 
         self.gates = construct_multi_branches(
-            branch_names=expert_names,
+            branch_names=tuple(output_group_names),
             branch_factory=initialize_modules_from_spec,
             branch_factory_kwargs={"spec": gate_spec},
         )
@@ -126,29 +130,29 @@ class MGMoEModel(nn.Module):
 
     @property
     def num_out_features(self) -> int:
-        return self.model_config.fc_task_dim * len(self.expert_branches)
+        return self.model_config.fc_task_dim
 
     @property
     def output_shape(self) -> tuple[int, ...]:
         return (self.num_out_features,)
 
-    def forward(self, inputs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         fused_features = self.fusion_callable(inputs)
 
-        gate_attentions = calculate_module_dict_outputs(
-            input_=fused_features, module_dict=self.gates
-        )
-
         expert_outputs = calculate_module_dict_outputs(
-            input_=fused_features, module_dict=self.expert_branches
+            input_=fused_features,
+            module_dict=self.expert_branches,
+        )
+        stacked_expert_outputs = torch.stack(list(expert_outputs.values()), dim=2)
+
+        gate_attentions = calculate_module_dict_outputs(
+            input_=fused_features,
+            module_dict=self.gates,
         )
 
         final_out = {}
-        stacked_expert_outputs = torch.stack(list(expert_outputs.values()), dim=2)
-        for expert_name, attention in gate_attentions.items():
-            weighted_expert_outputs = attention.unsqueeze(1) * stacked_expert_outputs
-            weighted_expert_sum = weighted_expert_outputs.sum(dim=2)
+        for group_name, attention in gate_attentions.items():
+            weighted = attention.unsqueeze(1) * stacked_expert_outputs
+            final_out[group_name] = weighted.sum(dim=2)
 
-            final_out[expert_name] = weighted_expert_sum
-
-        return self.fusion_callable(final_out)
+        return final_out

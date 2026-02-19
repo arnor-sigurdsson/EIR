@@ -1,6 +1,7 @@
 from collections.abc import MutableMapping
 from typing import (
     TYPE_CHECKING,
+    Any,
     Literal,
     NewType,
     Protocol,
@@ -42,6 +43,7 @@ class FusionModuleProtocol(Protocol):
         fusion_in_dim: int,
         fusion_callable: Union["al_features", "al_identity_features"],
         feature_dimensions_and_types: dict[str, "FeatureExtractorInfo"] | None = None,
+        **kwargs: object,
     ) -> None: ...
 
     @property
@@ -95,7 +97,13 @@ def run_meta_forward(
     output_modules_out = {}
     for output_name, output_module in output_modules.items():
         cur_fusion_target = fusion_to_output_mapping[output_name]
-        corresponding_fused_features = fused_features[cur_fusion_target]
+        fused = fused_features[cur_fusion_target]
+
+        corresponding_fused_features: Any
+        if isinstance(fused, dict) and output_name in fused:
+            corresponding_fused_features = fused[output_name]
+        else:
+            corresponding_fused_features = fused
 
         key = f"__extras_{output_name}"
         if key in inputs:

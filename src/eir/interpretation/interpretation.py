@@ -160,10 +160,13 @@ class WrapperModelForAttribution(nn.Module):
         for output_type, fusion_module in model.fusion_modules.items():
             fused_features[output_type] = fusion_module(feature_extractors_out)
         cur_fusion_target = model.fusion_to_output_mapping[self.output_name]
-        fused_features = fused_features[cur_fusion_target]
+        fused = fused_features[cur_fusion_target]
+
+        if isinstance(fused, dict) and self.output_name in fused:
+            fused = fused[self.output_name]
 
         output_modules_out = {}
-        cur_output = model.output_modules[self.output_name](fused_features)
+        cur_output = model.output_modules[self.output_name](fused)
         output_modules_out[self.output_name] = cur_output
 
         return output_modules_out[self.output_name][self.column_name]
