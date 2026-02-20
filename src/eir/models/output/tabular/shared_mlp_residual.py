@@ -107,6 +107,8 @@ class SharedResidualMLPOutputModule(nn.Module):
         self.shared_branch = nn.Sequential(shared_branch_module, final_block)
 
     def _build_expert(self, input_dimension: int, num_experts: int) -> None:
+        self.input_identity = nn.Identity()
+
         fc_task_dim = self.model_config.fc_task_dim
         if fc_task_dim % num_experts != 0:
             raise ValueError(
@@ -165,6 +167,8 @@ class SharedResidualMLPOutputModule(nn.Module):
         return dict(zip(self.target_names, split_outputs, strict=False))
 
     def _forward_expert(self, inputs: torch.Tensor) -> dict[str, torch.Tensor]:
+        inputs = self.input_identity(inputs)
+
         expert_outputs = calculate_module_dict_outputs(
             input_=inputs,
             module_dict=self.expert_branches,
