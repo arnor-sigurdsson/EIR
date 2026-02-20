@@ -142,13 +142,7 @@ class SharedResidualMLPOutputModule(nn.Module):
 
         self.target_final_layers = nn.ModuleDict(
             {
-                name: MLPResidualBlock(
-                    in_features=expert_dim,
-                    out_features=size,
-                    dropout_p=self.model_config.rb_do,
-                    stochastic_depth_p=self.model_config.stochastic_depth_p,
-                    full_preactivation=False,
-                )
+                name: nn.Linear(in_features=expert_dim, out_features=size)
                 for name, size in zip(self.target_names, self.target_sizes, strict=True)
             }
         )
@@ -174,14 +168,18 @@ class SharedResidualMLPOutputModule(nn.Module):
             module_dict=self.expert_branches,
         )
 
+        # stacked: (B, E, D) — all expert outputs
         stacked = torch.stack(list(expert_outputs.values()), dim=1)
+        # gate_weights: (T, E) — per-target learned expert preferences
         gate_weights = torch.softmax(self.expert_gates, dim=1)
+
+        # Per-target weighted average of expert outputs:
+        # (T, E) @ (B, E, D) -> (B, T, D)
+        all_mixed = torch.matmul(gate_weights, stacked)
+        all_mixed = self.output_identity(all_mixed)
 
         outputs = {}
         for i, name in enumerate(self.target_names):
-            weights = gate_weights[i].unsqueeze(0).unsqueeze(-1)
-            mixed = (weights * stacked).sum(dim=1)
-            mixed = self.output_identity(mixed)
-            outputs[name] = self.target_final_layers[name](mixed)
+            outputs[name] = self.target_final_layers[name](all_mixed[:, i, :])
 
         return outputs
