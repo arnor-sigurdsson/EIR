@@ -1,3 +1,4 @@
+import math
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -16,12 +17,15 @@ from eir.models.models_utils import (
 )
 
 if TYPE_CHECKING:
-    pass
+    from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
 
 
 @dataclass
 class MGMoEModelConfig:
     """
+    Note that this module by default uses sum fusion with input projection.
+
+
     :param layers:
         A sequence of two int values controlling the number of residual MLP blocks in
         the network. The first item (i.e. ``layers[0]``) refers to the number of blocks
@@ -63,6 +67,7 @@ class MGMoEModel(nn.Module):
         fusion_in_dim: int,
         output_group_names: Sequence[str],
         fusion_callable: al_features = default_fuse_features,
+        feature_dimensions_and_types: dict[str, "FeatureExtractorInfo"] | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -75,9 +80,26 @@ class MGMoEModel(nn.Module):
         self.fusion_callable = fusion_callable
 
         self.num_experts = self.model_config.mg_num_experts
+        self.use_sum_fusion = feature_dimensions_and_types is not None
+
+        if self.use_sum_fusion:
+            self.input_projections = nn.ModuleDict()
+            for name, info in feature_dimensions_and_types.items():
+                output_dim = info.output_dimension
+                self.input_projections[name] = nn.Sequential(
+                    nn.RMSNorm(normalized_shape=output_dim),
+                    nn.Linear(
+                        in_features=output_dim,
+                        out_features=self.model_config.fc_task_dim,
+                    ),
+                    nn.GELU(),
+                )
+            expert_in_dim = self.model_config.fc_task_dim
+        else:
+            expert_in_dim = fusion_in_dim
 
         gate_spec = self.get_gate_spec(
-            in_features=self.fusion_in_dim, out_features=self.num_experts
+            in_features=expert_in_dim, out_features=self.num_experts
         )
 
         expert_names = tuple(f"expert_{i}" for i in range(self.num_experts))
@@ -95,7 +117,7 @@ class MGMoEModel(nn.Module):
             block_constructor_kwargs=layer_kwargs,
             first_layer_kwargs_overload={
                 "full_preactivation": True,
-                "in_features": fusion_in_dim,
+                "in_features": expert_in_dim,
             },
         )
 
@@ -140,8 +162,35 @@ class MGMoEModel(nn.Module):
     def output_shape(self) -> tuple[int, ...]:
         return (self.num_out_features,)
 
+    def _fuse_inputs(self, inputs: dict[str, torch.Tensor]) -> torch.Tensor:
+        if not self.use_sum_fusion:
+            return self.fusion_callable(inputs)
+
+        projected = []
+        for name, tensor in inputs.items():
+            if name not in self.input_projections:
+                continue
+            flattened = tensor.flatten(start_dim=1)
+            proj = self.input_projections[name](flattened)
+            projected.append(proj)
+
+        if not projected:
+            raise ValueError(
+                f"No valid modalities found in inputs. "
+                f"Received: {list(inputs.keys())}, "
+                f"Expected: {list(self.input_projections.keys())}"
+            )
+
+        fused = torch.stack(projected, dim=0).sum(dim=0)
+
+        num_modalities = len(projected)
+        if num_modalities > 1:
+            fused = fused / math.sqrt(num_modalities)
+
+        return fused
+
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        fused_features = self.fusion_callable(inputs)
+        fused_features = self._fuse_inputs(inputs=inputs)
 
         expert_outputs = calculate_module_dict_outputs(
             input_=fused_features,
