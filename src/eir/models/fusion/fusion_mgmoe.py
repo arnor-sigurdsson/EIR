@@ -83,6 +83,7 @@ class MGMoEModel(nn.Module):
         self.use_sum_fusion = feature_dimensions_and_types is not None
 
         if self.use_sum_fusion:
+            assert feature_dimensions_and_types is not None
             self.input_projections = nn.ModuleDict()
             for name, info in feature_dimensions_and_types.items():
                 output_dim = info.output_dimension
