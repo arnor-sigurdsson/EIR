@@ -176,10 +176,13 @@ class SharedResidualMLPOutputModule(nn.Module):
         # Per-target weighted average of expert outputs:
         # (T, E) @ (B, E, D) -> (B, T, D)
         all_mixed = torch.matmul(gate_weights, stacked)
-        all_mixed = self.output_identity(all_mixed)
 
-        outputs = {}
+        per_target = []
         for i, name in enumerate(self.target_names):
-            outputs[name] = self.target_final_layers[name](all_mixed[:, i, :])
+            per_target.append(self.target_final_layers[name](all_mixed[:, i, :]))
 
-        return outputs
+        shared_out_tensor = torch.cat(per_target, dim=1)
+        final_out_tensor = self.output_identity(shared_out_tensor)
+        split_outputs = torch.split(final_out_tensor, self.target_sizes, dim=1)
+
+        return dict(zip(self.target_names, split_outputs, strict=False))
