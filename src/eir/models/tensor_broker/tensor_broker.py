@@ -270,6 +270,7 @@ def _detect_expert_boundaries(
             if hasattr(parent_module, "expert_boundaries"):
                 boundaries = parent_module.expert_boundaries
                 if boundaries is not None:
+                    assert isinstance(boundaries, dict)
                     return boundaries
     return None
 

@@ -250,9 +250,11 @@ class ArrayWrapperModel(nn.Module):
         return self.feature_extractor.l1_penalized_weights
 
     @property
-    def expert_boundaries(self) -> dict | None:
+    def expert_boundaries(self) -> dict[str, int] | None:
         if hasattr(self.feature_extractor, "expert_boundaries"):
-            return self.feature_extractor.expert_boundaries
+            boundaries = self.feature_extractor.expert_boundaries
+            assert isinstance(boundaries, dict)
+            return boundaries
         return None
 
     def forward(self, x):

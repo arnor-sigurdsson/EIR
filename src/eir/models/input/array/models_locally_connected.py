@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from functools import partial
 from typing import (
     TYPE_CHECKING,
-    Any,
     Literal,
     Protocol,
     Union,
@@ -308,6 +307,110 @@ class LCLMoEModelConfig(LCLModelConfig):
     num_experts: int = 4
 
 
+class ExpertTap(nn.Module):
+    def __init__(self, expert_index: int, depth_name: str):
+        """
+        We gave this and the aggregation checkpoints to gather up all expert
+        outputs at a given stage, and we need this little workaround here
+        because they are run in parallel. So essentially, the point of this module,
+        the AggregationCheckpoint module, and the ExpertAggregator module is to
+        gather the outputs of all experts at a given stage - which can be
+        used e.g. with the Tensor Broker to allow downstream modules to select
+        among all expert outputs at different stages in the network.
+
+        This ExpertTap module only has one job, to pull out *single* expert output at
+        a given state and write it to the bound storage. Note that the storage
+        is shared across all ExpertTap and AggregationCheckpoint modules, so that the
+        each expert-stage combination must have it's own unique key/dict path written
+        into the storage.
+        """
+        super().__init__()
+        self.expert_index = expert_index
+        self.depth_name = depth_name
+        self._storage: dict[str, dict[int, torch.Tensor]] | None = None
+
+    def bind_storage(self, storage: dict[str, dict[int, torch.Tensor]]) -> None:
+        self._storage = storage
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self._storage is not None:
+            if self.depth_name not in self._storage:
+                self._storage[self.depth_name] = {}
+            self._storage[self.depth_name][self.expert_index] = x
+        return x
+
+
+class AggregationCheckpoint(nn.Module):
+    def __init__(self, num_experts: int, expert_dim: int):
+        """
+        This servers as to store all expert outputs at a given stage in the network
+        as cached via the ExpertTap modules, and then make them available as a
+        concatenated tensor. This maintains the tensor-out interface of a general
+        module, but it also stores the boundaries that allows consumers of this
+        checkpoint to know how to split the concatenated tensor back into individual
+        expert outputs (for expert gating e.g. in the TB).
+        """
+        super().__init__()
+        self._expert_boundaries: dict[str, int] = {
+            "num_experts": num_experts,
+            "expert_dim": expert_dim,
+        }
+
+    @property
+    def expert_boundaries(self) -> dict[str, int]:
+        return self._expert_boundaries
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x
+
+
+class ExpertAggregator(nn.Module):
+    def __init__(
+        self,
+        depth_configs: list[tuple[str, int]],
+        num_experts: int,
+    ):
+        """
+        This contains the actual logic to set up aggregation checkpoint and populate
+        them with the concatenated outputs from the ExpertTap modules. This runs
+        after each expert stack in the network (which means that the taps have
+        actually already cached the individual expert outputs). Since e.g. the TB
+        first calls each modules `forward` method to infer tensor dimensions,
+        this will ensure the TB knowns the dimensions of the concatenated expert
+        outputs at each stage.
+
+        Then this aggregator is the actual entry point for the TBs, e.g. via:
+
+        (aggregator): ExpertAggregator(
+            (checkpoints): ModuleDict(
+            (after_fc_0): AggregationCheckpoint()
+            (after_lcl_block_0): AggregationCheckpoint()
+            )
+        )
+        """
+        super().__init__()
+        self.depth_names = [name for name, _ in depth_configs]
+        self.checkpoints = nn.ModuleDict()
+        for depth_name, expert_dim in depth_configs:
+            self.checkpoints[depth_name] = AggregationCheckpoint(
+                num_experts=num_experts,
+                expert_dim=expert_dim,
+            )
+        self._tap_storage: dict[str, dict[int, torch.Tensor]] | None = None
+
+    def bind_storage(self, storage: dict[str, dict[int, torch.Tensor]]) -> None:
+        self._tap_storage = storage
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        assert self._tap_storage is not None
+        for depth_name in self.depth_names:
+            expert_dict = self._tap_storage[depth_name]
+            expert_tensors = [expert_dict[k] for k in sorted(expert_dict.keys())]
+            concatenated = torch.cat(expert_tensors, dim=1)
+            self.checkpoints[depth_name](concatenated)
+        return x
+
+
 class LCLMoEModel(nn.Module):
     def __init__(
         self,
@@ -340,6 +443,7 @@ class LCLMoEModel(nn.Module):
         cutoff = dynamic_cutoff or self.model_config.cutoff
         assert isinstance(cutoff, int)
 
+        depth_configs: list[tuple[str, int]] = []
         self.expert_branches = nn.ModuleDict()
         for i in range(self.num_experts):
             fc_0 = LCL(
@@ -368,44 +472,56 @@ class LCLMoEModel(nn.Module):
                 block_layer_spec=self.model_config.layers,
             )
 
-            self.expert_branches[f"expert_{i}"] = nn.Sequential(
+            modules: list[nn.Module] = [
                 fc_0,
                 act_0,
-                lcl_blocks,
-            )
+                ExpertTap(expert_index=i, depth_name="after_fc_0"),
+            ]
 
-        self._single_expert_out_features = self._compute_single_expert_out_features()
+            if i == 0:
+                depth_configs.append(("after_fc_0", fc_0.out_features))
 
-        self.aggregation_checkpoints = nn.ModuleDict()
-        for depth_name in self._get_checkpoint_depth_names():
-            self.aggregation_checkpoints[depth_name] = nn.Identity()
+            for block_idx in range(len(lcl_blocks)):
+                block = lcl_blocks[block_idx]
+                depth_name = f"after_lcl_block_{block_idx}"
+                modules.append(block)
+                modules.append(ExpertTap(expert_index=i, depth_name=depth_name))
 
+                if i == 0:
+                    depth_configs.append((depth_name, cast(int, block.out_features)))
+
+            self.expert_branches[f"expert_{i}"] = nn.Sequential(*modules)
+
+        self._single_expert_out_features = depth_configs[-1][1]
+
+        self.aggregator = ExpertAggregator(
+            depth_configs=depth_configs,
+            num_experts=self.num_experts,
+        )
+
+        self._tap_storage: dict[str, dict[int, torch.Tensor]] = {}
+        self._bind_all_storage()
         self._init_weights()
+
+    def _bind_all_storage(self) -> None:
+        for expert in self.expert_branches.values():
+            for module in expert.modules():
+                if isinstance(module, ExpertTap):
+                    module.bind_storage(storage=self._tap_storage)
+        self.aggregator.bind_storage(storage=self._tap_storage)
 
     @property
     def _fc_0_in_features(self) -> int:
         return self.data_dimensions.num_elements()
 
-    def _compute_single_expert_out_features(self) -> int:
-        first_expert = next(iter(self.expert_branches.values()))
-        lcl_blocks = first_expert[2]
-        last_block = lcl_blocks[-1]
-        return cast(int, last_block.out_features)
-
-    def _get_checkpoint_depth_names(self) -> list[str]:
-        first_expert = next(iter(self.expert_branches.values()))
-        lcl_blocks = first_expert[2]
-        names = ["after_fc_0"]
-        for i in range(len(lcl_blocks)):
-            names.append(f"after_lcl_block_{i}")
-        return names
-
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        weights = []
+        weights: list[torch.Tensor] = []
         for expert in self.expert_branches.values():
-            fc_0 = expert[0]
-            weights.append(fc_0.weight)
+            for module in expert.modules():
+                if isinstance(module, LCL):
+                    weights.append(module.weight)
+                    break
         return torch.stack(weights)
 
     @property
@@ -417,7 +533,7 @@ class LCLMoEModel(nn.Module):
         return (self.num_out_features,)
 
     @property
-    def expert_boundaries(self) -> dict[str, Any]:
+    def expert_boundaries(self) -> dict[str, int]:
         return {
             "num_experts": self.num_experts,
             "expert_dim": self._single_expert_out_features,
@@ -429,35 +545,15 @@ class LCLMoEModel(nn.Module):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         out = self.flatten_fn(x=input)
 
+        self._tap_storage.clear()
+
         expert_outputs: list[torch.Tensor] = []
-        for _expert_name, expert_module in self.expert_branches.items():
-            fc_0 = expert_module[0]
-            act_0 = expert_module[1]
-            lcl_blocks = expert_module[2]
-
-            cur = fc_0(out)
-            cur = act_0(cur)
-
-            expert_outputs.append(cur)
-
-        after_fc_0 = torch.cat(expert_outputs, dim=1)
-        after_fc_0 = self.aggregation_checkpoints["after_fc_0"](after_fc_0)
-
-        num_lcl_blocks = len(next(iter(self.expert_branches.values()))[2])
-        for block_idx in range(num_lcl_blocks):
-            new_expert_outputs: list[torch.Tensor] = []
-            for expert_idx, expert_module in enumerate(self.expert_branches.values()):
-                lcl_blocks = expert_module[2]
-                cur = lcl_blocks[block_idx](expert_outputs[expert_idx])
-                new_expert_outputs.append(cur)
-
-            expert_outputs = new_expert_outputs
-
-            checkpoint_name = f"after_lcl_block_{block_idx}"
-            aggregated = torch.cat(expert_outputs, dim=1)
-            aggregated = self.aggregation_checkpoints[checkpoint_name](aggregated)
+        for expert in self.expert_branches.values():
+            expert_outputs.append(expert(out))
 
         final = torch.cat(expert_outputs, dim=1)
+        final = self.aggregator(final)
+
         return final
 
 
