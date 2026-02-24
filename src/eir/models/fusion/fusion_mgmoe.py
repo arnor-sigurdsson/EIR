@@ -86,15 +86,23 @@ class MGMoEModel(nn.Module):
             assert feature_dimensions_and_types is not None
             self.input_projections = nn.ModuleDict()
             for name, info in feature_dimensions_and_types.items():
-                output_dim = info.output_dimension
-                self.input_projections[name] = nn.Sequential(
-                    nn.RMSNorm(normalized_shape=output_dim),
-                    nn.Linear(
-                        in_features=output_dim,
-                        out_features=self.model_config.fc_task_dim,
-                    ),
-                    nn.GELU(),
-                )
+                expert_boundaries = info.extras.get("expert_boundaries")
+                if expert_boundaries is not None:
+                    self.input_projections[name] = ExpertBoundaryProjection(
+                        num_input_experts=expert_boundaries["num_experts"],
+                        expert_dim=expert_boundaries["expert_dim"],
+                        output_dim=self.model_config.fc_task_dim,
+                    )
+                else:
+                    output_dim = info.output_dimension
+                    self.input_projections[name] = nn.Sequential(
+                        nn.RMSNorm(normalized_shape=output_dim),
+                        nn.Linear(
+                            in_features=output_dim,
+                            out_features=self.model_config.fc_task_dim,
+                        ),
+                        nn.GELU(),
+                    )
             expert_in_dim = self.model_config.fc_task_dim
         else:
             expert_in_dim = fusion_in_dim
@@ -210,3 +218,45 @@ class MGMoEModel(nn.Module):
             final_out[group_name] = weighted.sum(dim=2)
 
         return final_out
+
+
+class ExpertBoundaryProjection(nn.Module):
+    def __init__(
+        self,
+        num_input_experts: int,
+        expert_dim: int,
+        output_dim: int,
+    ):
+        super().__init__()
+
+        self.num_input_experts = num_input_experts
+        self.expert_dim = expert_dim
+
+        self.expert_projections = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.RMSNorm(normalized_shape=expert_dim),
+                    nn.Linear(
+                        in_features=expert_dim,
+                        out_features=output_dim,
+                    ),
+                    nn.GELU(),
+                )
+                for _ in range(num_input_experts)
+            ]
+        )
+
+        self.expert_gate = nn.Parameter(torch.zeros(num_input_experts))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        expert_slices = x.reshape(x.shape[0], self.num_input_experts, self.expert_dim)
+
+        projected = []
+        for i, proj in enumerate(self.expert_projections):
+            projected.append(proj(expert_slices[:, i, :]))
+
+        stacked = torch.stack(projected, dim=1)
+        gate_weights = torch.softmax(self.expert_gate, dim=0)
+        gated = (gate_weights.unsqueeze(0).unsqueeze(-1) * stacked).sum(dim=1)
+
+        return gated

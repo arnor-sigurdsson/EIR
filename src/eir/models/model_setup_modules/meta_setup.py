@@ -323,6 +323,12 @@ def get_all_feature_extractor_dimensions_and_types(
                     extras["down_every_n_blocks"] = mic.down_sample_every_n_blocks
                     extras["layers"] = mic.layers
 
+        cur_module = input_modules[input_name]
+        if hasattr(cur_module, "expert_boundaries"):
+            cur_expert_boundaries = cur_module.expert_boundaries
+            if cur_expert_boundaries is not None:
+                extras["expert_boundaries"] = cur_expert_boundaries
+
         input_dimensionality_and_types[input_name] = FeatureExtractorInfo(
             input_dimension=in_features_per_input[input_name],
             output_dimension=out_feature_per_feature_extractor[input_name],

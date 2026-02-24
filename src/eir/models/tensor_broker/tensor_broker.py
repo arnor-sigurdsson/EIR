@@ -49,6 +49,13 @@ class CachedTensor:
     layer_path: str
 
 
+@dataclass
+class CachedTensorMeta:
+    layer_path: str
+    cache_target: str
+    expert_boundaries: dict[str, int] | None = None
+
+
 def prepare_example_test_batch(
     input_objects: al_input_objects_as_dict,
     output_objects: al_output_objects_as_dict,
@@ -251,6 +258,22 @@ def attach_tensor_broker_module_injection(
     return remove_hook
 
 
+def _detect_expert_boundaries(
+    layer_path: str,
+    all_named_modules: dict[str, nn.Module],
+) -> dict[str, int] | None:
+    parts = layer_path.split(".")
+    for i in range(len(parts), 0, -1):
+        parent_path = ".".join(parts[:i])
+        if parent_path in all_named_modules:
+            parent_module = all_named_modules[parent_path]
+            if hasattr(parent_module, "expert_boundaries"):
+                boundaries = parent_module.expert_boundaries
+                if boundaries is not None:
+                    return boundaries
+    return None
+
+
 def get_tensor_broker(
     input_objects: al_input_objects_as_dict,
     output_objects: al_output_objects_as_dict,
@@ -295,7 +318,7 @@ def get_tensor_broker(
     tensor_cache: dict[str, CachedTensor] = {}
     all_named_modules: dict[str, nn.Module] = dict(module_storage.named_modules())
 
-    have_been_cached_mapping: dict[str, tuple[str, str]] = {}
+    have_been_cached_mapping: dict[str, CachedTensorMeta] = {}
     for config in all_configs:
         if not config.tensor_broker_config:
             continue
@@ -322,7 +345,16 @@ def get_tensor_broker(
                     layer_path=layer_path,
                     layer_cache_target=layer_cache_target,
                 )
-                have_been_cached_mapping[tmc.name] = (layer_path, layer_cache_target)
+
+                expert_boundaries = _detect_expert_boundaries(
+                    layer_path=layer_path,
+                    all_named_modules=all_named_modules,
+                )
+                have_been_cached_mapping[tmc.name] = CachedTensorMeta(
+                    layer_path=layer_path,
+                    cache_target=layer_cache_target,
+                    expert_boundaries=expert_boundaries,
+                )
 
     have_been_used_from_cache = set()
     for config in all_configs:
@@ -341,12 +373,12 @@ def get_tensor_broker(
                 # The output of one hook becomes the input for the next,
                 # creating a "chain of fusions"
                 for from_name in tmc.use_from_cache:
-                    from_path, cache_target = have_been_cached_mapping[from_name]
+                    cached_meta = have_been_cached_mapping[from_name]
+                    from_path = cached_meta.layer_path
                     message_name = f"{from_name}>>>{to_name}: {from_path}>>>{to_path}"
-                    # . is not allowed in layer names in Torch
                     message_name = message_name.replace(".", "--")
 
-                    if cache_target == "output":
+                    if cached_meta.cache_target == "output":
                         from_shape_no_batch = output_shapes[from_path]
                     else:
                         from_shape_no_batch = input_shapes[from_path]
@@ -369,6 +401,7 @@ def get_tensor_broker(
                         projection_type=tmc.projection_type,
                         kernel_width_divisible_by=tmc.kernel_width_divisible_by,
                         projection_intermediate_factor=tmc.projection_intermediate_factor,
+                        expert_boundaries=cached_meta.expert_boundaries,
                     )
                     have_been_used_from_cache.add(from_name)
 

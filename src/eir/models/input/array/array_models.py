@@ -16,6 +16,8 @@ from eir.models.input.array.models_locally_connected import (
     FlattenFunc,
     LCLModel,
     LCLModelConfig,
+    LCLMoEModel,
+    LCLMoEModelConfig,
 )
 from eir.models.input.array.models_transformers import (
     ArrayTransformer,
@@ -25,15 +27,22 @@ from eir.models.input.array.models_transformers import (
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
 
-al_array_model_types = Literal["cnn", "lcl", "transformer"]
+al_array_model_types = Literal["cnn", "lcl", "lcl-moe", "transformer"]
 
-al_array_model_classes = type[CNNModel] | type[LCLModel] | type[ArrayTransformer]
-al_array_models = CNNModel | LCLModel | ArrayTransformer
+al_array_model_classes = (
+    type[CNNModel] | type[LCLModel] | type[LCLMoEModel] | type[ArrayTransformer]
+)
+al_array_models = CNNModel | LCLModel | LCLMoEModel | ArrayTransformer
 
 al_array_model_config_classes = (
-    type[CNNModelConfig] | type[LCLModelConfig] | type[ArrayTransformerConfig]
+    type[CNNModelConfig]
+    | type[LCLModelConfig]
+    | type[LCLMoEModelConfig]
+    | type[ArrayTransformerConfig]
 )
-al_array_model_configs = CNNModelConfig | LCLModelConfig | ArrayTransformerConfig
+al_array_model_configs = (
+    CNNModelConfig | LCLModelConfig | LCLMoEModelConfig | ArrayTransformerConfig
+)
 
 al_pre_normalization = Literal["instancenorm", "layernorm"] | None
 
@@ -43,6 +52,7 @@ al_array_model_init_kwargs = dict[
         "DataDimensions",
         CNNModelConfig,
         LCLModelConfig,
+        LCLMoEModelConfig,
         ArrayTransformerConfig,
         FlattenFunc,
     ],
@@ -53,6 +63,7 @@ def get_array_model_mapping() -> dict[str, al_array_model_classes]:
     mapping = {
         "cnn": CNNModel,
         "lcl": LCLModel,
+        "lcl-moe": LCLMoEModel,
         "transformer": ArrayTransformer,
     }
 
@@ -68,6 +79,7 @@ def get_array_config_dataclass_mapping() -> dict[str, al_array_model_config_clas
     mapping = {
         "cnn": CNNModelConfig,
         "lcl": LCLModelConfig,
+        "lcl-moe": LCLMoEModelConfig,
         "transformer": ArrayTransformerConfig,
     }
 
@@ -93,8 +105,8 @@ def get_array_model_init_kwargs(
     kwargs["data_dimensions"] = data_dimensions
 
     match model_type:
-        case "lcl":
-            assert isinstance(model_config, LCLModelConfig)
+        case "lcl" | "lcl-moe":
+            assert isinstance(model_config, LCLModelConfig | LCLMoEModelConfig)
 
             if model_config.patch_size is not None:
                 assert isinstance(model_config.patch_size, tuple | list)
@@ -236,6 +248,12 @@ class ArrayWrapperModel(nn.Module):
         if not has_l1_weights(self.feature_extractor):
             raise AttributeError("Feature extractor does not have l1_penalized_weights")
         return self.feature_extractor.l1_penalized_weights
+
+    @property
+    def expert_boundaries(self) -> dict | None:
+        if hasattr(self.feature_extractor, "expert_boundaries"):
+            return self.feature_extractor.expert_boundaries
+        return None
 
     def forward(self, x):
         out = self.pre_normalization(x)

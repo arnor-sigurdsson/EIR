@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import partial
 from typing import (
     TYPE_CHECKING,
+    Any,
     Literal,
     Protocol,
     Union,
@@ -293,6 +294,171 @@ class LCLModel(nn.Module):
         out = self.lcl_blocks(out)
 
         return out
+
+
+@dataclass
+class LCLMoEModelConfig(LCLModelConfig):
+    """
+    :param num_experts:
+        Number of parallel expert stacks. Each expert has its own ``fc_0`` and
+        ``lcl_blocks``, allowing experts to specialize on different genomic patterns
+        from the initial projection onward.
+    """
+
+    num_experts: int = 4
+
+
+class LCLMoEModel(nn.Module):
+    def __init__(
+        self,
+        model_config: LCLMoEModelConfig,
+        data_dimensions: "DataDimensions",
+        flatten_fn: FlattenFunc,
+        dynamic_cutoff: int | None = None,
+    ):
+        super().__init__()
+
+        self.model_config = model_config
+        self.data_dimensions = data_dimensions
+        self.flatten_fn = flatten_fn
+        self.num_experts = model_config.num_experts
+
+        kernel_width = parse_kernel_width(
+            kernel_width=self.model_config.kernel_width,
+            patch_size=self.model_config.patch_size,
+        )
+
+        fc_0_kernel_size = calc_value_after_expansion(
+            base=kernel_width,
+            expansion=self.model_config.first_kernel_expansion,
+        )
+        fc_0_out_feature_sets = calc_value_after_expansion(
+            base=2**self.model_config.channel_exp_base,
+            expansion=self.model_config.first_channel_expansion,
+        )
+
+        cutoff = dynamic_cutoff or self.model_config.cutoff
+        assert isinstance(cutoff, int)
+
+        self.expert_branches = nn.ModuleDict()
+        for i in range(self.num_experts):
+            fc_0 = LCL(
+                in_features=self._fc_0_in_features,
+                out_feature_sets=fc_0_out_feature_sets,
+                kernel_size=fc_0_kernel_size,
+                bias=True,
+            )
+            act_0 = nn.GELU()
+
+            lcl_parameter_spec = LCParameterSpec(
+                in_features=fc_0.out_features,
+                kernel_width=kernel_width,
+                channel_exp_base=self.model_config.channel_exp_base,
+                dropout_p=self.model_config.rb_do,
+                cutoff=cutoff,
+                stochastic_depth_p=self.model_config.stochastic_depth_p,
+                num_initial_maintaining_blocks=(
+                    self.model_config.num_initial_maintaining_blocks
+                ),
+                attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
+                direction=self.model_config.direction,
+            )
+            lcl_blocks = _get_lcl_blocks(
+                lcl_spec=lcl_parameter_spec,
+                block_layer_spec=self.model_config.layers,
+            )
+
+            self.expert_branches[f"expert_{i}"] = nn.Sequential(
+                fc_0,
+                act_0,
+                lcl_blocks,
+            )
+
+        self._single_expert_out_features = self._compute_single_expert_out_features()
+
+        self.aggregation_checkpoints = nn.ModuleDict()
+        for depth_name in self._get_checkpoint_depth_names():
+            self.aggregation_checkpoints[depth_name] = nn.Identity()
+
+        self._init_weights()
+
+    @property
+    def _fc_0_in_features(self) -> int:
+        return self.data_dimensions.num_elements()
+
+    def _compute_single_expert_out_features(self) -> int:
+        first_expert = next(iter(self.expert_branches.values()))
+        lcl_blocks = first_expert[2]
+        last_block = lcl_blocks[-1]
+        return cast(int, last_block.out_features)
+
+    def _get_checkpoint_depth_names(self) -> list[str]:
+        first_expert = next(iter(self.expert_branches.values()))
+        lcl_blocks = first_expert[2]
+        names = ["after_fc_0"]
+        for i in range(len(lcl_blocks)):
+            names.append(f"after_lcl_block_{i}")
+        return names
+
+    @property
+    def l1_penalized_weights(self) -> torch.Tensor:
+        weights = []
+        for expert in self.expert_branches.values():
+            fc_0 = expert[0]
+            weights.append(fc_0.weight)
+        return torch.stack(weights)
+
+    @property
+    def num_out_features(self) -> int:
+        return self.num_experts * self._single_expert_out_features
+
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.num_out_features,)
+
+    @property
+    def expert_boundaries(self) -> dict[str, Any]:
+        return {
+            "num_experts": self.num_experts,
+            "expert_dim": self._single_expert_out_features,
+        }
+
+    def _init_weights(self):
+        pass
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        out = self.flatten_fn(x=input)
+
+        expert_outputs: list[torch.Tensor] = []
+        for _expert_name, expert_module in self.expert_branches.items():
+            fc_0 = expert_module[0]
+            act_0 = expert_module[1]
+            lcl_blocks = expert_module[2]
+
+            cur = fc_0(out)
+            cur = act_0(cur)
+
+            expert_outputs.append(cur)
+
+        after_fc_0 = torch.cat(expert_outputs, dim=1)
+        after_fc_0 = self.aggregation_checkpoints["after_fc_0"](after_fc_0)
+
+        num_lcl_blocks = len(next(iter(self.expert_branches.values()))[2])
+        for block_idx in range(num_lcl_blocks):
+            new_expert_outputs: list[torch.Tensor] = []
+            for expert_idx, expert_module in enumerate(self.expert_branches.values()):
+                lcl_blocks = expert_module[2]
+                cur = lcl_blocks[block_idx](expert_outputs[expert_idx])
+                new_expert_outputs.append(cur)
+
+            expert_outputs = new_expert_outputs
+
+            checkpoint_name = f"after_lcl_block_{block_idx}"
+            aggregated = torch.cat(expert_outputs, dim=1)
+            aggregated = self.aggregation_checkpoints[checkpoint_name](aggregated)
+
+        final = torch.cat(expert_outputs, dim=1)
+        return final
 
 
 def parse_kernel_width(

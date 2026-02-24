@@ -8,6 +8,8 @@ from eir.models.input.array.models_locally_connected import (
     FlattenFunc,
     LCLModel,
     LCLModelConfig,
+    LCLMoEModel,
+    LCLMoEModelConfig,
     SimpleLCLModel,
     SimpleLCLModelConfig,
     flatten_h_w_fortran,
@@ -23,11 +25,17 @@ al_omics_model_classes = (
     | type["LinearModel"]
     | type["SimpleLCLModel"]
     | type["LCLModel"]
+    | type["LCLMoEModel"]
     | type["IdentityModel"]
 )
 
 al_omics_models = Union[
-    "CNNModel", "LinearModel", "SimpleLCLModel", "LCLModel", "IdentityModel"
+    "CNNModel",
+    "LinearModel",
+    "SimpleLCLModel",
+    "LCLModel",
+    "LCLMoEModel",
+    "IdentityModel",
 ]
 
 al_omics_model_types = Literal[
@@ -35,6 +43,7 @@ al_omics_model_types = Literal[
     "linear",
     "lcl-simple",
     "genome-local-net",
+    "genome-local-net-moe",
     "linear",
 ]
 
@@ -43,6 +52,7 @@ al_omics_model_config_classes = (
     | type[LinearModelConfig]
     | type[SimpleLCLModelConfig]
     | type[LCLModelConfig]
+    | type[LCLMoEModelConfig]
     | type[IdentityModelConfig]
 )
 
@@ -51,6 +61,7 @@ al_omics_model_configs = (
     | LinearModelConfig
     | SimpleLCLModelConfig
     | LCLModelConfig
+    | LCLMoEModelConfig
     | IdentityModelConfig
 )
 
@@ -75,6 +86,7 @@ def get_omics_model_mapping() -> dict[str, al_omics_model_classes]:
         "linear": LinearModel,
         "lcl-simple": SimpleLCLModel,
         "genome-local-net": LCLModel,
+        "genome-local-net-moe": LCLMoEModel,
         "identity": IdentityModel,
     }
 
@@ -96,6 +108,7 @@ def get_omics_config_dataclass_mapping() -> dict[str, al_omics_model_config_clas
         "linear": LinearModelConfig,
         "lcl-simple": SimpleLCLModelConfig,
         "genome-local-net": LCLModelConfig,
+        "genome-local-net-moe": LCLMoEModelConfig,
         "identity": IdentityModelConfig,
     }
 
@@ -135,7 +148,7 @@ def get_omics_model_init_kwargs(
     kwargs["data_dimensions"] = data_dimensions
 
     match model_type:
-        case "genome-local-net" | "lcl-simple":
+        case "genome-local-net" | "genome-local-net-moe" | "lcl-simple":
             kwargs["flatten_fn"] = flatten_h_w_fortran
 
     return kwargs

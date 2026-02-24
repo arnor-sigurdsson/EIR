@@ -8,6 +8,9 @@ from eir.models.layers.projection_layers import get_1d_projection_layer
 from eir.models.tensor_broker.projection_modules.cnn import (
     get_conv_params_for_dimension,
 )
+from eir.models.tensor_broker.projection_modules.expert_gated import (
+    ExpertGatedProjection,
+)
 from eir.models.tensor_broker.projection_modules.grouped_linear import (
     GroupedLinearProjectionWrapper,
 )
@@ -31,6 +34,7 @@ def get_projection_layer(
     projection_type: al_broker_projection_types,
     kernel_width_divisible_by: int | None = None,
     projection_intermediate_factor: int | None = None,
+    expert_boundaries: dict[str, int] | None = None,
 ) -> tuple[nn.Module, torch.Size]:
     """
     We have the cache_fusion_type input (currently mostly unused) and we return the
@@ -43,6 +47,18 @@ def get_projection_layer(
         - cross attention where we only need to match the embedding dimension.
         - sum along a specific dimension, would work due to broadcasting.
     """
+
+    if expert_boundaries is not None:
+        target_dim = to_shape_no_batch.numel()
+        projection = ExpertGatedProjection(
+            num_experts=expert_boundaries["num_experts"],
+            expert_dim=expert_boundaries["expert_dim"],
+            target_dim=target_dim,
+            projection_type=projection_type,
+            kernel_width_divisible_by=kernel_width_divisible_by,
+            projection_intermediate_factor=projection_intermediate_factor,
+        )
+        return projection, to_shape_no_batch
 
     matching_shapes = from_shape_no_batch == to_shape_no_batch
     not_ca = cache_fusion_type != "cross-attention"
