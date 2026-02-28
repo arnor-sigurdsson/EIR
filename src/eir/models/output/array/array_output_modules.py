@@ -69,10 +69,14 @@ class ArrayOutputWrapperModule(nn.Module):
             self.target_width = n_elements
         self.target_shape = self.data_dimensions.full_shape()
 
+        projection_layer_type = "auto"
+        if self.num_classes is not None:
+            projection_layer_type = "linear"
+
         self.projection_head = get_1d_projection_layer(
             input_dimension=self.feature_extractor.num_out_features,
             target_dimension=self.target_width,
-            projection_layer_type="auto",
+            projection_layer_type=projection_layer_type,
             lcl_diff_tolerance=0,
         )
 
