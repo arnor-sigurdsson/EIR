@@ -1,11 +1,14 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol, Union
 
+import numpy as np
+
 from eir.models.input.array.models_cnn import CNNModel, CNNModelConfig
 from eir.models.input.array.models_identity import IdentityModel, IdentityModelConfig
 from eir.models.input.array.models_linear import LinearModel, LinearModelConfig
 from eir.models.input.array.models_locally_connected import (
-    FlattenFunc,
+    LCLInformedMoEModel,
+    LCLInformedMoEModelConfig,
     LCLModel,
     LCLModelConfig,
     LCLMoEModel,
@@ -26,6 +29,7 @@ al_omics_model_classes = (
     | type["SimpleLCLModel"]
     | type["LCLModel"]
     | type["LCLMoEModel"]
+    | type["LCLInformedMoEModel"]
     | type["IdentityModel"]
 )
 
@@ -35,6 +39,7 @@ al_omics_models = Union[
     "SimpleLCLModel",
     "LCLModel",
     "LCLMoEModel",
+    "LCLInformedMoEModel",
     "IdentityModel",
 ]
 
@@ -44,6 +49,7 @@ al_omics_model_types = Literal[
     "lcl-simple",
     "genome-local-net",
     "genome-local-net-moe",
+    "genome-local-net-informed-moe",
     "linear",
 ]
 
@@ -53,6 +59,7 @@ al_omics_model_config_classes = (
     | type[SimpleLCLModelConfig]
     | type[LCLModelConfig]
     | type[LCLMoEModelConfig]
+    | type[LCLInformedMoEModelConfig]
     | type[IdentityModelConfig]
 )
 
@@ -62,6 +69,7 @@ al_omics_model_configs = (
     | SimpleLCLModelConfig
     | LCLModelConfig
     | LCLMoEModelConfig
+    | LCLInformedMoEModelConfig
     | IdentityModelConfig
 )
 
@@ -87,6 +95,7 @@ def get_omics_model_mapping() -> dict[str, al_omics_model_classes]:
         "lcl-simple": SimpleLCLModel,
         "genome-local-net": LCLModel,
         "genome-local-net-moe": LCLMoEModel,
+        "genome-local-net-informed-moe": LCLInformedMoEModel,
         "identity": IdentityModel,
     }
 
@@ -109,6 +118,7 @@ def get_omics_config_dataclass_mapping() -> dict[str, al_omics_model_config_clas
         "lcl-simple": SimpleLCLModelConfig,
         "genome-local-net": LCLModelConfig,
         "genome-local-net-moe": LCLMoEModelConfig,
+        "genome-local-net-informed-moe": LCLInformedMoEModelConfig,
         "identity": IdentityModelConfig,
     }
 
@@ -126,16 +136,9 @@ def get_omics_model_init_kwargs(
     model_type: al_omics_model_types,
     model_config: al_omics_model_configs,
     data_dimensions: "DataDimensions",
-) -> dict[str, Union["DataDimensions", al_omics_model_configs | FlattenFunc]]:
-    """
-    See: https://github.com/python/mypy/issues/5374 for type hint issue.
-
-    Possibly split / extend this function later to account for other kwargs that just
-    model_config, to allow for more flexibility in model instantiation (not restricting
-    to just model_config object).
-    """
-
-    kwargs: dict[str, DataDimensions | (al_omics_model_configs | FlattenFunc)] = {}
+    expert_snp_indices: dict[str, np.ndarray] | None = None,
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
     base_kwargs = model_config.__dict__
     base_kwargs = _enforce_omics_specific_settings(
         base_kwargs=base_kwargs, model_type=model_type
@@ -148,8 +151,22 @@ def get_omics_model_init_kwargs(
     kwargs["data_dimensions"] = data_dimensions
 
     match model_type:
-        case "genome-local-net" | "genome-local-net-moe" | "lcl-simple":
+        case (
+            "genome-local-net"
+            | "genome-local-net-moe"
+            | "genome-local-net-informed-moe"
+            | "lcl-simple"
+        ):
             kwargs["flatten_fn"] = flatten_h_w_fortran
+
+    if model_type == "genome-local-net-informed-moe":
+        if expert_snp_indices is None:
+            raise ValueError(
+                "expert_snp_indices must be provided when using "
+                "genome-local-net-informed-moe model type. "
+                "Set expert_snp_groups_file in the omics input data config."
+            )
+        kwargs["expert_snp_indices"] = expert_snp_indices
 
     return kwargs
 

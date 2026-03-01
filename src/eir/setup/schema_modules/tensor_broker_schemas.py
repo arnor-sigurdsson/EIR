@@ -95,6 +95,7 @@ class TensorMessageConfig:
     projection_type: al_broker_projection_types = "lcl"
     kernel_width_divisible_by: int | None = None
     projection_intermediate_factor: int | None = None
+    projection_lcl_residual_blocks: bool = False
     cache_dropout_p: float = 0.0
 
 

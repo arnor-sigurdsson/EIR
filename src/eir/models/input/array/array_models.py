@@ -14,6 +14,8 @@ from torch import Tensor, nn
 from eir.models.input.array.models_cnn import CNNModel, CNNModelConfig
 from eir.models.input.array.models_locally_connected import (
     FlattenFunc,
+    LCLInformedMoEModel,
+    LCLInformedMoEModelConfig,
     LCLModel,
     LCLModelConfig,
     LCLMoEModel,
@@ -27,21 +29,34 @@ from eir.models.input.array.models_transformers import (
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
 
-al_array_model_types = Literal["cnn", "lcl", "lcl-moe", "transformer"]
+al_array_model_types = Literal[
+    "cnn", "lcl", "lcl-moe", "lcl-informed-moe", "transformer"
+]
 
 al_array_model_classes = (
-    type[CNNModel] | type[LCLModel] | type[LCLMoEModel] | type[ArrayTransformer]
+    type[CNNModel]
+    | type[LCLModel]
+    | type[LCLMoEModel]
+    | type[LCLInformedMoEModel]
+    | type[ArrayTransformer]
 )
-al_array_models = CNNModel | LCLModel | LCLMoEModel | ArrayTransformer
+al_array_models = (
+    CNNModel | LCLModel | LCLMoEModel | LCLInformedMoEModel | ArrayTransformer
+)
 
 al_array_model_config_classes = (
     type[CNNModelConfig]
     | type[LCLModelConfig]
     | type[LCLMoEModelConfig]
+    | type[LCLInformedMoEModelConfig]
     | type[ArrayTransformerConfig]
 )
 al_array_model_configs = (
-    CNNModelConfig | LCLModelConfig | LCLMoEModelConfig | ArrayTransformerConfig
+    CNNModelConfig
+    | LCLModelConfig
+    | LCLMoEModelConfig
+    | LCLInformedMoEModelConfig
+    | ArrayTransformerConfig
 )
 
 al_pre_normalization = Literal["instancenorm", "layernorm"] | None
@@ -53,6 +68,7 @@ al_array_model_init_kwargs = dict[
         CNNModelConfig,
         LCLModelConfig,
         LCLMoEModelConfig,
+        LCLInformedMoEModelConfig,
         ArrayTransformerConfig,
         FlattenFunc,
     ],
@@ -64,6 +80,7 @@ def get_array_model_mapping() -> dict[str, al_array_model_classes]:
         "cnn": CNNModel,
         "lcl": LCLModel,
         "lcl-moe": LCLMoEModel,
+        "lcl-informed-moe": LCLInformedMoEModel,
         "transformer": ArrayTransformer,
     }
 
@@ -80,6 +97,7 @@ def get_array_config_dataclass_mapping() -> dict[str, al_array_model_config_clas
         "cnn": CNNModelConfig,
         "lcl": LCLModelConfig,
         "lcl-moe": LCLMoEModelConfig,
+        "lcl-informed-moe": LCLInformedMoEModelConfig,
         "transformer": ArrayTransformerConfig,
     }
 
@@ -105,8 +123,11 @@ def get_array_model_init_kwargs(
     kwargs["data_dimensions"] = data_dimensions
 
     match model_type:
-        case "lcl" | "lcl-moe":
-            assert isinstance(model_config, LCLModelConfig | LCLMoEModelConfig)
+        case "lcl" | "lcl-moe" | "lcl-informed-moe":
+            assert isinstance(
+                model_config,
+                LCLModelConfig | LCLMoEModelConfig | LCLInformedMoEModelConfig,
+            )
 
             if model_config.patch_size is not None:
                 assert isinstance(model_config.patch_size, tuple | list)

@@ -403,6 +403,7 @@ def get_tensor_broker(
                         kernel_width_divisible_by=tmc.kernel_width_divisible_by,
                         projection_intermediate_factor=tmc.projection_intermediate_factor,
                         expert_boundaries=cached_meta.expert_boundaries,
+                        projection_lcl_residual_blocks=tmc.projection_lcl_residual_blocks,
                     )
                     have_been_used_from_cache.add(from_name)
 
