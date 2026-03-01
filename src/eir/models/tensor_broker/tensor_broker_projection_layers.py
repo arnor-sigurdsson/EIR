@@ -4,7 +4,10 @@ from torch import nn
 from eir.models.input.array.models_cnn import CNNResidualBlock
 from eir.models.layers.mlp_layers import MLPResidualBlock
 from eir.models.layers.norm_layers import LearnableGate
-from eir.models.layers.projection_layers import get_1d_projection_layer
+from eir.models.layers.projection_layers import (
+    get_1d_projection_layer,
+    get_lcl_projection_layer,
+)
 from eir.models.tensor_broker.projection_modules.cnn import (
     get_conv_params_for_dimension,
 )
@@ -110,16 +113,27 @@ def get_projection_layer(
             if projection_lcl_residual_blocks:
                 cur_dim = input_dim
                 while cur_dim // 2 > mlp_input_target:
-                    next_dim = cur_dim // 2
-                    block = get_1d_projection_layer(
+                    target_dim = cur_dim // 2
+                    block = get_lcl_projection_layer(
                         input_dimension=cur_dim,
-                        target_dimension=next_dim,
-                        projection_layer_type="auto",
-                        lcl_diff_tolerance=0,
+                        target_dimension=target_dim,
+                        layer_type="lcl_residual",
+                        diff_tolerance=cur_dim // 100,
                         kernel_width_divisible_by=kernel_width_divisible_by,
                     )
-                    projection_layers.append(block)
-                    cur_dim = next_dim
+                    if block is not None:
+                        projection_layers.append(block)
+                        cur_dim = block.out_features
+                    else:
+                        block = get_1d_projection_layer(
+                            input_dimension=cur_dim,
+                            target_dimension=target_dim,
+                            projection_layer_type="auto",
+                            lcl_diff_tolerance=0,
+                            kernel_width_divisible_by=kernel_width_divisible_by,
+                        )
+                        projection_layers.append(block)
+                        cur_dim = target_dim
             else:
                 lcl_projection_layer = get_1d_projection_layer(
                     input_dimension=input_dim,
