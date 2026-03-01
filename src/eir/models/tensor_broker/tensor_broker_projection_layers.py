@@ -114,7 +114,7 @@ def get_projection_layer(
                     block = get_1d_projection_layer(
                         input_dimension=cur_dim,
                         target_dimension=next_dim,
-                        projection_layer_type="lcl_residual",
+                        projection_layer_type="auto",
                         lcl_diff_tolerance=0,
                         kernel_width_divisible_by=kernel_width_divisible_by,
                     )
