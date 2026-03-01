@@ -113,10 +113,10 @@ def get_projection_layer(
             if projection_lcl_residual_blocks:
                 cur_dim = input_dim
                 while cur_dim // 2 > mlp_input_target:
-                    target_dim = cur_dim // 2
+                    halve_target = cur_dim // 2
                     block = get_lcl_projection_layer(
                         input_dimension=cur_dim,
-                        target_dimension=target_dim,
+                        target_dimension=halve_target,
                         layer_type="lcl_residual",
                         diff_tolerance=cur_dim // 100,
                         kernel_width_divisible_by=kernel_width_divisible_by,
@@ -127,13 +127,13 @@ def get_projection_layer(
                     else:
                         block = get_1d_projection_layer(
                             input_dimension=cur_dim,
-                            target_dimension=target_dim,
+                            target_dimension=halve_target,
                             projection_layer_type="auto",
                             lcl_diff_tolerance=0,
                             kernel_width_divisible_by=kernel_width_divisible_by,
                         )
                         projection_layers.append(block)
-                        cur_dim = target_dim
+                        cur_dim = halve_target
             else:
                 lcl_projection_layer = get_1d_projection_layer(
                     input_dimension=input_dim,
