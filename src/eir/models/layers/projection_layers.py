@@ -160,8 +160,7 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
     kernel_width_divisible_by: int | None = None,
 ) -> tuple[int, int] | None:
     best_diff = np.inf
-    best_kernel_width = None
-    best_out_feature_sets = None
+    best_params = None
 
     def _compute(
         input_dimension_: int, kernel_width_: int, out_feature_sets_: int
@@ -194,19 +193,15 @@ def _find_best_lcl_kernel_width_and_out_feature_sets(
 
             if diff < best_diff:
                 best_diff = diff
-                best_kernel_width = kernel_width
-                best_out_feature_sets = out_feature_sets
+                best_params = (kernel_width, out_feature_sets)
 
-            if diff <= diff_tolerance:
-                break
+                if diff == 0:
+                    return best_params
 
-    if best_diff != 0:
-        return None
+            if best_diff <= diff_tolerance:
+                return best_params
 
-    if best_kernel_width is None:
-        return None
+    if best_params is not None and best_diff <= diff_tolerance:
+        return best_params
 
-    assert best_kernel_width is not None
-    assert best_out_feature_sets is not None
-
-    return best_kernel_width, best_out_feature_sets
+    return None
