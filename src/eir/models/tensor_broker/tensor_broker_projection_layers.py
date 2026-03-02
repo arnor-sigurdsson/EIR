@@ -112,8 +112,8 @@ def get_projection_layer(
 
             if projection_lcl_residual_blocks:
                 cur_dim = input_dim
-                while cur_dim // 2 > mlp_input_target:
-                    halve_target = cur_dim // 2
+                while cur_dim // 4 > mlp_input_target:
+                    halve_target = cur_dim // 4
                     block = get_lcl_projection_layer(
                         input_dimension=cur_dim,
                         target_dimension=halve_target,
