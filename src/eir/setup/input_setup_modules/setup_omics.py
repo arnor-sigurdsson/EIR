@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -146,22 +147,21 @@ def _setup_expert_snp_indices(
     expert_groups: dict[str, list[str]],
     subset_indices: np.ndarray,
 ) -> dict[str, np.ndarray]:
-    subset_set = set(subset_indices.tolist())
-    bim_var_ids = df_bim["VAR_ID"].values
-
     subset_index_to_position: dict[int, int] = {
         idx: pos for pos, idx in enumerate(subset_indices)
     }
 
+    varid_to_subset_positions: dict[str, list[int]] = defaultdict(list)
+    for bim_idx, var_id in enumerate(df_bim["VAR_ID"].values):
+        if bim_idx in subset_index_to_position:
+            varid_to_subset_positions[var_id].append(subset_index_to_position[bim_idx])
+
     result: dict[str, np.ndarray] = {}
     for name, snp_list in expert_groups.items():
-        positions: list[int] = []
+        positions: set[int] = set()
         for snp_id in snp_list:
-            bim_matches = np.where(bim_var_ids == snp_id)[0]
-            for bim_idx in bim_matches:
-                if bim_idx in subset_set:
-                    positions.append(subset_index_to_position[bim_idx])
-        result[name] = np.array(sorted(set(positions)), dtype=np.int64)
+            positions.update(varid_to_subset_positions.get(snp_id, ()))
+        result[name] = np.array(sorted(positions), dtype=np.int64)
 
     return result
 
