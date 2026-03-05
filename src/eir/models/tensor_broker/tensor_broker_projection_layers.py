@@ -165,6 +165,7 @@ def get_projection_layer(
                 dropout_p=0.0,
                 full_preactivation=True,
                 stochastic_depth_p=0.0,
+                reduce_at_fc_1=False,
             )
             projection_layers.append(projection_layer)
             projected_shape = to_shape_no_batch
