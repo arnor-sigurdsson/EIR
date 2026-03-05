@@ -135,13 +135,26 @@ def get_projection_layer(
                         projection_layers.append(block)
                         cur_dim = halve_target
             else:
-                lcl_projection_layer = get_1d_projection_layer(
-                    input_dimension=input_dim,
-                    target_dimension=mlp_input_target,
-                    projection_layer_type="lcl",
-                    lcl_diff_tolerance=0,
-                    kernel_width_divisible_by=kernel_width_divisible_by,
-                )
+                try:
+                    lcl_projection_layer = get_1d_projection_layer(
+                        input_dimension=input_dim,
+                        target_dimension=mlp_input_target,
+                        projection_layer_type="lcl",
+                        lcl_diff_tolerance=0,
+                        kernel_width_divisible_by=kernel_width_divisible_by,
+                    )
+                except ValueError:
+                    # Sometimes we cannot create are reasonable LCL projection
+                    # e.g. if target dim is much larger tha input dim so we have this
+                    # fallback
+                    lcl_projection_layer = get_1d_projection_layer(
+                        input_dimension=input_dim,
+                        target_dimension=mlp_input_target,
+                        projection_layer_type="auto",
+                        lcl_diff_tolerance=0,
+                        kernel_width_divisible_by=kernel_width_divisible_by,
+                    )
+
                 projection_layers.append(lcl_projection_layer)
                 cur_dim = mlp_input_target
 
