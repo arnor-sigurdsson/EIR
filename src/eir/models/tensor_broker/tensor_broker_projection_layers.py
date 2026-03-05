@@ -125,14 +125,14 @@ def get_projection_layer(
                         projection_layers.append(block)
                         cur_dim = block.out_features
                     else:
-                        block = get_1d_projection_layer(
+                        fallback = get_1d_projection_layer(
                             input_dimension=cur_dim,
                             target_dimension=halve_target,
                             projection_layer_type="auto",
                             lcl_diff_tolerance=0,
                             kernel_width_divisible_by=kernel_width_divisible_by,
                         )
-                        projection_layers.append(block)
+                        projection_layers.append(fallback)
                         cur_dim = halve_target
             else:
                 try:

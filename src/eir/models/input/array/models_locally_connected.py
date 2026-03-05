@@ -633,17 +633,31 @@ class LCLInformedMoEModel(nn.Module):
                 len(snp_indices) * data_dimensions.channels * data_dimensions.height
             )
 
+            expert_fc_0_kernel = _clamp_kernel_for_min_chunks(
+                kernel_size=fc_0_kernel_size,
+                in_features=expert_in_features,
+                min_chunks=4,
+                min_kernel=4,
+            )
+
             fc_0 = LCL(
                 in_features=expert_in_features,
                 out_feature_sets=fc_0_out_feature_sets,
-                kernel_size=fc_0_kernel_size,
+                kernel_size=expert_fc_0_kernel,
                 bias=True,
             )
             act_0 = nn.GELU()
 
+            expert_kernel_width = _clamp_kernel_for_min_chunks(
+                kernel_size=kernel_width,
+                in_features=int(fc_0.out_features),
+                min_chunks=4,
+                min_kernel=4,
+            )
+
             lcl_parameter_spec = LCParameterSpec(
-                in_features=fc_0.out_features,
-                kernel_width=kernel_width,
+                in_features=int(fc_0.out_features),
+                kernel_width=expert_kernel_width,
                 channel_exp_base=self.model_config.channel_exp_base,
                 dropout_p=self.model_config.rb_do,
                 cutoff=cutoff,
@@ -1027,6 +1041,17 @@ class LCLAttentionBlock(nn.Module):
         out = self.ls(out)
 
         return x + out
+
+
+def _clamp_kernel_for_min_chunks(
+    kernel_size: int,
+    in_features: int,
+    min_chunks: int = 4,
+    min_kernel: int = 4,
+) -> int:
+    max_kernel = in_features // min_chunks
+    clamped = min(kernel_size, max_kernel)
+    return max(clamped, min_kernel)
 
 
 def _do_add_attention(
