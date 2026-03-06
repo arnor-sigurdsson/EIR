@@ -258,13 +258,13 @@ def impute_partially_missing_output_modalities(
                 output_type_info = output_object.output_config.output_type_info
 
                 assert isinstance(output_type_info, SurvivalOutputTypeConfig)
-                event_column = output_type_info.event_column
-                time_column = output_type_info.time_column
 
-                if event_column not in cur_output_value:
-                    cur_output_value[event_column] = torch.nan
-                if time_column not in cur_output_value:
-                    cur_output_value[time_column] = torch.nan
+                for event_column in output_type_info.event_columns:
+                    if event_column not in cur_output_value:
+                        cur_output_value[event_column] = torch.nan
+                for time_column in output_type_info.time_columns:
+                    if time_column not in cur_output_value:
+                        cur_output_value[time_column] = torch.nan
 
                 outputs_values[output_name] = cur_output_value
 
@@ -408,10 +408,9 @@ def _build_survival_output_fill_value(
     output_type_info = output_object.output_config.output_type_info
     assert isinstance(output_type_info, SurvivalOutputTypeConfig)
 
-    event_column = output_type_info.event_column
-    time_column = output_type_info.time_column
-
-    fill_value[event_column] = torch.nan
-    fill_value[time_column] = torch.nan
+    for event_column in output_type_info.event_columns:
+        fill_value[event_column] = torch.nan
+    for time_column in output_type_info.time_columns:
+        fill_value[time_column] = torch.nan
 
     return fill_value

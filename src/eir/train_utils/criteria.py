@@ -152,11 +152,17 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
                 assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
 
                 surv_loss_name = output_type_info.loss_function
-                time_column = output_type_info.time_column
+                event_to_time_map = dict(
+                    zip(
+                        output_type_info.event_columns,
+                        output_type_info.time_columns,
+                        strict=True,
+                    )
+                )
 
                 criterion_surv = create_survival_criterion(
                     loss_name=surv_loss_name,
-                    time_column=time_column,
+                    event_to_time_map=event_to_time_map,
                 )
                 criteria_dict[output_name] = criterion_surv
 
@@ -538,23 +544,23 @@ def _cox_ph_loss(
 
 def create_survival_criterion(
     loss_name: Literal["NegativeLogLikelihood", "CoxPHLoss"],
-    time_column: str,
+    event_to_time_map: dict[str, str],
 ) -> Callable:
     def survival_criterion(
         predictions: dict[str, torch.Tensor],
         targets: dict[str, torch.Tensor],
     ) -> dict[str, torch.Tensor]:
-        time_tensor = targets[time_column].to(dtype=torch.long)
-
         losses = {}
-        for name, pred in predictions.items():
-            if name != time_column:
-                losses[name] = _survival_loss(
-                    input=pred,
-                    time=time_tensor,
-                    target=targets[name],
-                    loss_func=loss_name,
-                )
+        for event_column, time_column in event_to_time_map.items():
+            if event_column not in predictions:
+                continue
+            time_tensor = targets[time_column].to(dtype=torch.long)
+            losses[event_column] = _survival_loss(
+                input=predictions[event_column],
+                time=time_tensor,
+                target=targets[event_column],
+                loss_func=loss_name,
+            )
         return losses
 
     return survival_criterion

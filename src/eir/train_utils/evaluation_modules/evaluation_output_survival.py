@@ -45,205 +45,237 @@ def save_survival_evaluation_results_wrapper(
         assert isinstance(output_object, ComputedSurvivalOutputInfo)
 
         output_type_info = output_object.output_config.output_type_info
-        time_name = output_type_info.time_column
-        event_name = output_type_info.event_column
         model_type = (
             "cox" if output_type_info.loss_function == "CoxPHLoss" else "discrete"
         )
 
-        cur_sample_output_folder = utils.prepare_sample_output_folder(
-            output_folder=experiment.configs.gc.be.output_folder,
-            column_name=event_name,
-            output_name=output_name,
-            iteration=iteration,
-        )
-
-        ids = val_ids[output_name][event_name]
-        model_outputs = val_outputs[output_name][event_name]
-        events = val_labels[output_name][event_name]
-        times = val_labels[output_name][time_name]
-
-        filtered = filter_survival_missing_targets(
-            model_outputs=model_outputs,
-            events=events,
-            times=times,
-            cur_ids=ids,
-        )
-
-        model_outputs = filtered.model_outputs
-        events = general_torch_to_numpy(tensor=filtered.events)
-        events = events.astype(int)
-        times = general_torch_to_numpy(tensor=filtered.times)
-        ids = filtered.ids
-
-        if model_type == "discrete":
-            transformers = output_object.target_transformers
-            time_kbins_transformer = transformers[time_name]
-            time_bins = time_kbins_transformer.bin_edges_[0]
-            times_binned = times
-            it_func = time_kbins_transformer.inverse_transform
-            times = it_func(times_binned.reshape(-1, 1)).flatten()
-
-            hazards = torch.sigmoid(model_outputs).cpu().numpy()
-            survival_probs = np.cumprod(1 - hazards, axis=1)
-            time_bins_except_last = time_bins[:-1]
-
-            plot_discrete_survival_curves(
-                times=times,
-                events=events,
-                predicted_probs=survival_probs,
-                time_bins=time_bins_except_last,
-                output_folder=cur_sample_output_folder,
-            )
-
-            plot_discrete_risk_stratification(
-                times=times,
-                events=events,
-                predicted_probs=survival_probs,
-                time_bins=time_bins_except_last,
-                output_folder=cur_sample_output_folder,
-            )
-
-            base_df = pd.DataFrame(
-                {
-                    "ID": ids,
-                    time_name: times,
-                    event_name: events,
-                    "Predicted_Risk": hazards[:, -1],
-                }
-            )
-
-            surv_prob_columns = {
-                f"Surv_Prob_t{i}": survival_probs[:, i]
-                for i, _t in enumerate(time_bins_except_last)
-            }
-            surv_prob_df = pd.DataFrame(surv_prob_columns)
-
-            df = pd.concat([base_df, surv_prob_df], axis=1)
-
-            plot_discrete_individual_survival_curves(
-                df=df,
-                time_bins=time_bins_except_last,
-                output_folder=str(cur_sample_output_folder),
-                n_samples=5,
-            )
-
-            plot_td_auc_curve(
-                times=times,
-                events=events,
-                risk_scores=hazards,
-                output_folder=cur_sample_output_folder,
-                target_transformer=time_kbins_transformer,
-            )
-
-            plot_calibration_curves(
-                times=times,
-                events=events,
-                survival_probs=survival_probs,
-                time_points=time_bins_except_last,
-                output_folder=cur_sample_output_folder,
-                n_groups=10,
-            )
-
-        else:
-            # note: model outputs are log hazard ratios
-            risk_scores = model_outputs.cpu().numpy()
-
-            unique_times, baseline_hazard = estimate_baseline_hazard(
-                times=times,
-                events=events,
-                risk_scores=risk_scores,
-            )
-            baseline_survival = np.exp(-np.cumsum(baseline_hazard))
-
-            run_folder = Path(experiment.configs.gc.be.output_folder)
-            cur_serialization_path = get_output_serialization_path(
+        for event_name, time_name in zip(
+            output_type_info.event_columns,
+            output_type_info.time_columns,
+            strict=True,
+        ):
+            _save_survival_evaluation_for_event(
                 output_name=output_name,
                 output_type=output_type,
-                run_folder=Path(experiment.configs.gc.be.output_folder),
+                event_name=event_name,
+                time_name=time_name,
+                model_type=model_type,
+                output_object=output_object,
+                val_outputs=val_outputs,
+                val_labels=val_labels,
+                val_ids=val_ids,
+                iteration=iteration,
+                experiment=experiment,
+                evaluation_metrics=evaluation_metrics,
             )
 
-            em = evaluation_metrics
-            cur_performance_avg = em["average"]["average"]["perf-average"]
 
-            maybe_save_survival_hazards_and_times(
-                serialization_output_folder=cur_serialization_path,
-                run_folder=run_folder,
-                cur_performance=cur_performance_avg,
-                baseline_hazards=baseline_hazard,
-                unique_times=unique_times,
-            )
+def _save_survival_evaluation_for_event(
+    output_name: str,
+    output_type: str,
+    event_name: str,
+    time_name: str,
+    model_type: str,
+    output_object: ComputedSurvivalOutputInfo,
+    val_outputs: dict[str, dict[str, torch.Tensor]],
+    val_labels: dict[str, dict[str, torch.Tensor]],
+    val_ids: dict[str, dict[str, list[str]]],
+    iteration: int,
+    experiment: "Experiment",
+    evaluation_metrics: al_step_metric_dict,
+) -> None:
+    cur_sample_output_folder = utils.prepare_sample_output_folder(
+        output_folder=experiment.configs.gc.be.output_folder,
+        column_name=event_name,
+        output_name=output_name,
+        iteration=iteration,
+    )
 
-            max_time = np.max(times)
-            time_points = np.linspace(0, max_time, 100)
+    ids = val_ids[output_name][event_name]
+    model_outputs = val_outputs[output_name][event_name]
+    events = val_labels[output_name][event_name]
+    times = val_labels[output_name][time_name]
 
-            survival_probs = calculate_cox_survival_probs(
-                risk_scores=risk_scores,
-                unique_times=unique_times,
-                baseline_survival=baseline_survival,
-                time_points=time_points,
-            )
+    filtered = filter_survival_missing_targets(
+        model_outputs=model_outputs,
+        events=events,
+        times=times,
+        cur_ids=ids,
+    )
 
-            plot_cox_survival_curves(
-                times=times,
-                events=events,
-                risk_scores=risk_scores,
-                unique_times=unique_times,
-                baseline_survival=baseline_survival,
-                time_points=time_points,
-                output_folder=cur_sample_output_folder,
-            )
+    model_outputs = filtered.model_outputs
+    events_np = general_torch_to_numpy(tensor=filtered.events)
+    events_np = events_np.astype(int)
+    times_np = general_torch_to_numpy(tensor=filtered.times)
+    ids = filtered.ids
 
-            plot_cox_risk_stratification(
-                times=times,
-                events=events,
-                risk_scores=risk_scores,
-                unique_times=unique_times,
-                baseline_survival=baseline_survival,
-                time_points=time_points,
-                output_folder=cur_sample_output_folder,
-            )
+    if model_type == "discrete":
+        transformers = output_object.target_transformers
+        time_kbins_transformer = transformers[time_name]
+        time_bins = time_kbins_transformer.bin_edges_[0]
+        times_binned = times_np
+        it_func = time_kbins_transformer.inverse_transform
+        times_np = it_func(times_binned.reshape(-1, 1)).flatten()
 
-            base_data = {
+        hazards = torch.sigmoid(model_outputs).cpu().numpy()
+        survival_probs = np.cumprod(1 - hazards, axis=1)
+        time_bins_except_last = time_bins[:-1]
+
+        plot_discrete_survival_curves(
+            times=times_np,
+            events=events_np,
+            predicted_probs=survival_probs,
+            time_bins=time_bins_except_last,
+            output_folder=cur_sample_output_folder,
+        )
+
+        plot_discrete_risk_stratification(
+            times=times_np,
+            events=events_np,
+            predicted_probs=survival_probs,
+            time_bins=time_bins_except_last,
+            output_folder=cur_sample_output_folder,
+        )
+
+        base_df = pd.DataFrame(
+            {
                 "ID": ids,
-                time_name: times,
-                event_name: events,
-                "Risk_Score": risk_scores.squeeze(),
+                time_name: times_np,
+                event_name: events_np,
+                "Predicted_Risk": hazards[:, -1],
             }
+        )
 
-            surv_prob_cols = {
-                f"Surv_Prob_t{i}": survival_probs[:, i]
-                for i in range(survival_probs.shape[1])
-            }
+        surv_prob_columns = {
+            f"Surv_Prob_t{i}": survival_probs[:, i]
+            for i, _t in enumerate(time_bins_except_last)
+        }
+        surv_prob_df = pd.DataFrame(surv_prob_columns)
 
-            df = pd.DataFrame({**base_data, **surv_prob_cols})
+        df = pd.concat([base_df, surv_prob_df], axis=1)
 
-            plot_cox_individual_curves(
-                df=df,
-                time_points=time_points,
-                output_folder=str(cur_sample_output_folder),
-                n_samples=5,
-            )
+        plot_discrete_individual_survival_curves(
+            df=df,
+            time_bins=time_bins_except_last,
+            output_folder=str(cur_sample_output_folder),
+            n_samples=5,
+        )
 
-            plot_td_auc_curve(
-                times=times,
-                events=events,
-                risk_scores=risk_scores,
-                output_folder=cur_sample_output_folder,
-                target_transformer=IdentityTransformer(),
-            )
+        plot_td_auc_curve(
+            times=times_np,
+            events=events_np,
+            risk_scores=hazards,
+            output_folder=cur_sample_output_folder,
+            target_transformer=time_kbins_transformer,
+        )
 
-            plot_calibration_curves(
-                times=times,
-                events=events,
-                survival_probs=survival_probs,
-                time_points=time_points,
-                output_folder=cur_sample_output_folder,
-                n_groups=10,
-            )
+        plot_calibration_curves(
+            times=times_np,
+            events=events_np,
+            survival_probs=survival_probs,
+            time_points=time_bins_except_last,
+            output_folder=cur_sample_output_folder,
+            n_groups=10,
+        )
 
-        csv_path = f"{cur_sample_output_folder}/survival_predictions.csv"
-        df.to_csv(csv_path, index=False)
+    else:
+        risk_scores = model_outputs.cpu().numpy()
+
+        unique_times, baseline_hazard = estimate_baseline_hazard(
+            times=times_np,
+            events=events_np,
+            risk_scores=risk_scores,
+        )
+        baseline_survival = np.exp(-np.cumsum(baseline_hazard))
+
+        run_folder = Path(experiment.configs.gc.be.output_folder)
+        cur_serialization_path = get_output_serialization_path(
+            output_name=output_name,
+            output_type=output_type,
+            run_folder=Path(experiment.configs.gc.be.output_folder),
+        )
+
+        em = evaluation_metrics
+        cur_performance_avg = em["average"]["average"]["perf-average"]
+
+        maybe_save_survival_hazards_and_times(
+            serialization_output_folder=cur_serialization_path,
+            run_folder=run_folder,
+            cur_performance=cur_performance_avg,
+            baseline_hazards=baseline_hazard,
+            unique_times=unique_times,
+        )
+
+        max_time = np.max(times_np)
+        time_points = np.linspace(0, max_time, 100)
+
+        survival_probs = calculate_cox_survival_probs(
+            risk_scores=risk_scores,
+            unique_times=unique_times,
+            baseline_survival=baseline_survival,
+            time_points=time_points,
+        )
+
+        plot_cox_survival_curves(
+            times=times_np,
+            events=events_np,
+            risk_scores=risk_scores,
+            unique_times=unique_times,
+            baseline_survival=baseline_survival,
+            time_points=time_points,
+            output_folder=cur_sample_output_folder,
+        )
+
+        plot_cox_risk_stratification(
+            times=times_np,
+            events=events_np,
+            risk_scores=risk_scores,
+            unique_times=unique_times,
+            baseline_survival=baseline_survival,
+            time_points=time_points,
+            output_folder=cur_sample_output_folder,
+        )
+
+        base_data = {
+            "ID": ids,
+            time_name: times_np,
+            event_name: events_np,
+            "Risk_Score": risk_scores.squeeze(),
+        }
+
+        surv_prob_cols = {
+            f"Surv_Prob_t{i}": survival_probs[:, i]
+            for i in range(survival_probs.shape[1])
+        }
+
+        df = pd.DataFrame({**base_data, **surv_prob_cols})
+
+        plot_cox_individual_curves(
+            df=df,
+            time_points=time_points,
+            output_folder=str(cur_sample_output_folder),
+            n_samples=5,
+        )
+
+        plot_td_auc_curve(
+            times=times_np,
+            events=events_np,
+            risk_scores=risk_scores,
+            output_folder=cur_sample_output_folder,
+            target_transformer=IdentityTransformer(),
+        )
+
+        plot_calibration_curves(
+            times=times_np,
+            events=events_np,
+            survival_probs=survival_probs,
+            time_points=time_points,
+            output_folder=cur_sample_output_folder,
+            n_groups=10,
+        )
+
+    csv_path = f"{cur_sample_output_folder}/survival_predictions.csv"
+    df.to_csv(csv_path, index=False)
 
 
 def maybe_save_survival_hazards_and_times(

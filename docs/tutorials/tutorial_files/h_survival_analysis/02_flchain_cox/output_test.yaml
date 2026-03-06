@@ -3,7 +3,9 @@ output_info:
   output_name: flchain_prediction
   output_type: survival
 output_type_info:
-  time_column: time
-  event_column: event
+  time_columns:
+    - time
+  event_columns:
+    - event
   loss_function: CoxPHLoss
   num_durations: 0

@@ -13,11 +13,13 @@ output_info:
   output_source: ws://localhost:8000/ws
   output_type: survival
 output_type_info:
-  event_column: Origin
+  event_columns:
+    - Origin
   label_parsing_chunk_size: null
   loss_function: NegativeLogLikelihood
   max_duration: null
   num_durations: 10
-  time_column: Height
+  time_columns:
+    - Height
 sampling_config: {}
 tensor_broker_config: null

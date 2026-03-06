@@ -239,6 +239,7 @@ def set_up_all_target_labels_wrapper(
                 train_labels_df, valid_labels_df = process_survival_output(
                     n_bins=n_bins,
                     output_name=output_name,
+                    output_type_info=output_type_info,
                     tabular_target_labels_info=tabular_target_labels_info,
                     train_ids=train_ids,
                     valid_ids=valid_ids,
@@ -390,6 +391,7 @@ def process_array_or_image_output(
 def process_survival_output(
     n_bins: int,
     output_name: str,
+    output_type_info: SurvivalOutputTypeConfig,
     tabular_target_labels_info: dict[str, Any],
     train_ids: Sequence[str],
     valid_ids: Sequence[str],
@@ -411,59 +413,65 @@ def process_survival_output(
         do_transform_labels=True,
     )
 
-    assert len(tabular_info.con_columns) == 1
-    event_column = tabular_info.cat_columns[0]
-    time_column = tabular_info.con_columns[0]
+    time_columns = list(output_type_info.time_columns)
+    event_columns = list(output_type_info.event_columns)
 
+    all_time_cols = ["ID"] + time_columns
     df_time = pl.read_csv(
         tabular_info.file_path,
-        columns=["ID", time_column],
-    ).with_columns([pl.col("ID").cast(pl.Utf8), pl.col(time_column).cast(pl.Float32)])
+        columns=all_time_cols,
+    ).with_columns(
+        [pl.col("ID").cast(pl.Utf8)]
+        + [pl.col(tc).cast(pl.Float32) for tc in time_columns]
+    )
 
     df_time_train = df_time.filter(pl.col("ID").is_in(train_ids))
     df_time_valid = df_time.filter(pl.col("ID").is_in(valid_ids))
 
-    df_time_train, cur_labels.train_labels = synchronize_missing_survival_values(
-        df_time=df_time_train,
-        df_labels=cur_labels.train_labels,
-        time_column=time_column,
-        event_column=event_column,
-    )
+    for time_column, event_column in zip(time_columns, event_columns, strict=True):
+        df_time_train, cur_labels.train_labels = synchronize_missing_survival_values(
+            df_time=df_time_train,
+            df_labels=cur_labels.train_labels,
+            time_column=time_column,
+            event_column=event_column,
+        )
 
-    df_time_valid, cur_labels.valid_labels = synchronize_missing_survival_values(
-        df_time=df_time_valid,
-        df_labels=cur_labels.valid_labels,
-        time_column=time_column,
-        event_column=event_column,
-    )
+        df_time_valid, cur_labels.valid_labels = synchronize_missing_survival_values(
+            df_time=df_time_valid,
+            df_labels=cur_labels.valid_labels,
+            time_column=time_column,
+            event_column=event_column,
+        )
 
-    dur_input = _streamline_duration_transformer_input(
-        df_time_train=df_time_train,
-        time_column=time_column,
-    )
-    dur_transformer = fit_duration_transformer(durations=dur_input, n_bins=n_bins)
+    for time_column in time_columns:
+        dur_input = _streamline_duration_transformer_input(
+            df_time_train=df_time_train,
+            time_column=time_column,
+        )
+        dur_transformer = fit_duration_transformer(durations=dur_input, n_bins=n_bins)
 
-    cur_labels.train_labels = cur_labels.train_labels.with_columns(
-        [
-            transform_durations_with_nans(
-                df=df_time_train,
-                time_column=time_column,
-                transformer=dur_transformer,
-            ).alias(time_column)
-        ]
-    )
+        cur_labels.train_labels = cur_labels.train_labels.with_columns(
+            [
+                transform_durations_with_nans(
+                    df=df_time_train,
+                    time_column=time_column,
+                    transformer=dur_transformer,
+                ).alias(time_column)
+            ]
+        )
 
-    cur_labels.valid_labels = cur_labels.valid_labels.with_columns(
-        [
-            transform_durations_with_nans(
-                df=df_time_valid,
-                time_column=time_column,
-                transformer=dur_transformer,
-            ).alias(time_column)
-        ]
-    )
+        cur_labels.valid_labels = cur_labels.valid_labels.with_columns(
+            [
+                transform_durations_with_nans(
+                    df=df_time_valid,
+                    time_column=time_column,
+                    transformer=dur_transformer,
+                ).alias(time_column)
+            ]
+        )
 
-    cur_labels.label_transformers[time_column] = dur_transformer
+        cur_labels.label_transformers[time_column] = dur_transformer
+
     label_transformers[output_name] = cur_labels.label_transformers
 
     all_labels = cur_labels.all_labels
@@ -751,8 +759,8 @@ def get_tabular_target_file_infos(
 
             tabular_info = TabularFileInfo(
                 file_path=Path(output_config.output_info.output_source),
-                cat_columns=[output_type_info.event_column],
-                con_columns=[output_type_info.time_column],
+                cat_columns=list(output_type_info.event_columns),
+                con_columns=list(output_type_info.time_columns),
                 parsing_chunk_size=output_type_info.label_parsing_chunk_size,
             )
             tabular_files_info[output_name] = tabular_info
