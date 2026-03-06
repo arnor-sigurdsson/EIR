@@ -239,6 +239,7 @@ def predict(
     max_samples_for_viz: None | int = None
     if latent_config is not None:
         max_samples_for_viz = latent_config.max_samples_for_viz
+
     run_all_eval_hook_analysis(
         hook_outputs=hook_outputs,
         max_samples_for_viz=max_samples_for_viz,
@@ -506,6 +507,17 @@ def _auto_set_test_batch_size(batch_size: int, test_set_size: int) -> int:
 
 
 def _get_default_predict_hooks(train_hooks: "Hooks") -> PredictHooks:
+    """
+    Note this is specific to predict.py, and why we don't have the adversarial hooks
+    being active when doing a prediction.
+    """
+
+    logger.debug(
+        "Setting default predict hooks to predict-specific hooks."
+        "This means e.g. adversarial hooks will not be active during "
+        "prediction."
+    )
+
     stages = PredictStepFunctionHookStages(
         base_prepare_batch=[_hook_default_predict_prepare_batch],
         model_forward=train_hooks.step_func_hooks.model_forward,

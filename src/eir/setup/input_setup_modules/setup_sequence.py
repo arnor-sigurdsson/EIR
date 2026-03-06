@@ -414,8 +414,10 @@ def _get_hf_tokenizer(
         add_prefix_space=add_prefix_space,
     )
 
-    hf_tokenizer = _add_specials_to_hf_tokenizer(hf_tokenizer=hf_tokenizer)
-    return hf_tokenizer
+    hf_tokenizer = _add_specials_to_hf_tokenizer(  # type: ignore[assignment]
+        hf_tokenizer=hf_tokenizer,  # type: ignore[arg-type]
+    )
+    return hf_tokenizer  # type: ignore[return-value]
 
 
 def _add_specials_to_hf_tokenizer(

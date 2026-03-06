@@ -228,18 +228,19 @@ def _post_process_tabular_output(
     return processed_outputs
 
 
-def _normalize_categorical_outputs(outputs: torch.Tensor) -> tuple[float]:
+def _normalize_categorical_outputs(outputs: torch.Tensor) -> tuple[float, ...]:
     if outputs.size(-1) == 1:
-        normalized = torch.sigmoid(outputs).squeeze().tolist()
+        prob_class_1 = torch.sigmoid(outputs).squeeze().item()
+        prob_class_0 = 1.0 - prob_class_1
+        return prob_class_0, prob_class_1
     else:
         normalized = softmax(outputs).squeeze().tolist()
-
-    return ([normalized]) if isinstance(normalized, float) else tuple(normalized)
+        return tuple(normalized) if not isinstance(normalized, float) else (normalized,)
 
 
 def _normalize_continuous_outputs(
     outputs: torch.Tensor, transformer: StandardScaler
-) -> tuple[float]:
+) -> tuple[float, ...]:
     cur_output_reshaped = outputs.reshape(1, -1)
     transform_func = transformer.inverse_transform
     cur_output_normalized = transform_func(cur_output_reshaped).squeeze()
