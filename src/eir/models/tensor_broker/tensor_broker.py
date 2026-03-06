@@ -53,7 +53,6 @@ class CachedTensor:
 class CachedTensorMeta:
     layer_path: str
     cache_target: str
-    expert_boundaries: dict[str, int] | None = None
 
 
 def prepare_example_test_batch(
@@ -258,23 +257,6 @@ def attach_tensor_broker_module_injection(
     return remove_hook
 
 
-def _detect_expert_boundaries(
-    layer_path: str,
-    all_named_modules: dict[str, nn.Module],
-) -> dict[str, int] | None:
-    parts = layer_path.split(".")
-    for i in range(len(parts), 0, -1):
-        parent_path = ".".join(parts[:i])
-        if parent_path in all_named_modules:
-            parent_module = all_named_modules[parent_path]
-            if hasattr(parent_module, "expert_boundaries"):
-                boundaries = parent_module.expert_boundaries
-                if boundaries is not None:
-                    assert isinstance(boundaries, dict)
-                    return boundaries
-    return None
-
-
 def get_tensor_broker(
     input_objects: al_input_objects_as_dict,
     output_objects: al_output_objects_as_dict,
@@ -347,14 +329,9 @@ def get_tensor_broker(
                     layer_cache_target=layer_cache_target,
                 )
 
-                expert_boundaries = _detect_expert_boundaries(
-                    layer_path=layer_path,
-                    all_named_modules=all_named_modules,
-                )
                 have_been_cached_mapping[tmc.name] = CachedTensorMeta(
                     layer_path=layer_path,
                     cache_target=layer_cache_target,
-                    expert_boundaries=expert_boundaries,
                 )
 
     have_been_used_from_cache = set()
@@ -402,7 +379,6 @@ def get_tensor_broker(
                         projection_type=tmc.projection_type,
                         kernel_width_divisible_by=tmc.kernel_width_divisible_by,
                         projection_intermediate_factor=tmc.projection_intermediate_factor,
-                        expert_boundaries=cached_meta.expert_boundaries,
                         projection_lcl_residual_blocks=tmc.projection_lcl_residual_blocks,
                     )
                     have_been_used_from_cache.add(from_name)
