@@ -202,8 +202,6 @@ class LCLModelConfig:
     stochastic_depth_p: float = 0.00
     l1: float = 0.00
 
-    num_initial_maintaining_blocks: int = 0
-
     cutoff: int | Literal["auto"] = 1024
     direction: Literal["down", "up"] = "down"
     attention_inclusion_cutoff: int | None = None
@@ -254,7 +252,6 @@ class LCLModel(nn.Module):
             dropout_p=self.model_config.rb_do,
             cutoff=cutoff,
             stochastic_depth_p=self.model_config.stochastic_depth_p,
-            num_initial_maintaining_blocks=self.model_config.num_initial_maintaining_blocks,
             attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
             direction=self.model_config.direction,
         )
@@ -336,7 +333,6 @@ class LCParameterSpec:
     dropout_p: float
     stochastic_depth_p: float
     cutoff: int
-    num_initial_maintaining_blocks: int = 0
     attention_inclusion_cutoff: int | None = None
     direction: Literal["down", "up"] = "down"
 
@@ -376,26 +372,12 @@ def _generate_lcl_blocks_from_spec(
     block_modules: list[LCLResidualBlock | LCLAttentionBlock]
     block_modules = []
 
-    maintaining_kernel_size = 2**s.channel_exp_base
-    for i in range(s.num_initial_maintaining_blocks):
-        cur_in_features = s.in_features if i == 0 else block_modules[-1].out_features
-        maintaining_block = LCLResidualBlock(
-            in_features=cur_in_features,
-            kernel_size=maintaining_kernel_size,
-            out_feature_sets=maintaining_kernel_size,
-            dropout_p=s.dropout_p,
-            stochastic_depth_p=s.stochastic_depth_p,
-            full_preactivation=i == 0,
-            reduce_both=False,
-        )
-        block_modules.append(maintaining_block)
-
     first_downsampling_block = LCLResidualBlock(
-        in_features=block_modules[-1].out_features if block_modules else s.in_features,
+        in_features=s.in_features,
         kernel_size=s.kernel_width,
         out_feature_sets=2**s.channel_exp_base,
         dropout_p=s.dropout_p,
-        full_preactivation=len(block_modules) == 0,
+        full_preactivation=True,
     )
     block_modules.append(first_downsampling_block)
     block_layer_spec_copy[0] -= 1
@@ -458,26 +440,12 @@ def generate_lcl_residual_blocks_auto(lcl_parameter_spec: LCParameterSpec):
     block_modules: list[LCLResidualBlock | LCLAttentionBlock]
     block_modules = []
 
-    maintaining_kernel_size = 2**s.channel_exp_base
-    for i in range(s.num_initial_maintaining_blocks):
-        cur_in_features = s.in_features if i == 0 else block_modules[-1].out_features
-        maintaining_block = LCLResidualBlock(
-            in_features=cur_in_features,
-            kernel_size=maintaining_kernel_size,
-            out_feature_sets=maintaining_kernel_size,
-            dropout_p=s.dropout_p,
-            stochastic_depth_p=s.stochastic_depth_p,
-            full_preactivation=i == 0,
-            reduce_both=False,
-        )
-        block_modules.append(maintaining_block)
-
     first_downsampling_block = LCLResidualBlock(
-        in_features=block_modules[-1].out_features if block_modules else s.in_features,
+        in_features=s.in_features,
         kernel_size=s.kernel_width,
         out_feature_sets=2**s.channel_exp_base,
         dropout_p=s.dropout_p,
-        full_preactivation=len(block_modules) == 0,
+        full_preactivation=True,
     )
     block_modules.append(first_downsampling_block)
 
