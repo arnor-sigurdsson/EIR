@@ -29,7 +29,6 @@ def get_projection_layer(
     cache_fusion_type: al_broker_fusion_types,
     projection_type: al_broker_projection_types,
     kernel_width_divisible_by: int | None = None,
-    projection_intermediate_factor: int | None = None,
 ) -> tuple[nn.Module, torch.Size]:
     """
     We have the cache_fusion_type input (currently mostly unused) and we return the
@@ -81,8 +80,7 @@ def get_projection_layer(
             input_dim = from_shape_no_batch.numel()
             target_dim = to_shape_no_batch.numel()
 
-            factor = projection_intermediate_factor or 1
-            lcl_target_dim = target_dim * factor
+            lcl_target_dim = target_dim
 
             norm_layer = nn.RMSNorm(normalized_shape=input_dim)
             act_layer = nn.GELU()
