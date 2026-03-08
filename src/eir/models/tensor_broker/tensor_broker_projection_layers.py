@@ -3,7 +3,6 @@ from torch import nn
 
 from eir.models.input.array.models_cnn import CNNResidualBlock
 from eir.models.layers.mlp_layers import MLPResidualBlock
-from eir.models.layers.norm_layers import LearnableGate
 from eir.models.layers.projection_layers import (
     get_1d_projection_layer,
     get_lcl_projection_layer,
@@ -33,7 +32,6 @@ def get_projection_layer(
     cache_fusion_type: al_broker_fusion_types,
     projection_type: al_broker_projection_types,
     kernel_width_divisible_by: int | None = None,
-    projection_intermediate_factor: int | None = None,
     projection_lcl_residual_blocks: bool = False,
 ) -> tuple[nn.Module, torch.Size]:
     """
@@ -86,8 +84,7 @@ def get_projection_layer(
             input_dim = from_shape_no_batch.numel()
             target_dim = to_shape_no_batch.numel()
 
-            factor = projection_intermediate_factor or 1
-            mlp_input_target = target_dim * factor
+            mlp_input_target = target_dim
 
             norm_layer = nn.RMSNorm(normalized_shape=input_dim)
             act_layer = nn.GELU()
@@ -218,34 +215,6 @@ def get_projection_layer(
         case "pool":
             projection_layer = nn.AdaptiveAvgPool2d(output_size=to_shape_no_batch)
             projection_layers.append(projection_layer)
-
-            projected_shape = to_shape_no_batch
-
-        case "gated_maxpool":
-            input_dim = from_shape_no_batch.numel()
-            target_dim = to_shape_no_batch.numel()
-
-            projection_layers.append(nn.Flatten(start_dim=1))
-            projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
-            projection_layers.append(LearnableGate(dim=input_dim))
-            projection_layers.append(nn.GELU())
-            projection_layers.append(
-                nn.Unflatten(dim=1, unflattened_size=(1, input_dim))
-            )
-            projection_layers.append(nn.AdaptiveMaxPool1d(output_size=target_dim))
-            projection_layers.append(nn.Flatten(start_dim=1))
-            projection_layers.append(
-                MLPResidualBlock(
-                    in_features=target_dim,
-                    out_features=target_dim,
-                    dropout_p=0.0,
-                    full_preactivation=True,
-                    stochastic_depth_p=0.0,
-                )
-            )
-            projection_layers.append(
-                nn.Unflatten(dim=1, unflattened_size=to_shape_no_batch)
-            )
 
             projected_shape = to_shape_no_batch
 

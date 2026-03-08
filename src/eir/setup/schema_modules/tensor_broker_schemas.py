@@ -10,7 +10,6 @@ al_broker_projection_types = Literal[
     "linear",
     "grouped_linear",
     "pool",
-    "gated_maxpool",
     "cnn",
     "interpolate",
 ]
@@ -59,8 +58,6 @@ class TensorMessageConfig:
         - ``cnn``: Convolutional layer, only supports down sampling for now.
         - ``linear``: Linear layer.
         - ``pool``: Adaptive average pooling layer.
-        - ``gated_maxpool``: Learnable gate + GELU + Adaptive max pooling +
-            MLP residual (sparse signal selection).
         - ``grouped_linear``: Grouped linear layer (each dimension is projected
           separately with a learnable linear layer).
         - ``interpolate``: Interpolates the tensor to the target size.
@@ -70,13 +67,6 @@ class TensorMessageConfig:
 
     :param kernel_width_divisible_by:
         For LCL-based projections, constrain kernel width to be divisible by this value.
-
-    :param projection_intermediate_factor:
-        For ``lcl+mlp_residual`` projections, multiply the target dimension by this
-        factor to set the intermediate LCL output size. The MLP residual block then
-        compresses from ``target * factor`` to the final target dimension.
-        For example, a factor of 4 with target 512 would produce an intermediate size
-        of 2048.
 
     :param cache_dropout_p:
         Probability of dropping cached tensor injection during training. When set to
@@ -94,7 +84,6 @@ class TensorMessageConfig:
     cache_fusion_type: al_broker_fusion_types = "cat+conv"
     projection_type: al_broker_projection_types = "lcl"
     kernel_width_divisible_by: int | None = None
-    projection_intermediate_factor: int | None = None
     projection_lcl_residual_blocks: bool = False
     cache_dropout_p: float = 0.0
 
