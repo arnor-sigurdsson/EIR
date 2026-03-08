@@ -167,6 +167,16 @@ def get_meta_model_kwargs_from_configs(
         input_modules=input_modules,
     )
 
+    preliminary_fusion_mapping = _match_fusion_outputs_to_output_types(
+        output_types=output_types,
+        diffusion_targets=diffusion_targets,
+    )
+    computed_output_group_names = [
+        name
+        for name, target in preliminary_fusion_mapping.items()
+        if target == "computed"
+    ]
+
     fusion_modules = fusion.get_fusion_modules(
         fusion_model_type=fusion_config.model_type,
         model_config=fusion_config.model_config,
@@ -174,6 +184,7 @@ def get_meta_model_kwargs_from_configs(
         feature_dimensions_and_types=feature_dims_and_types,
         output_types=output_types,
         any_diffusion=diffusion_targets != {},
+        output_group_names=computed_output_group_names,
         strict=strict,
     )
     kwargs["fusion_modules"] = fusion_modules

@@ -240,6 +240,7 @@ class LCLModel(nn.Module):
             kernel_size=fc_0_kernel_size,
             bias=True,
         )
+        self.act_0 = nn.GELU()
 
         cutoff = dynamic_cutoff or self.model_config.cutoff
         assert isinstance(cutoff, int)
@@ -285,6 +286,7 @@ class LCLModel(nn.Module):
         out = self.flatten_fn(x=input)
 
         out = self.fc_0(out)
+        out = self.act_0(out)
         out = self.lcl_blocks(out)
 
         return out
@@ -367,15 +369,17 @@ def _generate_lcl_blocks_from_spec(
     s = lcl_parameter_spec
     block_layer_spec_copy: list[int] = list(copy(block_layer_spec))
 
-    first_block = LCLResidualBlock(
+    block_modules: list[LCLResidualBlock | LCLAttentionBlock]
+    block_modules = []
+
+    first_downsampling_block = LCLResidualBlock(
         in_features=s.in_features,
         kernel_size=s.kernel_width,
         out_feature_sets=2**s.channel_exp_base,
         dropout_p=s.dropout_p,
         full_preactivation=True,
     )
-
-    block_modules = [first_block]
+    block_modules.append(first_downsampling_block)
     block_layer_spec_copy[0] -= 1
 
     for cur_layer_index, block_dim in enumerate(block_layer_spec_copy):
@@ -433,25 +437,26 @@ def generate_lcl_residual_blocks_auto(lcl_parameter_spec: LCParameterSpec):
 
     s = lcl_parameter_spec
 
-    first_block = LCLResidualBlock(
+    block_modules: list[LCLResidualBlock | LCLAttentionBlock]
+    block_modules = []
+
+    first_downsampling_block = LCLResidualBlock(
         in_features=s.in_features,
         kernel_size=s.kernel_width,
         out_feature_sets=2**s.channel_exp_base,
         dropout_p=s.dropout_p,
         full_preactivation=True,
     )
-
-    block_modules: list[LCLResidualBlock | LCLAttentionBlock]
-    block_modules = [first_block]
+    block_modules.append(first_downsampling_block)
 
     if _do_add_attention(
         attention_inclusion_cutoff=s.attention_inclusion_cutoff,
-        in_features=first_block.out_features,
-        embedding_dim=first_block.out_feature_sets,
+        in_features=first_downsampling_block.out_features,
+        embedding_dim=first_downsampling_block.out_feature_sets,
     ):
         cur_attention_block = LCLAttentionBlock(
-            embedding_dim=first_block.out_feature_sets,
-            in_features=first_block.out_features,
+            embedding_dim=first_downsampling_block.out_feature_sets,
+            in_features=first_downsampling_block.out_features,
         )
         block_modules.append(cur_attention_block)
 
