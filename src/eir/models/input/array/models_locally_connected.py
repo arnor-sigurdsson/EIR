@@ -397,9 +397,6 @@ class LCLInformedMoEModel(nn.Module):
                 dropout_p=self.model_config.rb_do,
                 cutoff=cutoff,
                 stochastic_depth_p=self.model_config.stochastic_depth_p,
-                num_initial_maintaining_blocks=(
-                    self.model_config.num_initial_maintaining_blocks
-                ),
                 attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
                 direction=self.model_config.direction,
             )
