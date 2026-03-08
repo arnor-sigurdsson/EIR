@@ -285,6 +285,11 @@ def vectorized_bce_loss(
     predictions_stacked = torch.stack(list(predictions.values()), dim=1).squeeze()
     targets_stacked = torch.stack(list(targets.values()), dim=1).squeeze().float()
 
+    if hasattr(loss_func, "pos_weight") and loss_func.pos_weight is not None:
+        loss_func.pos_weight = loss_func.pos_weight.to(
+            device=predictions_stacked.device
+        )
+
     valid_mask = targets_stacked != -1
 
     targets_masked = targets_stacked.clone()
