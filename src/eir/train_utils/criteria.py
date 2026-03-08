@@ -4,6 +4,7 @@ from enum import Enum
 from functools import partial
 from typing import TYPE_CHECKING, Literal, Union
 
+import polars as pl
 import torch
 from torch import nn
 from torchsurv.loss.cox import neg_partial_log_likelihood
@@ -64,7 +65,10 @@ al_losses_classes = (
 )
 
 
-def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_dict:
+def get_criteria(
+    outputs_as_dict: "al_output_objects_as_dict",
+    train_labels: pl.DataFrame | None = None,
+) -> al_criteria_dict:
     criteria_dict: al_criteria_dict = {}
     log_empty_once = log_empty_loss_once()
 
@@ -89,11 +93,27 @@ def get_criteria(outputs_as_dict: "al_output_objects_as_dict") -> al_criteria_di
                 cat_loss_name = _get_cat_loss_name(
                     output_config=output_object.output_config
                 )
+
+                output_type_info = output_object.output_config.output_type_info
+                assert isinstance(output_type_info, TabularOutputTypeConfig)
+
+                pos_weight = None
+                if (
+                    output_type_info.cat_loss_class_balanced
+                    and cat_loss_name == "BCEWithLogitsLoss"
+                    and train_labels is not None
+                ):
+                    pos_weight = _compute_cb_pos_weight(
+                        train_labels=train_labels,
+                        cat_columns=list(output_type_info.target_cat_columns),
+                    )
+
                 criterion_cat = get_supervised_criterion(
                     column_type_="cat",
                     loss_name=cat_loss_name,
                     cat_label_smoothing_=label_smoothing,
                     reduction="none",
+                    pos_weight=pos_weight,
                 )
                 cat_loss_callable = (
                     loop_ce_loss
@@ -335,6 +355,7 @@ def get_supervised_criterion(
     loss_name: str,
     cat_label_smoothing_: float = 0.0,
     reduction: str = "none",
+    pos_weight: torch.Tensor | None = None,
 ) -> nn.CrossEntropyLoss | Callable:
     loss_dict = build_loss_dict()
 
@@ -352,6 +373,12 @@ def get_supervised_criterion(
             return nn.CrossEntropyLoss(
                 label_smoothing=cat_label_smoothing_,
                 reduction=reduction,
+            )
+
+        case "cat", "BCEWithLogitsLoss":
+            return nn.BCEWithLogitsLoss(
+                reduction=reduction,
+                pos_weight=pos_weight,
             )
 
         case "cat", _:
@@ -436,6 +463,30 @@ def _calc_con_loss(
             return loss_func(log_input=input.squeeze(), target=target.squeeze())
         case _:
             return loss_func(input=input.squeeze(), target=target.squeeze())
+
+
+def _compute_cb_pos_weight(
+    train_labels: pl.DataFrame,
+    cat_columns: list[str],
+) -> torch.Tensor:
+    n_total = len(train_labels)
+    beta = (n_total - 1) / n_total
+
+    weights = []
+    for col in cat_columns:
+        series = train_labels[col].drop_nulls().drop_nans()
+        n_pos = (series == 1).sum()
+        n_neg = (series == 0).sum()
+
+        if n_pos == 0 or n_neg == 0:
+            weights.append(1.0)
+            continue
+
+        effective_pos = (1 - beta**n_pos) / (1 - beta)
+        effective_neg = (1 - beta**n_neg) / (1 - beta)
+        weights.append(effective_neg / effective_pos)
+
+    return torch.tensor(data=weights, dtype=torch.float32)
 
 
 def get_loss_callable(
