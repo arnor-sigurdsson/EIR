@@ -105,6 +105,7 @@ def get_criteria(
                 ):
                     pos_weight = _compute_cb_pos_weight(
                         train_labels=train_labels,
+                        output_name=output_name,
                         cat_columns=list(output_type_info.target_cat_columns),
                     )
 
@@ -461,6 +462,7 @@ def _calc_con_loss(
 
 def _compute_cb_pos_weight(
     train_labels: pl.DataFrame,
+    output_name: str,
     cat_columns: list[str],
 ) -> torch.Tensor:
     n_total = len(train_labels)
@@ -468,7 +470,8 @@ def _compute_cb_pos_weight(
 
     weights = []
     for col in cat_columns:
-        series = train_labels[col].drop_nulls().drop_nans()
+        prefixed_col = f"{output_name}__{col}"
+        series = train_labels[prefixed_col].drop_nulls().drop_nans()
         n_pos = (series == 1).sum()
         n_neg = (series == 0).sum()
 
