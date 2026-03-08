@@ -231,6 +231,7 @@ def get_default_experiment(
 
     criteria = get_criteria(
         outputs_as_dict=outputs_as_dict,
+        train_labels=target_labels.train_labels,
     )
 
     loss_func = get_loss_callable(criteria=criteria)
