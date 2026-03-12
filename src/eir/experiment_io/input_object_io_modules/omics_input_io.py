@@ -18,6 +18,7 @@ def load_omics_input_object(serialized_input_folder: Path) -> ComputedOmicsInput
     data_dimensions_path = serialized_input_folder / "data_dimensions.json"
     snps_path = serialized_input_folder / "snps.bim"
     subset_snps_file_path = serialized_input_folder / "subset_snps_file.txt"
+    expert_snp_groups_path = serialized_input_folder / "expert_snp_groups.yaml"
 
     input_config = load_input_config_from_yaml(input_config_path=config_path)
     input_config_copy = deepcopy(input_config)
@@ -30,6 +31,9 @@ def load_omics_input_object(serialized_input_folder: Path) -> ComputedOmicsInput
 
     if subset_snps_file_path.exists():
         input_type_info.subset_snps_file = str(subset_snps_file_path)
+
+    if expert_snp_groups_path.exists():
+        input_type_info.expert_snp_groups_file = str(expert_snp_groups_path)
 
     input_config_copy.input_type_info = input_type_info
 

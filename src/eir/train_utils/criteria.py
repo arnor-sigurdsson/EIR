@@ -105,6 +105,7 @@ def get_criteria(
                 ):
                     pos_weight = _compute_cb_pos_weight(
                         train_labels=train_labels,
+                        output_name=output_name,
                         cat_columns=list(output_type_info.target_cat_columns),
                     )
 
@@ -290,6 +291,11 @@ def vectorized_bce_loss(
     predictions_stacked = torch.stack(list(predictions.values()), dim=1).squeeze()
     targets_stacked = torch.stack(list(targets.values()), dim=1).squeeze().float()
 
+    if hasattr(loss_func, "pos_weight") and loss_func.pos_weight is not None:
+        loss_func.pos_weight = loss_func.pos_weight.to(
+            device=predictions_stacked.device
+        )
+
     valid_mask = targets_stacked != -1
 
     targets_masked = targets_stacked.clone()
@@ -467,6 +473,7 @@ def _calc_con_loss(
 
 def _compute_cb_pos_weight(
     train_labels: pl.DataFrame,
+    output_name: str,
     cat_columns: list[str],
 ) -> torch.Tensor:
     n_total = len(train_labels)
@@ -474,7 +481,8 @@ def _compute_cb_pos_weight(
 
     weights = []
     for col in cat_columns:
-        series = train_labels[col].drop_nulls().drop_nans()
+        prefixed_col = f"{output_name}__{col}"
+        series = train_labels[prefixed_col].drop_nulls().drop_nans()
         n_pos = (series == 1).sum()
         n_neg = (series == 0).sum()
 
