@@ -45,6 +45,7 @@ class MLPResidualBlock(nn.Module):
         dropout_p: float = 0.0,
         full_preactivation: bool = False,
         stochastic_depth_p: float = 0.0,
+        reduce_at_fc_1: bool = True,
     ):
         super().__init__()
 
@@ -56,16 +57,17 @@ class MLPResidualBlock(nn.Module):
 
         self.norm_1 = nn.RMSNorm(normalized_shape=in_features)
 
+        fc_1_out = out_features if reduce_at_fc_1 else in_features
         self.fc_1 = nn.Linear(
             in_features=in_features,
-            out_features=out_features,
+            out_features=fc_1_out,
             bias=False,
         )
 
         self.act_1 = nn.GELU()
         self.do = nn.Dropout(p=dropout_p)
         self.fc_2 = nn.Linear(
-            in_features=out_features,
+            in_features=fc_1_out,
             out_features=out_features,
             bias=False,
         )

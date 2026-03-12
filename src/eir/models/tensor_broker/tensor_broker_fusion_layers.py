@@ -144,24 +144,34 @@ class GatedSumFusionLayer(nn.Module):
         gate_shape = [1] * tensor_ndim
         gate_shape[self.feature_axis] = num_features
 
-        self.gate_param = nn.Parameter(
+        self.gate_bias = nn.Parameter(
             torch.full(gate_shape, bias_val, dtype=torch.float32),
-            requires_grad=True,
+        )
+        self.gate_scale_main = nn.Parameter(
+            torch.zeros(gate_shape, dtype=torch.float32),
+        )
+        self.gate_scale_skip = nn.Parameter(
+            torch.zeros(gate_shape, dtype=torch.float32),
         )
 
     def extra_repr(self) -> str:
         return (
             f"input_shape={tuple(self.input_shape)}, "
-            f"gate_shape={tuple(self.gate_param.shape)}, "
+            f"num_features={self.gate_bias.shape[self.feature_axis]}, "
             f"feature_axis={self.feature_axis}"
         )
 
     def forward(
         self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
     ) -> torch.Tensor:
-        gate = torch.sigmoid(self.gate_param)
+        gate_logits = (
+            self.gate_bias
+            + self.gate_scale_main * input_tensor
+            + self.gate_scale_skip * projected_context_tensor
+        )
+        gate = torch.sigmoid(gate_logits)
 
-        output = (1.0 - gate) * projected_context_tensor + gate * input_tensor
+        output = gate * input_tensor + (1.0 - gate) * projected_context_tensor
         return output
 
 

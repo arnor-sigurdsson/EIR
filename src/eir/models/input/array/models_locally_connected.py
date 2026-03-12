@@ -10,6 +10,7 @@ from typing import (
     cast,
 )
 
+import numpy as np
 import torch
 from torch import nn
 
@@ -240,6 +241,7 @@ class LCLModel(nn.Module):
             kernel_size=fc_0_kernel_size,
             bias=True,
         )
+        self.act_0 = nn.GELU()
 
         cutoff = dynamic_cutoff or self.model_config.cutoff
         assert isinstance(cutoff, int)
@@ -285,9 +287,165 @@ class LCLModel(nn.Module):
         out = self.flatten_fn(x=input)
 
         out = self.fc_0(out)
+        out = self.act_0(out)
         out = self.lcl_blocks(out)
 
         return out
+
+
+@dataclass
+class LCLInformedMoEModelConfig(LCLModelConfig):
+    pass
+
+
+class ExpertBranch(nn.Module):
+    def __init__(
+        self,
+        fc_0: LCL,
+        act_0: nn.Module,
+        lcl_blocks: nn.Sequential,
+    ):
+        super().__init__()
+        self.fc_0 = fc_0
+        self.act_0 = act_0
+        self.lcl_blocks = lcl_blocks
+
+    @property
+    def out_features(self) -> int:
+        if len(self.lcl_blocks) > 0:
+            return cast(int, self.lcl_blocks[-1].out_features)
+        return self.fc_0.out_features
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.fc_0(x)
+        x = self.act_0(x)
+        x = self.lcl_blocks(x)
+        return x
+
+
+class LCLInformedMoEModel(nn.Module):
+    def __init__(
+        self,
+        model_config: LCLInformedMoEModelConfig,
+        data_dimensions: "DataDimensions",
+        flatten_fn: FlattenFunc,
+        expert_snp_indices: dict[str, np.ndarray],
+    ):
+        super().__init__()
+
+        self.model_config = model_config
+        self.data_dimensions = data_dimensions
+        self.flatten_fn = flatten_fn
+
+        kernel_width = parse_kernel_width(
+            kernel_width=self.model_config.kernel_width,
+            patch_size=self.model_config.patch_size,
+        )
+
+        fc_0_kernel_size = calc_value_after_expansion(
+            base=kernel_width,
+            expansion=self.model_config.first_kernel_expansion,
+        )
+        fc_0_out_feature_sets = calc_value_after_expansion(
+            base=2**self.model_config.channel_exp_base,
+            expansion=self.model_config.first_channel_expansion,
+        )
+
+        cutoff = self.model_config.cutoff
+        assert isinstance(cutoff, int)
+
+        self._expert_indices: dict[str, torch.Tensor] = {}
+        self.expert_branches = nn.ModuleDict()
+
+        for name, snp_indices in expert_snp_indices.items():
+            self.register_buffer(
+                f"_expert_idx_{name}",
+                torch.from_numpy(snp_indices).long(),
+            )
+            self._expert_indices[name] = getattr(self, f"_expert_idx_{name}")
+
+            expert_in_features = (
+                len(snp_indices) * data_dimensions.channels * data_dimensions.height
+            )
+
+            expert_fc_0_kernel = _clamp_kernel_for_min_chunks(
+                kernel_size=fc_0_kernel_size,
+                in_features=expert_in_features,
+                min_chunks=4,
+                min_kernel=4,
+            )
+
+            fc_0 = LCL(
+                in_features=expert_in_features,
+                out_feature_sets=fc_0_out_feature_sets,
+                kernel_size=expert_fc_0_kernel,
+                bias=True,
+            )
+            act_0 = nn.GELU()
+
+            expert_kernel_width = _clamp_kernel_for_min_chunks(
+                kernel_size=kernel_width,
+                in_features=int(fc_0.out_features),
+                min_chunks=4,
+                min_kernel=4,
+            )
+
+            lcl_parameter_spec = LCParameterSpec(
+                in_features=int(fc_0.out_features),
+                kernel_width=expert_kernel_width,
+                channel_exp_base=self.model_config.channel_exp_base,
+                dropout_p=self.model_config.rb_do,
+                cutoff=cutoff,
+                stochastic_depth_p=self.model_config.stochastic_depth_p,
+                attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
+                direction=self.model_config.direction,
+            )
+            lcl_blocks = _get_lcl_blocks(
+                lcl_spec=lcl_parameter_spec,
+                block_layer_spec=self.model_config.layers,
+            )
+
+            branch = ExpertBranch(
+                fc_0=fc_0,
+                act_0=act_0,
+                lcl_blocks=lcl_blocks,
+            )
+            self.expert_branches[name] = branch
+
+        self._init_weights()
+
+    @property
+    def l1_penalized_weights(self) -> torch.Tensor:
+        weights: list[torch.Tensor] = []
+        for branch in self.expert_branches.values():
+            assert isinstance(branch, ExpertBranch)
+            weights.append(branch.fc_0.weight)
+        return torch.stack(weights)
+
+    @property
+    def num_out_features(self) -> int:
+        total = 0
+        for branch in self.expert_branches.values():
+            assert isinstance(branch, ExpertBranch)
+            total += branch.out_features
+        return total
+
+    @property
+    def output_shape(self) -> tuple[int, ...]:
+        return (self.num_out_features,)
+
+    def _init_weights(self) -> None:
+        pass
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        expert_outputs: list[torch.Tensor] = []
+        for name, branch in self.expert_branches.items():
+            indices = self._expert_indices[name]
+            expert_input = input[:, :, :, indices]
+            out = self.flatten_fn(x=expert_input)
+            out = branch(out)
+            expert_outputs.append(out)
+        return torch.cat(expert_outputs, dim=1)
 
 
 def parse_kernel_width(
@@ -367,15 +525,17 @@ def _generate_lcl_blocks_from_spec(
     s = lcl_parameter_spec
     block_layer_spec_copy: list[int] = list(copy(block_layer_spec))
 
-    first_block = LCLResidualBlock(
+    block_modules: list[LCLResidualBlock | LCLAttentionBlock]
+    block_modules = []
+
+    first_downsampling_block = LCLResidualBlock(
         in_features=s.in_features,
         kernel_size=s.kernel_width,
         out_feature_sets=2**s.channel_exp_base,
         dropout_p=s.dropout_p,
         full_preactivation=True,
     )
-
-    block_modules = [first_block]
+    block_modules.append(first_downsampling_block)
     block_layer_spec_copy[0] -= 1
 
     for cur_layer_index, block_dim in enumerate(block_layer_spec_copy):
@@ -433,25 +593,26 @@ def generate_lcl_residual_blocks_auto(lcl_parameter_spec: LCParameterSpec):
 
     s = lcl_parameter_spec
 
-    first_block = LCLResidualBlock(
+    block_modules: list[LCLResidualBlock | LCLAttentionBlock]
+    block_modules = []
+
+    first_downsampling_block = LCLResidualBlock(
         in_features=s.in_features,
         kernel_size=s.kernel_width,
         out_feature_sets=2**s.channel_exp_base,
         dropout_p=s.dropout_p,
         full_preactivation=True,
     )
-
-    block_modules: list[LCLResidualBlock | LCLAttentionBlock]
-    block_modules = [first_block]
+    block_modules.append(first_downsampling_block)
 
     if _do_add_attention(
         attention_inclusion_cutoff=s.attention_inclusion_cutoff,
-        in_features=first_block.out_features,
-        embedding_dim=first_block.out_feature_sets,
+        in_features=first_downsampling_block.out_features,
+        embedding_dim=first_downsampling_block.out_feature_sets,
     ):
         cur_attention_block = LCLAttentionBlock(
-            embedding_dim=first_block.out_feature_sets,
-            in_features=first_block.out_features,
+            embedding_dim=first_downsampling_block.out_feature_sets,
+            in_features=first_downsampling_block.out_features,
         )
         block_modules.append(cur_attention_block)
 
@@ -583,6 +744,17 @@ class LCLAttentionBlock(nn.Module):
         out = self.ls(out)
 
         return x + out
+
+
+def _clamp_kernel_for_min_chunks(
+    kernel_size: int,
+    in_features: int,
+    min_chunks: int = 4,
+    min_kernel: int = 4,
+) -> int:
+    max_kernel = in_features // min_chunks
+    clamped = min(kernel_size, max_kernel)
+    return max(clamped, min_kernel)
 
 
 def _do_add_attention(

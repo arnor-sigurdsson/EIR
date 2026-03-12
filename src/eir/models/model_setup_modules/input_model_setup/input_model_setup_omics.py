@@ -1,3 +1,5 @@
+import numpy as np
+
 from eir.models.input.omics.omics_models import (
     al_omics_model_configs,
     al_omics_model_types,
@@ -12,12 +14,14 @@ def get_omics_model_from_model_config(
     model_init_config: al_omics_model_configs,
     data_dimensions: DataDimensions,
     model_type: al_omics_model_types,
+    expert_snp_indices: dict[str, np.ndarray] | None = None,
 ) -> al_omics_models:
     omics_model_class = get_omics_model_class(model_type=model_type)
     model_init_kwargs = get_omics_model_init_kwargs(
         model_type=model_type,
         model_config=model_init_config,
         data_dimensions=data_dimensions,
+        expert_snp_indices=expert_snp_indices,
     )
     omics_model = omics_model_class(**model_init_kwargs)  # type: ignore
 

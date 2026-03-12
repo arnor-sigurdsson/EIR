@@ -14,6 +14,8 @@ from torch import Tensor, nn
 from eir.models.input.array.models_cnn import CNNModel, CNNModelConfig
 from eir.models.input.array.models_locally_connected import (
     FlattenFunc,
+    LCLInformedMoEModel,
+    LCLInformedMoEModelConfig,
     LCLModel,
     LCLModelConfig,
 )
@@ -25,15 +27,22 @@ from eir.models.input.array.models_transformers import (
 if TYPE_CHECKING:
     from eir.setup.input_setup_modules.common import DataDimensions
 
-al_array_model_types = Literal["cnn", "lcl", "transformer"]
+al_array_model_types = Literal["cnn", "lcl", "lcl-informed-moe", "transformer"]
 
-al_array_model_classes = type[CNNModel] | type[LCLModel] | type[ArrayTransformer]
-al_array_models = CNNModel | LCLModel | ArrayTransformer
+al_array_model_classes = (
+    type[CNNModel] | type[LCLModel] | type[LCLInformedMoEModel] | type[ArrayTransformer]
+)
+al_array_models = CNNModel | LCLModel | LCLInformedMoEModel | ArrayTransformer
 
 al_array_model_config_classes = (
-    type[CNNModelConfig] | type[LCLModelConfig] | type[ArrayTransformerConfig]
+    type[CNNModelConfig]
+    | type[LCLModelConfig]
+    | type[LCLInformedMoEModelConfig]
+    | type[ArrayTransformerConfig]
 )
-al_array_model_configs = CNNModelConfig | LCLModelConfig | ArrayTransformerConfig
+al_array_model_configs = (
+    CNNModelConfig | LCLModelConfig | LCLInformedMoEModelConfig | ArrayTransformerConfig
+)
 
 al_pre_normalization = Literal["instancenorm", "layernorm"] | None
 
@@ -43,6 +52,7 @@ al_array_model_init_kwargs = dict[
         "DataDimensions",
         CNNModelConfig,
         LCLModelConfig,
+        LCLInformedMoEModelConfig,
         ArrayTransformerConfig,
         FlattenFunc,
     ],
@@ -53,6 +63,7 @@ def get_array_model_mapping() -> dict[str, al_array_model_classes]:
     mapping = {
         "cnn": CNNModel,
         "lcl": LCLModel,
+        "lcl-informed-moe": LCLInformedMoEModel,
         "transformer": ArrayTransformer,
     }
 
@@ -68,6 +79,7 @@ def get_array_config_dataclass_mapping() -> dict[str, al_array_model_config_clas
     mapping = {
         "cnn": CNNModelConfig,
         "lcl": LCLModelConfig,
+        "lcl-informed-moe": LCLInformedMoEModelConfig,
         "transformer": ArrayTransformerConfig,
     }
 
@@ -93,8 +105,11 @@ def get_array_model_init_kwargs(
     kwargs["data_dimensions"] = data_dimensions
 
     match model_type:
-        case "lcl":
-            assert isinstance(model_config, LCLModelConfig)
+        case "lcl" | "lcl-informed-moe":
+            assert isinstance(
+                model_config,
+                LCLModelConfig | LCLInformedMoEModelConfig,
+            )
 
             if model_config.patch_size is not None:
                 assert isinstance(model_config.patch_size, tuple | list)

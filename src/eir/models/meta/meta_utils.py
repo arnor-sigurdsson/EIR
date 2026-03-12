@@ -1,6 +1,7 @@
 from collections.abc import MutableMapping
 from typing import (
     TYPE_CHECKING,
+    Any,
     Literal,
     NewType,
     Protocol,
@@ -42,6 +43,7 @@ class FusionModuleProtocol(Protocol):
         fusion_in_dim: int,
         fusion_callable: Union["al_features", "al_identity_features"],
         feature_dimensions_and_types: dict[str, "FeatureExtractorInfo"] | None = None,
+        **kwargs: object,
     ) -> None: ...
 
     @property
@@ -49,6 +51,9 @@ class FusionModuleProtocol(Protocol):
 
     @property
     def num_out_features(self) -> int: ...
+
+    @property
+    def per_output_group(self) -> bool: ...
 
     def __call__(
         self, input: dict[str, FeatureExtractorOutType]
@@ -95,7 +100,24 @@ def run_meta_forward(
     output_modules_out = {}
     for output_name, output_module in output_modules.items():
         cur_fusion_target = fusion_to_output_mapping[output_name]
-        corresponding_fused_features = fused_features[cur_fusion_target]
+        fused = fused_features[cur_fusion_target]
+
+        corresponding_fused_features: Any
+        fusion_module = fusion_modules[cur_fusion_target]
+
+        # MGMoE (and similar) returns a dict keyed by output group name
+        # pass-through fusion also returns a dict but keyed by input name.
+        # When an output name matches an input name (e.g. image output task),
+        # but expects to be passed a dict (i.e. not the extracted tensor),
+        # we therefore must only extract per-group outputs for per_output_group modules
+        if (
+            getattr(fusion_module, "per_output_group", False)
+            and isinstance(fused, dict)
+            and output_name in fused
+        ):
+            corresponding_fused_features = fused[output_name]
+        else:
+            corresponding_fused_features = fused
 
         key = f"__extras_{output_name}"
         if key in inputs:

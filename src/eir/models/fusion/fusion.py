@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Literal, NewType, cast
 
 import torch
@@ -48,6 +49,7 @@ def get_fusion_modules(
     feature_dimensions_and_types: dict[str, "FeatureExtractorInfo"] | None,
     output_types: dict[str, Literal["tabular", "sequence", "array"]],
     any_diffusion: bool,
+    output_group_names: Sequence[str] | None = None,
     strict: bool = True,
 ) -> al_fusion_modules:
     if strict:
@@ -80,6 +82,7 @@ def get_fusion_modules(
             fusion_in_dim=fusion_in_dim,
             fusion_callable=fusion_callable,
             feature_dimensions_and_types=feature_dimensions_and_types,
+            output_group_names=output_group_names,
         )
         fusion_modules["computed"] = computing_fusion_module
 

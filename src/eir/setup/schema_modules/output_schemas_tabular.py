@@ -35,6 +35,11 @@ class TabularOutputTypeConfig:
     :param con_loss_name:
         Loss function to use for continuous targets.
 
+    :param cat_loss_class_balanced:
+        Whether to use class-balanced weighting for categorical loss. Uses the
+        effective number of samples (Cui et al., 2019) to compute per-class weights,
+        helping with imbalanced targets. Only applicable with ``BCEWithLogitsLoss``.
+
     :param uncertainty_weighted_mt_loss:
         Whether to use uncertainty weighted loss for multitask / multilabel learning.
     """
@@ -45,4 +50,12 @@ class TabularOutputTypeConfig:
     cat_label_smoothing: float = 0.0
     cat_loss_name: al_cat_loss_names = "CrossEntropyLoss"
     con_loss_name: al_con_loss_names = "MSELoss"
+    cat_loss_class_balanced: bool = False
     uncertainty_weighted_mt_loss: bool = False
+
+    def __post_init__(self) -> None:
+        if self.cat_loss_class_balanced and self.cat_loss_name != "BCEWithLogitsLoss":
+            raise ValueError(
+                "cat_loss_class_balanced is only supported with BCEWithLogitsLoss. "
+                f"Got cat_loss_name='{self.cat_loss_name}'."
+            )

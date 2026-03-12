@@ -719,6 +719,7 @@ class OmicsInputDataConfig:
 
     snp_file: str | None = None
     subset_snps_file: str | None = None
+    expert_snp_groups_file: str | None = None
     na_augment_alpha: float = 1.0
     na_augment_beta: float = 5.0
     shuffle_augment_alpha: float = 0.0
