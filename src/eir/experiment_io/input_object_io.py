@@ -307,6 +307,12 @@ def _serialize_input_object(
                 snp_file_dst = output_folder / "snps.bim"
                 snp_file_dst.write_text(snp_file_src.read_text())
 
+            expert_snp_groups_file = input_type_info.expert_snp_groups_file
+            if expert_snp_groups_file:
+                expert_groups_src = Path(expert_snp_groups_file)
+                expert_groups_dst = output_folder / "expert_snp_groups.yaml"
+                expert_groups_dst.write_text(expert_groups_src.read_text())
+
             save_dataclass(
                 obj=input_object.data_dimensions,
                 file_path=output_folder / "data_dimensions.json",

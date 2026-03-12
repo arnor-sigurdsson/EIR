@@ -350,6 +350,7 @@ def get_input_modules(
                     model_type=input_model_config.model_type,
                     model_init_config=input_model_config.model_init_config,
                     data_dimensions=inputs_object.data_dimensions,
+                    expert_snp_indices=inputs_object.expert_snp_indices,
                 )
                 input_modules[input_name] = cur_omics_model
 

@@ -3,7 +3,10 @@ from torch import nn
 
 from eir.models.input.array.models_cnn import CNNResidualBlock
 from eir.models.layers.mlp_layers import MLPResidualBlock
-from eir.models.layers.projection_layers import get_1d_projection_layer
+from eir.models.layers.projection_layers import (
+    get_1d_projection_layer,
+    get_lcl_projection_layer,
+)
 from eir.models.tensor_broker.projection_modules.cnn import (
     get_conv_params_for_dimension,
 )
@@ -29,6 +32,7 @@ def get_projection_layer(
     cache_fusion_type: al_broker_fusion_types,
     projection_type: al_broker_projection_types,
     kernel_width_divisible_by: int | None = None,
+    projection_lcl_residual_blocks: bool = False,
 ) -> tuple[nn.Module, torch.Size]:
     """
     We have the cache_fusion_type input (currently mostly unused) and we return the
@@ -80,32 +84,70 @@ def get_projection_layer(
             input_dim = from_shape_no_batch.numel()
             target_dim = to_shape_no_batch.numel()
 
-            lcl_target_dim = target_dim
+            mlp_input_target = target_dim
 
             norm_layer = nn.RMSNorm(normalized_shape=input_dim)
             act_layer = nn.GELU()
+            projection_layers.append(norm_layer)
+            projection_layers.append(act_layer)
 
-            lcl_projection_layer = get_1d_projection_layer(
-                input_dimension=input_dim,
-                target_dimension=lcl_target_dim,
-                projection_layer_type="lcl",
-                lcl_diff_tolerance=0,
-                kernel_width_divisible_by=kernel_width_divisible_by,
-            )
-            projected_shape = to_shape_no_batch
+            if projection_lcl_residual_blocks:
+                cur_dim = input_dim
+                while cur_dim // 4 > mlp_input_target:
+                    halve_target = cur_dim // 4
+                    block = get_lcl_projection_layer(
+                        input_dimension=cur_dim,
+                        target_dimension=halve_target,
+                        layer_type="lcl_residual",
+                        diff_tolerance=cur_dim // 100,
+                        kernel_width_divisible_by=kernel_width_divisible_by,
+                    )
+                    if block is not None:
+                        projection_layers.append(block)
+                        cur_dim = block.out_features
+                    else:
+                        fallback = get_1d_projection_layer(
+                            input_dimension=cur_dim,
+                            target_dimension=halve_target,
+                            projection_layer_type="auto",
+                            lcl_diff_tolerance=0,
+                            kernel_width_divisible_by=kernel_width_divisible_by,
+                        )
+                        projection_layers.append(fallback)
+                        cur_dim = halve_target
+            else:
+                try:
+                    lcl_projection_layer = get_1d_projection_layer(
+                        input_dimension=input_dim,
+                        target_dimension=mlp_input_target,
+                        projection_layer_type="lcl",
+                        lcl_diff_tolerance=0,
+                        kernel_width_divisible_by=kernel_width_divisible_by,
+                    )
+                except ValueError:
+                    # Sometimes we cannot create are reasonable LCL projection
+                    # e.g. if target dim is much larger tha input dim so we have this
+                    # fallback
+                    lcl_projection_layer = get_1d_projection_layer(
+                        input_dimension=input_dim,
+                        target_dimension=mlp_input_target,
+                        projection_layer_type="auto",
+                        lcl_diff_tolerance=0,
+                        kernel_width_divisible_by=kernel_width_divisible_by,
+                    )
+
+                projection_layers.append(lcl_projection_layer)
+                cur_dim = mlp_input_target
 
             mlp_residual_block = MLPResidualBlock(
-                in_features=lcl_target_dim,
+                in_features=cur_dim,
                 out_features=target_dim,
                 dropout_p=0.0,
                 full_preactivation=True,
                 stochastic_depth_p=0.0,
             )
-
-            projection_layers.append(norm_layer)
-            projection_layers.append(act_layer)
-            projection_layers.append(lcl_projection_layer)
             projection_layers.append(mlp_residual_block)
+            projected_shape = to_shape_no_batch
 
         case "mlp_residual":
             input_dim = from_shape_no_batch.numel()
@@ -117,6 +159,7 @@ def get_projection_layer(
                 dropout_p=0.0,
                 full_preactivation=True,
                 stochastic_depth_p=0.0,
+                reduce_at_fc_1=False,
             )
             projection_layers.append(projection_layer)
             projected_shape = to_shape_no_batch
