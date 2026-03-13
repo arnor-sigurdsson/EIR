@@ -269,8 +269,11 @@ def one_shot_array_generation(
     array_outputs = outputs[array_output_name][array_output_name]
 
     output_type_info = output_object.output_config.output_type_info
-    assert isinstance(output_type_info, ArrayOutputTypeConfig)
-    is_categorical = output_type_info.loss == "categorical"
+    assert isinstance(output_type_info, ArrayOutputTypeConfig | ImageOutputTypeConfig)
+
+    is_categorical = None
+    if isinstance(output_type_info, ArrayOutputTypeConfig):
+        is_categorical = output_type_info.loss == "categorical"
 
     final_numpy_outputs = []
     for batch_idx in range(batch_size):
