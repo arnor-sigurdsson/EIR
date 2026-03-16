@@ -511,8 +511,8 @@ def _compute_cb_pos_weight(
             weights.append(1.0)
             continue
 
-        effective_pos = (1 - beta**n_pos) / (1 - beta)
-        effective_neg = (1 - beta**n_neg) / (1 - beta)
+        effective_pos = (1 - beta ** float(n_pos)) / (1 - beta)
+        effective_neg = (1 - beta ** float(n_neg)) / (1 - beta)
         weights.append(effective_neg / effective_pos)
 
     return torch.tensor(data=weights, dtype=torch.float32)
