@@ -94,13 +94,15 @@ class AdditiveFusionLayer(nn.Module):
         super().__init__()
         self.input_shape = input_shape
         self.context_shape = context_shape
-        self.gate = nn.Parameter(torch.tensor(gate_init_value))
+        self.gate = nn.Parameter(
+            torch.full(size=input_shape, fill_value=gate_init_value)
+        )
 
     def extra_repr(self) -> str:
         return (
             f"input_shape={tuple(self.input_shape)}, "
             f"context_shape={tuple(self.context_shape)}, "
-            f"gate={self.gate.item():.4f}"
+            f"gate_mean={self.gate.mean().item():.4f}"
         )
 
     def forward(
