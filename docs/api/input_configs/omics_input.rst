@@ -32,7 +32,7 @@ Quick Example
      model_type: "cnn"
      model_init_config:
        channel_exp_base: 3
-       kernel_width: 8
+       kernel_width: 6
 
 Input Data Configuration
 ------------------------

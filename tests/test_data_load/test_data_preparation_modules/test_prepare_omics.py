@@ -10,7 +10,8 @@ from eir.data_load.data_preparation_modules import prepare_omics
 
 
 def test_prepare_genotype_array_train_mode():
-    test_array = torch.zeros((4, 100), dtype=torch.uint8).detach().numpy()
+    test_array = torch.zeros((3, 100), dtype=torch.uint8).detach().numpy()
+    test_array[0, :] = 1
     test_array_copy = deepcopy(test_array)
 
     prepared_array_train = prepare_omics.prepare_one_hot_omics_data(
@@ -25,7 +26,8 @@ def test_prepare_genotype_array_train_mode():
     assert prepared_array_train != test_array
     assert (test_array_copy == test_array).all()
 
-    assert (prepared_array_train[:, -1, :] == 1).sum() / 100 > 0.925
+    is_missing = (prepared_array_train[0].sum(dim=0) == 0).float()
+    assert is_missing.sum() / 100 > 0.925
 
     prepared_array_train = prepare_omics.prepare_one_hot_omics_data(
         genotype_array=test_array,
@@ -39,14 +41,15 @@ def test_prepare_genotype_array_train_mode():
     assert prepared_array_train != test_array
     assert (test_array_copy == test_array).all()
 
-    assert prepared_array_train.sum() == 100
-    # check roughly evenly distributed after shuffling
-    for i in range(4):
-        assert (prepared_array_train[:, i, :] == 1).sum() < 40
+    non_missing = prepared_array_train[0].sum(dim=0) > 0
+    non_missing_cols = prepared_array_train[:, :, non_missing]
+    assert (non_missing_cols.sum(dim=1) == 1).all()
+    for i in range(3):
+        assert (non_missing_cols[:, i, :] == 1).sum() < non_missing.sum()
 
 
 def test_prepare_genotype_array_test_mode():
-    test_array = torch.zeros((1, 4, 100), dtype=torch.uint8).detach().numpy()
+    test_array = torch.zeros((1, 3, 100), dtype=torch.uint8).detach().numpy()
     test_array_copy = deepcopy(test_array)
 
     prepared_array_test = prepare_omics.prepare_one_hot_omics_data(
@@ -74,8 +77,8 @@ def test_prepare_genotype_array_test_mode():
     ],
 )
 def test_load_omics_array_from_disk(subset_indices: None | Sequence[int]):
-    test_arr = np.zeros((4, 100))
-    test_arr[-1, :50] = 1
+    test_arr = np.zeros((3, 100))
+    test_arr[2, :50] = 1
     test_arr[0, 50:] = 1
 
     with patch(

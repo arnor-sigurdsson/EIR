@@ -151,7 +151,7 @@ def _add_bad_arrays_and_targets_for_dataset_testing(
 def _set_up_bad_arrays_for_testing(n_snps: int, output_folder: Path) -> None:
     # try setting up some labels and arrays that should not be included
     for i in range(10):
-        random_arr = np.random.rand(4, n_snps)
+        random_arr = np.random.rand(3, n_snps)
         outpath = Path(output_folder, f"SampleIgnoreFILE_{i}.npy")
         np.save(str(outpath), random_arr)
 
@@ -575,7 +575,8 @@ def check_dataset(
         assert target_labels[output_name][target_column] in expected_transformed_values
 
     test_genotype = test_inputs["test_genotype"]
-    assert (test_genotype.sum(1) == 1).all()
+    col_sums = test_genotype.sum(1)
+    assert ((col_sums == 0) | (col_sums == 1)).all()
 
     assert test_id == dataset.target_labels_storage.get_row(0)["ID"]
     assert test_id == dataset.input_storage.get_row(0)["ID"]

@@ -223,7 +223,7 @@ def test_classification(prep_modelling_test_configs):
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                                 "rb_do": 0.20,
                             },
@@ -762,7 +762,7 @@ def _should_compile():
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                                 "l1": 1e-06,
                                 "rb_do": 0.10,
@@ -804,7 +804,7 @@ def _should_compile():
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                                 "l1": 1e-06,
                             },
@@ -842,7 +842,7 @@ def _should_compile():
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                                 "l1": 2e-05,
                             },
@@ -885,7 +885,7 @@ def _should_compile():
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                             },
                         },
@@ -1013,7 +1013,7 @@ def test_multi_task(
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                                 "l1": 2e-05,
                                 "rb_do": 0.20,

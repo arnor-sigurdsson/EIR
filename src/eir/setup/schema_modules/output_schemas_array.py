@@ -57,7 +57,7 @@ class ArrayOutputSamplingConfig:
         on the input type, different formats are expected:
 
         - ``sequence``: A string written directly in the ``.yaml`` file.
-        - ``omics``: A file path to NumPy array of shape ``(4, n_SNPs)`` on disk.
+        - ``omics``: A file path to NumPy array of shape ``(3, n_SNPs)`` on disk.
         - ``image``: An image file path on disk.
         - ``tabular``: A mapping of :literal:`(column key: value)` written directly
           in the ``.yaml`` file.

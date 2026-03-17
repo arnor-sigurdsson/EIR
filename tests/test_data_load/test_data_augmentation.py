@@ -410,7 +410,7 @@ def test_calc_mixed_loss(test_inputs, expected_output):
 
 
 def test_make_random_snps_missing_some():
-    test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
+    test_array = torch.zeros((1, 3, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
     patch_target = "eir.data_load.data_augmentation.torch.randperm"
@@ -424,14 +424,13 @@ def test_make_random_snps_missing_some():
             na_augment_beta=1.0,
         )
 
-        assert (array.sum(1) != 1).sum() == 0
-
-        expected_missing = torch.tensor([True] * 5, dtype=torch.bool)
-        assert (array[:, 3, mock_return] == expected_missing).all()
+        assert (not array[:, :, mock_return]).all()
+        is_missing = array[0].sum(dim=0) == 0
+        assert is_missing[mock_return].all()
 
 
 def test_make_random_snps_missing_uniform_distribution():
-    test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
+    test_array = torch.zeros((1, 3, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
     array = data_augmentation.make_random_omics_columns_missing(
@@ -442,11 +441,12 @@ def test_make_random_snps_missing_uniform_distribution():
 
     assert array[:, 0, :].any(), "Expected some SNPs to be set to the default state."
     assert not array[:, 1, :].any(), "Expected no SNPs in this state."
-    assert array[:, 3, :].any(), "Expected some SNPs to be set to the missing state."
+    is_missing = array[0].sum(dim=0) == 0
+    assert is_missing.any(), "Expected some SNPs to be set to missing (all-zeros)."
 
 
 def test_make_random_snps_missing_maximal():
-    test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
+    test_array = torch.zeros((1, 3, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
     array = data_augmentation.make_random_omics_columns_missing(
@@ -455,7 +455,8 @@ def test_make_random_snps_missing_maximal():
         na_augment_beta=1.0,
     )
 
-    missing_percentage = (array[:, 3, :].sum() / 1000).item()
+    is_missing = (array[0].sum(dim=0) == 0).float()
+    missing_percentage = (is_missing.sum() / 1000).item()
 
     assert missing_percentage > 0.925, (
         "Expected a high percentage of SNPs to be set to missing."
@@ -463,7 +464,7 @@ def test_make_random_snps_missing_maximal():
 
 
 def test_make_random_snps_missing_minimal():
-    test_array = torch.zeros((1, 4, 1000), dtype=torch.bool)
+    test_array = torch.zeros((1, 3, 1000), dtype=torch.bool)
     test_array[:, 0, :] = True
 
     array = data_augmentation.make_random_omics_columns_missing(
@@ -472,7 +473,8 @@ def test_make_random_snps_missing_minimal():
         na_augment_beta=100.0,
     )
 
-    missing_percentage = (array[:, 3, :].sum() / 1000).item()
+    is_missing = (array[0].sum(dim=0) == 0).float()
+    missing_percentage = (is_missing.sum() / 1000).item()
     assert missing_percentage < 0.075, "Expected minimal SNPs to be set to missing."
 
 
@@ -482,8 +484,7 @@ def test_shuffle_columns_some():
             [
                 [True, False, True, False, True, False, False, False, False, False],
                 [False, True, False, False, False, False, False, False, False, False],
-                [False, False, False, False, False, True, False, False, True, True],
-                [False, False, False, True, False, False, True, True, False, False],
+                [False, False, False, True, False, True, True, True, True, True],
             ]
         ],
         dtype=torch.bool,
@@ -507,7 +508,6 @@ def test_shuffle_columns_one_hot():
             [
                 [True, False, True],
                 [False, True, False],
-                [False, False, False],
                 [False, False, False],
             ]
         ],

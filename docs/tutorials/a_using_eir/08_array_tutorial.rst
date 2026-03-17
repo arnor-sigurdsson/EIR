@@ -71,7 +71,7 @@ here is an example configuration for the LCL model:
     and the genotype models in :ref:`01-genotype-tutorial`, there are some
     important differences. The most important is how the LC layers are
     applied over the input dimensions. Considering the 2D case, where
-    we have one-hot encoded arrays with shape ``(4, n_SNPs)``.
+    we have one-hot encoded arrays with shape ``(3, n_SNPs)``.
     In the genotype case, the ``kernel_width``
     parameter in the LC layer will be applied in colum-order,
     meaning a width of 8 will cover the first 2 SNPs.
