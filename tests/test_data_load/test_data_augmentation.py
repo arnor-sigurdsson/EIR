@@ -424,7 +424,7 @@ def test_make_random_snps_missing_some():
             na_augment_beta=1.0,
         )
 
-        assert (not array[:, :, mock_return]).all()
+        assert (~array[:, :, mock_return]).all()
         is_missing = array[0].sum(dim=0) == 0
         assert is_missing[mock_return].all()
 
