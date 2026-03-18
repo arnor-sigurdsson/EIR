@@ -226,7 +226,7 @@ def test_prepare_sequence_output_manual_sample_data(
     ]
     assert set(prepared_test_data.keys()) == set(expected_keys)
 
-    assert prepared_test_data["test_genotype"].shape == (1, 4, 1000)
+    assert prepared_test_data["test_genotype"].shape == (1, 3, 1000)
 
     assert prepared_test_data["test_image"].shape == (1, 16, 16)
 
