@@ -517,25 +517,31 @@ class ManifoldMixupContext:
             active=False,
         )
 
-        self._hook_handles: list[Callable[[], None]] = []
-        self._resolved_modules: dict[str, nn.Module] | None = None
-
-    def _resolve_modules(self, model: nn.Module) -> None:
-        all_named_modules = dict(model.named_modules())
-        self._resolved_modules = {}
-
-        for group_name, layer_paths in self.layer_groups.items():
+        self._hooks_installed: bool = False
+        self._layer_to_group: dict[str, str] = {}
+        for group_name, layer_paths in layer_groups.items():
             for layer_path in layer_paths:
-                if layer_path in self._resolved_modules:
-                    continue
-                self._resolved_modules[layer_path] = get_module_from_path(
-                    all_named_modules=all_named_modules,
-                    layer_path=layer_path,
-                    custom_error_message=(
-                        f"Manifold mixup layer path '{layer_path}' "
-                        f"(group '{group_name}') not found in model"
-                    ),
-                )
+                self._layer_to_group[layer_path] = group_name
+
+    def setup_hooks(self, model: nn.Module) -> None:
+        if self._hooks_installed:
+            return
+
+        all_named_modules = dict(model.named_modules())
+
+        for layer_path, group_name in self._layer_to_group.items():
+            module = get_module_from_path(
+                all_named_modules=all_named_modules,
+                layer_path=layer_path,
+                custom_error_message=(
+                    f"Manifold mixup layer path '{layer_path}' "
+                    f"(group '{group_name}') not found in model"
+                ),
+            )
+            hook = self._make_mixup_hook(group_name=group_name)
+            module.register_forward_hook(hook)
+
+        self._hooks_installed = True
 
     def sample_new_state(self) -> ManifoldMixupState:
         lambda_ = _sample_lambda(mixing_alpha=self.mixing_alpha)
@@ -543,7 +549,7 @@ class ManifoldMixupContext:
             batch_size=self.batch_size,
         )
         active_group = self.group_names[
-            torch.randint(low=0, high=len(self.group_names), size=(1,)).item()
+            int(torch.randint(low=0, high=len(self.group_names), size=(1,)).item())
         ]
 
         self.state = ManifoldMixupState(
@@ -557,23 +563,7 @@ class ManifoldMixupContext:
     def deactivate(self) -> None:
         self.state.active = False
 
-    def attach_hooks(self, model: nn.Module) -> None:
-        if self._resolved_modules is None:
-            self._resolve_modules(model=model)
-
-        active_layers = self.layer_groups[self.state.active_group]
-
-        for layer_path in active_layers:
-            module = self._resolved_modules[layer_path]
-            handle = module.register_forward_hook(self._make_mixup_hook())
-            self._hook_handles.append(handle.remove)
-
-    def remove_hooks(self) -> None:
-        for remove_fn in self._hook_handles:
-            remove_fn()
-        self._hook_handles.clear()
-
-    def _make_mixup_hook(self) -> Callable:
+    def _make_mixup_hook(self, group_name: str) -> Callable:
         ctx = self
 
         def hook(
@@ -584,6 +574,8 @@ class ManifoldMixupContext:
             if not ctx.state.active:
                 return output
             if not module.training:
+                return output
+            if ctx.state.active_group != group_name:
                 return output
 
             state = ctx.state
@@ -628,10 +620,8 @@ def hook_manifold_mixup_prepare(
 ) -> dict[str, Any]:
     batch = state["batch"]
 
-    manifold_ctx.remove_hooks()
-
+    manifold_ctx.setup_hooks(model=experiment.model)
     manifold_state = manifold_ctx.sample_new_state()
-    manifold_ctx.attach_hooks(model=experiment.model)
 
     target_columns_gen = get_output_info_generator(
         outputs_as_dict=experiment.outputs,
