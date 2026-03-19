@@ -755,6 +755,17 @@ def _should_compile():
                     "model": {
                         "compile_model": _should_compile(),
                     },
+                    "training_control": {
+                        "mixing_alpha": 0.2,
+                        "manifold_mixup_layer_groups": {
+                            "early": [
+                                "input_modules.test_genotype.lcl_blocks.0",
+                            ],
+                            "late": [
+                                "fusion_modules.computed.fusion_modules.fusion.0.0",
+                            ],
+                        },
+                    },
                 },
                 "input_configs": [
                     {

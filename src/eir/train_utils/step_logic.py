@@ -11,7 +11,11 @@ from torch import autocast, nn
 from torch.nn.utils import clip_grad_norm_
 from torch.optim.optimizer import Optimizer
 
-from eir.data_load.data_augmentation import get_mix_data_hook, hook_mix_loss
+from eir.data_load.data_augmentation import (
+    get_manifold_mixup_hooks,
+    get_mix_data_hook,
+    hook_mix_loss,
+)
 from eir.data_load.data_utils import Batch
 from eir.models import model_training_utils
 from eir.models.input.tabular.tabular import get_tabular_inputs
@@ -115,7 +119,26 @@ def _get_default_step_function_hooks_init_kwargs(
 
     extra_state: dict[str, Any] = {}
 
-    if configs.gc.tc.mixing_alpha:
+    if configs.gc.tc.manifold_mixup_layer_groups:
+        if not configs.gc.tc.mixing_alpha:
+            raise ValueError("manifold_mixup_layer_groups requires mixing_alpha > 0.")
+        logger.debug(
+            "Setting up manifold mixup hooks with α=%.2g, %d layer group(s).",
+            configs.gc.tc.mixing_alpha,
+            len(configs.gc.tc.manifold_mixup_layer_groups),
+        )
+        manifold_ctx, manifold_prepare_hook, manifold_loss_hook = (
+            get_manifold_mixup_hooks(
+                layer_groups=configs.gc.tc.manifold_mixup_layer_groups,
+                mixing_alpha=configs.gc.tc.mixing_alpha,
+                batch_size=configs.gc.be.batch_size,
+            )
+        )
+        init_kwargs["post_prepare_batch"].append(manifold_prepare_hook)
+        init_kwargs["loss"][0] = manifold_loss_hook
+        extra_state["manifold_mixup_ctx"] = manifold_ctx
+
+    elif configs.gc.tc.mixing_alpha:
         logger.debug(
             "Setting up hooks for mixing with with α=%.2g.",
             configs.gc.tc.mixing_alpha,

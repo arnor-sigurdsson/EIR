@@ -322,12 +322,29 @@ class TrainingControlConfig:
         Alpha parameter used for mixing (higher means more mixing).
         See `Mixup: Beyond Empirical
         Risk Minimization <https://arxiv.org/abs/1710.09412>`_ for details.
+
+    :param manifold_mixup_layer_groups:
+        Groups of layer paths for manifold mixup. Each group is a named set of
+        layers. At each training step, one group is randomly selected and mixup
+        is applied to the output of all layers in that group. The lambda value
+        is sampled from Beta(mixing_alpha, mixing_alpha). Layer paths follow
+        PyTorch's named_modules() convention, e.g.
+        ``"input_modules.genotype.encoder.layer_0"``.
+
+        Example::
+
+            manifold_mixup_layer_groups:
+              early:
+                - "input_modules.genotype.encoder.layer_0"
+              late:
+                - "fusion_modules.default.fc_1"
     """
 
     early_stopping_patience: int = 10
     early_stopping_buffer: None | int = None
     weighted_sampling_columns: None | Sequence[str] = None
     mixing_alpha: float = 0.0
+    manifold_mixup_layer_groups: None | dict[str, Sequence[str]] = None
 
 
 @dataclass
