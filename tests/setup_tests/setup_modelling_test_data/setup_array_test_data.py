@@ -103,3 +103,44 @@ def _set_up_base_test_array(
         base_array[mask] = np.nan
 
     return base_array, elements_active
+
+
+def create_test_categorical_array_data(
+    test_data_config: "TestDataConfig",
+    categorical_array_output_folder: Path,
+) -> Path:
+    c = test_data_config
+
+    categorical_array_output_folder = set_up_test_data_root_outpath(
+        base_folder=categorical_array_output_folder,
+    )
+
+    num_classes = len(c.target_classes)
+
+    for cls, cls_integer in c.target_classes.items():
+        for sample_idx in range(c.n_per_class):
+            sample_output_path = categorical_array_output_folder / f"{sample_idx}_{cls}"
+            _create_and_save_categorical_test_array(
+                sample_output_path=sample_output_path,
+                class_integer=cls_integer,
+                num_classes=num_classes,
+            )
+
+    return categorical_array_output_folder
+
+
+def _create_and_save_categorical_test_array(
+    sample_output_path: Path,
+    class_integer: int,
+    num_classes: int,
+) -> None:
+    arr = np.zeros(shape=100, dtype=np.int64)
+
+    segment_size = 100 // num_classes
+    for i in range(num_classes):
+        start = i * segment_size
+        end = (i + 1) * segment_size if i < num_classes - 1 else 100
+        label = (i + class_integer) % num_classes
+        arr[start:end] = label
+
+    np.save(str(sample_output_path), arr)

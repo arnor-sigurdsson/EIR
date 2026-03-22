@@ -12,6 +12,7 @@ from _pytest.fixtures import SubRequest
 
 from tests.setup_tests.setup_modelling_test_data.setup_array_test_data import (
     create_test_array_data_and_labels,
+    create_test_categorical_array_data,
 )
 from tests.setup_tests.setup_modelling_test_data.setup_image_test_data import (
     create_test_image_data,
@@ -83,6 +84,13 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
         if drop_random_samples:
             _delete_random_files_from_folder(folder=array_sample_folder, n_to_drop=50)
 
+    categorical_array_path = base_outfolder / "categorical_array"
+    if "array" in test_data_config.modalities and not categorical_array_path.exists():
+        create_test_categorical_array_data(
+            test_data_config=test_data_config,
+            categorical_array_output_folder=categorical_array_path,
+        )
+
     _merge_labels_from_modalities(base_path=base_outfolder)
 
     if drop_random_samples:
@@ -102,6 +110,12 @@ def create_test_data(request, tmp_path_factory, parse_test_cl_args) -> "TestData
                 test_folder=test_data_config.scoped_tmp_path,
                 name=modality,
                 post_split_callables=post_split_callables,
+            )
+
+        if "array" in test_data_config.modalities:
+            common_split_test_data_wrapper(
+                test_folder=test_data_config.scoped_tmp_path,
+                name="categorical_array",
             )
 
     return test_data_config

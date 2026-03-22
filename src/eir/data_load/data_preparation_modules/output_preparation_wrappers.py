@@ -16,6 +16,7 @@ from eir.data_load.data_preparation_modules.input_preparation_wrappers import (
 from eir.data_load.data_preparation_modules.prepare_array import (
     array_load_wrapper,
     prepare_array_data,
+    prepare_array_data_categorical,
 )
 from eir.data_load.data_preparation_modules.prepare_image import (
     image_load_wrapper,
@@ -27,6 +28,7 @@ from eir.setup.output_setup_modules.image_output_setup import (
     ComputedImageOutputInfo,
     ImageOutputTypeConfig,
 )
+from eir.setup.schemas import ArrayOutputTypeConfig
 
 
 def prepare_outputs_disk(
@@ -46,10 +48,17 @@ def prepare_outputs_disk(
                 loaded_array = array_load_wrapper(
                     data_pointer=data_pointer,
                 )
-                array_prepared = prepare_array_data(
-                    array_data=loaded_array,
-                    normalization_stats=output_object.normalization_stats,
-                )
+                oti = output_object.output_config.output_type_info
+                assert isinstance(oti, ArrayOutputTypeConfig)
+                if oti.loss == "categorical":
+                    array_prepared = prepare_array_data_categorical(
+                        array_data=loaded_array,
+                    )
+                else:
+                    array_prepared = prepare_array_data(
+                        array_data=loaded_array,
+                        normalization_stats=output_object.normalization_stats,
+                    )
                 output_prepared = {output_name: array_prepared}
 
             case ComputedImageOutputInfo():
@@ -88,10 +97,17 @@ def prepare_outputs_memory(
         match output_object:
             case ComputedArrayOutputInfo():
                 loaded_array = output[output_name]
-                array_prepared = prepare_array_data(
-                    array_data=loaded_array,
-                    normalization_stats=output_object.normalization_stats,
-                )
+                oti = output_object.output_config.output_type_info
+                assert isinstance(oti, ArrayOutputTypeConfig)
+                if oti.loss == "categorical":
+                    array_prepared = prepare_array_data_categorical(
+                        array_data=loaded_array,
+                    )
+                else:
+                    array_prepared = prepare_array_data(
+                        array_data=loaded_array,
+                        normalization_stats=output_object.normalization_stats,
+                    )
                 output_prepared: dict[str, torch.Tensor | int | float] = {
                     output_name: array_prepared
                 }

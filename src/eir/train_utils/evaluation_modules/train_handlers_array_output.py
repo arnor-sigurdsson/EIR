@@ -268,16 +268,25 @@ def one_shot_array_generation(
     batch_size = len(eval_samples)
     array_outputs = outputs[array_output_name][array_output_name]
 
-    assert output_object.normalization_stats is not None
+    output_type_info = output_object.output_config.output_type_info
+    assert isinstance(output_type_info, ArrayOutputTypeConfig | ImageOutputTypeConfig)
+
+    is_categorical = None
+    if isinstance(output_type_info, ArrayOutputTypeConfig):
+        is_categorical = output_type_info.loss == "categorical"
 
     final_numpy_outputs = []
     for batch_idx in range(batch_size):
         cur_output = array_outputs[batch_idx]
-        cur_output_raw = un_normalize_wrapper(
-            array=cur_output,
-            normalization_stats=output_object.normalization_stats,
-        )
-        cur_output_numpy = cur_output_raw.cpu().numpy()
+        if is_categorical:
+            cur_output_numpy = cur_output.cpu().numpy()
+        else:
+            assert output_object.normalization_stats is not None
+            cur_output_raw = un_normalize_wrapper(
+                array=cur_output,
+                normalization_stats=output_object.normalization_stats,
+            )
+            cur_output_numpy = cur_output_raw.cpu().numpy()
         final_numpy_outputs.append(cur_output_numpy)
 
     return final_numpy_outputs

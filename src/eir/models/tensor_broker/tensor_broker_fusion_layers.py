@@ -89,21 +89,26 @@ class AdditiveFusionLayer(nn.Module):
         self,
         input_shape: torch.Size,
         context_shape: torch.Size,
+        gate_init_value: float = 0.01,
     ):
         super().__init__()
         self.input_shape = input_shape
         self.context_shape = context_shape
+        self.gate = nn.Parameter(
+            torch.full(size=input_shape, fill_value=gate_init_value)
+        )
 
     def extra_repr(self) -> str:
         return (
             f"input_shape={tuple(self.input_shape)}, "
-            f"context_shape={tuple(self.context_shape)}"
+            f"context_shape={tuple(self.context_shape)}, "
+            f"gate_mean={self.gate.mean().item():.4f}"
         )
 
     def forward(
         self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
     ) -> torch.Tensor:
-        return input_tensor + projected_context_tensor
+        return input_tensor + self.gate * projected_context_tensor
 
 
 class GatedSumFusionLayer(nn.Module):

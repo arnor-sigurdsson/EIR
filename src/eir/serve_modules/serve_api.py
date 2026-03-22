@@ -147,11 +147,14 @@ def get_model_info(
 
             case ComputedArrayOutputInfo():
                 shape = output_object.data_dimensions.full_shape()
-                model_info["outputs"][name] = {
+                info: dict[str, Any] = {
                     "type": "array",
                     "shape": shape,
                     "dtype": output_object.dtype.str,
                 }
+                if output_object.num_classes is not None:
+                    info["num_classes"] = output_object.num_classes
+                model_info["outputs"][name] = info
 
             case ComputedImageOutputInfo():
                 shape = output_object.data_dimensions.full_shape()

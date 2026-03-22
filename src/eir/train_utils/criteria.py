@@ -22,6 +22,7 @@ from eir.setup.output_setup_modules.tabular_output_setup import (
     ComputedTabularOutputInfo,
 )
 from eir.setup.schema_modules.output_schemas_tabular import TabularOutputTypeConfig
+from eir.setup.schemas import ArrayOutputTypeConfig
 from eir.train_utils.metrics import (
     LogEmptyLossProtocol,
     calculate_prediction_losses,
@@ -154,7 +155,33 @@ def get_criteria(
 
                 criteria_dict[output_name] = criterion_callable
 
-            case ComputedArrayOutputInfo() | ComputedImageOutputInfo():
+            case ComputedArrayOutputInfo():
+                output_type_info = output_object.output_config.output_type_info
+                assert isinstance(output_type_info, ArrayOutputTypeConfig)
+
+                if output_type_info.loss == "categorical":
+                    criterion = partial(
+                        _array_cat_loss,
+                        cat_loss_func=nn.CrossEntropyLoss(
+                            ignore_index=-1,
+                            reduction="mean",
+                        ),
+                    )
+                else:
+                    criterion = partial(
+                        _calc_con_loss,
+                        loss_func=nn.MSELoss(),
+                        nan_handling=NaNHandling.MASK,
+                    )
+
+                criterion_callable = _get_extract_and_call_criterion(
+                    output_name=output_name,
+                    loss_callable=criterion,
+                )
+
+                criteria_dict[output_name] = criterion_callable
+
+            case ComputedImageOutputInfo():
                 criterion = partial(
                     _calc_con_loss,
                     loss_func=nn.MSELoss(),
@@ -484,8 +511,8 @@ def _compute_cb_pos_weight(
             weights.append(1.0)
             continue
 
-        effective_pos = (1 - beta**n_pos) / (1 - beta)
-        effective_neg = (1 - beta**n_neg) / (1 - beta)
+        effective_pos = (1 - beta ** float(n_pos)) / (1 - beta)
+        effective_neg = (1 - beta ** float(n_neg)) / (1 - beta)
         weights.append(effective_neg / effective_pos)
 
     return torch.tensor(data=weights, dtype=torch.float32)
@@ -508,6 +535,47 @@ def _sequence_cat_loss(
 ) -> torch.Tensor:
     loss = cat_loss_func(input=input.transpose(2, 1), target=target)
     return loss
+
+
+def _array_cat_loss(
+    input: torch.Tensor,
+    target: torch.Tensor,
+    cat_loss_func: nn.CrossEntropyLoss,
+) -> torch.Tensor:
+    ce_loss = cat_loss_func(input=input, target=target)
+    dice_loss = _compute_dice_loss(input=input, target=target, ignore_index=-1)
+    return ce_loss + dice_loss
+
+
+def _compute_dice_loss(
+    input: torch.Tensor,
+    target: torch.Tensor,
+    ignore_index: int = -1,
+    smooth: float = 1.0,
+) -> torch.Tensor:
+    valid_mask = target != ignore_index
+    valid_target = target.clone()
+    valid_target[~valid_mask] = 0
+
+    probs = torch.softmax(input, dim=1)
+
+    target_one_hot = torch.zeros_like(probs)
+    target_one_hot.scatter_(dim=1, index=valid_target.unsqueeze(1), value=1.0)
+
+    valid_mask_expanded = valid_mask.unsqueeze(1).expand_as(probs)
+    probs = probs * valid_mask_expanded
+    target_one_hot = target_one_hot * valid_mask_expanded
+
+    dims = tuple(range(2, probs.ndim))
+    batch_dims = (0,) + dims
+
+    intersection = (probs * target_one_hot).sum(dim=batch_dims)
+    cardinality = probs.sum(dim=batch_dims) + target_one_hot.sum(dim=batch_dims)
+
+    dice_per_class = (2.0 * intersection + smooth) / (cardinality + smooth)
+    dice_loss = 1.0 - dice_per_class.mean()
+
+    return dice_loss
 
 
 def _survival_loss(

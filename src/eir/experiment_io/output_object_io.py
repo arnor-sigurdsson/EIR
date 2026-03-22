@@ -235,6 +235,10 @@ def serialize_output_object(
                     file_path=output_folder / "diffusion_config.json",
                 )
 
+            if output_object.num_classes is not None:
+                with open(output_folder / "num_classes.json", "w") as f:
+                    json.dump(output_object.num_classes, f)
+
         case _:
             raise ValueError(f"Invalid output object: {output_object}")
 

@@ -45,6 +45,62 @@ def _get_output_array_data_parameters() -> Sequence[dict]:
     return parameters
 
 
+def _get_categorical_array_out_parametrization() -> dict[str, Any]:
+    output_configs = [
+        {
+            "output_info": {
+                "output_name": "test_cat_array",
+            },
+            "output_type_info": {
+                "loss": "categorical",
+            },
+            "model_config": {
+                "model_type": "lcl",
+                "model_init_config": {
+                    "kernel_width": 8,
+                    "channel_exp_base": 3,
+                    "attention_inclusion_cutoff": 128,
+                },
+            },
+        },
+    ]
+
+    configs = {
+        "global_configs": {
+            "basic_experiment": {
+                "output_folder": "test_categorical_array_generation",
+                "n_epochs": 15,
+                "memory_dataset": True,
+            },
+        },
+        "input_configs": [
+            {
+                "input_info": {"input_name": "test_array"},
+                "input_type_info": {
+                    "normalization": "channel",
+                },
+                "model_config": {
+                    "model_type": "cnn",
+                    "model_init_config": {
+                        "layers": [1],
+                        "kernel_width": 4,
+                        "kernel_height": 4,
+                        "channel_exp_base": 4,
+                        "down_stride_width": 1,
+                        "down_stride_height": 1,
+                        "attention_inclusion_cutoff": 256,
+                        "allow_first_conv_size_reduction": False,
+                        "down_sample_every_n_blocks": 2,
+                    },
+                },
+            },
+        ],
+        "output_configs": output_configs,
+    }
+
+    return configs
+
+
 def _get_array_out_parametrization(loss: str) -> dict[str, Any]:
     assert loss in ["mse", "diffusion"]
 
@@ -259,3 +315,33 @@ def _array_output_test_check_wrapper(
                 f" threshold of {success_rate_threshold:.1%}. "
                 f"{passed_checks} passed out of {total_checks} total checks."
             )
+
+
+@pytest.mark.skipif(condition=should_skip_in_gha_macos(), reason="In GHA.")
+@pytest.mark.parametrize(
+    "create_test_data",
+    _get_output_array_data_parameters(),
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "create_test_config_init_base",
+    [
+        {
+            "injections": _get_categorical_array_out_parametrization(),
+        },
+    ],
+    indirect=True,
+)
+def test_categorical_array_output_modelling(
+    prep_modelling_test_configs: "al_modelling_test_configs",
+) -> None:
+    experiment, test_config = prep_modelling_test_configs
+
+    train.train(experiment=experiment)
+
+    check_performance_result_wrapper(
+        outputs=experiment.outputs,
+        run_path=test_config.run_path,
+        max_thresholds=(0.5,),
+        min_thresholds=(1.5,),
+    )
