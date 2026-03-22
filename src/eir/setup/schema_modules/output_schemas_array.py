@@ -19,7 +19,9 @@ class ArrayOutputTypeConfig:
         If None, will use all samples.
 
     :param loss:
-        Which loss to use for training the model. Either ``mse`` or ``diffusion``.
+        Which loss to use for training the model. One of ``mse``, ``diffusion`` or
+        ``categorical``. If ``categorical``, the model will be trained to predict
+        discrete classes for each element in the array.
 
     :param diffusion_time_steps:
         Number of time steps to use for diffusion loss. Only used if ``loss`` is
@@ -36,7 +38,7 @@ class ArrayOutputTypeConfig:
 
     normalization: Literal["element", "channel"] | None = "channel"
     adaptive_normalization_max_samples: int | None = None
-    loss: Literal["mse", "diffusion"] = "mse"
+    loss: Literal["mse", "diffusion", "categorical"] = "mse"
     diffusion_time_steps: int | None = 500
     diffusion_beta_schedule: Literal[
         "linear",
