@@ -90,18 +90,17 @@ def _set_up_base_test_omics_array(n_snps: int) -> tuple[np.ndarray, np.ndarray]:
     corrupting the data. Consider this example:
 
     Fortran-ordered memory of a one-hot array:
-        Memory: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
-        Intended shape (4x4):    When Deep Lake reads in C-order:
-        1 0 0 0                  1 1 0 0
-        0 1 0 0      -->         0 0 0 0
-        0 0 1 0                  0 0 0 0
-        0 0 0 1                  0 0 1 1
+        Memory: [1,0,0, 0,1,0, 0,0,1]
+        Intended shape (3x3):    When Deep Lake reads in C-order:
+        1 0 0                    1 1 0
+        0 1 0        -->         0 0 0
+        0 0 1                    0 0 1
 
     To prevent this, we use np.ascontiguousarray() to ensure C-ordered memory
     layout before yielding the arrays for storage.
     """
     # create random one hot array
-    base_array = np.eye(4, dtype=bool)[np.random.choice(4, n_snps)].T
+    base_array = np.eye(3, dtype=bool)[np.random.choice(3, n_snps)].T
 
     # ensure C order
     base_array = np.ascontiguousarray(base_array)
@@ -121,7 +120,6 @@ def _create_test_array(
     # make samples have missing for chosen, otherwise might have alleles chosen
     # below by random, without having the phenotype
     base_array[:, snp_idxs_candidates] = 0
-    base_array[3, snp_idxs_candidates] = 1
 
     lower_bound, upper_bound = 4, 11  # between 4 and 10 snps
 

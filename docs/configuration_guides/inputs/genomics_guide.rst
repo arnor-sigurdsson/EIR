@@ -40,8 +40,9 @@ Quick Start
      model_type: genome-local-net              # GLN model designed for genomics
 
 .. note::
-    The ``input_source`` should contain NumPy arrays of shape ``(4, n_SNPs)``,
-    where each SNP is represented by 4 values (one-hot encoded). You can
+    The ``input_source`` should contain NumPy arrays of shape ``(3, n_SNPs)``,
+    where each SNP is represented by 3 values (one-hot encoded). Missing
+    genotypes are represented as all-zeros across the 3 channels. You can
     convert your ``.bed/.bim/.fam`` files to EIR format using the
     `plink pipelines <https://github.com/arnor-sigurdsson/plink_pipelines>`_ tool.
 
@@ -88,7 +89,7 @@ About the GLN Model
        direction: "down"                     # "down" (compress) or "up" (expand)
 
        # Kernel configuration
-       kernel_width: 16                      # Width of locally connected kernels (SNPs per window)
+       kernel_width: 12                      # Width of locally connected kernels (4 SNPs × 3 channels)
        first_kernel_expansion: -2            # Shrink first kernel (negative = divide, positive = multiply)
        num_lcl_chunks: null                  # Alternative: split input into N chunks
 
@@ -177,27 +178,27 @@ If configuring manually, these are some of the criteria we found useful
 
    # < 1K SNPs: Smaller kernels for limited data
    model_init_config:
-     kernel_width: 16
+     kernel_width: 12
      first_kernel_expansion: -4    # 16/4 = 4 (covers 1 SNP)
 
    # 1K - 10K SNPs
    model_init_config:
-     kernel_width: 16
+     kernel_width: 12
      first_kernel_expansion: -2    # 16/2 = 8 (covers 2 SNPs)
 
    # 10K - 100K SNPs
    model_init_config:
-     kernel_width: 16
+     kernel_width: 12
      first_kernel_expansion: 1     # 16*1 = 16 (covers 4 SNPs)
 
    # 100K - 500K SNPs
    model_init_config:
-     kernel_width: 16
+     kernel_width: 12
      first_kernel_expansion: 2     # 16*2 = 32 (covers 8 SNPs)
 
    # > 500K SNPs: Higher context to reduce feature size more aggressively
    model_init_config:
-     kernel_width: 16
+     kernel_width: 12
      first_kernel_expansion: 4     # 16*4 = 64 (covers 16 SNPs)
 
 **Memory and Performance:**
@@ -262,7 +263,7 @@ If configuring manually, these are some of the criteria we found useful
    model_config:
      model_type: genome-local-net
      model_init_config:
-       kernel_width: 16
+       kernel_width: 12
        first_kernel_expansion: 2     # For 100K-500K SNPs
 
 .. note::

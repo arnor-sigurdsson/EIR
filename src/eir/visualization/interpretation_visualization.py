@@ -56,14 +56,13 @@ def generate_snp_gradient_matrix(
         What we flag as "alternative" and "reference" can in theory be somewhat
         arbitrary, as long as we are grabbing the correct nucleotides.
     """
-    snp_matrix = np.zeros((4, len(snp_indexes)), dtype=object)
+    snp_matrix = np.zeros((3, len(snp_indexes)), dtype=object)
 
     for matrix_col, snp_idx in enumerate(snp_indexes):
         cur_row = snp_df.iloc[snp_idx]
         snp_matrix[0, matrix_col] = cur_row.REF * 2  # 0 alt alleles counted
         snp_matrix[1, matrix_col] = cur_row.REF + cur_row.ALT  # 1 alt alleles counted
         snp_matrix[2, matrix_col] = cur_row.ALT * 2  # 2 alt alleles counted
-        snp_matrix[3, matrix_col] = ""  # missing
     return snp_matrix
 
 
@@ -104,8 +103,8 @@ def plot_top_gradients(
                 cur_ax.set_xticklabels([])
                 cur_ax.set_xticks([])
 
-            cur_ax.set_yticks(np.arange(4))
-            cur_ax.set_yticklabels(["REF", "HET", "ALT", "MIS"])
+            cur_ax.set_yticks(np.arange(3))
+            cur_ax.set_yticklabels(["REF", "HET", "ALT"])
 
             for snp_form in range(cur_snp_matrix.shape[0]):
                 for snp_id in range(cur_snp_matrix.shape[1]):

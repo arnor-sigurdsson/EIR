@@ -119,7 +119,7 @@ def test_impute_missing_modalities(
         dtypes=impute_dtypes,
     )
     assert len(with_imputed_omics) == 3
-    assert with_imputed_omics["test_genotype"].numel() == test_data_config.n_snps * 4
+    assert with_imputed_omics["test_genotype"].numel() == test_data_config.n_snps * 3
 
 
 def test_impute_single_missing_modality():

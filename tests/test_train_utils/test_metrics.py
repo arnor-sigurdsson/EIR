@@ -447,7 +447,7 @@ def test_get_model_l1_loss(get_l1_test_model):
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                                 "l1": 1e-03,
                                 "rb_do": 0.20,
