@@ -286,7 +286,7 @@ def test_get_cur_dilation(test_input, expected):
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                                 "l1": 1e-03,
                                 "rb_do": 0.20,
@@ -329,7 +329,7 @@ def test_get_cur_dilation(test_input, expected):
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                                 "l1": 1e-03,
                             },
@@ -374,7 +374,7 @@ def test_get_cur_dilation(test_input, expected):
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                                 "l1": 1e-03,
                             },
@@ -419,7 +419,7 @@ def test_get_cur_dilation(test_input, expected):
                         "model_config": {
                             "model_type": "genome-local-net",
                             "model_init_config": {
-                                "kernel_width": 8,
+                                "kernel_width": 6,
                                 "channel_exp_base": 2,
                                 "l1": 1e-03,
                                 "rb_do": 0.20,

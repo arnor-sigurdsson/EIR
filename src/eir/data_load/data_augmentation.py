@@ -421,10 +421,7 @@ def _apply_block_masking_to_omics(
     block_start = np.random.choice(max(1, n_snps - n_to_mask + 1))
     block_end = block_start + n_to_mask
 
-    missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
-        -1, 1
-    )
-    omics_array[:, :, block_start:block_end] = missing_arr
+    omics_array[:, :, block_start:block_end] = False
 
     return omics_array
 
@@ -437,10 +434,7 @@ def _apply_random_masking_to_omics(
         return omics_array
 
     n_snps = omics_array.shape[2]
-    missing_pattern = torch.tensor([False, False, False, True], dtype=torch.bool).view(
-        4, 1
-    )
-    is_missing = (omics_array[0, :, :] == missing_pattern).all(dim=0)
+    is_missing = omics_array[0].sum(dim=0) == 0
     unmasked_indices = (~is_missing).nonzero(as_tuple=True)[0]
 
     if len(unmasked_indices) == 0:
@@ -455,10 +449,7 @@ def _apply_random_masking_to_omics(
     random_indices = torch.randperm(len(unmasked_indices))[:n_to_mask]
     snps_to_mask = unmasked_indices[random_indices]
 
-    missing_arr = torch.tensor([False, False, False, True], dtype=torch.bool).reshape(
-        -1, 1
-    )
-    omics_array[:, :, snps_to_mask] = missing_arr
+    omics_array[:, :, snps_to_mask] = False
 
     return omics_array
 
@@ -481,13 +472,13 @@ def shuffle_random_omics_columns(
     batch_size = omics_array.shape[0]
     one_hot_random = torch.zeros(
         batch_size,
-        4,
+        3,
         n_to_shuffle,
         dtype=torch.bool,
     )
     random_indices = torch.randint(
         0,
-        4,
+        3,
         (batch_size, n_to_shuffle),
     )
     one_hot_random.scatter_(1, random_indices.unsqueeze(1), 1)

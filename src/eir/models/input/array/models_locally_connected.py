@@ -191,7 +191,7 @@ class LCLModelConfig:
 
     layers: None | list[int] = None
 
-    kernel_width: int | Literal["patch"] = 16
+    kernel_width: int | Literal["patch"] = 12
     first_kernel_expansion: int = -2
 
     channel_exp_base: int = 2
