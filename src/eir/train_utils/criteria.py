@@ -656,7 +656,7 @@ def _cox_ph_loss(
         return risk_scores.new_zeros((), requires_grad=True)
 
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message="Ties in event time detected*")
+        warnings.filterwarnings("ignore", message="Ties in*")
         loss = neg_partial_log_likelihood(
             log_hz=masked_risk_scores,
             event=masked_event,

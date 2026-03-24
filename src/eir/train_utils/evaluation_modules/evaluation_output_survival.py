@@ -29,6 +29,67 @@ if TYPE_CHECKING:
 logger = get_logger(name=__name__)
 
 
+def save_survival_baseline_hazards_wrapper(
+    val_outputs: dict[str, dict[str, torch.Tensor]],
+    val_labels: dict[str, dict[str, torch.Tensor]],
+    experiment: "Experiment",
+    evaluation_metrics: al_step_metric_dict,
+) -> None:
+    for output_name, output_object in experiment.outputs.items():
+        output_type = output_object.output_config.output_info.output_type
+        if output_type != "survival":
+            continue
+
+        assert isinstance(output_object, ComputedSurvivalOutputInfo)
+
+        output_type_info = output_object.output_config.output_type_info
+        if output_type_info.loss_function != "CoxPHLoss":
+            continue
+
+        for event_name, time_name in zip(
+            output_type_info.event_columns,
+            output_type_info.time_columns,
+            strict=True,
+        ):
+            model_outputs = val_outputs[output_name][event_name]
+            events = val_labels[output_name][event_name]
+            times = val_labels[output_name][time_name]
+
+            filtered = filter_survival_missing_targets(
+                model_outputs=model_outputs,
+                events=events,
+                times=times,
+                cur_ids=[],
+            )
+
+            risk_scores = filtered.model_outputs.cpu().numpy()
+            events_np = general_torch_to_numpy(tensor=filtered.events).astype(int)
+            times_np = general_torch_to_numpy(tensor=filtered.times)
+
+            unique_times, baseline_hazard = estimate_baseline_hazard(
+                times=times_np,
+                events=events_np,
+                risk_scores=risk_scores,
+            )
+
+            cur_serialization_path = get_output_serialization_path(
+                output_name=output_name,
+                output_type=output_type,
+                run_folder=Path(experiment.configs.gc.be.output_folder),
+            )
+
+            em = evaluation_metrics
+            cur_performance_avg = em["average"]["average"]["perf-average"]
+
+            maybe_save_survival_hazards_and_times(
+                serialization_output_folder=cur_serialization_path,
+                run_folder=Path(experiment.configs.gc.be.output_folder),
+                cur_performance=cur_performance_avg,
+                baseline_hazards=baseline_hazard,
+                unique_times=unique_times,
+            )
+
+
 def save_survival_evaluation_results_wrapper(
     val_outputs: dict[str, dict[str, torch.Tensor]],
     val_labels: dict[str, dict[str, torch.Tensor]],
