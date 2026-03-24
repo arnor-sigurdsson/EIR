@@ -17,7 +17,12 @@ from tqdm import tqdm
 from eir.data_load.label_setup import (
     Labels,
     TabularFileInfo,
+    _filter_ids_from_label_df,
+    _get_all_label_columns_and_dtypes,
+    _split_df_by_ids,
+    _validate_df,
     al_label_transformers,
+    ensure_categorical_columns_and_format,
     gather_ids_from_data_source,
     gather_ids_from_tabular_file,
     get_file_path_iterator,
@@ -173,7 +178,92 @@ def update_labels_df(
 
     if master_df.columns == ["ID"]:
         return new_labels_renamed
+
+    if master_df.height == new_labels_renamed.height and master_df.get_column(
+        "ID"
+    ).equals(new_labels_renamed.get_column("ID")):
+        return pl.concat([master_df, new_labels_renamed.drop("ID")], how="horizontal")
+
     return master_df.join(new_labels_renamed, on="ID", how="full", coalesce=True)
+
+
+@dataclass
+class PreloadedTabularData:
+    train_df: pl.DataFrame
+    valid_df: pl.DataFrame
+
+
+def preload_tabular_data_per_source(
+    tabular_target_labels_info: dict[str, TabularFileInfo],
+    train_ids: Sequence[str],
+    valid_ids: Sequence[str],
+) -> dict[Path, PreloadedTabularData]:
+    cols_per_source: dict[Path, list[TabularFileInfo]] = {}
+    for info in tabular_target_labels_info.values():
+        source = info.file_path
+        if source not in cols_per_source:
+            cols_per_source[source] = []
+        cols_per_source[source].append(info)
+
+    any_chunked = any(
+        info.parsing_chunk_size is not None
+        for infos in cols_per_source.values()
+        for info in infos
+    )
+    if any_chunked:
+        return {}
+
+    ids_to_keep = list(train_ids) + list(valid_ids)
+    result: dict[Path, PreloadedTabularData] = {}
+
+    for source, infos in cols_per_source.items():
+        all_con_cols: list[str] = []
+        all_cat_cols: list[str] = []
+        for info in infos:
+            all_con_cols.extend(info.con_columns)
+            all_cat_cols.extend(info.cat_columns)
+
+        all_columns, dtypes = _get_all_label_columns_and_dtypes(
+            cat_columns=all_cat_cols,
+            con_columns=all_con_cols,
+        )
+        read_columns = list({"ID"} | set(all_columns))
+
+        logger.info(
+            "Pre-loading %d columns from %s for %d outputs.",
+            len(read_columns) - 1,
+            source,
+            len(infos),
+        )
+
+        df_full = pl.read_csv(
+            source=source,
+            columns=read_columns,
+            schema_overrides={"ID": pl.Utf8, **dtypes},
+        )
+
+        df_filtered = _filter_ids_from_label_df(
+            df_labels=df_full,
+            ids_to_keep=ids_to_keep,
+        )
+        del df_full
+
+        df_filtered = ensure_categorical_columns_and_format(df=df_filtered)
+        _validate_df(df=df_filtered)
+
+        df_train, df_valid = _split_df_by_ids(
+            df=df_filtered,
+            train_ids=list(train_ids),
+            valid_ids=list(valid_ids),
+        )
+        del df_filtered
+
+        result[source] = PreloadedTabularData(
+            train_df=df_train,
+            valid_df=df_valid,
+        )
+
+    return result
 
 
 def set_up_all_target_labels_wrapper(
@@ -192,6 +282,17 @@ def set_up_all_target_labels_wrapper(
         output_configs=output_configs
     )
 
+    preloaded_data = preload_tabular_data_per_source(
+        tabular_target_labels_info=tabular_target_labels_info,
+        train_ids=train_ids,
+        valid_ids=valid_ids,
+    )
+
+    sources_remaining: dict[Path, int] = {}
+    for info in tabular_target_labels_info.values():
+        source = info.file_path
+        sources_remaining[source] = sources_remaining.get(source, 0) + 1
+
     for output_config in output_configs:
         output_source = output_config.output_info.output_source
         output_name = output_config.output_info.output_name
@@ -200,6 +301,8 @@ def set_up_all_target_labels_wrapper(
 
         match output_type:
             case "tabular":
+                source_path = Path(output_source)
+                source_data = preloaded_data.get(source_path)
                 train_labels_df, valid_labels_df = process_tabular_output(
                     output_name=output_name,
                     tabular_target_labels_info=tabular_target_labels_info,
@@ -210,7 +313,13 @@ def set_up_all_target_labels_wrapper(
                     per_modality_missing_ids=per_modality_missing_ids,
                     train_labels_df=train_labels_df,
                     valid_labels_df=valid_labels_df,
+                    preloaded_data=source_data,
                 )
+                if source_path in sources_remaining:
+                    sources_remaining[source_path] -= 1
+                    if sources_remaining[source_path] == 0:
+                        preloaded_data.pop(source_path, None)
+                        del sources_remaining[source_path]
             case "sequence":
                 train_labels_df, valid_labels_df = process_sequence_output(
                     output_name=output_name,
@@ -236,6 +345,8 @@ def set_up_all_target_labels_wrapper(
                 output_type_info = output_config.output_type_info
                 assert isinstance(output_type_info, SurvivalOutputTypeConfig)
                 n_bins = output_type_info.num_durations
+                source_path = Path(output_source)
+                source_data = preloaded_data.get(source_path)
                 train_labels_df, valid_labels_df = process_survival_output(
                     n_bins=n_bins,
                     output_name=output_name,
@@ -248,7 +359,13 @@ def set_up_all_target_labels_wrapper(
                     per_modality_missing_ids=per_modality_missing_ids,
                     train_labels_df=train_labels_df,
                     valid_labels_df=valid_labels_df,
+                    preloaded_data=source_data,
                 )
+                if source_path in sources_remaining:
+                    sources_remaining[source_path] -= 1
+                    if sources_remaining[source_path] == 0:
+                        preloaded_data.pop(source_path, None)
+                        del sources_remaining[source_path]
             case _:
                 raise ValueError(f"Unknown output type: '{output_type}'.")
 
@@ -275,12 +392,19 @@ def process_tabular_output(
     per_modality_missing_ids: dict[str, set[str]],
     train_labels_df: pl.DataFrame,
     valid_labels_df: pl.DataFrame,
+    preloaded_data: PreloadedTabularData | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     tabular_info = tabular_target_labels_info[output_name]
     cur_labels = set_up_train_and_valid_tabular_data(
         tabular_file_info=tabular_info,
         train_ids=train_ids,
         valid_ids=valid_ids,
+        preloaded_train_df=(
+            preloaded_data.train_df if preloaded_data is not None else None
+        ),
+        preloaded_valid_df=(
+            preloaded_data.valid_df if preloaded_data is not None else None
+        ),
     )
     label_transformers[output_name] = cur_labels.label_transformers
 
@@ -400,6 +524,7 @@ def process_survival_output(
     per_modality_missing_ids: dict[str, set[str]],
     train_labels_df: pl.DataFrame,
     valid_labels_df: pl.DataFrame,
+    preloaded_data: PreloadedTabularData | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     tabular_info = tabular_target_labels_info[output_name]
 
@@ -411,6 +536,12 @@ def process_survival_output(
         train_ids=train_ids,
         valid_ids=valid_ids,
         do_transform_labels=True,
+        preloaded_train_df=(
+            preloaded_data.train_df if preloaded_data is not None else None
+        ),
+        preloaded_valid_df=(
+            preloaded_data.valid_df if preloaded_data is not None else None
+        ),
     )
 
     time_columns = list(output_type_info.time_columns)
