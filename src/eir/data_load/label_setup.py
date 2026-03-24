@@ -64,26 +64,36 @@ def set_up_train_and_valid_tabular_data(
     valid_ids: Sequence[str],
     impute_missing: bool = False,
     do_transform_labels: bool = True,
+    preloaded_train_df: pl.DataFrame | None = None,
+    preloaded_valid_df: pl.DataFrame | None = None,
 ) -> Labels:
     if len(tabular_file_info.con_columns) + len(tabular_file_info.cat_columns) < 1:
         raise ValueError(f"No label columns specified in {tabular_file_info}.")
 
-    parse_wrapper = get_label_parsing_wrapper(
-        label_parsing_chunk_size=tabular_file_info.parsing_chunk_size
-    )
-    ids_to_keep = list(train_ids) + list(valid_ids)
-    df_labels = parse_wrapper(
-        label_file_tabular_info=tabular_file_info,
-        ids_to_keep=ids_to_keep,
-    )
-    _validate_df(df=df_labels)
+    if preloaded_train_df is not None and preloaded_valid_df is not None:
+        output_cols = list(tabular_file_info.con_columns) + list(
+            tabular_file_info.cat_columns
+        )
+        select_cols = ["ID"] + output_cols
+        df_labels_train = preloaded_train_df.select(select_cols)
+        df_labels_valid = preloaded_valid_df.select(select_cols)
+    else:
+        parse_wrapper = get_label_parsing_wrapper(
+            label_parsing_chunk_size=tabular_file_info.parsing_chunk_size
+        )
+        ids_to_keep = list(train_ids) + list(valid_ids)
+        df_labels = parse_wrapper(
+            label_file_tabular_info=tabular_file_info,
+            ids_to_keep=ids_to_keep,
+        )
+        _validate_df(df=df_labels)
 
-    df_labels_train, df_labels_valid = _split_df_by_ids(
-        df=df_labels,
-        train_ids=list(train_ids),
-        valid_ids=list(valid_ids),
-    )
-    del df_labels
+        df_labels_train, df_labels_valid = _split_df_by_ids(
+            df=df_labels,
+            train_ids=list(train_ids),
+            valid_ids=list(valid_ids),
+        )
+        del df_labels
 
     pre_check_label_df(df=df_labels_train, name="Training DataFrame")
     pre_check_label_df(df=df_labels_valid, name="Validation DataFrame")
