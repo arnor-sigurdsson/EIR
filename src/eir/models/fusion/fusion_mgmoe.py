@@ -84,23 +84,28 @@ class MGMoEModel(nn.Module):
 
         if self.use_sum_fusion:
             assert feature_dimensions_and_types is not None
-            self.input_projections = nn.ModuleDict()
-            for name, info in feature_dimensions_and_types.items():
-                output_dim = info.output_dimension
-                self.input_projections[name] = nn.Sequential(
-                    nn.RMSNorm(normalized_shape=output_dim),
-                    nn.Linear(
-                        in_features=output_dim,
-                        out_features=self.model_config.fc_task_dim,
-                    ),
-                    nn.GELU(),
-                )
+            self.expert_projections = nn.ModuleDict()
+            for expert_idx in range(self.num_experts):
+                expert_projs = nn.ModuleDict()
+                for name, info in feature_dimensions_and_types.items():
+                    output_dim = info.output_dimension
+                    expert_projs[name] = nn.Sequential(
+                        nn.RMSNorm(normalized_shape=output_dim),
+                        nn.Linear(
+                            in_features=output_dim,
+                            out_features=self.model_config.fc_task_dim,
+                        ),
+                        nn.GELU(),
+                    )
+                self.expert_projections[f"expert_{expert_idx}"] = expert_projs
+
             expert_in_dim = self.model_config.fc_task_dim
         else:
             expert_in_dim = fusion_in_dim
 
         gate_spec = self.get_gate_spec(
-            in_features=expert_in_dim, out_features=self.num_experts
+            in_features=self.model_config.fc_task_dim,
+            out_features=self.num_experts,
         )
 
         expert_names = tuple(f"expert_{i}" for i in range(self.num_experts))
@@ -163,23 +168,26 @@ class MGMoEModel(nn.Module):
     def output_shape(self) -> tuple[int, ...]:
         return (self.num_out_features,)
 
-    def _fuse_inputs(self, inputs: dict[str, torch.Tensor]) -> torch.Tensor:
-        if not self.use_sum_fusion:
-            return self.fusion_callable(inputs)
-
+    def _fuse_for_expert(
+        self,
+        inputs: dict[str, torch.Tensor],
+        expert_name: str,
+    ) -> torch.Tensor:
+        expert_projs_module = self.expert_projections[expert_name]
+        assert isinstance(expert_projs_module, nn.ModuleDict)
         projected = []
         for name, tensor in inputs.items():
-            if name not in self.input_projections:
+            if name not in expert_projs_module:
                 continue
             flattened = tensor.flatten(start_dim=1)
-            proj = self.input_projections[name](flattened)
+            proj = expert_projs_module[name](flattened)
             projected.append(proj)
 
         if not projected:
             raise ValueError(
-                f"No valid modalities found in inputs. "
+                f"No valid modalities found in inputs for {expert_name}. "
                 f"Received: {list(inputs.keys())}, "
-                f"Expected: {list(self.input_projections.keys())}"
+                f"Expected: {list(expert_projs_module.keys())}"
             )
 
         fused = torch.stack(projected, dim=0).sum(dim=0)
@@ -191,16 +199,32 @@ class MGMoEModel(nn.Module):
         return fused
 
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        fused_features = self._fuse_inputs(inputs=inputs)
+        if self.use_sum_fusion:
+            expert_out_list = []
+            for expert_name, expert_branch in self.expert_branches.items():
+                expert_input = self._fuse_for_expert(
+                    inputs=inputs,
+                    expert_name=expert_name,
+                )
+                cur_expert_output = expert_branch(expert_input)
+                expert_out_list.append(cur_expert_output)
 
-        expert_outputs = calculate_module_dict_outputs(
-            input_=fused_features,
-            module_dict=self.expert_branches,
-        )
-        stacked_expert_outputs = torch.stack(list(expert_outputs.values()), dim=2)
+            stacked_expert_outputs = torch.stack(expert_out_list, dim=2)
+
+            gate_features = torch.stack(expert_out_list, dim=0).mean(dim=0)
+        else:
+            fused_features = self.fusion_callable(inputs)
+            expert_outputs = calculate_module_dict_outputs(
+                input_=fused_features,
+                module_dict=self.expert_branches,
+            )
+            stacked_expert_outputs = torch.stack(list(expert_outputs.values()), dim=2)
+            gate_features = torch.stack(list(expert_outputs.values()), dim=0).mean(
+                dim=0
+            )
 
         gate_attentions = calculate_module_dict_outputs(
-            input_=fused_features,
+            input_=gate_features,
             module_dict=self.gates,
         )
 
