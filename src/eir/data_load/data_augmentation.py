@@ -1,4 +1,4 @@
-from collections.abc import Generator, Iterable, Sequence
+from collections.abc import Callable, Generator, Iterable, Sequence
 from dataclasses import dataclass
 from functools import lru_cache, partial
 from typing import (
@@ -10,8 +10,10 @@ from typing import (
 import numpy as np
 import torch
 from timm.data.mixup import rand_bbox
+from torch import nn
 
 from eir.data_load.data_utils import Batch, get_output_info_generator
+from eir.models.model_training_utils import get_module_from_path
 from eir.train_utils.metrics import filter_missing_outputs_and_labels
 from eir.utils.logging import get_logger
 
@@ -486,3 +488,174 @@ def shuffle_random_omics_columns(
     omics_array[:, :, random_to_shuffle] = one_hot_random
 
     return omics_array
+
+
+@dataclass
+class ManifoldMixupState:
+    lambda_: float
+    permuted_indexes: torch.Tensor
+    active_group: str
+    active: bool
+
+
+class ManifoldMixupContext:
+    def __init__(
+        self,
+        layer_groups: dict[str, Sequence[str]],
+        mixing_alpha: float,
+        batch_size: int,
+    ):
+        self.layer_groups = layer_groups
+        self.group_names = list(layer_groups.keys())
+        self.mixing_alpha = mixing_alpha
+        self.batch_size = batch_size
+
+        self.state = ManifoldMixupState(
+            lambda_=1.0,
+            permuted_indexes=torch.arange(batch_size),
+            active_group="",
+            active=False,
+        )
+
+        self._hooks_installed: bool = False
+        self._layer_to_group: dict[str, str] = {}
+        for group_name, layer_paths in layer_groups.items():
+            for layer_path in layer_paths:
+                self._layer_to_group[layer_path] = group_name
+
+    def setup_hooks(self, model: nn.Module) -> None:
+        if self._hooks_installed:
+            return
+
+        all_named_modules = dict(model.named_modules())
+
+        for layer_path, group_name in self._layer_to_group.items():
+            module = get_module_from_path(
+                all_named_modules=all_named_modules,
+                layer_path=layer_path,
+                custom_error_message=(
+                    f"Manifold mixup layer path '{layer_path}' "
+                    f"(group '{group_name}') not found in model"
+                ),
+            )
+            hook = self._make_mixup_hook(group_name=group_name)
+            module.register_forward_hook(hook)
+
+        self._hooks_installed = True
+
+    def sample_new_state(self) -> ManifoldMixupState:
+        lambda_ = _sample_lambda(mixing_alpha=self.mixing_alpha)
+        permuted_indexes = get_random_batch_indices_to_mix(
+            batch_size=self.batch_size,
+        )
+        active_group = self.group_names[
+            int(torch.randint(low=0, high=len(self.group_names), size=(1,)).item())
+        ]
+
+        self.state = ManifoldMixupState(
+            lambda_=lambda_,
+            permuted_indexes=permuted_indexes,
+            active_group=active_group,
+            active=True,
+        )
+        return self.state
+
+    def deactivate(self) -> None:
+        self.state.active = False
+
+    def _make_mixup_hook(self, group_name: str) -> Callable:
+        ctx = self
+
+        def hook(
+            module: nn.Module,
+            args: tuple[torch.Tensor, ...],
+            output: torch.Tensor,
+        ) -> torch.Tensor:
+            if not ctx.state.active:
+                return output
+            if not module.training:
+                return output
+            if ctx.state.active_group != group_name:
+                return output
+
+            state = ctx.state
+            mixed = (
+                state.lambda_ * output
+                + (1.0 - state.lambda_) * output[state.permuted_indexes]
+            )
+            return mixed
+
+        return hook
+
+
+def get_manifold_mixup_hooks(
+    layer_groups: dict[str, Sequence[str]],
+    mixing_alpha: float,
+    batch_size: int,
+) -> tuple["ManifoldMixupContext", Callable, Callable]:
+    ctx = ManifoldMixupContext(
+        layer_groups=layer_groups,
+        mixing_alpha=mixing_alpha,
+        batch_size=batch_size,
+    )
+
+    hook_prepare = partial(
+        hook_manifold_mixup_prepare,
+        manifold_ctx=ctx,
+    )
+    hook_loss = partial(
+        hook_manifold_mixup_loss,
+        manifold_ctx=ctx,
+    )
+
+    return ctx, hook_prepare, hook_loss
+
+
+def hook_manifold_mixup_prepare(
+    experiment: "Experiment",
+    state: dict,
+    manifold_ctx: ManifoldMixupContext,
+    *args: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    batch = state["batch"]
+
+    manifold_ctx.setup_hooks(model=experiment.model)
+    manifold_state = manifold_ctx.sample_new_state()
+
+    target_columns_gen = get_output_info_generator(
+        outputs_as_dict=experiment.outputs,
+    )
+    targets_permuted = mixup_all_targets(
+        targets=batch.target_labels,
+        permuted_indices_for_mixing=manifold_state.permuted_indexes,
+        target_columns_gen=target_columns_gen,
+    )
+
+    mixing_info = MixingObject(
+        ids=batch.ids,
+        targets=batch.target_labels,
+        targets_permuted=targets_permuted,
+        lambda_=manifold_state.lambda_,
+        permuted_indexes=manifold_state.permuted_indexes,
+    )
+
+    return {"mixing_info": mixing_info}
+
+
+def hook_manifold_mixup_loss(
+    experiment: "Experiment",
+    state: dict,
+    manifold_ctx: ManifoldMixupContext,
+    batch: "Batch",
+    *args: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    manifold_ctx.deactivate()
+
+    return hook_mix_loss(
+        experiment=experiment,
+        state=state,
+        batch=batch,
+        **kwargs,
+    )
