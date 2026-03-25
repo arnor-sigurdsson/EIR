@@ -1,5 +1,4 @@
 import math
-from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -11,9 +10,7 @@ from eir.models.fusion.fusion_default import al_features, default_fuse_features
 from eir.models.layers.mlp_layers import MLPResidualBlock
 from eir.models.models_utils import (
     calculate_module_dict_outputs,
-    construct_multi_branches,
     create_multi_task_blocks_with_first_adaptor_block,
-    initialize_modules_from_spec,
 )
 
 if TYPE_CHECKING:
@@ -103,11 +100,6 @@ class MGMoEModel(nn.Module):
         else:
             expert_in_dim = fusion_in_dim
 
-        gate_spec = self.get_gate_spec(
-            in_features=self.model_config.fc_task_dim,
-            out_features=self.num_experts,
-        )
-
         expert_names = tuple(f"expert_{i}" for i in range(self.num_experts))
         layer_kwargs = {
             "in_features": self.model_config.fc_task_dim,
@@ -127,34 +119,12 @@ class MGMoEModel(nn.Module):
             },
         )
 
-        self.gates = construct_multi_branches(
-            branch_names=tuple(output_group_names),
-            branch_factory=initialize_modules_from_spec,
-            branch_factory_kwargs={"spec": gate_spec},
-        )
-
-        self._init_weights()
-
-    @staticmethod
-    def get_gate_spec(in_features: int, out_features: int):
-        spec = OrderedDict(
+        self.gate_logits = nn.ParameterDict(
             {
-                "gate_fc": (
-                    nn.Linear,
-                    {
-                        "in_features": in_features,
-                        "out_features": out_features,
-                        "bias": True,
-                    },
-                ),
-                "gate_attention": (nn.Softmax, {"dim": 1}),
+                name: nn.Parameter(torch.zeros(self.num_experts))
+                for name in output_group_names
             }
         )
-
-        return spec
-
-    def _init_weights(self):
-        pass
 
     @property
     def per_output_group(self) -> bool:
@@ -210,8 +180,6 @@ class MGMoEModel(nn.Module):
                 expert_out_list.append(cur_expert_output)
 
             stacked_expert_outputs = torch.stack(expert_out_list, dim=2)
-
-            gate_features = torch.stack(expert_out_list, dim=0).mean(dim=0)
         else:
             fused_features = self.fusion_callable(inputs)
             expert_outputs = calculate_module_dict_outputs(
@@ -219,18 +187,11 @@ class MGMoEModel(nn.Module):
                 module_dict=self.expert_branches,
             )
             stacked_expert_outputs = torch.stack(list(expert_outputs.values()), dim=2)
-            gate_features = torch.stack(list(expert_outputs.values()), dim=0).mean(
-                dim=0
-            )
-
-        gate_attentions = calculate_module_dict_outputs(
-            input_=gate_features,
-            module_dict=self.gates,
-        )
 
         final_out = {}
-        for group_name, attention in gate_attentions.items():
-            weighted = attention.unsqueeze(1) * stacked_expert_outputs
+        for group_name, logits in self.gate_logits.items():
+            attention = torch.softmax(logits, dim=0)
+            weighted = attention * stacked_expert_outputs
             final_out[group_name] = weighted.sum(dim=2)
 
         return final_out
