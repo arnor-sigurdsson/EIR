@@ -26,6 +26,7 @@ from eir.setup.schemas import GlobalConfig
 from eir.target_setup.target_label_setup import MissingTargetsInfo
 from eir.train_utils import metrics, utils
 from eir.train_utils.evaluation_modules.evaluation_output_survival import (
+    save_survival_baseline_hazards_wrapper,
     save_survival_evaluation_results_wrapper,
 )
 from eir.train_utils.evaluation_modules.train_handlers_array_output import (
@@ -108,6 +109,13 @@ def validation_handler(engine: Engine, handler_config: "HandlerConfig") -> None:
         iteration=iteration,
         write_header=write_eval_header,
         prefixes={"metrics": "validation_", "writer": "validation"},
+    )
+
+    save_survival_baseline_hazards_wrapper(
+        val_outputs=evaluation_results.gathered_outputs,
+        val_labels=evaluation_results.gathered_labels,
+        experiment=handler_config.experiment,
+        evaluation_metrics=evaluation_results.metrics_with_averages,
     )
 
     if gc.ec.saved_result_detail_level >= 5:

@@ -159,16 +159,15 @@ def general_post_process(
                 output_type_info = output_object.output_config.output_type_info
                 assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
 
-                event_name = output_type_info.event_column
-
-                processed_outputs = process_survival_prediction(
-                    output_object=output_object,
-                    output_model_config=output_model_config,
-                    cur_model_outputs=cur_model_outputs,
-                )
-
                 post_processed[output_name] = {}
-                post_processed[output_name][event_name] = processed_outputs
+                for event_name in output_type_info.event_columns:
+                    processed_outputs = process_survival_prediction(
+                        output_object=output_object,
+                        output_model_config=output_model_config,
+                        cur_model_outputs=cur_model_outputs,
+                        event_name=event_name,
+                    )
+                    post_processed[output_name][event_name] = processed_outputs
 
             case _:
                 raise NotImplementedError(
@@ -264,6 +263,7 @@ def process_survival_prediction(
     output_object: ComputedSurvivalOutputInfo,
     output_model_config: schemas.TabularOutputModuleConfig,
     cur_model_outputs: dict[str, torch.Tensor | list[int] | np.ndarray],
+    event_name: str,
 ) -> dict:
     assert isinstance(output_model_config, schemas.TabularOutputModuleConfig)
     assert isinstance(
@@ -281,11 +281,13 @@ def process_survival_prediction(
         processed_outputs = _process_discrete_survival_prediction(
             output_object=output_object,
             cur_model_outputs=tabular_outputs,
+            event_name=event_name,
         )
     else:
         processed_outputs = _process_cox_survival_prediction(
             output_object=output_object,
             cur_model_outputs=tabular_outputs,
+            event_name=event_name,
         )
 
     return processed_outputs
@@ -294,14 +296,14 @@ def process_survival_prediction(
 def _process_discrete_survival_prediction(
     output_object: ComputedSurvivalOutputInfo,
     cur_model_outputs: dict[str, torch.Tensor],
+    event_name: str,
 ) -> dict:
     processed_outputs: dict[str, Any] = {}
 
     output_type_info = output_object.output_config.output_type_info
     assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
 
-    time_name = output_type_info.time_column
-    event_name = output_type_info.event_column
+    time_name = output_type_info.get_time_column_for_event(event_column=event_name)
 
     transformers = output_object.target_transformers
     time_kbins_transformer = transformers[time_name]
@@ -321,13 +323,12 @@ def _process_discrete_survival_prediction(
 def _process_cox_survival_prediction(
     output_object: ComputedSurvivalOutputInfo,
     cur_model_outputs: dict[str, torch.Tensor],
+    event_name: str,
 ) -> dict:
     processed_outputs: dict[str, Any] = {}
 
     output_type_info = output_object.output_config.output_type_info
     assert isinstance(output_type_info, schemas.SurvivalOutputTypeConfig)
-
-    event_name = output_type_info.event_column
 
     risk_scores = cur_model_outputs[event_name].cpu().numpy()
 

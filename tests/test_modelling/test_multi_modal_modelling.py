@@ -141,8 +141,8 @@ def get_base_parametrization(
                 {
                     "output_info": {"output_name": "test_output_survival"},
                     "output_type_info": {
-                        "event_column": "BinaryOrigin",
-                        "time_column": "Time",
+                        "event_columns": ["BinaryOrigin"],
+                        "time_columns": ["Time"],
                     },
                 },
             ],

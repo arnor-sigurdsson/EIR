@@ -54,8 +54,8 @@ def get_output_info_generator(
             case ComputedSurvivalOutputInfo():
                 output_type_info = output_object.output_config.output_type_info
                 assert isinstance(output_type_info, SurvivalOutputTypeConfig)
-                event_name = output_type_info.event_column
-                yield output_name, "survival", event_name
+                for event_name in output_type_info.event_columns:
+                    yield output_name, "survival", event_name
             case _:
                 raise TypeError(f"Unknown output object: {output_object}")
 

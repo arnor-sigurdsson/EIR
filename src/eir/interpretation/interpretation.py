@@ -287,7 +287,7 @@ def tabular_attribution_analysis_wrapper(
         if output_type == "survival":
             output_type_info = exp.outputs[output_name].output_config.output_type_info
             assert isinstance(output_type_info, SurvivalOutputTypeConfig)
-            if target_column_name == output_type_info.time_column:
+            if target_column_name in output_type_info.time_columns:
                 continue
 
             if output_type_info.loss_function == "CoxPHLoss":
@@ -967,15 +967,13 @@ def _get_interpretation_data_producer(
         target_labels = batch.target_labels
         match (output_object, column_type):
             case (ComputedSurvivalOutputInfo(), "cat"):
-                # here we inject the *time* target label as the event target label
-                # as we will be looking at attributions towards each output node
-                # (time bin) in the case of discrete survival outputs
                 output_type_info = output_object.output_config.output_type_info
                 assert isinstance(output_type_info, SurvivalOutputTypeConfig)
-                time_column = output_type_info.time_column
-                event_column = output_type_info.event_column
+                time_column = output_type_info.get_time_column_for_event(
+                    event_column=column_name
+                )
                 time_bin = target_labels[output_name][time_column].to(torch.long)
-                target_labels[output_name][event_column] = time_bin
+                target_labels[output_name][column_name] = time_bin
             case (ComputedTabularOutputInfo(), "cat"):
                 output_type_info = output_object.output_config.output_type_info
                 assert isinstance(output_type_info, TabularOutputTypeConfig)

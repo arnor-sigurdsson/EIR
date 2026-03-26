@@ -124,8 +124,8 @@ def _get_pre_trained_module_setup_parametrization() -> dict:
                 {
                     "output_info": {"output_name": "test_output_survival"},
                     "output_type_info": {
-                        "event_column": "BinaryOrigin",
-                        "time_column": "Time",
+                        "event_columns": ["BinaryOrigin"],
+                        "time_columns": ["Time"],
                     },
                 },
             ],
@@ -367,8 +367,8 @@ def _add_new_feature_extractor_to_experiment(
                     {
                         "output_info": {"output_name": "test_output_survival"},
                         "output_type_info": {
-                            "event_column": "BinaryOrigin",
-                            "time_column": "Time",
+                            "event_columns": ["BinaryOrigin"],
+                            "time_columns": ["Time"],
                         },
                     },
                 ],

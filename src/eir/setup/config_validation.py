@@ -176,13 +176,14 @@ def validate_output_configs(output_configs: Sequence[schemas.OutputConfig]) -> N
                         )
 
             case SurvivalOutputTypeConfig(
-                time_column, event_column, num_durations, loss_function, _, _
+                time_columns, event_columns, num_durations, loss_function, _, _
             ):
-                validate_tabular_source(
-                    source_to_check=Path(output_source),
-                    expected_columns=[time_column, event_column],
-                    name="Survival output",
-                )
+                if output_source is not None:
+                    validate_tabular_source(
+                        source_to_check=Path(output_source),
+                        expected_columns=list(time_columns) + list(event_columns),
+                        name="Survival output",
+                    )
 
                 if loss_function == "CoxPHLoss" and num_durations != 0:
                     raise ValueError(

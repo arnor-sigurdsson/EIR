@@ -239,7 +239,7 @@ def calculate_batch_metrics(
             cur_oti = cur_output_object.output_config.output_type_info
             assert isinstance(cur_oti, SurvivalOutputTypeConfig)
 
-            cur_time_name = cur_oti.time_column
+            cur_time_name = cur_oti.get_time_column_for_event(event_column=target_name)
             cur_times = labels[output_name][cur_time_name]
 
             filtered = filter_survival_missing_targets(
@@ -1472,7 +1472,7 @@ def _build_general_metric_info(
             case TabularOutputTypeConfig():
                 targets = list(oti.target_cat_columns) + list(oti.target_con_columns)
             case SurvivalOutputTypeConfig():
-                targets = [oti.event_column]
+                targets = list(oti.event_columns)
             case _:
                 targets = [output_name]
 

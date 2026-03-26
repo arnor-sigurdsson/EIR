@@ -554,8 +554,8 @@ def get_test_survival_base_output_inits(
             "output_source": str(label_file),
         },
         "output_type_info": {
-            "event_column": "Origin",
-            "time_column": "Height",
+            "event_columns": ["Origin"],
+            "time_columns": ["Height"],
         },
         "model_config": {},
     }

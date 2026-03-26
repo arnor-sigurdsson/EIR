@@ -109,9 +109,10 @@ def get_appropriate_target_transformer(
             assert isinstance(output_type_info, SurvivalOutputTypeConfig)
 
             if target_column_type == "cat":
-                target_transformer = output_object.target_transformers[
-                    output_type_info.time_column
-                ]
+                time_column = output_type_info.get_time_column_for_event(
+                    event_column=target_column_name
+                )
+                target_transformer = output_object.target_transformers[time_column]
 
     return target_transformer
 
