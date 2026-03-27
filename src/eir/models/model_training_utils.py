@@ -469,7 +469,12 @@ def get_module_from_path(
     if layer_path in all_named_modules:
         return all_named_modules[layer_path]
 
-    common_prefixes = ["_forward_module.", "module.", "_orig_mod."]
+    common_prefixes = [
+        "_forward_module._orig_mod.",
+        "_forward_module.",
+        "module.",
+        "_orig_mod.",
+    ]
     for prefix in common_prefixes:
         prefixed_path = prefix + layer_path
         if prefixed_path in all_named_modules:
