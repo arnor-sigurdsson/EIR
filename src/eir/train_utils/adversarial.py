@@ -144,7 +144,7 @@ def hook_add_adversarial_losses(
                 stochastic_depth_p=adv_config.stochastic_depth_p,
                 projection_type=adv_config.projection_type,
             )
-            module = module.to(device)
+            module = module.to(device=device, dtype=embedding_sample.dtype)
             adversarial_modules[adv_config.name] = module
 
             logger.debug(
