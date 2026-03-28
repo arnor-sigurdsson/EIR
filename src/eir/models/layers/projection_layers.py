@@ -113,6 +113,7 @@ def get_lcl_projection_layer(
     out_feature_sets_candidates: Sequence[int] = tuple(range(1, 1024 + 1)),
     diff_tolerance: int = 0,
     kernel_width_divisible_by: int | None = None,
+    full_preactivation: bool = False,
 ) -> LCLResidualBlock | LCL | None:
     layer_class: type[LCLResidualBlock] | type[LCL]
     match layer_type:
@@ -140,11 +141,16 @@ def get_lcl_projection_layer(
         return None
 
     best_kernel_size, best_out_feature_sets = solution
-    best_layer = layer_class(
-        in_features=input_dimension,
-        kernel_size=best_kernel_size,
-        out_feature_sets=best_out_feature_sets,
-    )
+
+    kwargs: dict = {
+        "in_features": input_dimension,
+        "kernel_size": best_kernel_size,
+        "out_feature_sets": best_out_feature_sets,
+    }
+    if layer_type == "lcl_residual":
+        kwargs["full_preactivation"] = full_preactivation
+
+    best_layer = layer_class(**kwargs)
 
     return best_layer
 

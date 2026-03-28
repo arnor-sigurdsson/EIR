@@ -68,6 +68,14 @@ class TensorMessageConfig:
     :param kernel_width_divisible_by:
         For LCL-based projections, constrain kernel width to be divisible by this value.
 
+    :param projection_first_block_full_preactivation:
+        Whether the first residual block in the projection chain should use
+        full pre-activation (normalizing both main and identity branches).
+        Set to True when the source tensor is raw/unnormalized (e.g., output
+        of a linear layer with no preceding normalization or activation).
+        Set to False when the source tensor is already well-conditioned
+        (e.g., output of a residual block).
+
     :param cache_dropout_p:
         Probability of dropping cached tensor injection during training. When set to
         a value > 0, the cached tensor will be randomly skipped during forward pass
@@ -85,6 +93,7 @@ class TensorMessageConfig:
     projection_type: al_broker_projection_types = "lcl"
     kernel_width_divisible_by: int | None = None
     projection_lcl_residual_blocks: bool = False
+    projection_first_block_full_preactivation: bool = True
     cache_dropout_p: float = 0.0
 
 
