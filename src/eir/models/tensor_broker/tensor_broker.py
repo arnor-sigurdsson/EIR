@@ -379,7 +379,6 @@ def get_tensor_broker(
                         projection_type=tmc.projection_type,
                         kernel_width_divisible_by=tmc.kernel_width_divisible_by,
                         projection_lcl_residual_blocks=tmc.projection_lcl_residual_blocks,
-                        projection_first_block_full_preactivation=tmc.projection_first_block_full_preactivation,
                     )
                     have_been_used_from_cache.add(from_name)
 

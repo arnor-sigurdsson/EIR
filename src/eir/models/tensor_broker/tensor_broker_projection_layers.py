@@ -33,7 +33,6 @@ def get_projection_layer(
     projection_type: al_broker_projection_types,
     kernel_width_divisible_by: int | None = None,
     projection_lcl_residual_blocks: bool = False,
-    projection_first_block_full_preactivation: bool = True,
 ) -> tuple[nn.Module, torch.Size]:
     """
     We have the cache_fusion_type input (currently mostly unused) and we return the
@@ -88,10 +87,9 @@ def get_projection_layer(
             mlp_input_target = target_dim
 
             if projection_lcl_residual_blocks:
+                projection_layers.append(nn.GELU())
+
                 cur_dim = input_dim
-                is_first_block = projection_first_block_full_preactivation
-                if is_first_block:
-                    projection_layers.append(nn.GELU())
                 while cur_dim // 4 > mlp_input_target:
                     halve_target = cur_dim // 4
                     block = get_lcl_projection_layer(
@@ -100,19 +98,11 @@ def get_projection_layer(
                         layer_type="lcl_residual",
                         diff_tolerance=cur_dim // 100,
                         kernel_width_divisible_by=kernel_width_divisible_by,
-                        full_preactivation=is_first_block,
                     )
                     if block is not None:
                         projection_layers.append(block)
                         cur_dim = block.out_features
-                        is_first_block = False
                     else:
-                        if is_first_block:
-                            projection_layers.append(
-                                nn.RMSNorm(normalized_shape=cur_dim)
-                            )
-                            is_first_block = False
-
                         fallback = get_1d_projection_layer(
                             input_dimension=cur_dim,
                             target_dimension=halve_target,
@@ -123,10 +113,8 @@ def get_projection_layer(
                         projection_layers.append(fallback)
                         cur_dim = halve_target
             else:
-                is_first_block = False
-                if projection_first_block_full_preactivation:
-                    projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
-                    projection_layers.append(nn.GELU())
+                projection_layers.append(nn.GELU())
+                projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
 
                 try:
                     lcl_projection_layer = get_1d_projection_layer(
@@ -137,9 +125,6 @@ def get_projection_layer(
                         kernel_width_divisible_by=kernel_width_divisible_by,
                     )
                 except ValueError:
-                    # Sometimes we cannot create are reasonable LCL projection
-                    # e.g. if target dim is much larger tha input dim so we have this
-                    # fallback
                     lcl_projection_layer = get_1d_projection_layer(
                         input_dimension=input_dim,
                         target_dimension=mlp_input_target,
@@ -155,7 +140,6 @@ def get_projection_layer(
                 in_features=cur_dim,
                 out_features=target_dim,
                 dropout_p=0.0,
-                full_preactivation=is_first_block,
                 stochastic_depth_p=0.0,
             )
             projection_layers.append(mlp_residual_block)
@@ -169,7 +153,6 @@ def get_projection_layer(
                 in_features=input_dim,
                 out_features=target_dim,
                 dropout_p=0.0,
-                full_preactivation=True,
                 stochastic_depth_p=0.0,
                 reduce_at_fc_1=False,
             )

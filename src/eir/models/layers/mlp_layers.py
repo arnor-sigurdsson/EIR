@@ -72,17 +72,18 @@ class MLPResidualBlock(nn.Module):
             bias=False,
         )
 
+        self._norm_identity = full_preactivation or (in_features != out_features)
         self.downsample_identity: nn.Module
-        if in_features == out_features:
-            self.downsample_identity = nn.Identity()
-            ls_init = 1e-05
-        else:
+        if in_features != out_features:
             self.downsample_identity = nn.Linear(
                 in_features=in_features,
                 out_features=out_features,
                 bias=True,
             )
             ls_init = 1.0
+        else:
+            self.downsample_identity = nn.Identity()
+            ls_init = 1e-05
 
         self.ls = LayerScale(
             dim=out_features,
@@ -97,7 +98,7 @@ class MLPResidualBlock(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.norm_1(x)
 
-        identity = out if self.full_preactivation else x
+        identity = out if self._norm_identity else x
         identity = self.downsample_identity(identity)
 
         out = self.fc_1(out)

@@ -168,22 +168,24 @@ class LCLResidualBlock(nn.Module):
         # in contrast to what we do in the standard MLP blocks
         self.ls = LayerScale(dim=self.out_features, init_values=1.0)
 
-        if in_features == self.out_features:
-            self.downsample_identity = lambda x: x
-        else:
+        self._norm_identity = full_preactivation or (in_features != self.out_features)
+        self.downsample_identity: nn.Module
+        if in_features != self.out_features:
             self.downsample_identity = LCL(
                 in_features=self.in_features,
                 out_feature_sets=1,
                 bias=True,
                 num_chunks=self.fc_2.out_features,
             )
+        else:
+            self.downsample_identity = nn.Identity()
 
         self.stochastic_depth = StochasticDepth(p=stochastic_depth_p, mode="batch")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.norm_1(x)
 
-        identity = out if self.full_preactivation else x
+        identity = out if self._norm_identity else x
         identity = self.downsample_identity(identity)
 
         out = self.fc_1(out)

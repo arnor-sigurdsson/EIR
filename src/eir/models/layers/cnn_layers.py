@@ -194,6 +194,12 @@ class CNNResidualBlockBase(nn.Module):
         stochastic_depth_p: float = 0.0,
         conv_downsample_identity: bool = True,
     ):
+        """
+        TODO:   Look into adding a dynamic addition of a norm under downsample identity
+                (if dimensions are being changed in the downsample),
+                similar to what we have e.g. in MLPResidualBlock currently.
+
+        """
         super().__init__()
 
         self.in_channels = in_channels
