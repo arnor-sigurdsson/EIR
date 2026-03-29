@@ -384,7 +384,7 @@ def get_tensor_broker(
                     cache_target=layer_cache_target,
                 )
 
-    have_been_used_from_cache = set()
+    have_been_used_from_cache: set[str] = set()
     for config in all_configs:
         if not config.tensor_broker_config:
             continue
@@ -440,6 +440,7 @@ def _setup_sequential_hooks(
     tensor_cache: dict[str, CachedTensor],
     device: str,
 ) -> None:
+    assert tmc.use_from_cache is not None
     for from_name in tmc.use_from_cache:
         cached_meta = have_been_cached_mapping[from_name]
         from_path = cached_meta.layer_path
@@ -519,6 +520,7 @@ def _setup_multi_source_aggregation(
     from_paths: list[str] = []
     source_names: list[str] = []
 
+    assert tmc.use_from_cache is not None
     for from_name in tmc.use_from_cache:
         cached_meta = have_been_cached_mapping[from_name]
         from_path = cached_meta.layer_path
