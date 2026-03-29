@@ -15,6 +15,7 @@ al_broker_projection_types = Literal[
 ]
 
 al_broker_fusion_types = Literal["cross-attention", "sum", "cat+conv", "additive"]
+al_multi_source_aggregation_types = Literal["attention"]
 
 
 @dataclass
@@ -68,6 +69,16 @@ class TensorMessageConfig:
     :param kernel_width_divisible_by:
         For LCL-based projections, constrain kernel width to be divisible by this value.
 
+    :param multi_source_aggregation:
+        When set, all entries in ``use_from_cache`` are projected individually and
+        then aggregated into a single tensor before being fused with the target.
+        Currently supports:
+
+        - ``attention``: Softmax attention over sources using a learned query vector.
+
+        When ``None`` (default), the current behavior is preserved: each source
+        gets its own sequential hook.
+
     :param cache_dropout_p:
         Probability of dropping cached tensor injection during training. When set to
         a value > 0, the cached tensor will be randomly skipped during forward pass
@@ -85,6 +96,7 @@ class TensorMessageConfig:
     projection_type: al_broker_projection_types = "lcl"
     kernel_width_divisible_by: int | None = None
     projection_lcl_residual_blocks: bool = False
+    multi_source_aggregation: "al_multi_source_aggregation_types | None" = None
     cache_dropout_p: float = 0.0
 
 

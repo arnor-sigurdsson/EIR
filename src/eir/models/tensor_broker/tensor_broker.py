@@ -22,6 +22,9 @@ from eir.models.meta.meta_utils import (
     run_meta_forward,
 )
 from eir.models.tensor_broker.tensor_broker_fusion_layers import (
+    MultiSourceAttentionAggregation,
+    MultiSourceProjectAndFuseLayer,
+    get_fusion_layer,
     get_fusion_layer_wrapper,
 )
 from eir.models.tensor_broker.tensor_broker_projection_layers import (
@@ -29,6 +32,7 @@ from eir.models.tensor_broker.tensor_broker_projection_layers import (
 )
 from eir.setup.input_setup import al_input_objects_as_dict
 from eir.setup.output_setup import al_output_objects_as_dict
+from eir.setup.schema_modules.tensor_broker_schemas import TensorMessageConfig
 from eir.setup.schemas import FusionConfig, InputConfig, OutputConfig
 from eir.train_utils.step_logic import (
     al_dataloader_getitem_batch,
@@ -257,6 +261,52 @@ def attach_tensor_broker_module_injection(
     return remove_hook
 
 
+def attach_multi_source_tensor_broker_injection(
+    target_module: nn.Module,
+    tensor_broker_module: MultiSourceProjectAndFuseLayer,
+    tensor_cache: dict[str, CachedTensor],
+    tensor_cache_keys: list[str],
+    cache_dropout_p: float = 0.0,
+) -> Callable[[], None]:
+    def hook(
+        module: nn.Module,
+        args: tuple[torch.Tensor, ...],
+        kwargs: dict[str, torch.Tensor],
+    ) -> tuple[tuple[torch.Tensor, ...], dict[str, torch.Tensor]]:
+        if len(args) > 0:
+            input_tensor = args[0]
+        else:
+            x = kwargs.get("x")
+            input_key = kwargs.get("input")
+            if x is not None:
+                input_tensor = x
+            elif input_key is not None:
+                input_tensor = input_key
+            else:
+                raise ValueError("No input tensor found in args or kwargs.")
+
+        if module.training and cache_dropout_p > 0.0:
+            if torch.rand(1).item() < cache_dropout_p:
+                return args, kwargs
+
+        cached_tensors = [tensor_cache[key].tensor for key in tensor_cache_keys]
+        tensor_broker_out = tensor_broker_module(input_tensor, cached_tensors)
+
+        if len(args) > 0:
+            new_args = (tensor_broker_out,) + args[1:]
+            return new_args, kwargs
+        new_kwargs = kwargs.copy()
+        new_kwargs["x" if "x" in kwargs else "input"] = tensor_broker_out
+        return args, new_kwargs
+
+    handle = target_module.register_forward_pre_hook(hook, with_kwargs=True)
+
+    def remove_hook():
+        handle.remove()
+
+    return remove_hook
+
+
 def get_tensor_broker(
     input_objects: al_input_objects_as_dict,
     output_objects: al_output_objects_as_dict,
@@ -344,64 +394,185 @@ def get_tensor_broker(
             to_name = tmc.name
 
             if tmc.use_from_cache:
-                # For each `from_name`, a forward pre-hook is attached to
-                # the target module.
-                # If multiple hooks are attached to the same module,
-                # PyTorch executes them  sequentially in the order of registration.
-                # The output of one hook becomes the input for the next,
-                # creating a "chain of fusions"
-                for from_name in tmc.use_from_cache:
-                    cached_meta = have_been_cached_mapping[from_name]
-                    from_path = cached_meta.layer_path
-                    message_name = f"{from_name}>>>{to_name}: {from_path}>>>{to_path}"
-                    message_name = message_name.replace(".", "--")
-
-                    if cached_meta.cache_target == "output":
-                        from_shape_no_batch = output_shapes[from_path]
-                    else:
-                        from_shape_no_batch = input_shapes[from_path]
-
-                    msg = (
-                        f"When setting up message '{message_name}', "
-                        f"the destination path "
-                        f"'{to_path}' was not found as a module in the model."
-                    )
-                    to_shape_no_batch = fuzzy_dict_lookup(
-                        d=input_shapes,
-                        key=to_path,
-                        custom_prefix_message=msg,
-                    )
-
-                    projection_layer, projected_shape = get_projection_layer(
-                        from_shape_no_batch=from_shape_no_batch,
-                        to_shape_no_batch=to_shape_no_batch,
-                        cache_fusion_type=tmc.cache_fusion_type,
-                        projection_type=tmc.projection_type,
-                        kernel_width_divisible_by=tmc.kernel_width_divisible_by,
-                        projection_lcl_residual_blocks=tmc.projection_lcl_residual_blocks,
-                    )
-                    have_been_used_from_cache.add(from_name)
-
-                    fusion_layer = get_fusion_layer_wrapper(
-                        projected_shape=projected_shape,
-                        target_shape=to_shape_no_batch,
-                        cache_fusion_type=tmc.cache_fusion_type,
-                        projection_layer=projection_layer,
+                if tmc.multi_source_aggregation is not None:
+                    _setup_multi_source_aggregation(
+                        tmc=tmc,
+                        to_path=to_path,
+                        to_name=to_name,
+                        have_been_cached_mapping=have_been_cached_mapping,
+                        have_been_used_from_cache=have_been_used_from_cache,
+                        output_shapes=output_shapes,
+                        input_shapes=input_shapes,
+                        all_named_modules=all_named_modules,
+                        tensor_broker_modules=tensor_broker_modules,
+                        tensor_cache=tensor_cache,
                         device=device,
                     )
-
-                    tensor_broker_modules[message_name] = fusion_layer
-
-                    attach_tensor_broker_module_injection(
-                        target_module=all_named_modules[to_path],
-                        tensor_broker_module=fusion_layer,
+                else:
+                    _setup_sequential_hooks(
+                        tmc=tmc,
+                        to_path=to_path,
+                        to_name=to_name,
+                        have_been_cached_mapping=have_been_cached_mapping,
+                        have_been_used_from_cache=have_been_used_from_cache,
+                        output_shapes=output_shapes,
+                        input_shapes=input_shapes,
+                        all_named_modules=all_named_modules,
+                        tensor_broker_modules=tensor_broker_modules,
                         tensor_cache=tensor_cache,
-                        tensor_cache_key=from_path,
-                        cache_dropout_p=tmc.cache_dropout_p,
+                        device=device,
                     )
 
     tensor_broker_modules = tensor_broker_modules
     return tensor_broker_modules
+
+
+def _setup_sequential_hooks(
+    tmc: TensorMessageConfig,
+    to_path: str,
+    to_name: str,
+    have_been_cached_mapping: dict[str, CachedTensorMeta],
+    have_been_used_from_cache: set[str],
+    output_shapes: dict[str, torch.Size],
+    input_shapes: dict[str, torch.Size],
+    all_named_modules: dict[str, nn.Module],
+    tensor_broker_modules: nn.ModuleDict,
+    tensor_cache: dict[str, CachedTensor],
+    device: str,
+) -> None:
+    for from_name in tmc.use_from_cache:
+        cached_meta = have_been_cached_mapping[from_name]
+        from_path = cached_meta.layer_path
+        message_name = f"{from_name}>>>{to_name}: {from_path}>>>{to_path}"
+        message_name = message_name.replace(".", "--")
+
+        if cached_meta.cache_target == "output":
+            from_shape_no_batch = output_shapes[from_path]
+        else:
+            from_shape_no_batch = input_shapes[from_path]
+
+        msg = (
+            f"When setting up message '{message_name}', "
+            f"the destination path "
+            f"'{to_path}' was not found as a module in the model."
+        )
+        to_shape_no_batch = fuzzy_dict_lookup(
+            d=input_shapes,
+            key=to_path,
+            custom_prefix_message=msg,
+        )
+
+        projection_layer, projected_shape = get_projection_layer(
+            from_shape_no_batch=from_shape_no_batch,
+            to_shape_no_batch=to_shape_no_batch,
+            cache_fusion_type=tmc.cache_fusion_type,
+            projection_type=tmc.projection_type,
+            kernel_width_divisible_by=tmc.kernel_width_divisible_by,
+            projection_lcl_residual_blocks=tmc.projection_lcl_residual_blocks,
+        )
+        have_been_used_from_cache.add(from_name)
+
+        fusion_layer = get_fusion_layer_wrapper(
+            projected_shape=projected_shape,
+            target_shape=to_shape_no_batch,
+            cache_fusion_type=tmc.cache_fusion_type,
+            projection_layer=projection_layer,
+            device=device,
+        )
+
+        tensor_broker_modules[message_name] = fusion_layer
+
+        attach_tensor_broker_module_injection(
+            target_module=all_named_modules[to_path],
+            tensor_broker_module=fusion_layer,
+            tensor_cache=tensor_cache,
+            tensor_cache_key=from_path,
+            cache_dropout_p=tmc.cache_dropout_p,
+        )
+
+
+def _setup_multi_source_aggregation(
+    tmc: TensorMessageConfig,
+    to_path: str,
+    to_name: str,
+    have_been_cached_mapping: dict[str, CachedTensorMeta],
+    have_been_used_from_cache: set[str],
+    output_shapes: dict[str, torch.Size],
+    input_shapes: dict[str, torch.Size],
+    all_named_modules: dict[str, nn.Module],
+    tensor_broker_modules: nn.ModuleDict,
+    tensor_cache: dict[str, CachedTensor],
+    device: str,
+) -> None:
+    msg = (
+        f"When setting up multi-source aggregation for '{to_name}', "
+        f"the destination path "
+        f"'{to_path}' was not found as a module in the model."
+    )
+    to_shape_no_batch = fuzzy_dict_lookup(
+        d=input_shapes,
+        key=to_path,
+        custom_prefix_message=msg,
+    )
+
+    projection_layers: list[nn.Module] = []
+    from_paths: list[str] = []
+    source_names: list[str] = []
+
+    for from_name in tmc.use_from_cache:
+        cached_meta = have_been_cached_mapping[from_name]
+        from_path = cached_meta.layer_path
+
+        if cached_meta.cache_target == "output":
+            from_shape_no_batch = output_shapes[from_path]
+        else:
+            from_shape_no_batch = input_shapes[from_path]
+
+        projection_layer, _ = get_projection_layer(
+            from_shape_no_batch=from_shape_no_batch,
+            to_shape_no_batch=to_shape_no_batch,
+            cache_fusion_type=tmc.cache_fusion_type,
+            projection_type=tmc.projection_type,
+            kernel_width_divisible_by=tmc.kernel_width_divisible_by,
+            projection_lcl_residual_blocks=tmc.projection_lcl_residual_blocks,
+        )
+
+        projection_layers.append(projection_layer)
+        from_paths.append(from_path)
+        source_names.append(from_name)
+        have_been_used_from_cache.add(from_name)
+
+    feature_dim = to_shape_no_batch.numel()
+    aggregation_layer = MultiSourceAttentionAggregation(
+        feature_dim=feature_dim,
+        num_sources=len(projection_layers),
+    )
+
+    fusion_layer = get_fusion_layer(
+        projected_shape=to_shape_no_batch,
+        target_shape=to_shape_no_batch,
+        cache_fusion_type=tmc.cache_fusion_type,
+    )
+
+    multi_source_module = MultiSourceProjectAndFuseLayer(
+        projection_layers=nn.ModuleList(projection_layers),
+        aggregation_layer=aggregation_layer,
+        fusion_layer=fusion_layer,
+    )
+
+    sources_str = "+".join(source_names)
+    message_name = f"{sources_str}>>>{to_name}: multi_source>>>{to_path}"
+    message_name = message_name.replace(".", "--")
+
+    tensor_broker_modules[message_name] = multi_source_module
+
+    attach_multi_source_tensor_broker_injection(
+        target_module=all_named_modules[to_path],
+        tensor_broker_module=multi_source_module,
+        tensor_cache=tensor_cache,
+        tensor_cache_keys=from_paths,
+        cache_dropout_p=tmc.cache_dropout_p,
+    )
 
 
 def fuzzy_dict_lookup(

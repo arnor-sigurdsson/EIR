@@ -339,6 +339,17 @@ def validate_tensor_broker_configs(
                     f"Message '{msg.name}' uses {msg.projection_type}."
                 )
 
+    for broker_config in all_tensor_broker_configs:
+        for msg in broker_config.message_configs:
+            if msg.multi_source_aggregation is not None:
+                if not msg.use_from_cache or len(msg.use_from_cache) < 2:
+                    raise ValueError(
+                        f"Message '{msg.name}' has multi_source_aggregation="
+                        f"'{msg.multi_source_aggregation}' but use_from_cache "
+                        f"must contain at least 2 sources. "
+                        f"Got: {msg.use_from_cache}."
+                    )
+
     cached_messages = set()
     used_messages = set()
     for broker_config in all_tensor_broker_configs:

@@ -228,6 +228,51 @@ class ConcatenationFusionLayer(nn.Module):
         return out + residual
 
 
+class MultiSourceAttentionAggregation(nn.Module):
+    def __init__(self, feature_dim: int, num_sources: int):
+        super().__init__()
+        self.feature_dim = feature_dim
+        self.num_sources = num_sources
+        self.query = nn.Parameter(torch.zeros(feature_dim))
+        self.key_norm = nn.RMSNorm(normalized_shape=feature_dim)
+
+    def extra_repr(self) -> str:
+        return f"feature_dim={self.feature_dim}, num_sources={self.num_sources}"
+
+    def forward(self, sources: list[torch.Tensor]) -> torch.Tensor:
+        stacked = torch.stack(sources, dim=1)
+        keys = self.key_norm(stacked)
+        logits = torch.einsum("d, b k d -> b k", self.query, keys)
+        weights = torch.softmax(logits, dim=1)
+        out = torch.einsum("b k, b k d -> b d", weights, stacked)
+        return out
+
+
+class MultiSourceProjectAndFuseLayer(nn.Module):
+    def __init__(
+        self,
+        projection_layers: nn.ModuleList,
+        aggregation_layer: MultiSourceAttentionAggregation,
+        fusion_layer: nn.Module,
+    ):
+        super().__init__()
+        self.projection_layers = projection_layers
+        self.aggregation_layer = aggregation_layer
+        self.fusion_layer = fusion_layer
+
+    def forward(
+        self,
+        input_tensor: torch.Tensor,
+        cached_tensors: list[torch.Tensor],
+    ) -> torch.Tensor:
+        projected = [
+            proj(ct)
+            for proj, ct in zip(self.projection_layers, cached_tensors, strict=True)
+        ]
+        aggregated = self.aggregation_layer(sources=projected)
+        return self.fusion_layer(input_tensor, aggregated)
+
+
 class CrossAttentionFusionLayer(nn.Module):
     def __init__(
         self,
