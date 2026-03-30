@@ -319,6 +319,17 @@ def get_tensor_broker(
     output_configs: Sequence[OutputConfig],
     device: str,
 ) -> nn.ModuleDict:
+    """
+
+    Hook execution order per module during forward pass:
+
+      1. Inject pre-hook (reads from cache, fuses with input)
+      2. Module forward() (runs on the fused input)
+      3. Store forward hook (caches the output)
+
+    Cached outputs from a layer therefore always include any injected tensors.
+
+    """
     tensor_broker_modules = nn.ModuleDict()
     all_configs = list(input_configs) + list(fusion_configs) + list(output_configs)
 
