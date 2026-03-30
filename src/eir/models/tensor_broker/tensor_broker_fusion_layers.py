@@ -176,7 +176,7 @@ class GatedSumFusionLayer(nn.Module):
         )
         gate = torch.sigmoid(gate_logits)
 
-        output = gate * input_tensor + (1.0 - gate) * projected_context_tensor
+        output = input_tensor + gate * projected_context_tensor
         return output
 
 
