@@ -138,14 +138,14 @@ def get_projection_layer(
 
             mlp_residual_block = MLPResidualBlock(
                 in_features=cur_dim,
-                out_features=cur_dim,
+                out_features=target_dim,
                 dropout_p=0.0,
                 stochastic_depth_p=0.0,
             )
             projection_layers.append(mlp_residual_block)
 
-            final_norm = nn.RMSNorm(normalized_shape=cur_dim)
-            final_proj = nn.Linear(in_features=cur_dim, out_features=target_dim)
+            final_norm = nn.RMSNorm(normalized_shape=target_dim)
+            final_proj = nn.Linear(in_features=target_dim, out_features=target_dim)
 
             projection_layers.append(final_norm)
             projection_layers.append(final_proj)
@@ -158,15 +158,15 @@ def get_projection_layer(
 
             projection_layer = MLPResidualBlock(
                 in_features=input_dim,
-                out_features=input_dim,
+                out_features=target_dim,
                 dropout_p=0.0,
                 stochastic_depth_p=0.0,
                 reduce_at_fc_1=False,
             )
             projection_layers.append(projection_layer)
 
-            final_norm = nn.RMSNorm(normalized_shape=input_dim)
-            final_proj = nn.Linear(in_features=input_dim, out_features=target_dim)
+            final_norm = nn.RMSNorm(normalized_shape=target_dim)
+            final_proj = nn.Linear(in_features=target_dim, out_features=target_dim)
 
             projection_layers.append(final_norm)
             projection_layers.append(final_proj)
