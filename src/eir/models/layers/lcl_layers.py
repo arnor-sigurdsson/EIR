@@ -88,10 +88,11 @@ class LCL(nn.Module):
         )
 
     def forward(self, input: torch.Tensor):
-        input_padded = F.pad(input=input, pad=[0, self.padding, 0, 0])
+        if self.padding > 0:
+            input = F.pad(input=input, pad=[0, self.padding, 0, 0])
 
-        input_reshaped = input_padded.reshape(
-            input.shape[0], 1, self.num_chunks, self.kernel_size
+        input_reshaped = input.reshape(
+            input.shape[0], self.num_chunks, self.kernel_size
         )
 
         out = calc_lcl_forward(input=input_reshaped, weight=self.weight, bias=self.bias)
@@ -109,7 +110,7 @@ def calc_lcl_forward(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tens
     s: kernel size (width)
     o: output sets
     """
-    summed = torch.einsum("nhw, ohw -> noh", input.squeeze(1), weight)
+    summed = torch.einsum("nhw, ohw -> noh", input, weight)
     flattened = summed.flatten(start_dim=1)
 
     final = flattened

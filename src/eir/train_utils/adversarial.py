@@ -144,7 +144,7 @@ def hook_add_adversarial_losses(
                 stochastic_depth_p=adv_config.stochastic_depth_p,
                 projection_type=adv_config.projection_type,
             )
-            module = module.to(device)
+            module = module.to(device=device)
             adversarial_modules[adv_config.name] = module
 
             logger.debug(
@@ -156,15 +156,14 @@ def hook_add_adversarial_losses(
 
         adversarial_state["modules"] = adversarial_modules
 
+        all_adversarial_params = []
         total_params = 0
-        for module_name, module in adversarial_modules.items():
-            total_params += sum(
-                p.numel() for p in module.parameters() if p.requires_grad
-            )
-            experiment.optimizer.add_param_group({"params": module.parameters()})
-            logger.debug(
-                "Added adversarial module '%s' parameters to optimizer", module_name
-            )
+        for _module_name, module in adversarial_modules.items():
+            module_params = [p for p in module.parameters() if p.requires_grad]
+            total_params += sum(p.numel() for p in module_params)
+            all_adversarial_params.extend(module_params)
+
+        experiment.optimizer.add_param_group({"params": all_adversarial_params})
 
         logger.info(
             "Added %d adversarial modules to optimizer with %d parameters",
@@ -177,42 +176,43 @@ def hook_add_adversarial_losses(
     current_iteration = state["iteration"]
 
     scaled_adversarial_losses = []
-    for adv_config in adversarial_configs:
-        if not adv_config.enabled:
-            continue
+    with experiment.fabric.autocast():
+        for adv_config in adversarial_configs:
+            if not adv_config.enabled:
+                continue
 
-        adversarial_module = adversarial_modules[adv_config.name]
+            adversarial_module = adversarial_modules[adv_config.name]
 
-        embedding_cache_key = f"{adv_config.name}_embedding"
-        target_cache_key = f"{adv_config.name}_target"
+            embedding_cache_key = f"{adv_config.name}_embedding"
+            target_cache_key = f"{adv_config.name}_target"
 
-        embedding = adversarial_cache[embedding_cache_key]
-        target = adversarial_cache[target_cache_key]
+            embedding = adversarial_cache[embedding_cache_key]
+            target = adversarial_cache[target_cache_key]
 
-        embedding_flat = embedding.view(embedding.size(0), -1)
-        target_flat = target.view(target.size(0), -1)
+            embedding_flat = embedding.view(embedding.size(0), -1)
+            target_flat = target.view(target.size(0), -1)
 
-        adv_loss = adversarial_module(
-            embedding=embedding_flat,
-            target=target_flat,
-        )
+            adv_loss = adversarial_module(
+                embedding=embedding_flat,
+                target=target_flat,
+            )
 
-        warmup_factor = min(1.0, current_iteration / adv_config.warmup_steps)
-        current_lambda = adv_config.lambda_adv * warmup_factor
+            warmup_factor = min(1.0, current_iteration / adv_config.warmup_steps)
+            current_lambda = adv_config.lambda_adv * warmup_factor
 
-        scaled_adv_loss = current_lambda * adv_loss
+            scaled_adv_loss = current_lambda * adv_loss
 
-        scaled_adversarial_losses.append(scaled_adv_loss)
+            scaled_adversarial_losses.append(scaled_adv_loss)
 
-        state["losses"][f"adversarial_{adv_config.name}"] = adv_loss.item()
-        state["losses"][f"adversarial_{adv_config.name}_lambda"] = current_lambda
+            state["losses"][f"adversarial_{adv_config.name}"] = adv_loss.item()
+            state["losses"][f"adversarial_{adv_config.name}_lambda"] = current_lambda
 
-    if scaled_adversarial_losses:
-        total_adversarial_loss = torch.stack(scaled_adversarial_losses).mean()
-    else:
-        total_adversarial_loss = torch.tensor(0.0, device=device)
+        if scaled_adversarial_losses:
+            total_adversarial_loss = torch.stack(scaled_adversarial_losses).mean()
+        else:
+            total_adversarial_loss = torch.tensor(0.0, device=device)
 
-    state["loss"] = state["loss"] + total_adversarial_loss
+        state["loss"] = state["loss"] + total_adversarial_loss
 
     if isinstance(total_adversarial_loss, torch.Tensor):
         state["losses"]["adversarial_total"] = total_adversarial_loss.item()

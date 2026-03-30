@@ -424,6 +424,7 @@ def train(experiment: Experiment) -> None:
     if not in_dist or (in_dist and in_master):
         trainer = configure_trainer(trainer=trainer, experiment=experiment)
 
+    exp.model.train()
     logger.info("Starting training.")
     trainer.run(data=exp.train_loader, max_epochs=gc.be.n_epochs)
 
@@ -438,7 +439,6 @@ def get_base_trainer(experiment: Experiment) -> Engine:
         """
         The output here goes to trainer.output.
         """
-        experiment.model.train()
         experiment.optimizer.zero_grad()
 
         base_prepare_inputs_stage = step_hooks.base_prepare_batch
