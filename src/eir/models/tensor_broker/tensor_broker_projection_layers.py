@@ -146,6 +146,8 @@ def get_projection_layer(
 
             final_norm = nn.RMSNorm(normalized_shape=target_dim)
             final_proj = nn.Linear(in_features=target_dim, out_features=target_dim)
+            nn.init.eye_(final_proj.weight)
+            nn.init.zeros_(final_proj.bias)
 
             projection_layers.append(final_norm)
             projection_layers.append(final_proj)
@@ -167,6 +169,8 @@ def get_projection_layer(
 
             final_norm = nn.RMSNorm(normalized_shape=target_dim)
             final_proj = nn.Linear(in_features=target_dim, out_features=target_dim)
+            nn.init.eye_(final_proj.weight)
+            nn.init.zeros_(final_proj.bias)
 
             projection_layers.append(final_norm)
             projection_layers.append(final_proj)
