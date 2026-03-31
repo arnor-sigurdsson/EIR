@@ -144,14 +144,6 @@ def get_projection_layer(
             )
             projection_layers.append(mlp_residual_block)
 
-            final_norm = nn.RMSNorm(normalized_shape=target_dim)
-            final_proj = nn.Linear(in_features=target_dim, out_features=target_dim)
-            nn.init.eye_(final_proj.weight)
-            nn.init.zeros_(final_proj.bias)
-
-            projection_layers.append(final_norm)
-            projection_layers.append(final_proj)
-
             projected_shape = to_shape_no_batch
 
         case "mlp_residual":
@@ -166,15 +158,6 @@ def get_projection_layer(
                 reduce_at_fc_1=False,
             )
             projection_layers.append(projection_layer)
-
-            final_norm = nn.RMSNorm(normalized_shape=target_dim)
-            final_proj = nn.Linear(in_features=target_dim, out_features=target_dim)
-            nn.init.eye_(final_proj.weight)
-            nn.init.zeros_(final_proj.bias)
-
-            projection_layers.append(final_norm)
-            projection_layers.append(final_proj)
-
             projected_shape = to_shape_no_batch
 
         case "cnn":
