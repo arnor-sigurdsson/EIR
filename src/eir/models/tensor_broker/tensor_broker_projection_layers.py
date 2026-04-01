@@ -87,7 +87,7 @@ def get_projection_layer(
             mlp_input_target = target_dim
 
             if projection_lcl_residual_blocks:
-                projection_layers.append(nn.GELU())
+                projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
 
                 cur_dim = input_dim
                 while cur_dim // 4 > mlp_input_target:
@@ -113,8 +113,8 @@ def get_projection_layer(
                         projection_layers.append(fallback)
                         cur_dim = halve_target
             else:
-                projection_layers.append(nn.GELU())
                 projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
+                projection_layers.append(nn.GELU())
 
                 try:
                     lcl_projection_layer = get_1d_projection_layer(
