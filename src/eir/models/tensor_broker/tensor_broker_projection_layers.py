@@ -114,7 +114,6 @@ def get_projection_layer(
                         cur_dim = halve_target
             else:
                 projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
-                projection_layers.append(nn.GELU())
 
                 try:
                     lcl_projection_layer = get_1d_projection_layer(
@@ -134,6 +133,7 @@ def get_projection_layer(
                     )
 
                 projection_layers.append(lcl_projection_layer)
+                projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
                 cur_dim = mlp_input_target
 
             mlp_residual_block = MLPResidualBlock(
