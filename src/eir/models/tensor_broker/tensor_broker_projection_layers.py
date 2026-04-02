@@ -133,7 +133,7 @@ def get_projection_layer(
                     )
 
                 projection_layers.append(lcl_projection_layer)
-                projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
+                projection_layers.append(nn.RMSNorm(normalized_shape=mlp_input_target))
                 cur_dim = mlp_input_target
 
             mlp_residual_block = MLPResidualBlock(
