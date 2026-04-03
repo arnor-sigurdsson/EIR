@@ -153,12 +153,18 @@ def get_projection_layer(
 
             projection_layer = MLPResidualBlock(
                 in_features=input_dim,
-                out_features=target_dim,
+                out_features=input_dim,
                 dropout_p=0.1,
                 stochastic_depth_p=0.1,
                 reduce_at_fc_1=False,
             )
             projection_layers.append(projection_layer)
+
+            projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
+            projection_layers.append(
+                nn.Linear(in_features=input_dim, out_features=target_dim)
+            )
+
             projected_shape = to_shape_no_batch
 
         case "cnn":
