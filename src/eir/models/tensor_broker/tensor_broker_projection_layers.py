@@ -98,6 +98,7 @@ def get_projection_layer(
                         layer_type="lcl_residual",
                         diff_tolerance=cur_dim // 100,
                         kernel_width_divisible_by=kernel_width_divisible_by,
+                        dropout_p=0.1,
                     )
                     if block is not None:
                         projection_layers.append(block)
@@ -139,8 +140,8 @@ def get_projection_layer(
             mlp_residual_block = MLPResidualBlock(
                 in_features=cur_dim,
                 out_features=target_dim,
-                dropout_p=0.0,
-                stochastic_depth_p=0.0,
+                dropout_p=0.1,
+                stochastic_depth_p=0.1,
             )
             projection_layers.append(mlp_residual_block)
 
@@ -153,8 +154,8 @@ def get_projection_layer(
             projection_layer = MLPResidualBlock(
                 in_features=input_dim,
                 out_features=target_dim,
-                dropout_p=0.0,
-                stochastic_depth_p=0.0,
+                dropout_p=0.1,
+                stochastic_depth_p=0.1,
                 reduce_at_fc_1=False,
             )
             projection_layers.append(projection_layer)

@@ -114,6 +114,7 @@ def get_lcl_projection_layer(
     diff_tolerance: int = 0,
     kernel_width_divisible_by: int | None = None,
     full_preactivation: bool = False,
+    dropout_p: float = 0.0,
 ) -> LCLResidualBlock | LCL | None:
     layer_class: type[LCLResidualBlock] | type[LCL]
     match layer_type:
@@ -146,6 +147,7 @@ def get_lcl_projection_layer(
         "in_features": input_dimension,
         "kernel_size": best_kernel_size,
         "out_feature_sets": best_out_feature_sets,
+        "dropout_p": dropout_p,
     }
     if layer_type == "lcl_residual":
         kwargs["full_preactivation"] = full_preactivation
