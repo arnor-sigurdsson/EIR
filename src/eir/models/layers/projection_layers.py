@@ -147,10 +147,10 @@ def get_lcl_projection_layer(
         "in_features": input_dimension,
         "kernel_size": best_kernel_size,
         "out_feature_sets": best_out_feature_sets,
-        "dropout_p": dropout_p,
     }
     if layer_type == "lcl_residual":
         kwargs["full_preactivation"] = full_preactivation
+        kwargs["dropout_p"] = dropout_p
 
     best_layer = layer_class(**kwargs)
 
