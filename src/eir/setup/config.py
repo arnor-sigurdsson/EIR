@@ -419,6 +419,7 @@ def load_fusion_configs(fusion_configs: Iterable[dict]) -> schemas.FusionConfig:
         model_type=combined_config["model_type"],
         model_config=fusion_model_config,
         tensor_broker_config=tensor_broker_config,
+        modalities_to_skip=combined_config.get("modalities_to_skip", None),
     )
 
     return fusion_config

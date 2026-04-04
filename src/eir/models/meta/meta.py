@@ -27,6 +27,7 @@ class MetaModel(nn.Module):
         output_modules: al_output_modules,
         fusion_to_output_mapping: dict[str, Literal["computed", "pass-through"]],
         tensor_broker: nn.ModuleDict,
+        modalities_to_skip: set[str] | None = None,
     ):
         super().__init__()
 
@@ -35,6 +36,7 @@ class MetaModel(nn.Module):
         self.output_modules = output_modules
         self.fusion_to_output_mapping = fusion_to_output_mapping
         self.tensor_broker = tensor_broker
+        self.modalities_to_skip = modalities_to_skip or set()
 
         apply_transformer_specific_modifications(model=self)
 
@@ -48,6 +50,7 @@ class MetaModel(nn.Module):
             output_modules=self.output_modules,
             fusion_to_output_mapping=self.fusion_to_output_mapping,
             inputs=inputs,
+            modalities_to_skip=self.modalities_to_skip,
         )
 
         return output_modules_out

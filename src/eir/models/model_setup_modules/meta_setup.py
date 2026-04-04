@@ -167,6 +167,15 @@ def get_meta_model_kwargs_from_configs(
         input_modules=input_modules,
     )
 
+    skip_set = set(fusion_config.modalities_to_skip or [])
+    if skip_set:
+        feature_dims_and_types = {
+            k: v for k, v in feature_dims_and_types.items() if k not in skip_set
+        }
+    modules_for_fusion: al_input_modules = {
+        k: v for k, v in input_modules.items() if k not in skip_set
+    }
+
     preliminary_fusion_mapping = _match_fusion_outputs_to_output_types(
         output_types=output_types,
         diffusion_targets=diffusion_targets,
@@ -180,7 +189,7 @@ def get_meta_model_kwargs_from_configs(
     fusion_modules = fusion.get_fusion_modules(
         fusion_model_type=fusion_config.model_type,
         model_config=fusion_config.model_config,
-        modules_to_fuse=input_modules,
+        modules_to_fuse=modules_for_fusion,
         feature_dimensions_and_types=feature_dims_and_types,
         output_types=output_types,
         any_diffusion=diffusion_targets != {},
@@ -219,6 +228,7 @@ def get_meta_model_kwargs_from_configs(
         device="cpu",
     )
     kwargs["tensor_broker"] = tensor_broker
+    kwargs["modalities_to_skip"] = skip_set if skip_set else None
 
     return kwargs
 

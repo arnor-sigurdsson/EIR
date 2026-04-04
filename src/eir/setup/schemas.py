@@ -1049,6 +1049,13 @@ class FusionConfig:
 
     :param model_config:
         Fusion model configuration.
+
+    :param modalities_to_skip:
+        List of modality names (e.g. ['eir_tabular']) to exclude from fusion.
+        Skipped modalities will not have fusion projections created and their
+        feature extractor outputs will not be passed to any fusion module.
+        Input modules are still created (for pass-through outputs, tensor broker, etc.)
+        but their outputs are filtered out before reaching fusion.
     """
 
     model_type: Literal[
@@ -1063,6 +1070,7 @@ class FusionConfig:
         ResidualMLPConfig | IdentityConfig | MGMoEModelConfig | AttentionFusionConfig
     )
     tensor_broker_config: None | TensorBrokerConfig = None
+    modalities_to_skip: list[str] | None = None
 
 
 @dataclass
