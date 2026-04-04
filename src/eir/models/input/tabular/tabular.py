@@ -185,9 +185,12 @@ class SimpleTabularModel(nn.Module):
         output = self.layer(input)
         output = self.mlp_blocks(output)
 
-        if self.training and self.drop_prob > 0.0:
-            mask = (torch.rand(1, device=output.device) >= self.drop_prob).float()
-            output = output * mask
+        if self.drop_prob > 0.0:
+            if self.training:
+                mask = (torch.rand(1, device=output.device) >= self.drop_prob).float()
+                output = output * mask
+            else:
+                output = output * (1.0 - self.drop_prob)
 
         return output
 
