@@ -302,12 +302,10 @@ class ExpertBranch(nn.Module):
     def __init__(
         self,
         fc_0: LCL,
-        norm_0: nn.Module,
         lcl_blocks: nn.Sequential,
     ):
         super().__init__()
         self.fc_0 = fc_0
-        self.norm_0 = norm_0
         self.lcl_blocks = lcl_blocks
 
     @property
@@ -318,7 +316,6 @@ class ExpertBranch(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.fc_0(x)
-        x = self.norm_0(x)
         x = self.lcl_blocks(x)
         return x
 
@@ -381,7 +378,6 @@ class LCLInformedMoEModel(nn.Module):
                 kernel_size=expert_fc_0_kernel,
                 bias=True,
             )
-            norm_0 = nn.RMSNorm(normalized_shape=fc_0.out_features)
 
             expert_kernel_width = _clamp_kernel_for_min_chunks(
                 kernel_size=kernel_width,
@@ -407,7 +403,6 @@ class LCLInformedMoEModel(nn.Module):
 
             branch = ExpertBranch(
                 fc_0=fc_0,
-                norm_0=norm_0,
                 lcl_blocks=lcl_blocks,
             )
             self.expert_branches[name] = branch
