@@ -164,9 +164,7 @@ class LCLResidualBlock(nn.Module):
 
         self.out_features = self.fc_2.out_features
 
-        # generally seems to work better to always initialize to 1.0 in LCL blocks
-        # in contrast to what we do in the standard MLP blocks
-        self.ls = LayerScale(dim=self.out_features, init_values=1.0)
+        self.ls = LayerScale(dim=self.out_features, init_values=1e-05)
 
         self._norm_identity = full_preactivation or (in_features != self.out_features)
         self.downsample_identity: nn.Module
