@@ -295,28 +295,43 @@ class LCLModel(nn.Module):
 
 @dataclass
 class LCLInformedMoEModelConfig(LCLModelConfig):
-    pass
+    """
+    :param stub_experts:
+        When True, expert branches only initialize fc_0 (no LCL blocks)
+        and return zeros of shape (batch_size, 1) during forward.
+        Useful for retaining first kernel outputs to be passed e.g. exclusively
+        via TB.
+    """
+
+    stub_experts: bool = False
 
 
 class ExpertBranch(nn.Module):
     def __init__(
         self,
         fc_0: LCL,
-        lcl_blocks: nn.Sequential,
+        lcl_blocks: nn.Sequential | None = None,
+        stub: bool = False,
     ):
         super().__init__()
         self.fc_0 = fc_0
-        self.lcl_blocks = lcl_blocks
+        self.lcl_blocks = lcl_blocks if not stub else None
+        self.stub = stub
 
     @property
     def out_features(self) -> int:
-        if len(self.lcl_blocks) > 0:
+        if self.stub:
+            return 1
+        if self.lcl_blocks is not None and len(self.lcl_blocks) > 0:
             return cast(int, self.lcl_blocks[-1].out_features)
         return self.fc_0.out_features
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.stub:
+            return torch.zeros(x.shape[0], 1, device=x.device, dtype=x.dtype)
         x = self.fc_0(x)
-        x = self.lcl_blocks(x)
+        if self.lcl_blocks is not None:
+            x = self.lcl_blocks(x)
         return x
 
 
@@ -379,31 +394,36 @@ class LCLInformedMoEModel(nn.Module):
                 bias=True,
             )
 
-            expert_kernel_width = _clamp_kernel_for_min_chunks(
-                kernel_size=kernel_width,
-                in_features=int(fc_0.out_features),
-                min_chunks=4,
-                min_kernel=4,
-            )
+            stub = self.model_config.stub_experts
 
-            lcl_parameter_spec = LCParameterSpec(
-                in_features=int(fc_0.out_features),
-                kernel_width=expert_kernel_width,
-                channel_exp_base=self.model_config.channel_exp_base,
-                dropout_p=self.model_config.rb_do,
-                cutoff=cutoff,
-                stochastic_depth_p=self.model_config.stochastic_depth_p,
-                attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
-                direction=self.model_config.direction,
-            )
-            lcl_blocks = _get_lcl_blocks(
-                lcl_spec=lcl_parameter_spec,
-                block_layer_spec=self.model_config.layers,
-            )
+            lcl_blocks: nn.Sequential | None = None
+            if not stub:
+                expert_kernel_width = _clamp_kernel_for_min_chunks(
+                    kernel_size=kernel_width,
+                    in_features=int(fc_0.out_features),
+                    min_chunks=4,
+                    min_kernel=4,
+                )
+
+                lcl_parameter_spec = LCParameterSpec(
+                    in_features=int(fc_0.out_features),
+                    kernel_width=expert_kernel_width,
+                    channel_exp_base=self.model_config.channel_exp_base,
+                    dropout_p=self.model_config.rb_do,
+                    cutoff=cutoff,
+                    stochastic_depth_p=self.model_config.stochastic_depth_p,
+                    attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
+                    direction=self.model_config.direction,
+                )
+                lcl_blocks = _get_lcl_blocks(
+                    lcl_spec=lcl_parameter_spec,
+                    block_layer_spec=self.model_config.layers,
+                )
 
             branch = ExpertBranch(
                 fc_0=fc_0,
                 lcl_blocks=lcl_blocks,
+                stub=stub,
             )
             self.expert_branches[name] = branch
 
