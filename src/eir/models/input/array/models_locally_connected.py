@@ -327,9 +327,11 @@ class ExpertBranch(nn.Module):
         return self.fc_0.out_features
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.fc_0(x)
+
         if self.stub:
             return torch.zeros(x.shape[0], 1, device=x.device, dtype=x.dtype)
-        x = self.fc_0(x)
+
         if self.lcl_blocks is not None:
             x = self.lcl_blocks(x)
         return x

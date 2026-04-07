@@ -106,7 +106,9 @@ class AdditiveFusionLayer(nn.Module):
         )
 
     def forward(
-        self, input_tensor: torch.Tensor, projected_context_tensor: torch.Tensor
+        self,
+        input_tensor: torch.Tensor,
+        projected_context_tensor: torch.Tensor,
     ) -> torch.Tensor:
         return input_tensor + self.gate * projected_context_tensor
 
