@@ -241,7 +241,7 @@ class LCLModel(nn.Module):
             kernel_size=fc_0_kernel_size,
             bias=True,
         )
-        self.act_0 = nn.GELU()
+        self.norm_0 = nn.RMSNorm(normalized_shape=self.fc_0.out_features)
 
         cutoff = dynamic_cutoff or self.model_config.cutoff
         assert isinstance(cutoff, int)
@@ -287,7 +287,7 @@ class LCLModel(nn.Module):
         out = self.flatten_fn(x=input)
 
         out = self.fc_0(out)
-        out = self.act_0(out)
+        out = self.norm_0(out)
         out = self.lcl_blocks(out)
 
         return out
@@ -302,12 +302,10 @@ class ExpertBranch(nn.Module):
     def __init__(
         self,
         fc_0: LCL,
-        act_0: nn.Module,
         lcl_blocks: nn.Sequential,
     ):
         super().__init__()
         self.fc_0 = fc_0
-        self.act_0 = act_0
         self.lcl_blocks = lcl_blocks
 
     @property
@@ -318,7 +316,6 @@ class ExpertBranch(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.fc_0(x)
-        x = self.act_0(x)
         x = self.lcl_blocks(x)
         return x
 
@@ -381,7 +378,6 @@ class LCLInformedMoEModel(nn.Module):
                 kernel_size=expert_fc_0_kernel,
                 bias=True,
             )
-            act_0 = nn.GELU()
 
             expert_kernel_width = _clamp_kernel_for_min_chunks(
                 kernel_size=kernel_width,
@@ -407,7 +403,6 @@ class LCLInformedMoEModel(nn.Module):
 
             branch = ExpertBranch(
                 fc_0=fc_0,
-                act_0=act_0,
                 lcl_blocks=lcl_blocks,
             )
             self.expert_branches[name] = branch

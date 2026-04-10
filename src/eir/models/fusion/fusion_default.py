@@ -100,7 +100,7 @@ class SumFusionModule(nn.Module):
             self.input_projections[name] = nn.Sequential(
                 nn.RMSNorm(normalized_shape=output_dim),
                 nn.Linear(in_features=output_dim, out_features=self.fusion_dim),
-                nn.GELU(),
+                nn.RMSNorm(normalized_shape=self.fusion_dim),
             )
 
         fusion_resblocks_kwargs = {
