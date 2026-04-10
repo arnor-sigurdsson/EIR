@@ -86,11 +86,6 @@ def get_projection_layer(
 
             mlp_input_target = target_dim
 
-            norm_layer = nn.RMSNorm(normalized_shape=input_dim)
-            act_layer = nn.GELU()
-            projection_layers.append(norm_layer)
-            projection_layers.append(act_layer)
-
             if projection_lcl_residual_blocks:
                 cur_dim = input_dim
                 while cur_dim // 4 > mlp_input_target:
@@ -101,6 +96,7 @@ def get_projection_layer(
                         layer_type="lcl_residual",
                         diff_tolerance=cur_dim // 100,
                         kernel_width_divisible_by=kernel_width_divisible_by,
+                        dropout_p=0.1,
                     )
                     if block is not None:
                         projection_layers.append(block)
@@ -116,6 +112,8 @@ def get_projection_layer(
                         projection_layers.append(fallback)
                         cur_dim = halve_target
             else:
+                projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
+
                 try:
                     lcl_projection_layer = get_1d_projection_layer(
                         input_dimension=input_dim,
@@ -125,9 +123,6 @@ def get_projection_layer(
                         kernel_width_divisible_by=kernel_width_divisible_by,
                     )
                 except ValueError:
-                    # Sometimes we cannot create are reasonable LCL projection
-                    # e.g. if target dim is much larger tha input dim so we have this
-                    # fallback
                     lcl_projection_layer = get_1d_projection_layer(
                         input_dimension=input_dim,
                         target_dimension=mlp_input_target,
@@ -137,16 +132,17 @@ def get_projection_layer(
                     )
 
                 projection_layers.append(lcl_projection_layer)
+                projection_layers.append(nn.RMSNorm(normalized_shape=mlp_input_target))
                 cur_dim = mlp_input_target
 
             mlp_residual_block = MLPResidualBlock(
                 in_features=cur_dim,
                 out_features=target_dim,
                 dropout_p=0.0,
-                full_preactivation=True,
                 stochastic_depth_p=0.0,
             )
             projection_layers.append(mlp_residual_block)
+
             projected_shape = to_shape_no_batch
 
         case "mlp_residual":
@@ -155,13 +151,18 @@ def get_projection_layer(
 
             projection_layer = MLPResidualBlock(
                 in_features=input_dim,
-                out_features=target_dim,
+                out_features=input_dim,
                 dropout_p=0.0,
-                full_preactivation=True,
                 stochastic_depth_p=0.0,
                 reduce_at_fc_1=False,
             )
             projection_layers.append(projection_layer)
+
+            projection_layers.append(nn.RMSNorm(normalized_shape=input_dim))
+            projection_layers.append(
+                nn.Linear(in_features=input_dim, out_features=target_dim)
+            )
+
             projected_shape = to_shape_no_batch
 
         case "cnn":
