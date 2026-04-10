@@ -178,7 +178,7 @@ def set_up_output_module_config(
 
     if not model_type:
         try:
-            model_type = model_config_class.model_type
+            model_type = model_config_class.model_type  # type: ignore[misc]
         except AttributeError:
             logger.error(
                 "Not model type specified in model config and could not find default "
