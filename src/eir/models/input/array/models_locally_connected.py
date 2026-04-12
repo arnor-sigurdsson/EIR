@@ -301,10 +301,17 @@ class LCLInformedMoEModelConfig(LCLModelConfig):
         and return zeros of shape (batch_size, 1) during forward.
         Useful for retaining first kernel outputs to be passed e.g. exclusively
         via TB.
+
+    :param auto_scale_fc0_kernel:
+        When True, the fc_0 kernel size is automatically scaled per expert
+        based on each expert's SNP count. Overrides the global
+        kernel_width / first_kernel_expansion for the first layer only.
+        Resulting kernel sizes are always divisible by 3.
     """
 
     stub_experts: bool = False
     expert_output_dim: int | None = None
+    auto_scale_fc0_kernel: bool = False
 
 
 class ExpertBranch(nn.Module):
@@ -379,12 +386,18 @@ class LCLInformedMoEModel(nn.Module):
             )
             self._expert_indices[name] = getattr(self, f"_expert_idx_{name}")
 
+            n_snps = len(snp_indices)
             expert_in_features = (
-                len(snp_indices) * data_dimensions.channels * data_dimensions.height
+                n_snps * data_dimensions.channels * data_dimensions.height
             )
 
+            if model_config.auto_scale_fc0_kernel:
+                cur_fc_0_kernel = _get_auto_scaled_fc0_kernel(n_snps=n_snps)
+            else:
+                cur_fc_0_kernel = fc_0_kernel_size
+
             expert_fc_0_kernel = _clamp_kernel_for_min_chunks(
-                kernel_size=fc_0_kernel_size,
+                kernel_size=cur_fc_0_kernel,
                 in_features=expert_in_features,
                 min_chunks=4,
                 min_kernel=4,
@@ -805,6 +818,21 @@ def _clamp_kernel_for_min_chunks(
     max_kernel = in_features // min_chunks
     clamped = min(kernel_size, max_kernel)
     return max(clamped, min_kernel)
+
+
+def _get_auto_scaled_fc0_kernel(n_snps: int) -> int:
+    if n_snps < 1_000:
+        return 3
+    elif n_snps < 10_000:
+        return 6
+    elif n_snps < 100_000:
+        return 12
+    elif n_snps < 500_000:
+        return 24
+    elif n_snps < 2_000_000:
+        return 48
+    else:
+        return 96
 
 
 def _do_add_attention(
