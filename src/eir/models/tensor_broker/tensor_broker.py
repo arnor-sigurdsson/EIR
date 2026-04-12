@@ -96,9 +96,9 @@ def create_tensor_shapes_estimation_hook(
         if isinstance(output, torch.Tensor):
             output_shapes[layer_path] = output.shape[1:]
         elif isinstance(output, dict):
-            cur_output_shapes = {k: v.shape[1:] for k, v in output.items()}
-            for k, v in cur_output_shapes.items():
-                output_shapes[f"{layer_path}.{k}"] = v
+            for k, v in output.items():
+                if isinstance(v, torch.Tensor):
+                    output_shapes[f"{layer_path}.{k}"] = v.shape[1:]
 
         if len(args) > 0:
             input_tensor = args[0]
@@ -115,9 +115,9 @@ def create_tensor_shapes_estimation_hook(
         if isinstance(input_tensor, torch.Tensor):
             input_shapes[layer_path] = input_tensor.shape[1:]
         elif isinstance(input_tensor, dict):
-            cur_input_shapes = {k: v.shape[1:] for k, v in input_tensor.items()}
-            for k, v in cur_input_shapes.items():
-                input_shapes[f"{layer_path}.{k}"] = v
+            for k, v in input_tensor.items():
+                if isinstance(v, torch.Tensor):
+                    input_shapes[f"{layer_path}.{k}"] = v.shape[1:]
 
     return hook
 

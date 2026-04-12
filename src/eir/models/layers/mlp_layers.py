@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass, field
 
 import torch
@@ -109,5 +110,87 @@ class MLPResidualBlock(nn.Module):
         out = self.ls(out)
 
         out = self.stochastic_depth(out)
+
+        return out + identity
+
+
+def _kaiming_uniform_3d(weight: torch.Tensor) -> None:
+    for i in range(weight.shape[0]):
+        nn.init.kaiming_uniform_(weight[i], a=math.sqrt(5))
+
+
+class BatchedMLPResidualBlock(nn.Module):
+    def __init__(
+        self,
+        n_groups: int,
+        in_features: int,
+        out_features: int,
+        dropout_p: float = 0.0,
+        full_preactivation: bool = False,
+        stochastic_depth_p: float = 0.0,
+    ):
+        super().__init__()
+
+        self.n_groups = n_groups
+        self.in_features = in_features
+        self.out_features = out_features
+        self._norm_identity = full_preactivation or (in_features != out_features)
+
+        self.norm_weight = nn.Parameter(torch.ones(n_groups, in_features))
+
+        self.fc_1_weight = nn.Parameter(
+            torch.empty(n_groups, out_features, in_features)
+        )
+        self.fc_2_weight = nn.Parameter(
+            torch.empty(n_groups, out_features, out_features)
+        )
+
+        self.has_downsample = in_features != out_features
+        if self.has_downsample:
+            self.downsample_weight = nn.Parameter(
+                torch.empty(n_groups, out_features, in_features)
+            )
+            self.downsample_bias = nn.Parameter(torch.zeros(n_groups, 1, out_features))
+            ls_init = 1.0
+        else:
+            ls_init = 1e-05
+
+        self.ls_gamma = nn.Parameter(torch.full((n_groups, 1, out_features), ls_init))
+
+        self.act = nn.GELU()
+        self.do = nn.Dropout(p=dropout_p)
+        self.stochastic_depth_p = stochastic_depth_p
+        self.stochastic_depth = StochasticDepth(
+            p=stochastic_depth_p,
+            mode="batch",
+        )
+
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        _kaiming_uniform_3d(weight=self.fc_1_weight)
+        _kaiming_uniform_3d(weight=self.fc_2_weight)
+        if self.has_downsample:
+            _kaiming_uniform_3d(weight=self.downsample_weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        variance = x.pow(2).mean(dim=-1, keepdim=True)
+        out = x * torch.rsqrt(variance + 1e-8) * self.norm_weight.unsqueeze(1)
+
+        identity = out if self._norm_identity else x
+        if self.has_downsample:
+            identity = (
+                torch.bmm(identity, self.downsample_weight.transpose(1, 2))
+                + self.downsample_bias
+            )
+
+        out = torch.bmm(out, self.fc_1_weight.transpose(1, 2))
+        out = self.act(out)
+        out = self.do(out)
+        out = torch.bmm(out, self.fc_2_weight.transpose(1, 2))
+        out = out * self.ls_gamma
+
+        n, b, d = out.shape
+        out = self.stochastic_depth(out.reshape(n * b, d)).reshape(n, b, d)
 
         return out + identity

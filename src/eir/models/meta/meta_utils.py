@@ -3,7 +3,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
-    NewType,
     Protocol,
     Union,
 )
@@ -16,14 +15,14 @@ if TYPE_CHECKING:
     from eir.models.fusion.fusion_identity import al_identity_features
     from eir.models.model_setup_modules.meta_setup import FeatureExtractorInfo
 
-FeatureExtractorOutType = NewType("FeatureExtractorOutType", torch.Tensor)
+al_feature_extractor_out = torch.Tensor | dict[str, torch.Tensor]
 
 
 class FeatureExtractorProtocol(Protocol):
     @property
     def num_out_features(self) -> int: ...
 
-    def __call__(self, input: torch.Tensor) -> FeatureExtractorOutType: ...
+    def __call__(self, input: torch.Tensor) -> al_feature_extractor_out: ...
 
 
 class FeatureExtractorProtocolWithL1(Protocol):
@@ -33,7 +32,7 @@ class FeatureExtractorProtocolWithL1(Protocol):
     @property
     def l1_penalized_weights(self) -> torch.Tensor: ...
 
-    def __call__(self, input: torch.Tensor) -> FeatureExtractorOutType: ...
+    def __call__(self, input: torch.Tensor) -> al_feature_extractor_out: ...
 
 
 class FusionModuleProtocol(Protocol):
@@ -56,7 +55,7 @@ class FusionModuleProtocol(Protocol):
     def per_output_group(self) -> bool: ...
 
     def __call__(
-        self, input: dict[str, FeatureExtractorOutType]
+        self, input: dict[str, al_feature_extractor_out]
     ) -> "al_fused_features": ...
 
 

@@ -304,6 +304,7 @@ class LCLInformedMoEModelConfig(LCLModelConfig):
     """
 
     stub_experts: bool = False
+    expert_output_dim: int | None = None
 
 
 class ExpertBranch(nn.Module):
@@ -425,9 +426,22 @@ class LCLInformedMoEModel(nn.Module):
             branch = ExpertBranch(
                 fc_0=fc_0,
                 lcl_blocks=lcl_blocks,
-                stub=stub,
             )
             self.expert_branches[name] = branch
+
+        self._per_expert_output = model_config.expert_output_dim is not None
+        if self._per_expert_output:
+            assert model_config.expert_output_dim is not None
+            self.expert_projections = nn.ModuleDict()
+            for name in self.expert_branches:
+                branch = cast(ExpertBranch, self.expert_branches[name])
+                self.expert_projections[name] = nn.Sequential(
+                    nn.RMSNorm(normalized_shape=branch.out_features),
+                    nn.Linear(
+                        in_features=branch.out_features,
+                        out_features=model_config.expert_output_dim,
+                    ),
+                )
 
         self._init_weights()
 
@@ -441,6 +455,9 @@ class LCLInformedMoEModel(nn.Module):
 
     @property
     def num_out_features(self) -> int:
+        if self._per_expert_output:
+            assert self.model_config.expert_output_dim is not None
+            return self.model_config.expert_output_dim
         total = 0
         for branch in self.expert_branches.values():
             assert isinstance(branch, ExpertBranch)
@@ -454,7 +471,12 @@ class LCLInformedMoEModel(nn.Module):
     def _init_weights(self) -> None:
         pass
 
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
+    def forward(self, input: torch.Tensor) -> torch.Tensor | dict[str, torch.Tensor]:
+        if self._per_expert_output:
+            return self._forward_per_expert(input=input)
+        return self._forward_concat(input=input)
+
+    def _forward_concat(self, input: torch.Tensor) -> torch.Tensor:
         expert_outputs: list[torch.Tensor] = []
         for name, branch in self.expert_branches.items():
             indices = self._expert_indices[name]
@@ -463,6 +485,17 @@ class LCLInformedMoEModel(nn.Module):
             out = branch(out)
             expert_outputs.append(out)
         return torch.cat(expert_outputs, dim=1)
+
+    def _forward_per_expert(self, input: torch.Tensor) -> dict[str, torch.Tensor]:
+        expert_outputs: dict[str, torch.Tensor] = {}
+        for name, branch in self.expert_branches.items():
+            indices = self._expert_indices[name]
+            expert_input = input[:, :, :, indices]
+            out = self.flatten_fn(x=expert_input)
+            out = branch(out)
+            out = self.expert_projections[name](out)
+            expert_outputs[name] = out
+        return expert_outputs
 
 
 def parse_kernel_width(

@@ -21,6 +21,7 @@ al_fusion_model = Literal[
     "mlp-residual",
     "mlp-residual-sum",
     "identity",
+    "identity-per-group",
     "mgmoe",
     "attention",
 ]
@@ -72,7 +73,7 @@ def get_fusion_modules(
         fusion_class = get_fusion_class(fusion_model_type=fusion_model_type)
 
         fusion_callable: al_features | al_identity_features
-        if fusion_model_type == "pass-through" or fusion_model_type == "attention":
+        if fusion_model_type in ("pass-through", "attention", "identity-per-group"):
             fusion_callable = pass_through_fuse
         else:
             fusion_callable = default_fuse_features
@@ -126,6 +127,7 @@ def _check_fusion_modules(
         "mlp-residual",
         "mgmoe",
         "identity",
+        "identity-per-group",
         "pass-through",
         "attention",
     }
@@ -153,7 +155,7 @@ def _check_fusion_modules(
         raise ValueError(
             f"When using only {computed_set} outputs, pass-through is not supported. "
             f"Got {fusion_model_type}. Kindly set the fusion_model_type "
-            "to 'mlp-residual', 'mgmoe', or 'identity'."
+            "to 'mlp-residual', 'mgmoe', 'identity', or 'identity-per-group'."
         )
 
     if (
@@ -187,6 +189,11 @@ def get_fusion_class(
         return cast(type[FusionModuleProtocol], fusion_default.SumFusionModule)
     if fusion_model_type in ("identity", "pass-through"):
         return cast(type[FusionModuleProtocol], fusion_identity.IdentityFusionModel)
+    if fusion_model_type == "identity-per-group":
+        return cast(
+            type[FusionModuleProtocol],
+            fusion_identity.PerOutputGroupIdentityFusionModel,
+        )
     if fusion_model_type == "attention":
         return cast(type[FusionModuleProtocol], fusion_attention.AttentionFusionModule)
     raise ValueError(f"Unrecognized fusion model type: {fusion_model_type}.")
