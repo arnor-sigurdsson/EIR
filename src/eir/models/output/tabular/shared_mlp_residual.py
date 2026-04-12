@@ -212,7 +212,14 @@ class SharedResidualMLPOutputModule(nn.Module):
             [inputs[name] for name in self._batched_group_names], dim=0
         )
 
-        stacked = self.input_identity(stacked)
+        # input_identity sees (B, N_groups * D) as an entry point, later we can
+        # make this group aware, but then also e.g. needs TB updates
+        n, b, d = stacked.shape
+        stacked = (
+            self.input_identity(stacked.permute(1, 0, 2).reshape(b, n * d))
+            .reshape(b, n, d)
+            .permute(1, 0, 2)
+        )
 
         for block in self.batched_blocks:
             stacked = block(stacked)
@@ -230,7 +237,16 @@ class SharedResidualMLPOutputModule(nn.Module):
             torch.bmm(normed, self.batched_proj_weight.transpose(1, 2))
             + self.batched_proj_bias
         )
-        projected = self.output_identity(projected)
+
+        # same as input_identity,  sees (B, N_groups * D)
+        n_out, b_out, max_out = projected.shape
+        projected = (
+            self.output_identity(
+                projected.permute(1, 0, 2).reshape(b_out, n_out * max_out)
+            )
+            .reshape(b_out, n_out, max_out)
+            .permute(1, 0, 2)
+        )
 
         results: dict[str, torch.Tensor] = {}
         for i, (targets, sizes) in enumerate(
