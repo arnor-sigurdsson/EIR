@@ -128,6 +128,20 @@ class SharedResidualMLPOutputModule(nn.Module):
         self._batched_group_targets: list[list[str]] = [
             sorted(expert_groups[name]) for name in self._batched_group_names
         ]
+
+        grouped_targets = {
+            t for targets in self._batched_group_targets for t in targets
+        }
+        missing = set(self.num_outputs_per_target.keys()) - grouped_targets
+        if missing:
+            raise ValueError(
+                f"expert_groups does not cover all output targets. "
+                f"Missing targets ({len(missing)}): "
+                f"{sorted(missing)[:10]}"
+                f"{'...' if len(missing) > 10 else ''}. "
+                f"Either add these targets to an expert group or "
+                f"remove them from the output columns."
+            )
         self._batched_group_output_sizes: list[list[int]] = [
             [self.num_outputs_per_target[t] for t in targets]
             for targets in self._batched_group_targets
