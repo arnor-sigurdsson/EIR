@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -180,8 +181,12 @@ class SharedResidualMLPOutputModule(nn.Module):
         self.batched_proj_weight = nn.Parameter(
             torch.empty(n_groups, max_outputs, fc_task_dim)
         )
-        self.batched_proj_bias = nn.Parameter(torch.zeros(n_groups, 1, max_outputs))
-        nn.init.kaiming_uniform_(self.batched_proj_weight.view(-1, fc_task_dim))
+        self.batched_proj_bias = nn.Parameter(torch.empty(n_groups, 1, max_outputs))
+        for g in range(n_groups):
+            nn.init.kaiming_uniform_(self.batched_proj_weight[g], a=math.sqrt(5))
+            fan_in = fc_task_dim
+            bound = 1 / math.sqrt(fan_in)
+            nn.init.uniform_(self.batched_proj_bias[g], -bound, bound)
 
     def forward(
         self,
