@@ -226,6 +226,7 @@ def get_meta_model_kwargs_from_configs(
         fusion_configs=[fusion_config],
         output_configs=output_configs,
         device="cpu",
+        modalities_to_skip=skip_set if skip_set else None,
     )
     kwargs["tensor_broker"] = tensor_broker
     kwargs["modalities_to_skip"] = skip_set if skip_set else None

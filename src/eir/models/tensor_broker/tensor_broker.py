@@ -126,6 +126,7 @@ def estimate_tensor_shapes(
     module_storage: "ModuleStorage",
     fusion_to_output_mapping: dict[str, Literal["computed", "pass-through"]],
     example_input_data: dict[str, torch.Tensor],
+    modalities_to_skip: set[str] | None = None,
 ) -> tuple[dict[str, torch.Size], dict[str, torch.Size]]:
     output_shapes: dict[str, torch.Size] = {}
     input_shapes: dict[str, torch.Size] = {}
@@ -147,6 +148,7 @@ def estimate_tensor_shapes(
             output_modules=module_storage.output_modules,
             fusion_to_output_mapping=fusion_to_output_mapping,
             inputs=example_input_data,
+            modalities_to_skip=modalities_to_skip,
         )
 
     for h in hooks:
@@ -268,6 +270,7 @@ def get_tensor_broker(
     fusion_configs: Sequence[FusionConfig],
     output_configs: Sequence[OutputConfig],
     device: str,
+    modalities_to_skip: set[str] | None = None,
 ) -> nn.ModuleDict:
     tensor_broker_modules = nn.ModuleDict()
     all_configs = list(input_configs) + list(fusion_configs) + list(output_configs)
@@ -296,6 +299,7 @@ def get_tensor_broker(
         module_storage=module_storage,
         fusion_to_output_mapping=fusion_to_output_mapping,
         example_input_data=example_batch.inputs,
+        modalities_to_skip=modalities_to_skip,
     )
 
     tensor_cache: dict[str, CachedTensor] = {}
