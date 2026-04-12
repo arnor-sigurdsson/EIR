@@ -554,7 +554,6 @@ def _get_multi_task_output_configs(
         "linear",
         "shared_mlp_residual",
     ] = "mlp_residual",
-    shared_mlp_residual_experts: int = 0,
 ) -> Sequence[dict]:
     output_configs = [
         {
@@ -585,10 +584,6 @@ def _get_multi_task_output_configs(
         output_configs[1]["model_config"] = {
             "model_type": "shared_mlp_residual",
         }
-        if shared_mlp_residual_experts > 0:
-            output_configs[1]["model_config"]["model_init_config"] = {
-                "num_experts": shared_mlp_residual_experts,
-            }
 
     return output_configs
 
@@ -829,7 +824,6 @@ def _should_compile():
                 "output_configs": _get_multi_task_output_configs(
                     uncertainty_mt_loss=False,
                     output_type="shared_mlp_residual",
-                    shared_mlp_residual_experts=2,
                 ),
             },
         },
