@@ -708,6 +708,13 @@ def generate_lcl_residual_blocks_auto(lcl_parameter_spec: LCParameterSpec):
             stochastic_depth_p=s.stochastic_depth_p,
         )
 
+        if not _is_making_progress(
+            new_size=cur_block.out_features,
+            old_size=cur_size,
+            direction=s.direction,
+        ):
+            break
+
         block_modules.append(cur_block)
 
         if _do_add_attention(
@@ -737,6 +744,16 @@ def _should_break_auto(
         return cur_size <= cutoff
     if direction == "up":
         return cur_size >= cutoff
+    raise ValueError(f"Unknown direction: {direction}")
+
+
+def _is_making_progress(
+    new_size: int, old_size: int, direction: Literal["up", "down"]
+) -> bool:
+    if direction == "down":
+        return new_size < old_size
+    if direction == "up":
+        return new_size > old_size
     raise ValueError(f"Unknown direction: {direction}")
 
 
