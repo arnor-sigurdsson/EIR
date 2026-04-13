@@ -307,11 +307,103 @@ class LCLInformedMoEModelConfig(LCLModelConfig):
         based on each expert's SNP count. Overrides the global
         kernel_width / first_kernel_expansion for the first layer only.
         Resulting kernel sizes are always divisible by 3.
+
+    :param cross_expert_attention_heads:
+        If set, adds multi-head self-attention across expert representations
+        after expert projections. Allows each expert to pull in information
+        from other experts. Requires expert_output_dim to be set.
+
+    :param cross_expert_attention_layers:
+        Number of cross-expert transformer blocks. Only used when
+        cross_expert_attention_heads is set.
+
+    :param cross_expert_attention_dropout:
+        Dropout probability for cross-expert attention and FFN layers.
     """
 
     stub_experts: bool = False
     expert_output_dim: int | None = None
     auto_scale_fc0_kernel: bool = False
+    cross_expert_attention_heads: int | None = None
+    cross_expert_attention_layers: int = 1
+    cross_expert_attention_dropout: float = 0.10
+
+
+class SwiGLUFFN(nn.Module):
+    def __init__(self, dim: int, dropout_p: float = 0.0):
+        super().__init__()
+        hidden_dim = int(dim * 8 / 3)
+        hidden_dim = ((hidden_dim + 7) // 8) * 8
+
+        self.w_gate = nn.Linear(in_features=dim, out_features=hidden_dim, bias=False)
+        self.w_up = nn.Linear(in_features=dim, out_features=hidden_dim, bias=False)
+        self.w_down = nn.Linear(in_features=hidden_dim, out_features=dim, bias=False)
+        self.dropout = nn.Dropout(p=dropout_p)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.dropout(
+            self.w_down(nn.functional.silu(self.w_gate(x)) * self.w_up(x))
+        )
+
+
+class CrossExpertTransformerBlock(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        num_heads: int,
+        dropout_p: float = 0.0,
+    ):
+        super().__init__()
+        self.attn_norm = nn.RMSNorm(dim)
+        self.attn = nn.MultiheadAttention(
+            embed_dim=dim,
+            num_heads=num_heads,
+            dropout=dropout_p,
+            batch_first=True,
+        )
+        self.ffn_norm = nn.RMSNorm(dim)
+        self.ffn = SwiGLUFFN(dim=dim, dropout_p=dropout_p)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h = self.attn_norm(x)
+        h, _ = self.attn(query=h, key=h, value=h, need_weights=False)
+        x = x + h
+        x = x + self.ffn(self.ffn_norm(x))
+        return x
+
+
+class CrossExpertAttention(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        num_heads: int,
+        num_layers: int = 1,
+        dropout_p: float = 0.0,
+    ):
+        super().__init__()
+        self.blocks = nn.ModuleList(
+            [
+                CrossExpertTransformerBlock(
+                    dim=dim,
+                    num_heads=num_heads,
+                    dropout_p=dropout_p,
+                )
+                for _ in range(num_layers)
+            ]
+        )
+        self.final_norm = nn.RMSNorm(dim)
+
+    def forward(
+        self, expert_outputs: dict[str, torch.Tensor]
+    ) -> dict[str, torch.Tensor]:
+        names = sorted(expert_outputs.keys())
+        stacked = torch.stack([expert_outputs[n] for n in names], dim=1)
+
+        for block in self.blocks:
+            stacked = block(stacked)
+        stacked = self.final_norm(stacked)
+
+        return {name: stacked[:, i] for i, name in enumerate(names)}
 
 
 class ExpertBranch(nn.Module):
@@ -456,6 +548,20 @@ class LCLInformedMoEModel(nn.Module):
                     ),
                 )
 
+        self._cross_expert_attention: CrossExpertAttention | None = None
+        if model_config.cross_expert_attention_heads is not None:
+            if not self._per_expert_output:
+                raise ValueError(
+                    "cross_expert_attention_heads requires expert_output_dim to be set."
+                )
+            assert model_config.expert_output_dim is not None
+            self._cross_expert_attention = CrossExpertAttention(
+                dim=model_config.expert_output_dim,
+                num_heads=model_config.cross_expert_attention_heads,
+                num_layers=model_config.cross_expert_attention_layers,
+                dropout_p=model_config.cross_expert_attention_dropout,
+            )
+
         self._init_weights()
 
     @property
@@ -508,6 +614,12 @@ class LCLInformedMoEModel(nn.Module):
             out = branch(out)
             out = self.expert_projections[name](out)
             expert_outputs[name] = out
+
+        if self._cross_expert_attention is not None:
+            expert_outputs = self._cross_expert_attention(
+                expert_outputs=expert_outputs,
+            )
+
         return expert_outputs
 
 

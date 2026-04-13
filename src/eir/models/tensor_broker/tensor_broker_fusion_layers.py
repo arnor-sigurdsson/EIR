@@ -89,7 +89,7 @@ class AdditiveFusionLayer(nn.Module):
         self,
         input_shape: torch.Size,
         context_shape: torch.Size,
-        gate_init_value: float = 1e-05,
+        gate_init_value: float = 1e-01,
     ):
         super().__init__()
         self.input_shape = input_shape
