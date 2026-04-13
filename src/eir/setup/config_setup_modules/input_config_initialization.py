@@ -133,7 +133,7 @@ def set_up_input_feature_extractor_config(
     model_type = model_init_kwargs_base.get("model_type")
     if not model_type:
         try:
-            model_type = model_config_class.model_type
+            model_type = model_config_class.model_type  # type: ignore[misc]
         except AttributeError as e:
             logger.error(
                 "Not model type specified in model config and "
