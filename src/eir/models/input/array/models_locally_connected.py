@@ -838,9 +838,7 @@ def _clamp_kernel_for_min_chunks(
 
 
 def _get_auto_scaled_fc0_kernel(n_snps: int) -> int:
-    if n_snps < 1_000:
-        return 3
-    elif n_snps < 10_000:
+    if n_snps < 1_000 or n_snps < 10_000:
         return 6
     elif n_snps < 100_000:
         return 12
