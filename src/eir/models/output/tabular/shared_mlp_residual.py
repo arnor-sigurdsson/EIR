@@ -98,13 +98,18 @@ class SharedResidualMLPOutputModule(nn.Module):
 
         final_block = MLPResidualBlock(
             in_features=self.model_config.fc_task_dim,
-            out_features=self.total_outputs,
+            out_features=self.model_config.fc_task_dim,
             dropout_p=self.model_config.rb_do,
             stochastic_depth_p=self.model_config.stochastic_depth_p,
             full_preactivation=False,
         )
 
-        self.shared_branch = nn.Sequential(shared_branch_module, final_block)
+        final_norm = nn.RMSNorm(self.model_config.fc_task_dim)
+        final_proj = nn.Linear(self.model_config.fc_task_dim, self.total_outputs)
+
+        self.shared_branch = nn.Sequential(
+            shared_branch_module, final_block, final_norm, final_proj
+        )
 
     def _build_expert(self, input_dimension: int, num_experts: int) -> None:
         self.input_identity = nn.Identity()
@@ -139,6 +144,8 @@ class SharedResidualMLPOutputModule(nn.Module):
         self.expert_gates = nn.Parameter(
             torch.zeros(num_targets, num_experts),
         )
+
+        self.expert_norm = nn.RMSNorm(expert_dim)
 
         self.target_final_layers = nn.ModuleDict(
             {
@@ -176,6 +183,7 @@ class SharedResidualMLPOutputModule(nn.Module):
         # Per-target weighted average of expert outputs:
         # (T, E) @ (B, E, D) -> (B, T, D)
         all_mixed = torch.matmul(gate_weights, stacked)
+        all_mixed = self.expert_norm(all_mixed)
 
         per_target = []
         for i, name in enumerate(self.target_names):
