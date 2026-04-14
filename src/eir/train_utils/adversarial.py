@@ -43,8 +43,14 @@ class AdversarialDisentanglementModule(nn.Module):
         dropout_p: float = 0.1,
         stochastic_depth_p: float = 0.0,
         projection_type: Literal[
-            "linear", "lcl", "lcl_residual", "mlp_residual", "grouped_linear"
+            "linear",
+            "lcl",
+            "lcl_residual",
+            "mlp_residual",
+            "lcl+mlp_residual",
+            "grouped_linear",
         ] = "linear",
+        projection_lcl_residual_blocks: bool = True,
     ):
         super().__init__()
         self.embedding_dim = embedding_dim
@@ -53,6 +59,7 @@ class AdversarialDisentanglementModule(nn.Module):
         self.layers = layers if layers is not None else [2]
         self.dropout_p = dropout_p
         self.projection_type = projection_type
+        self.projection_lcl_residual_blocks = projection_lcl_residual_blocks
 
         from_shape = torch.Size([embedding_dim])
         to_shape = torch.Size([fc_dim])
@@ -62,6 +69,7 @@ class AdversarialDisentanglementModule(nn.Module):
             to_shape_no_batch=to_shape,
             cache_fusion_type="sum",
             projection_type=projection_type,
+            projection_lcl_residual_blocks=projection_lcl_residual_blocks,
         )
 
         mlp_blocks = []
@@ -143,6 +151,9 @@ def hook_add_adversarial_losses(
                 dropout_p=adv_config.dropout_p,
                 stochastic_depth_p=adv_config.stochastic_depth_p,
                 projection_type=adv_config.projection_type,
+                projection_lcl_residual_blocks=(
+                    adv_config.projection_lcl_residual_blocks
+                ),
             )
             module = module.to(device=device)
             adversarial_modules[adv_config.name] = module
