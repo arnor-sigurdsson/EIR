@@ -49,6 +49,12 @@ class AdversarialConfig:
     :param projection_type:
         Type of projection layer to use before the adversarial discriminator.
 
+    :param projection_lcl_residual_blocks:
+        When ``projection_type='lcl+mlp_residual'``, use progressive LCL residual
+        blocks to reduce dimensionality before the final MLP residual block,
+        instead of a single LCL projection. Useful for very high-dimensional
+        embeddings where a dense MLP would blow up in parameters.
+
     :param embedding_cache_target:
         Whether to cache 'input' or 'output' of the embedding layer.
         Default 'output' caches the layer's output activations.
@@ -71,8 +77,14 @@ class AdversarialConfig:
     dropout_p: float = 0.1
     stochastic_depth_p: float = 0.0
     projection_type: Literal[
-        "linear", "lcl", "lcl_residual", "mlp_residual", "grouped_linear"
+        "linear",
+        "lcl",
+        "lcl_residual",
+        "mlp_residual",
+        "lcl+mlp_residual",
+        "grouped_linear",
     ] = "linear"
+    projection_lcl_residual_blocks: bool = True
     embedding_cache_target: Literal["input", "output"] = "output"
     target_cache_target: Literal["input", "output"] = "output"
 
