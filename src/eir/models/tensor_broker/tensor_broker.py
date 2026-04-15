@@ -100,6 +100,7 @@ def create_tensor_shapes_estimation_hook(
                 if isinstance(v, torch.Tensor):
                     output_shapes[f"{layer_path}.{k}"] = v.shape[1:]
 
+        input_tensor: torch.Tensor | dict[str, torch.Tensor] | None = None
         if len(args) > 0:
             input_tensor = args[0]
         else:
@@ -109,8 +110,6 @@ def create_tensor_shapes_estimation_hook(
                 input_tensor = x
             elif input_key is not None:
                 input_tensor = input_key
-            else:
-                raise ValueError("No input tensor found in args or kwargs.")
 
         if isinstance(input_tensor, torch.Tensor):
             input_shapes[layer_path] = input_tensor.shape[1:]
