@@ -1,6 +1,7 @@
+import math
 from collections.abc import Callable, Sequence
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from typing import (
     TYPE_CHECKING,
@@ -20,7 +21,13 @@ from eir.models.layers.attention_layers import (
     LinearAttention,
     SparseAttentionType,
 )
-from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
+from eir.models.layers.lcl_layers import (
+    LCL,
+    BatchedLCL,
+    BatchedLCLResidualBlock,
+    BatchedRMSNorm,
+    LCLResidualBlock,
+)
 from eir.models.layers.norm_layers import LayerScale
 from eir.utils.logging import get_logger
 
@@ -339,6 +346,8 @@ class LCLInformedMoEModelConfig(LCLModelConfig):
     cross_expert_attention_layers: int = 1
     cross_expert_attention_dropout: float = 0.10
     cross_expert_attention_type: SparseAttentionType = "softmax"
+    expert_batching: bool = False
+    expert_batching_tolerance: float = 0.15
 
 
 class SwiGLUFFN(nn.Module):
@@ -468,6 +477,219 @@ class ExpertBranch(nn.Module):
         return x
 
 
+@dataclass
+class _ExpertBucketMember:
+    name: str
+    in_features: int
+    n_snps: int
+    snp_indices: np.ndarray
+
+
+def _bucket_experts(
+    members: list[_ExpertBucketMember],
+    tolerance: float,
+) -> list[list[_ExpertBucketMember]]:
+    sorted_members = sorted(members, key=lambda m: m.in_features)
+    buckets: list[list[_ExpertBucketMember]] = []
+    current: list[_ExpertBucketMember] = [sorted_members[0]]
+    for m in sorted_members[1:]:
+        bucket_min = current[0].in_features
+        if m.in_features <= bucket_min * (1 + tolerance):
+            current.append(m)
+        else:
+            buckets.append(current)
+            current = [m]
+    buckets.append(current)
+    return buckets
+
+
+class BatchedExpertBucket(nn.Module):
+    """
+    Processes multiple experts that share a padded in_features in a single
+    batched forward pass. Experts in the bucket are zero-padded (along the SNP
+    dim) up to the bucket's max n_snps; the bucket's module structure (block
+    depths, kernel sizes, feature sets) is derived from the padded in_features,
+    so all experts share identical structure here.
+    """
+
+    def __init__(
+        self,
+        expert_names: list[str],
+        snp_indices_per_expert: list[np.ndarray],
+        padded_n_snps: int,
+        data_channels: int,
+        data_height: int,
+        fc_0_kernel_size: int,
+        fc_0_out_feature_sets: int,
+        lcl_spec: "LCParameterSpec | None",
+        expert_output_dim: int | None,
+        stub_experts: bool,
+    ):
+        super().__init__()
+
+        self.expert_names = expert_names
+        self.num_experts = len(expert_names)
+        self.padded_n_snps = padded_n_snps
+        self.data_channels = data_channels
+        self.data_height = data_height
+
+        padded_in_features = padded_n_snps * data_channels * data_height
+
+        indices = torch.zeros(self.num_experts, padded_n_snps, dtype=torch.long)
+        mask = torch.zeros(self.num_experts, padded_n_snps)
+        for i, si in enumerate(snp_indices_per_expert):
+            n = len(si)
+            indices[i, :n] = torch.from_numpy(si).long()
+            mask[i, :n] = 1.0
+        self.register_buffer("snp_indices", indices)
+        self.register_buffer("snp_mask", mask)
+
+        self.stub_experts = stub_experts
+
+        self.fc_0 = BatchedLCL(
+            num_experts=self.num_experts,
+            in_features=padded_in_features,
+            out_feature_sets=fc_0_out_feature_sets,
+            kernel_size=fc_0_kernel_size,
+            bias=True,
+        )
+
+        self.lcl_blocks: nn.Sequential | None = None
+        if not stub_experts and lcl_spec is not None:
+            spec_bucket = replace(lcl_spec, in_features=self.fc_0.out_features)
+            self.lcl_blocks = _generate_batched_lcl_blocks(
+                num_experts=self.num_experts,
+                lcl_spec=spec_bucket,
+            )
+            out_features = cast(int, self.lcl_blocks[-1].out_features)
+        else:
+            out_features = self.fc_0.out_features
+
+        self.branch_out_features = out_features
+
+        self._has_projection = expert_output_dim is not None and not stub_experts
+        if self._has_projection:
+            assert expert_output_dim is not None
+            self.proj_norm = BatchedRMSNorm(
+                num_experts=self.num_experts,
+                normalized_shape=out_features,
+            )
+            self.proj_weight = nn.Parameter(
+                torch.empty(self.num_experts, expert_output_dim, out_features)
+            )
+            self.proj_bias = nn.Parameter(
+                torch.zeros(self.num_experts, expert_output_dim)
+            )
+            nn.init.kaiming_uniform_(self.proj_weight, a=math.sqrt(5))
+            self.projection_out_features = expert_output_dim
+        else:
+            self.projection_out_features = out_features
+
+    def gather_and_flatten(
+        self,
+        input: torch.Tensor,
+        flatten_fn: "FlattenFunc",
+    ) -> torch.Tensor:
+        snp_indices = cast(torch.Tensor, self.snp_indices)
+        snp_mask = cast(torch.Tensor, self.snp_mask)
+        gathered = input[:, :, :, snp_indices]
+        gathered = gathered.permute(3, 0, 1, 2, 4).contiguous()
+        gathered = gathered * snp_mask.view(
+            self.num_experts, 1, 1, 1, self.padded_n_snps
+        )
+
+        g, b = gathered.shape[0], gathered.shape[1]
+        collapsed = gathered.reshape(g * b, *gathered.shape[2:])
+        flat = flatten_fn(x=collapsed)
+        return flat.reshape(g, b, -1)
+
+    def forward(self, padded_input: torch.Tensor) -> torch.Tensor:
+        if self.stub_experts:
+            out = self.fc_0(padded_input)
+            return torch.zeros(
+                self.num_experts,
+                out.shape[1],
+                1,
+                device=out.device,
+                dtype=out.dtype,
+            )
+
+        out = self.fc_0(padded_input)
+        if self.lcl_blocks is not None:
+            out = self.lcl_blocks(out)
+
+        if self._has_projection:
+            out = self.proj_norm(out)
+            out = torch.einsum("gbd, god -> gbo", out, self.proj_weight)
+            out = out + self.proj_bias.unsqueeze(1)
+
+        return out
+
+
+def _generate_batched_lcl_blocks(
+    num_experts: int,
+    lcl_spec: "LCParameterSpec",
+) -> nn.Sequential:
+    if lcl_spec.attention_inclusion_cutoff is not None:
+        raise NotImplementedError(
+            "attention_inclusion_cutoff is not supported for batched experts yet."
+        )
+
+    s = lcl_spec
+    block_modules: list[BatchedLCLResidualBlock] = []
+
+    first = BatchedLCLResidualBlock(
+        num_experts=num_experts,
+        in_features=s.in_features,
+        kernel_size=s.kernel_width,
+        out_feature_sets=2**s.channel_exp_base,
+        dropout_p=s.dropout_p,
+        full_preactivation=True,
+    )
+    block_modules.append(first)
+
+    while True:
+        cur_no_blocks = len(block_modules)
+        cur_index = cur_no_blocks // 2
+
+        cur_out_feature_sets = 2 ** (s.channel_exp_base + cur_index)
+        cur_kernel_width = s.kernel_width
+        cur_out_feature_sets, cur_kernel_width = _adjust_auto_params(
+            cur_out_feature_sets=cur_out_feature_sets,
+            cur_kernel_width=cur_kernel_width,
+            direction=s.direction,
+        )
+
+        cur_size = block_modules[-1].out_features
+
+        if _should_break_auto(
+            cur_size=cur_size,
+            cutoff=s.cutoff,
+            direction=s.direction,
+        ):
+            break
+
+        cur_block = BatchedLCLResidualBlock(
+            num_experts=num_experts,
+            in_features=cur_size,
+            kernel_size=cur_kernel_width,
+            out_feature_sets=cur_out_feature_sets,
+            dropout_p=s.dropout_p,
+            stochastic_depth_p=s.stochastic_depth_p,
+        )
+
+        if not _is_making_progress(
+            new_size=cur_block.out_features,
+            old_size=cur_size,
+            direction=s.direction,
+        ):
+            break
+
+        block_modules.append(cur_block)
+
+    return nn.Sequential(*block_modules)
+
+
 class LCLInformedMoEModel(nn.Module):
     def __init__(
         self,
@@ -499,8 +721,78 @@ class LCLInformedMoEModel(nn.Module):
         cutoff = self.model_config.cutoff
         assert isinstance(cutoff, int)
 
+        self._use_batched_experts = (
+            model_config.expert_batching and not model_config.auto_scale_fc0_kernel
+        )
+        if model_config.expert_batching and model_config.auto_scale_fc0_kernel:
+            logger.warning(
+                "expert_batching is enabled but auto_scale_fc0_kernel is True; "
+                "falling back to per-expert loop (batching not yet supported for "
+                "auto-scaled kernels)."
+            )
+
+        self._expert_output_dim = model_config.expert_output_dim
+
+        if self._use_batched_experts:
+            self._init_batched_experts(
+                expert_snp_indices=expert_snp_indices,
+                fc_0_kernel_size=fc_0_kernel_size,
+                fc_0_out_feature_sets=fc_0_out_feature_sets,
+                kernel_width=kernel_width,
+                cutoff=cutoff,
+            )
+        else:
+            self._init_legacy_experts(
+                expert_snp_indices=expert_snp_indices,
+                fc_0_kernel_size=fc_0_kernel_size,
+                fc_0_out_feature_sets=fc_0_out_feature_sets,
+                kernel_width=kernel_width,
+                cutoff=cutoff,
+            )
+
+        self._per_expert_output = model_config.expert_output_dim is not None
+        if self._per_expert_output and not self._use_batched_experts:
+            assert model_config.expert_output_dim is not None
+            self.expert_projections = nn.ModuleDict()
+            for name in self.expert_branches:
+                branch = cast(ExpertBranch, self.expert_branches[name])
+                self.expert_projections[name] = nn.Sequential(
+                    nn.RMSNorm(normalized_shape=branch.out_features),
+                    nn.Linear(
+                        in_features=branch.out_features,
+                        out_features=model_config.expert_output_dim,
+                    ),
+                )
+
+        self._cross_expert_attention: CrossExpertAttention | None = None
+        if model_config.cross_expert_attention_heads is not None:
+            if not self._per_expert_output:
+                raise ValueError(
+                    "cross_expert_attention_heads requires expert_output_dim to be set."
+                )
+            assert model_config.expert_output_dim is not None
+            self._cross_expert_attention = CrossExpertAttention(
+                dim=model_config.expert_output_dim,
+                num_heads=model_config.cross_expert_attention_heads,
+                num_layers=model_config.cross_expert_attention_layers,
+                dropout_p=model_config.cross_expert_attention_dropout,
+                attention_type=model_config.cross_expert_attention_type,
+            )
+
+        self._init_weights()
+
+    def _init_legacy_experts(
+        self,
+        expert_snp_indices: dict[str, np.ndarray],
+        fc_0_kernel_size: int,
+        fc_0_out_feature_sets: int,
+        kernel_width: int,
+        cutoff: int,
+    ) -> None:
         self._expert_indices: dict[str, torch.Tensor] = {}
         self.expert_branches = nn.ModuleDict()
+        data_dimensions = self.data_dimensions
+        model_config = self.model_config
 
         for name, snp_indices in expert_snp_indices.items():
             self.register_buffer(
@@ -533,7 +825,7 @@ class LCLInformedMoEModel(nn.Module):
                 bias=True,
             )
 
-            stub = self.model_config.stub_experts
+            stub = model_config.stub_experts
 
             lcl_blocks: nn.Sequential | None = None
             if not stub:
@@ -547,68 +839,171 @@ class LCLInformedMoEModel(nn.Module):
                 lcl_parameter_spec = LCParameterSpec(
                     in_features=int(fc_0.out_features),
                     kernel_width=expert_kernel_width,
-                    channel_exp_base=self.model_config.channel_exp_base,
-                    dropout_p=self.model_config.rb_do,
+                    channel_exp_base=model_config.channel_exp_base,
+                    dropout_p=model_config.rb_do,
                     cutoff=cutoff,
-                    stochastic_depth_p=self.model_config.stochastic_depth_p,
-                    attention_inclusion_cutoff=self.model_config.attention_inclusion_cutoff,
-                    direction=self.model_config.direction,
+                    stochastic_depth_p=model_config.stochastic_depth_p,
+                    attention_inclusion_cutoff=model_config.attention_inclusion_cutoff,
+                    direction=model_config.direction,
                 )
                 lcl_blocks = _get_lcl_blocks(
                     lcl_spec=lcl_parameter_spec,
-                    block_layer_spec=self.model_config.layers,
+                    block_layer_spec=model_config.layers,
                 )
 
             branch = ExpertBranch(
                 fc_0=fc_0,
                 lcl_blocks=lcl_blocks,
+                stub=stub,
             )
             self.expert_branches[name] = branch
 
-        self._per_expert_output = model_config.expert_output_dim is not None
-        if self._per_expert_output:
-            assert model_config.expert_output_dim is not None
-            self.expert_projections = nn.ModuleDict()
-            for name in self.expert_branches:
-                branch = cast(ExpertBranch, self.expert_branches[name])
-                self.expert_projections[name] = nn.Sequential(
-                    nn.RMSNorm(normalized_shape=branch.out_features),
-                    nn.Linear(
-                        in_features=branch.out_features,
-                        out_features=model_config.expert_output_dim,
-                    ),
-                )
+    def _init_batched_experts(
+        self,
+        expert_snp_indices: dict[str, np.ndarray],
+        fc_0_kernel_size: int,
+        fc_0_out_feature_sets: int,
+        kernel_width: int,
+        cutoff: int,
+    ) -> None:
+        model_config = self.model_config
+        data_dimensions = self.data_dimensions
 
-        self._cross_expert_attention: CrossExpertAttention | None = None
-        if model_config.cross_expert_attention_heads is not None:
-            if not self._per_expert_output:
-                raise ValueError(
-                    "cross_expert_attention_heads requires expert_output_dim to be set."
+        members: list[_ExpertBucketMember] = []
+        for name, snp_indices in expert_snp_indices.items():
+            n_snps = len(snp_indices)
+            in_features = n_snps * data_dimensions.channels * data_dimensions.height
+            members.append(
+                _ExpertBucketMember(
+                    name=name,
+                    in_features=in_features,
+                    n_snps=n_snps,
+                    snp_indices=snp_indices,
                 )
-            assert model_config.expert_output_dim is not None
-            self._cross_expert_attention = CrossExpertAttention(
-                dim=model_config.expert_output_dim,
-                num_heads=model_config.cross_expert_attention_heads,
-                num_layers=model_config.cross_expert_attention_layers,
-                dropout_p=model_config.cross_expert_attention_dropout,
-                attention_type=model_config.cross_expert_attention_type,
             )
 
-        self._init_weights()
+        bucket_groups = _bucket_experts(
+            members=members,
+            tolerance=model_config.expert_batching_tolerance,
+        )
+
+        self.expert_buckets = nn.ModuleList()
+        self._expert_to_bucket: dict[str, tuple[int, int]] = {}
+        self._ordered_expert_names: list[str] = [
+            m.name for group in bucket_groups for m in group
+        ]
+
+        for bucket_idx, group in enumerate(bucket_groups):
+            padded_n_snps = max(m.n_snps for m in group)
+            padded_in_features = (
+                padded_n_snps * data_dimensions.channels * data_dimensions.height
+            )
+
+            bucket_fc_0_kernel = _clamp_kernel_for_min_chunks(
+                kernel_size=fc_0_kernel_size,
+                in_features=padded_in_features,
+                min_chunks=4,
+                min_kernel=4,
+            )
+
+            lcl_spec: LCParameterSpec | None = None
+            if not model_config.stub_experts:
+                bucket_post_fc0 = BatchedLCL(
+                    num_experts=1,
+                    in_features=padded_in_features,
+                    out_feature_sets=fc_0_out_feature_sets,
+                    kernel_size=bucket_fc_0_kernel,
+                    bias=True,
+                )
+                post_fc0_features = bucket_post_fc0.out_features
+                del bucket_post_fc0
+
+                bucket_kernel_width = _clamp_kernel_for_min_chunks(
+                    kernel_size=kernel_width,
+                    in_features=post_fc0_features,
+                    min_chunks=4,
+                    min_kernel=4,
+                )
+
+                lcl_spec = LCParameterSpec(
+                    in_features=post_fc0_features,
+                    kernel_width=bucket_kernel_width,
+                    channel_exp_base=model_config.channel_exp_base,
+                    dropout_p=model_config.rb_do,
+                    cutoff=cutoff,
+                    stochastic_depth_p=model_config.stochastic_depth_p,
+                    attention_inclusion_cutoff=model_config.attention_inclusion_cutoff,
+                    direction=model_config.direction,
+                )
+
+                if model_config.layers is not None:
+                    raise NotImplementedError(
+                        "Explicit `layers` spec is not yet "
+                        "supported with expert_batching."
+                    )
+
+            bucket = BatchedExpertBucket(
+                expert_names=[m.name for m in group],
+                snp_indices_per_expert=[m.snp_indices for m in group],
+                padded_n_snps=padded_n_snps,
+                data_channels=data_dimensions.channels,
+                data_height=data_dimensions.height,
+                fc_0_kernel_size=bucket_fc_0_kernel,
+                fc_0_out_feature_sets=fc_0_out_feature_sets,
+                lcl_spec=lcl_spec,
+                expert_output_dim=model_config.expert_output_dim,
+                stub_experts=model_config.stub_experts,
+            )
+            for within_idx, m in enumerate(group):
+                self._expert_to_bucket[m.name] = (bucket_idx, within_idx)
+            self.expert_buckets.append(bucket)
+
+        bucket_sizes = [len(g) for g in bucket_groups]
+        pad_waste = []
+        for g in bucket_groups:
+            min_snps = min(m.n_snps for m in g)
+            max_snps = max(m.n_snps for m in g)
+            waste_pct = (1 - min_snps / max_snps) * 100
+            pad_waste.append(f"{waste_pct:.0f}%")
+
+        logger.info(
+            "LCLInformedMoEModel: expert_batching enabled. "
+            "%d experts grouped into %d buckets. "
+            "Bucket sizes: %s. Pad waste: %s.",
+            len(members),
+            len(bucket_groups),
+            bucket_sizes,
+            pad_waste,
+        )
 
     @property
     def l1_penalized_weights(self) -> torch.Tensor:
-        weights: list[torch.Tensor] = []
+        if self._use_batched_experts:
+            weights: list[torch.Tensor] = []
+            for bucket in self.expert_buckets:
+                assert isinstance(bucket, BatchedExpertBucket)
+                weights.append(bucket.fc_0.weight.flatten(end_dim=0))
+            return torch.cat(weights, dim=0)
+
+        branch_weights: list[torch.Tensor] = []
         for branch in self.expert_branches.values():
             assert isinstance(branch, ExpertBranch)
-            weights.append(branch.fc_0.weight)
-        return torch.stack(weights)
+            branch_weights.append(branch.fc_0.weight)
+        return torch.stack(branch_weights)
 
     @property
     def num_out_features(self) -> int:
         if self._per_expert_output:
             assert self.model_config.expert_output_dim is not None
             return self.model_config.expert_output_dim
+
+        if self._use_batched_experts:
+            total = 0
+            for bucket in self.expert_buckets:
+                assert isinstance(bucket, BatchedExpertBucket)
+                total += bucket.num_experts * bucket.branch_out_features
+            return total
+
         total = 0
         for branch in self.expert_branches.values():
             assert isinstance(branch, ExpertBranch)
@@ -623,9 +1018,52 @@ class LCLInformedMoEModel(nn.Module):
         pass
 
     def forward(self, input: torch.Tensor) -> torch.Tensor | dict[str, torch.Tensor]:
+        if self._use_batched_experts:
+            bucket_outputs = self._forward_buckets(input=input)
+            if self._per_expert_output:
+                return self._assemble_per_expert(bucket_outputs=bucket_outputs)
+            return self._assemble_concat(bucket_outputs=bucket_outputs)
+
         if self._per_expert_output:
             return self._forward_per_expert(input=input)
         return self._forward_concat(input=input)
+
+    def _forward_buckets(
+        self,
+        input: torch.Tensor,
+    ) -> list[torch.Tensor]:
+        outputs: list[torch.Tensor] = []
+        for bucket in self.expert_buckets:
+            assert isinstance(bucket, BatchedExpertBucket)
+            flat = bucket.gather_and_flatten(input=input, flatten_fn=self.flatten_fn)
+            outputs.append(bucket(flat))
+        return outputs
+
+    def _assemble_concat(
+        self,
+        bucket_outputs: list[torch.Tensor],
+    ) -> torch.Tensor:
+        pieces: list[torch.Tensor] = []
+        for out in bucket_outputs:
+            g, b = out.shape[:2]
+            pieces.append(out.permute(1, 0, 2).reshape(b, g * out.shape[-1]))
+        return torch.cat(pieces, dim=1)
+
+    def _assemble_per_expert(
+        self,
+        bucket_outputs: list[torch.Tensor],
+    ) -> dict[str, torch.Tensor]:
+        expert_outputs: dict[str, torch.Tensor] = {}
+        for bucket, out in zip(self.expert_buckets, bucket_outputs, strict=True):
+            assert isinstance(bucket, BatchedExpertBucket)
+            for i, name in enumerate(bucket.expert_names):
+                expert_outputs[name] = out[i]
+
+        if self._cross_expert_attention is not None:
+            expert_outputs = self._cross_expert_attention(
+                expert_outputs=expert_outputs,
+            )
+        return expert_outputs
 
     def _forward_concat(self, input: torch.Tensor) -> torch.Tensor:
         expert_outputs: list[torch.Tensor] = []

@@ -231,3 +231,187 @@ def _calculate_num_chunks_for_equal_lcl_out_features(
     Ensure total out features are equal to in features.
     """
     return in_features // out_feature_sets
+
+
+class BatchedLCL(nn.Module):
+    __constants__ = ["bias", "in_features", "out_features", "num_experts"]
+
+    def __init__(
+        self,
+        num_experts: int,
+        in_features: int,
+        out_feature_sets: int,
+        num_chunks: int = 10,
+        kernel_size: int | None = None,
+        bias: bool = True,
+    ):
+        super().__init__()
+
+        self.num_experts = num_experts
+        self.in_features = in_features
+        self.out_feature_sets = out_feature_sets
+        self.num_chunks = num_chunks
+
+        if kernel_size:
+            self.kernel_size = kernel_size
+            self.num_chunks = int(math.ceil(in_features / kernel_size))
+        else:
+            self.kernel_size = int(math.ceil(self.in_features / self.num_chunks))
+
+        self.out_features = self.out_feature_sets * self.num_chunks
+        self.padding = _find_lcl_padding_needed(
+            input_size=self.in_features,
+            kernel_size=self.kernel_size,
+            num_chunks=self.num_chunks,
+        )
+
+        self.weight = Parameter(
+            torch.empty(
+                num_experts,
+                self.out_feature_sets,
+                self.num_chunks,
+                self.kernel_size,
+            )
+        )
+        if bias:
+            self.bias = Parameter(torch.empty(num_experts, self.out_features))
+        else:
+            self.register_parameter("bias", None)
+
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            nn.init.zeros_(self.bias)
+
+    def extra_repr(self) -> str:
+        return (
+            f"num_experts={self.num_experts}, in_features={self.in_features}, "
+            f"num_chunks={self.num_chunks}, kernel_size={self.kernel_size}, "
+            f"out_feature_sets={self.out_feature_sets}, "
+            f"out_features={self.out_features}, bias={self.bias is not None}"
+        )
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        if self.padding > 0:
+            input = F.pad(input=input, pad=[0, self.padding])
+
+        g, b = input.shape[0], input.shape[1]
+        reshaped = input.reshape(g, b, self.num_chunks, self.kernel_size)
+
+        out = torch.einsum("gbhw, gohw -> gboh", reshaped, self.weight)
+        out = out.flatten(start_dim=2)
+        if self.bias is not None:
+            out = out + self.bias.unsqueeze(1)
+        return out
+
+
+class BatchedRMSNorm(nn.Module):
+    def __init__(
+        self,
+        num_experts: int,
+        normalized_shape: int,
+        eps: float = 1e-5,
+    ):
+        super().__init__()
+        self.num_experts = num_experts
+        self.normalized_shape = normalized_shape
+        self.eps = eps
+        self.weight = Parameter(torch.ones(num_experts, normalized_shape))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        variance = x.pow(2).mean(dim=-1, keepdim=True)
+        x = x * torch.rsqrt(variance + self.eps)
+        return x * self.weight.unsqueeze(1)
+
+
+class BatchedLayerScale(nn.Module):
+    def __init__(self, num_experts: int, dim: int, init_values: float = 1e-5):
+        super().__init__()
+        self.gamma = Parameter(torch.full((num_experts, dim), init_values))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x * self.gamma.unsqueeze(1)
+
+
+class BatchedLCLResidualBlock(nn.Module):
+    def __init__(
+        self,
+        num_experts: int,
+        in_features: int,
+        out_feature_sets: int,
+        kernel_size: int,
+        dropout_p: float = 0.0,
+        stochastic_depth_p: float = 0.0,
+        full_preactivation: bool = False,
+        reduce_both: bool = True,
+    ):
+        super().__init__()
+
+        self.num_experts = num_experts
+        self.in_features = in_features
+        self.kernel_size = kernel_size
+        self.out_feature_sets = out_feature_sets
+        self.dropout_p = dropout_p
+        self.full_preactivation = full_preactivation
+        self.reduce_both = reduce_both
+        self.stochastic_depth_p = stochastic_depth_p
+
+        self.norm_1 = BatchedRMSNorm(
+            num_experts=num_experts,
+            normalized_shape=in_features,
+        )
+        self.fc_1 = BatchedLCL(
+            num_experts=num_experts,
+            in_features=in_features,
+            out_feature_sets=out_feature_sets,
+            kernel_size=kernel_size,
+            bias=True,
+        )
+        self.act_1 = nn.GELU()
+        self.do = nn.Dropout(p=dropout_p)
+
+        fc_2_kwargs = _get_lcl_2_kwargs(
+            in_features=self.fc_1.out_features,
+            out_feature_sets=out_feature_sets,
+            bias=True,
+            kernel_size=kernel_size,
+            reduce_both=reduce_both,
+        )
+        self.fc_2 = BatchedLCL(num_experts=num_experts, **fc_2_kwargs)
+
+        self.out_features = self.fc_2.out_features
+
+        self.ls = BatchedLayerScale(num_experts=num_experts, dim=self.out_features)
+
+        self._norm_identity = full_preactivation or (in_features != self.out_features)
+
+        self.downsample_identity: nn.Module
+        if in_features != self.out_features:
+            self.downsample_identity = BatchedLCL(
+                num_experts=num_experts,
+                in_features=in_features,
+                out_feature_sets=1,
+                num_chunks=self.fc_2.out_features,
+                bias=True,
+            )
+        else:
+            self.downsample_identity = nn.Identity()
+
+        self.stochastic_depth = StochasticDepth(p=stochastic_depth_p, mode="batch")
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = self.norm_1(x)
+
+        identity = out if self._norm_identity else x
+        identity = self.downsample_identity(identity)
+
+        out = self.fc_1(out)
+        out = self.act_1(out)
+        out = self.do(out)
+        out = self.fc_2(out)
+        out = self.ls(out)
+        out = self.stochastic_depth(out)
+
+        return out + identity
