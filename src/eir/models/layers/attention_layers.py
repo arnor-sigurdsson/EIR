@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from functools import partial
+from typing import Literal
 
 import torch
 import torch.nn.functional as F
@@ -6,6 +8,164 @@ from einops import rearrange
 from torch import Tensor, nn
 
 from eir.models.layers.norm_layers import LayerScale, RMSNorm
+
+SparseAttentionType = Literal["softmax", "entmax15", "sparsemax"]
+
+
+def _make_ix_like(input: Tensor, dim: int = -1) -> Tensor:
+    d = input.size(dim)
+    rho = torch.arange(start=1, end=d + 1, device=input.device, dtype=input.dtype)
+    view = [1] * input.dim()
+    view[dim] = -1
+    return rho.view(view)
+
+
+class _Entmax15Function(torch.autograd.Function):
+    """
+    All entmax/sparsemax functionality adapted from:
+    https://github.com/deep-spin/entmax/
+    """
+
+    @staticmethod
+    def forward(
+        ctx: torch.autograd.function.FunctionCtx, input: Tensor, dim: int = -1
+    ) -> Tensor:  # type: ignore[override]
+        ctx.dim = dim  # type: ignore[attr-defined]
+
+        max_val, _ = input.max(dim=dim, keepdim=True)
+        input = input - max_val
+        input = input / 2
+
+        x_srt, _ = torch.sort(input=input, descending=True, dim=dim)
+        rho = _make_ix_like(input=input, dim=dim)
+        mean = x_srt.cumsum(dim=dim) / rho
+        mean_sq = (x_srt**2).cumsum(dim=dim) / rho
+        ss = rho * (mean_sq - mean**2)
+        delta = (1 - ss) / rho
+        delta_nz = torch.clamp(input=delta, min=0)
+        tau = mean - torch.sqrt(delta_nz)
+
+        support_size = (tau <= x_srt).sum(dim=dim).unsqueeze(dim=dim)
+        tau_star = tau.gather(dim=dim, index=support_size - 1)
+
+        output = torch.clamp(input=input - tau_star, min=0) ** 2
+        ctx.save_for_backward(output)
+        return output
+
+    @staticmethod
+    def backward(
+        ctx: torch.autograd.function.FunctionCtx, grad_output: Tensor
+    ) -> tuple[Tensor, None]:  # type: ignore[override]
+        (y,) = ctx.saved_tensors  # type: ignore[attr-defined]
+        dim = ctx.dim  # type: ignore[attr-defined]
+
+        gppr = y.sqrt()
+        dx = grad_output * gppr
+        q = dx.sum(dim=dim, keepdim=True) / gppr.sum(dim=dim, keepdim=True).clamp(
+            min=1e-12
+        )
+        dx -= q * gppr
+        dx *= (y > 0).float()
+
+        return dx, None
+
+
+class _SparsemaxFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(
+        ctx: torch.autograd.function.FunctionCtx, input: Tensor, dim: int = -1
+    ) -> Tensor:  # type: ignore[override]
+        ctx.dim = dim  # type: ignore[attr-defined]
+
+        max_val, _ = input.max(dim=dim, keepdim=True)
+        input = input - max_val
+
+        z_sorted, _ = torch.sort(input=input, descending=True, dim=dim)
+        z_cumsum = z_sorted.cumsum(dim=dim)
+        k = _make_ix_like(input=input, dim=dim)
+        support = (1 + k * z_sorted > z_cumsum).float()
+        k_star = support.sum(dim=dim, keepdim=True)
+        tau = (z_cumsum.gather(dim=dim, index=(k_star - 1).long()) - 1) / k_star
+
+        output = torch.clamp(input=input - tau, min=0)
+        ctx.save_for_backward(output)
+        return output
+
+    @staticmethod
+    def backward(
+        ctx: torch.autograd.function.FunctionCtx, grad_output: Tensor
+    ) -> tuple[Tensor, None]:  # type: ignore[override]
+        (output,) = ctx.saved_tensors  # type: ignore[attr-defined]
+        dim = ctx.dim  # type: ignore[attr-defined]
+
+        nonzero = (output > 0).float()
+        grad_input = grad_output * nonzero
+        v_hat = grad_input.sum(dim=dim, keepdim=True) / nonzero.sum(
+            dim=dim, keepdim=True
+        ).clamp(min=1e-12)
+        grad_input -= v_hat * nonzero
+        return grad_input, None
+
+
+def entmax15(input: Tensor, dim: int = -1) -> Tensor:
+    return _Entmax15Function.apply(input, dim)
+
+
+def sparsemax(input: Tensor, dim: int = -1) -> Tensor:
+    return _SparsemaxFunction.apply(input, dim)
+
+
+class EntmaxMultiheadAttention(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout_p: float = 0.0,
+        attention_type: SparseAttentionType = "entmax15",
+    ):
+        super().__init__()
+        assert embed_dim % num_heads == 0
+
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim**-0.5
+        self.attention_type = attention_type
+
+        self.q_proj = nn.Linear(
+            in_features=embed_dim, out_features=embed_dim, bias=False
+        )
+        self.k_proj = nn.Linear(
+            in_features=embed_dim, out_features=embed_dim, bias=False
+        )
+        self.v_proj = nn.Linear(
+            in_features=embed_dim, out_features=embed_dim, bias=False
+        )
+        self.out_proj = nn.Linear(
+            in_features=embed_dim, out_features=embed_dim, bias=False
+        )
+        self.dropout = nn.Dropout(p=dropout_p)
+
+        if attention_type == "entmax15":
+            self._attn_fn = entmax15
+        elif attention_type == "sparsemax":
+            self._attn_fn = sparsemax
+        else:
+            self._attn_fn = partial(F.softmax, dim=-1)
+
+    def forward(self, x: Tensor) -> Tensor:
+        b, s, _ = x.shape
+
+        q = self.q_proj(x).view(b, s, self.num_heads, self.head_dim).transpose(1, 2)
+        k = self.k_proj(x).view(b, s, self.num_heads, self.head_dim).transpose(1, 2)
+        v = self.v_proj(x).view(b, s, self.num_heads, self.head_dim).transpose(1, 2)
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = self._attn_fn(attn, dim=-1)
+        attn = self.dropout(attn)
+
+        out = (attn @ v).transpose(1, 2).contiguous().view(b, s, self.embed_dim)
+        return self.out_proj(out)
 
 
 class LinearAttention(nn.Module):

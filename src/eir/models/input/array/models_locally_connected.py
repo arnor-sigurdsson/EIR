@@ -15,7 +15,11 @@ import torch
 from torch import nn
 
 from eir.models.input.sequence.transformer_models import PositionalEmbedding
-from eir.models.layers.attention_layers import LinearAttention
+from eir.models.layers.attention_layers import (
+    EntmaxMultiheadAttention,
+    LinearAttention,
+    SparseAttentionType,
+)
 from eir.models.layers.lcl_layers import LCL, LCLResidualBlock
 from eir.models.layers.norm_layers import LayerScale
 from eir.utils.logging import get_logger
@@ -319,6 +323,13 @@ class LCLInformedMoEModelConfig(LCLModelConfig):
 
     :param cross_expert_attention_dropout:
         Dropout probability for cross-expert attention and FFN layers.
+
+    :param cross_expert_attention_type:
+        Attention function used in cross-expert attention blocks.
+        ``"softmax"`` uses standard dense attention.
+        ``"entmax15"`` uses entmax with alpha=1.5, producing sparse attention
+        weights where some experts receive exactly zero weight.
+        ``"sparsemax"`` uses alpha=2.0, producing even sparser attention.
     """
 
     stub_experts: bool = False
@@ -327,6 +338,7 @@ class LCLInformedMoEModelConfig(LCLModelConfig):
     cross_expert_attention_heads: int | None = None
     cross_expert_attention_layers: int = 1
     cross_expert_attention_dropout: float = 0.10
+    cross_expert_attention_type: SparseAttentionType = "softmax"
 
 
 class SwiGLUFFN(nn.Module):
@@ -352,21 +364,38 @@ class CrossExpertTransformerBlock(nn.Module):
         dim: int,
         num_heads: int,
         dropout_p: float = 0.0,
+        attention_type: SparseAttentionType = "softmax",
     ):
         super().__init__()
         self.attn_norm = nn.RMSNorm(dim)
-        self.attn = nn.MultiheadAttention(
-            embed_dim=dim,
-            num_heads=num_heads,
-            dropout=dropout_p,
-            batch_first=True,
-        )
+
+        if attention_type == "softmax":
+            self.attn: nn.MultiheadAttention | EntmaxMultiheadAttention = (
+                nn.MultiheadAttention(
+                    embed_dim=dim,
+                    num_heads=num_heads,
+                    dropout=dropout_p,
+                    batch_first=True,
+                )
+            )
+        else:
+            self.attn = EntmaxMultiheadAttention(
+                embed_dim=dim,
+                num_heads=num_heads,
+                dropout_p=dropout_p,
+                attention_type=attention_type,
+            )
+
         self.ffn_norm = nn.RMSNorm(dim)
         self.ffn = SwiGLUFFN(dim=dim, dropout_p=dropout_p)
+        self._attention_type = attention_type
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         h = self.attn_norm(x)
-        h, _ = self.attn(query=h, key=h, value=h, need_weights=False)
+        if self._attention_type == "softmax":
+            h, _ = self.attn(query=h, key=h, value=h, need_weights=False)
+        else:
+            h = self.attn(x=h)
         x = x + h
         x = x + self.ffn(self.ffn_norm(x))
         return x
@@ -379,6 +408,7 @@ class CrossExpertAttention(nn.Module):
         num_heads: int,
         num_layers: int = 1,
         dropout_p: float = 0.0,
+        attention_type: SparseAttentionType = "softmax",
     ):
         super().__init__()
         self.blocks = nn.ModuleList(
@@ -387,6 +417,7 @@ class CrossExpertAttention(nn.Module):
                     dim=dim,
                     num_heads=num_heads,
                     dropout_p=dropout_p,
+                    attention_type=attention_type,
                 )
                 for _ in range(num_layers)
             ]
@@ -560,6 +591,7 @@ class LCLInformedMoEModel(nn.Module):
                 num_heads=model_config.cross_expert_attention_heads,
                 num_layers=model_config.cross_expert_attention_layers,
                 dropout_p=model_config.cross_expert_attention_dropout,
+                attention_type=model_config.cross_expert_attention_type,
             )
 
         self._init_weights()

@@ -81,6 +81,10 @@ class SharedResidualMLPOutputModule(nn.Module):
         self.input_identity = nn.Identity()
         self.output_identity = nn.Identity()
 
+        if model_config.expert_groups is not None:
+            for group_name in self._batched_group_names:
+                self.add_module(f"{group_name}_output", nn.Identity())
+
     def _build_shared(self, input_dimension: int) -> None:
         task_resblocks_kwargs: dict[str, float | int | bool] = {
             "in_features": self.model_config.fc_task_dim,
@@ -276,7 +280,10 @@ class SharedResidualMLPOutputModule(nn.Module):
             )
         ):
             group_out = projected[i, :, : sum(sizes)]
+            cur_expert_name = self._batched_group_names[i]
+            group_out = getattr(self, f"{cur_expert_name}_output")(group_out)
             split = torch.split(group_out, sizes, dim=1)
+
             for target_name, target_tensor in zip(targets, split, strict=False):
                 results[target_name] = target_tensor
 
