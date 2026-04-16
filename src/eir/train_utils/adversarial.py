@@ -155,7 +155,7 @@ def hook_add_adversarial_losses(
                     adv_config.projection_lcl_residual_blocks
                 ),
             )
-            module = module.to(device=device)
+            module = experiment.fabric.setup_module(module)
             adversarial_modules[adv_config.name] = module
 
             logger.debug(
