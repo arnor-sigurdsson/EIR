@@ -483,23 +483,29 @@ class _ExpertBucketMember:
     in_features: int
     n_snps: int
     snp_indices: np.ndarray
+    fc_0_kernel: int
 
 
 def _bucket_experts(
     members: list[_ExpertBucketMember],
     tolerance: float,
 ) -> list[list[_ExpertBucketMember]]:
-    sorted_members = sorted(members, key=lambda m: m.in_features)
+    by_kernel: dict[int, list[_ExpertBucketMember]] = {}
+    for m in members:
+        by_kernel.setdefault(m.fc_0_kernel, []).append(m)
+
     buckets: list[list[_ExpertBucketMember]] = []
-    current: list[_ExpertBucketMember] = [sorted_members[0]]
-    for m in sorted_members[1:]:
-        bucket_min = current[0].in_features
-        if m.in_features <= bucket_min * (1 + tolerance):
-            current.append(m)
-        else:
-            buckets.append(current)
-            current = [m]
-    buckets.append(current)
+    for kernel in sorted(by_kernel):
+        sorted_members = sorted(by_kernel[kernel], key=lambda m: m.in_features)
+        current: list[_ExpertBucketMember] = [sorted_members[0]]
+        for m in sorted_members[1:]:
+            bucket_min = current[0].in_features
+            if m.in_features <= bucket_min * (1 + tolerance):
+                current.append(m)
+            else:
+                buckets.append(current)
+                current = [m]
+        buckets.append(current)
     return buckets
 
 
@@ -721,15 +727,7 @@ class LCLInformedMoEModel(nn.Module):
         cutoff = self.model_config.cutoff
         assert isinstance(cutoff, int)
 
-        self._use_batched_experts = (
-            model_config.expert_batching and not model_config.auto_scale_fc0_kernel
-        )
-        if model_config.expert_batching and model_config.auto_scale_fc0_kernel:
-            logger.warning(
-                "expert_batching is enabled but auto_scale_fc0_kernel is True; "
-                "falling back to per-expert loop (batching not yet supported for "
-                "auto-scaled kernels)."
-            )
+        self._use_batched_experts = model_config.expert_batching
 
         self._expert_output_dim = model_config.expert_output_dim
 
@@ -873,12 +871,17 @@ class LCLInformedMoEModel(nn.Module):
         for name, snp_indices in expert_snp_indices.items():
             n_snps = len(snp_indices)
             in_features = n_snps * data_dimensions.channels * data_dimensions.height
+            if model_config.auto_scale_fc0_kernel:
+                member_kernel = _get_auto_scaled_fc0_kernel(n_snps=n_snps)
+            else:
+                member_kernel = fc_0_kernel_size
             members.append(
                 _ExpertBucketMember(
                     name=name,
                     in_features=in_features,
                     n_snps=n_snps,
                     snp_indices=snp_indices,
+                    fc_0_kernel=member_kernel,
                 )
             )
 
@@ -899,8 +902,10 @@ class LCLInformedMoEModel(nn.Module):
                 padded_n_snps * data_dimensions.channels * data_dimensions.height
             )
 
+            group_kernel = group[0].fc_0_kernel
+            assert all(m.fc_0_kernel == group_kernel for m in group)
             bucket_fc_0_kernel = _clamp_kernel_for_min_chunks(
-                kernel_size=fc_0_kernel_size,
+                kernel_size=group_kernel,
                 in_features=padded_in_features,
                 min_chunks=4,
                 min_kernel=4,
@@ -959,6 +964,7 @@ class LCLInformedMoEModel(nn.Module):
             self.expert_buckets.append(bucket)
 
         bucket_sizes = [len(g) for g in bucket_groups]
+        bucket_kernels = [g[0].fc_0_kernel for g in bucket_groups]
         pad_waste = []
         for g in bucket_groups:
             min_snps = min(m.n_snps for m in g)
@@ -969,10 +975,11 @@ class LCLInformedMoEModel(nn.Module):
         logger.info(
             "LCLInformedMoEModel: expert_batching enabled. "
             "%d experts grouped into %d buckets. "
-            "Bucket sizes: %s. Pad waste: %s.",
+            "Bucket sizes: %s. fc_0 kernels: %s. Pad waste: %s.",
             len(members),
             len(bucket_groups),
             bucket_sizes,
+            bucket_kernels,
             pad_waste,
         )
 
