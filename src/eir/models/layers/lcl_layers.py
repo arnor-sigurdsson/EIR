@@ -307,6 +307,39 @@ class BatchedLCL(nn.Module):
         return out
 
 
+class BatchedLinear(nn.Module):
+    def __init__(
+        self,
+        num_experts: int,
+        in_features: int,
+        out_features: int,
+        bias: bool = True,
+    ):
+        super().__init__()
+        self.num_experts = num_experts
+        self.in_features = in_features
+        self.out_features = out_features
+
+        self.weight = Parameter(torch.empty(num_experts, out_features, in_features))
+        if bias:
+            self.bias = Parameter(torch.empty(num_experts, out_features))
+        else:
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            bound = 1 / math.sqrt(self.in_features)
+            nn.init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = torch.einsum("gbi, goi -> gbo", x, self.weight)
+        if self.bias is not None:
+            out = out + self.bias.unsqueeze(1)
+        return out
+
+
 class BatchedRMSNorm(nn.Module):
     def __init__(
         self,

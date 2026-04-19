@@ -25,10 +25,15 @@ from eir.models.layers.lcl_layers import (
     LCL,
     BatchedLCL,
     BatchedLCLResidualBlock,
+    BatchedLinear,
     BatchedRMSNorm,
     LCLResidualBlock,
 )
 from eir.models.layers.norm_layers import LayerScale
+from eir.models.layers.projection_layers import (
+    _find_best_lcl_kernel_width_and_out_feature_sets,
+    get_1d_projection_layer,
+)
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -348,6 +353,7 @@ class LCLInformedMoEModelConfig(LCLModelConfig):
     cross_expert_attention_type: SparseAttentionType = "softmax"
     expert_batching: bool = False
     expert_batching_tolerance: float = 0.15
+    fc0_highway: bool = False
 
 
 class SwiGLUFFN(nn.Module):
@@ -466,15 +472,21 @@ class ExpertBranch(nn.Module):
             return cast(int, self.lcl_blocks[-1].out_features)
         return self.fc_0.out_features
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.fc_0(x)
-
+    def forward_with_fc0(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        fc0_out = self.fc_0(x)
         if self.stub:
-            return torch.zeros(x.shape[0], 1, device=x.device, dtype=x.dtype)
-
+            main = torch.zeros(
+                fc0_out.shape[0], 1, device=fc0_out.device, dtype=fc0_out.dtype
+            )
+            return fc0_out, main
+        main = fc0_out
         if self.lcl_blocks is not None:
-            x = self.lcl_blocks(x)
-        return x
+            main = self.lcl_blocks(main)
+        return fc0_out, main
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        _, main = self.forward_with_fc0(x=x)
+        return main
 
 
 @dataclass
@@ -509,6 +521,72 @@ def _bucket_experts(
     return buckets
 
 
+def _build_batched_highway(
+    num_experts: int,
+    in_features: int,
+    target_dim: int,
+) -> nn.Module:
+    if in_features == target_dim:
+        return nn.Identity()
+
+    kernel_width_candidates = tuple(range(1, 16384 + 1))
+    out_feature_sets_candidates = tuple(range(1, 1024 + 1))
+
+    residual_solution = _find_best_lcl_kernel_width_and_out_feature_sets(
+        input_dimension=in_features,
+        target_dimension=target_dim,
+        n_layers=2,
+        kernel_width_candidates=kernel_width_candidates,
+        out_feature_sets_candidates=out_feature_sets_candidates,
+    )
+    if residual_solution is not None:
+        kernel_size, out_feature_sets = residual_solution
+        block = BatchedLCLResidualBlock(
+            num_experts=num_experts,
+            in_features=in_features,
+            kernel_size=kernel_size,
+            out_feature_sets=out_feature_sets,
+        )
+        if block.out_features == target_dim:
+            return block
+
+    single_solution = _find_best_lcl_kernel_width_and_out_feature_sets(
+        input_dimension=in_features,
+        target_dimension=target_dim,
+        n_layers=1,
+        kernel_width_candidates=kernel_width_candidates,
+        out_feature_sets_candidates=out_feature_sets_candidates,
+    )
+    if single_solution is not None:
+        kernel_size, out_feature_sets = single_solution
+        lcl = BatchedLCL(
+            num_experts=num_experts,
+            in_features=in_features,
+            out_feature_sets=out_feature_sets,
+            kernel_size=kernel_size,
+            bias=True,
+        )
+        if lcl.out_features == target_dim:
+            return lcl
+
+    return BatchedLinear(
+        num_experts=num_experts,
+        in_features=in_features,
+        out_features=target_dim,
+    )
+
+
+def _build_legacy_highway(
+    in_features: int,
+    target_dim: int,
+) -> nn.Module:
+    return get_1d_projection_layer(
+        input_dimension=in_features,
+        target_dimension=target_dim,
+        projection_layer_type="auto",
+    )
+
+
 class BatchedExpertBucket(nn.Module):
     """
     Processes multiple experts that share a padded in_features in a single
@@ -530,6 +608,7 @@ class BatchedExpertBucket(nn.Module):
         lcl_spec: "LCParameterSpec | None",
         expert_output_dim: int | None,
         stub_experts: bool,
+        fc0_highway: bool = False,
     ):
         super().__init__()
 
@@ -591,6 +670,15 @@ class BatchedExpertBucket(nn.Module):
         else:
             self.projection_out_features = out_features
 
+        self.highway: nn.Module | None = None
+        if fc0_highway and self._has_projection:
+            assert expert_output_dim is not None
+            self.highway = _build_batched_highway(
+                num_experts=self.num_experts,
+                in_features=self.fc_0.out_features,
+                target_dim=expert_output_dim,
+            )
+
     def gather_and_flatten(
         self,
         input: torch.Tensor,
@@ -620,7 +708,8 @@ class BatchedExpertBucket(nn.Module):
                 dtype=out.dtype,
             )
 
-        out = self.fc_0(padded_input)
+        fc0_out = self.fc_0(padded_input)
+        out = fc0_out
         if self.lcl_blocks is not None:
             out = self.lcl_blocks(out)
 
@@ -628,6 +717,8 @@ class BatchedExpertBucket(nn.Module):
             out = self.proj_norm(out)
             out = torch.einsum("gbd, god -> gbo", out, self.proj_weight)
             out = out + self.proj_bias.unsqueeze(1)
+            if self.highway is not None:
+                out = out + self.highway(fc0_out)
 
         return out
 
@@ -749,9 +840,17 @@ class LCLInformedMoEModel(nn.Module):
             )
 
         self._per_expert_output = model_config.expert_output_dim is not None
+
+        self._fc0_highway = model_config.fc0_highway
+        if self._fc0_highway and not self._per_expert_output:
+            raise ValueError("fc0_highway=True requires expert_output_dim to be set.")
+
+        self.expert_highways: nn.ModuleDict | None = None
         if self._per_expert_output and not self._use_batched_experts:
             assert model_config.expert_output_dim is not None
             self.expert_projections = nn.ModuleDict()
+            if self._fc0_highway:
+                self.expert_highways = nn.ModuleDict()
             for name in self.expert_branches:
                 branch = cast(ExpertBranch, self.expert_branches[name])
                 self.expert_projections[name] = nn.Sequential(
@@ -761,6 +860,11 @@ class LCLInformedMoEModel(nn.Module):
                         out_features=model_config.expert_output_dim,
                     ),
                 )
+                if self.expert_highways is not None:
+                    self.expert_highways[name] = _build_legacy_highway(
+                        in_features=branch.fc_0.out_features,
+                        target_dim=model_config.expert_output_dim,
+                    )
 
         self._cross_expert_attention: CrossExpertAttention | None = None
         if model_config.cross_expert_attention_heads is not None:
@@ -958,6 +1062,7 @@ class LCLInformedMoEModel(nn.Module):
                 lcl_spec=lcl_spec,
                 expert_output_dim=model_config.expert_output_dim,
                 stub_experts=model_config.stub_experts,
+                fc0_highway=model_config.fc0_highway,
             )
             for within_idx, m in enumerate(group):
                 self._expert_to_bucket[m.name] = (bucket_idx, within_idx)
@@ -1085,11 +1190,14 @@ class LCLInformedMoEModel(nn.Module):
     def _forward_per_expert(self, input: torch.Tensor) -> dict[str, torch.Tensor]:
         expert_outputs: dict[str, torch.Tensor] = {}
         for name, branch in self.expert_branches.items():
+            assert isinstance(branch, ExpertBranch)
             indices = self._expert_indices[name]
             expert_input = input[:, :, :, indices]
-            out = self.flatten_fn(x=expert_input)
-            out = branch(out)
+            flat = self.flatten_fn(x=expert_input)
+            fc0_out, out = branch.forward_with_fc0(x=flat)
             out = self.expert_projections[name](out)
+            if self.expert_highways is not None:
+                out = out + self.expert_highways[name](fc0_out)
             expert_outputs[name] = out
 
         if self._cross_expert_attention is not None:
