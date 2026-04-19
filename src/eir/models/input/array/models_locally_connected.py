@@ -403,6 +403,8 @@ class CrossExpertTransformerBlock(nn.Module):
 
         self.ffn_norm = nn.RMSNorm(dim)
         self.ffn = SwiGLUFFN(dim=dim, dropout_p=dropout_p)
+        self.attn_ls = LayerScale(dim=dim, init_values=1e-5)
+        self.ffn_ls = LayerScale(dim=dim, init_values=1e-5)
         self._attention_type = attention_type
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -411,8 +413,8 @@ class CrossExpertTransformerBlock(nn.Module):
             h, _ = self.attn(query=h, key=h, value=h, need_weights=False)
         else:
             h = self.attn(x=h)
-        x = x + h
-        x = x + self.ffn(self.ffn_norm(x))
+        x = x + self.attn_ls(h)
+        x = x + self.ffn_ls(self.ffn(self.ffn_norm(x)))
         return x
 
 
