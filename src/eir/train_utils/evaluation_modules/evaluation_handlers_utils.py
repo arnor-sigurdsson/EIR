@@ -318,14 +318,21 @@ def _streamline_tabular_data_for_transformers(
     tabular_input: dict[str, np.ndarray], transformers: al_label_transformers
 ) -> dict[str, torch.Tensor]:
     parsed_output = {}
+
     for name, value in tabular_input.items():
         cur_transformer = transformers[name]
         value_np = np.array([value])
+
         value_streamlined = streamline_values_for_transformers(
-            transformer=cur_transformer, values=value_np
+            transformer=cur_transformer,
+            values=value_np,
         )
         value_transformed = cur_transformer.transform(value_streamlined)
-        value_tensor = torch.from_numpy(value_transformed).float()
+
+        value_tensor = torch.from_numpy(value_transformed)
+        if value_tensor.dtype == torch.float64:
+            value_tensor = value_tensor.float()
+
         parsed_output[name] = value_tensor.squeeze()
     return parsed_output
 
