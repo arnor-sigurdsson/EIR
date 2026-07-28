@@ -325,8 +325,8 @@ def _streamline_tabular_data_for_transformers(
             transformer=cur_transformer, values=value_np
         )
         value_transformed = cur_transformer.transform(value_streamlined)
-        value_tensor = torch.from_numpy(value_transformed)
-        parsed_output[name] = value_tensor.squeeze(0)
+        value_tensor = torch.from_numpy(value_transformed).float()
+        parsed_output[name] = value_tensor.squeeze()
     return parsed_output
 
 
