@@ -351,6 +351,13 @@ def get_default_predict_experiment(
 
     default_train_hooks = loaded_train_experiment.hooks
 
+    # TODO: Fix bug here when evaluate is called with e.g. sequence output
+    #       generation, then output_source is patched to be a folder with just
+    #       one {output_name}_seed_file.txt, and this will iterate over the files
+    #       there, and expect the seed_file filename there to be an ID,
+    #       A temporary fix is perhaps to raise an error if it's not purely a set
+    #       of tabular/survival outputs here, as they are the only
+
     if predict_cl_args.evaluate:
         test_ids = gather_all_ids_from_output_configs(
             output_configs=configs_overloaded_for_predict.output_configs

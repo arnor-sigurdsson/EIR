@@ -19,7 +19,7 @@ from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from tqdm import tqdm
-from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast
+from transformers import AutoTokenizer, PreTrainedTokenizerBase
 from transformers.models.auto.tokenization_auto import TOKENIZER_MAPPING_NAMES
 from transformers.tokenization_utils_base import (
     EncodedInput,
@@ -69,7 +69,7 @@ al_hf_encode_func = Callable[[al_hf_tokenizer_inputs], Sequence[int]]
 al_sequence_input_objects_hf = tuple[
     Vocab,
     "GatheredSequenceStats",
-    PreTrainedTokenizer,
+    PreTrainedTokenizerBase,
     al_hf_encode_func,
 ]
 
@@ -282,16 +282,14 @@ def _init_min_freq(
 
 def extract_tokenizer_object_from_function(
     tokenizer_callable: TokenizerProtocolRaw | TokenizerProtocolPreSplit,
-) -> Tokenizer | PreTrainedTokenizer:
+) -> Tokenizer | PreTrainedTokenizerBase:
     assert isinstance(tokenizer_callable, TokenizerWrapper | HFTokenizerWrapper), (
         f"Expected TokenizerWrapper instance, got {type(tokenizer_callable).__name__}"
     )
 
     tokenizer_object = tokenizer_callable.tokenizer
-    assert isinstance(
-        tokenizer_object, Tokenizer | PreTrainedTokenizer | PreTrainedTokenizerFast
-    ), (
-        f"Expected Tokenizer or PreTrainedTokenizer, got "
+    assert isinstance(tokenizer_object, Tokenizer | PreTrainedTokenizerBase), (
+        f"Expected Tokenizer or PreTrainedTokenizerBase, got "
         f"{type(tokenizer_object).__name__}"
     )
 
@@ -389,7 +387,9 @@ def get_sequence_input_objects_from_pretrained(
     return vocab, gathered_stats, hf_tokenizer, _passthrough_hf_encode
 
 
-def sync_hf_and_pytorch_vocab(hf_tokenizer: Tokenizer | PreTrainedTokenizer) -> Vocab:
+def sync_hf_and_pytorch_vocab(
+    hf_tokenizer: Tokenizer | PreTrainedTokenizerBase,
+) -> Vocab:
     hf_tokenizer_vocab = hf_tokenizer.get_vocab()
     hf_tokenizer_vocab_sorted = OrderedDict(
         dict(sorted(hf_tokenizer_vocab.items(), key=lambda item: item[1]))
@@ -402,27 +402,25 @@ def sync_hf_and_pytorch_vocab(hf_tokenizer: Tokenizer | PreTrainedTokenizer) -> 
 def _get_hf_tokenizer(
     hf_model_name: str,
     add_prefix_space: bool = True,
-) -> PreTrainedTokenizer:
+) -> PreTrainedTokenizerBase:
     """
     See https://github.com/huggingface/transformers/issues/5486 for why we need to
     set the environment variable.
     """
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    hf_tokenizer = AutoTokenizer.from_pretrained(
+    hf_tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
         pretrained_model_name_or_path=hf_model_name,
         add_prefix_space=add_prefix_space,
     )
 
-    hf_tokenizer = _add_specials_to_hf_tokenizer(  # type: ignore[assignment]
-        hf_tokenizer=hf_tokenizer,  # type: ignore[arg-type]
-    )
-    return hf_tokenizer  # type: ignore[return-value]
+    hf_tokenizer = _add_specials_to_hf_tokenizer(hf_tokenizer=hf_tokenizer)
+    return hf_tokenizer
 
 
 def _add_specials_to_hf_tokenizer(
-    hf_tokenizer: PreTrainedTokenizer,
-) -> PreTrainedTokenizer:
+    hf_tokenizer: PreTrainedTokenizerBase,
+) -> PreTrainedTokenizerBase:
     hf_tokenizer_copy = deepcopy(hf_tokenizer)
     name_special_token_map = _get_default_specials_map()
 
