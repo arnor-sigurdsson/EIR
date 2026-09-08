@@ -14,7 +14,7 @@ jobs:
         python-version: ['3.13']
         group: [1, 2, 3, 4, 5]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Free disk space
         if: runner.os == 'Linux'
@@ -27,10 +27,10 @@ jobs:
           docker-images: true
 
       - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v10.0.1
       - name: Run tests with Python ${{ matrix.python-version }} on ${{ matrix.os }}
         env:
           PYTEST_GROUP: ${{ matrix.group }}
@@ -60,7 +60,7 @@ jobs:
             TARGET: ubuntu
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Release
         id: release
@@ -75,12 +75,12 @@ jobs:
     needs: [build]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
           architecture: x64
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v10.0.1
       - name: Build package
         run: uv build --no-sources
       - name: Upload to PyPI

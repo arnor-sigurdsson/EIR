@@ -9,7 +9,7 @@ jobs:
         python-version: ['3.13']
         group: [1, 2, 3, 4, 5]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Free disk space
         if: runner.os == 'Linux'
@@ -22,10 +22,10 @@ jobs:
           docker-images: true
 
       - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v10.0.1
       - name: Run tests with Python ${{ matrix.python-version }} on ${{ matrix.os }}
         env:
           PYTEST_GROUP: ${{ matrix.group }}
@@ -34,7 +34,7 @@ jobs:
           uv run tox -e py_partial
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-24.04'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
