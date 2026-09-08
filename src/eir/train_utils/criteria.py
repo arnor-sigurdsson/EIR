@@ -663,7 +663,6 @@ def _cox_ph_loss(
             time=masked_time.float(),
             ties_method=ties_method,
             reduction="mean",
-            checks=True,
         )
 
     return loss
