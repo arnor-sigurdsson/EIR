@@ -164,12 +164,6 @@ class SequenceResidualCrossAttention(nn.Module):
             norm_first=True,
         )
 
-        encoder_mask = torch.triu(
-            torch.ones(self.target_max_length, self.target_max_length) * float("-inf"),
-            diagonal=1,
-        )
-        self.register_buffer("encoder_mask", encoder_mask)
-
         self.norm_2_target = nn.RMSNorm(normalized_shape=target_embedding_dim)
         self.act_2 = SwiGLU(
             in_features=target_embedding_dim,
@@ -217,7 +211,7 @@ class SequenceResidualCrossAttention(nn.Module):
         out = self.act_2(out)
         out = self.encoder(
             out,
-            mask=self.encoder_mask,
+            is_causal=True,
         )
         out = self.ls(out)
 
@@ -284,24 +278,6 @@ class CrossAttention(nn.Module):
         self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
         self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
 
-        attn_mask = None
-        if self.apply_causal_mask:
-            assert seq_length is not None
-            assert context_length is not None
-            attn_mask = ~torch.triu(
-                torch.ones(
-                    seq_length,
-                    context_length,
-                    dtype=torch.bool,
-                ),
-                diagonal=1,
-            )
-            # Expand dimensions for batch and heads: [1, 1, seq_length, context_length]
-            attn_mask = attn_mask.unsqueeze(0).unsqueeze(0)
-
-        self.attn_mask: torch.Tensor | None
-        self.register_buffer("attn_mask", attn_mask)
-
         self.to_out = nn.Linear(inner_dim, dim)
 
     def forward(
@@ -328,7 +304,7 @@ class CrossAttention(nn.Module):
             query=q,
             key=k,
             value=v,
-            attn_mask=self.attn_mask,
+            is_causal=self.apply_causal_mask,
             dropout_p=self.dropout_p if self.training else 0.0,
         )
 

@@ -88,12 +88,6 @@ class SequenceOutputModule(nn.Module):
             embedding_dim=self.embedding_dim,
         )
 
-        mask = torch.triu(
-            torch.ones(self.max_length, self.max_length) * float("-inf"),
-            diagonal=1,
-        )
-        self.register_buffer("mask", mask)
-
         self.output_transformer = Transformer(
             d_model=self.embedding_dim,
             nhead=self.output_model_init_config.num_heads,
@@ -151,7 +145,7 @@ class SequenceOutputModule(nn.Module):
             projected = cur_projection(input_tensor=input_tensor, target_tensor=out)
             out = projected
 
-        out = self.output_transformer(out, mask=self.mask)
+        out = self.output_transformer(out, is_causal=True)
 
         out = self.final_norm(out)
         out = self.head(out)
