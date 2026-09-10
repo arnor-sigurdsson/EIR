@@ -26,6 +26,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          prune-cache: 'true'
       - name: Run tests with Python ${{ matrix.python-version }} on ${{ matrix.os }}
         env:
           PYTEST_GROUP: ${{ matrix.group }}
