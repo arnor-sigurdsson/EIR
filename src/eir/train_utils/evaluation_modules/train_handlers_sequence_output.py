@@ -645,7 +645,7 @@ def sample_next_token_index_from_output(
             )
 
     frequency_penalty = sampling_config.frequency_penalty
-    if generated_tokens_history is not None and repetition_penalty > 0.0:
+    if generated_tokens_history is not None and frequency_penalty > 0.0:
         for i in range(cur_position_logits.size(0)):
             cur_position_logits[i] = apply_frequency_penalty(
                 logits=cur_position_logits[i],
