@@ -354,7 +354,6 @@ def autoregressive_sequence_generation(
     """
     output_object = experiment.outputs[seq_output_name]
     input_object = input_objects[seq_output_name]
-    max_length = sampling_config.generated_sequence_length
 
     assert isinstance(output_object, ComputedSequenceOutputInfo)
     assert isinstance(input_object, ComputedSequenceInputInfo)
@@ -383,7 +382,8 @@ def autoregressive_sequence_generation(
     indices = autoregressive_pre_batch.indices
 
     indices_has_finished: dict[int, bool] = {}
-    for _i in range(0, sampling_config.generated_sequence_length):
+    max_length = output_object.computed_max_length
+    for _i in range(0, max_length):
         if len(indices_has_finished) == len(eval_samples):
             break
 
@@ -447,11 +447,12 @@ def autoregressive_sequence_generation(
             is_eos = next_token_index == st.eos_idx
             is_at_max_length = indices[sample_index] == max_length
 
+            if not is_eos:
+                generated_tokens[sample_index].append(next_token_index)
+
             if is_eos or is_at_max_length:
                 indices_has_finished[sample_index] = True
                 continue
-
-            generated_tokens[sample_index].append(next_token_index)
 
     return generated_tokens
 
@@ -567,17 +568,21 @@ def _prepare_current_autoregressive_input(
     """
     Assuming max_length of 5:
 
-    Truncate (from start):
-        - [A, B, C, D, E] -> [B, C, D, E]
     Pad:
         - [B, C, D, E] -> [B, C, D, E, pad]
+
     In autoregressive batch preparation hook:
         - [B, C, D, E, pad] -> [bos, B, C, D, E, pad] -> [bos, B, C, D, E]
 
+    Already at max_length:
+        If we add [B, C, D, E, F], we don't pad, but we will cut off the last token
+        and get [bos, B, C, D, E] in the batch preparation hook. So this
+        recomputes the prediction for F.
+
     So essentially the pad is a placeholder to that we need here due to how
-    the batch is later (in the batch preparation hook) prepared, namely
+    the batch is later (in the batch preparation hook) prepared. Namely,
     as it inserts the bos at the beginning and cuts off at the end, so in the case
-    where the sequence is already at max_length, we need to pad it to make sure
+    where the sequence is already at max_length. We need to pad it to make sure
     that the latest token is preserved.
 
     The reason for padding with the BOS token is that the tensor we get here
@@ -585,16 +590,16 @@ def _prepare_current_autoregressive_input(
     simply slice that directly (+1 for the target), but here we need to pad
     the input at the beginning, opting for a BOS token.
     """
+
+    # Note for samples that are already at max length, we recompute the prediction
+    # for the last token
+    assert len(generated_tokens) <= max_length
+
     current_sequence = torch.tensor(generated_tokens, dtype=torch.long)
-    current_sequence = _maybe_truncate_autoregressive_sequence(
-        current_sequence=current_sequence,
-        max_length=max_length,
-    )
 
     assert current_sequence.dim() == 1, current_sequence.shape
 
     pad_size = max_length - len(current_sequence)
-    assert pad_size >= 1, pad_size
 
     current_sequence = F.pad(current_sequence, (0, pad_size), value=pad_idx)
     assert current_sequence.dim() == 1, current_sequence.shape
@@ -603,24 +608,6 @@ def _prepare_current_autoregressive_input(
     current_inputs_copy[seq_output_name] = current_sequence
 
     return current_inputs_copy
-
-
-def _maybe_truncate_autoregressive_sequence(
-    current_sequence: torch.Tensor,
-    max_length: int,
-) -> torch.Tensor:
-    """
-    +1 to account for bos token being inserted and last token removed later.
-    If already at max length, we truncate from the start and leave 1 element
-    missing (+1) to allow for padding.
-    """
-    sequence_length = len(current_sequence)
-
-    if sequence_length >= max_length:
-        start = sequence_length - max_length + 1
-        current_sequence = current_sequence[start:]
-
-    return current_sequence
 
 
 def sample_next_token_index_from_output(
@@ -634,14 +621,13 @@ def sample_next_token_index_from_output(
     batch_indices = torch.arange(cur_logits.size(0))
     cur_position_logits = cur_logits[batch_indices, current_target_indices, :]
 
-    repetition_penalty = sampling_config.repetition_penalty
-    if generated_tokens_history is not None and repetition_penalty != 1.0:
+    presence_penalty = sampling_config.presence_penalty
+    if generated_tokens_history is not None and presence_penalty > 0.0:
         for i in range(cur_position_logits.size(0)):
-            cur_position_logits[i] = apply_repetition_penalty(
-                logits=cur_position_logits[i],
+            cur_position_logits[i] = apply_presence_penalty(
+                logits_cur_pos=cur_position_logits[i],
                 generated_tokens=generated_tokens_history[i],
-                penalty=repetition_penalty,
-                max_window=sampling_config.repetition_penalty_max_window,
+                penalty=presence_penalty,
             )
 
     frequency_penalty = sampling_config.frequency_penalty
@@ -650,8 +636,7 @@ def sample_next_token_index_from_output(
             cur_position_logits[i] = apply_frequency_penalty(
                 logits=cur_position_logits[i],
                 generated_tokens=generated_tokens_history[i],
-                penalty=frequency_penalty,
-                max_window=sampling_config.frequency_penalty_max_window,
+                frequency_penalty=frequency_penalty,
             )
 
     temperature = sampling_config.temperature
@@ -664,22 +649,6 @@ def sample_next_token_index_from_output(
         top_p=sampling_config.top_p,
     )
 
-    tau = sampling_config.tau
-    filter_value = -float("Inf")
-    if tau < 1.0:
-        valid_tokens_mask = filtered_logits != filter_value
-        valid_tokens_count = valid_tokens_mask.sum(dim=-1)
-
-        batch_indices = torch.where(valid_tokens_count > 1)[0]
-        if len(batch_indices) > 0:
-            batch_logits = filtered_logits[batch_indices]
-            batch_filtered = locally_typical_sampling(
-                logits=batch_logits,
-                tau=tau,
-                filter_value=filter_value,
-            )
-            filtered_logits[batch_indices] = batch_filtered
-
     probabilities = F.softmax(input=filtered_logits, dim=-1)
     next_token_indices = torch.multinomial(input=probabilities, num_samples=1)
     next_token_indices_list = next_token_indices.squeeze(1).tolist()
@@ -687,34 +656,22 @@ def sample_next_token_index_from_output(
     return next_token_indices_list
 
 
-def apply_repetition_penalty(
-    logits: torch.Tensor,
+def apply_presence_penalty(
+    logits_cur_pos: torch.Tensor,
     generated_tokens: list[int],
-    penalty: float = 1.2,
-    max_window: int = 64,
+    penalty: float = 1.1,
 ) -> torch.Tensor:
     if not generated_tokens:
-        return logits
+        return logits_cur_pos
 
-    generated_tokens = generated_tokens[-max_window:]
-    unique_tokens = torch.tensor(list(set(generated_tokens)), device=logits.device)
-
-    valid_tokens = unique_tokens[unique_tokens < logits.size(0)]
-
-    if len(valid_tokens) == 0:
-        return logits
-
-    logits_modified = logits.clone()
-
-    token_logits = logits_modified[valid_tokens]
-
-    token_logits = torch.where(
-        token_logits >= 0,
-        token_logits / penalty,
-        token_logits * penalty,
+    unique_tokens = torch.tensor(
+        list(set(generated_tokens)),
+        device=logits_cur_pos.device,
     )
 
-    logits_modified[valid_tokens] = token_logits
+    logits_modified = logits_cur_pos.clone()
+
+    logits_modified[unique_tokens] -= penalty
 
     return logits_modified
 
@@ -722,36 +679,31 @@ def apply_repetition_penalty(
 def apply_frequency_penalty(
     logits: torch.Tensor,
     generated_tokens: list[int],
-    penalty: float = 0.1,
-    max_window: int = 128,
+    frequency_penalty: float = 0.1,
 ) -> torch.Tensor:
-    if not generated_tokens or penalty <= 0.0:
+    if not generated_tokens or frequency_penalty <= 0.0:
         return logits
 
-    recent_tokens = generated_tokens[-max_window:]
+    token_counts = Counter(generated_tokens)
 
-    token_counts = Counter(recent_tokens)
-
-    vocab_size = logits.size(0)
     valid_tokens = []
     penalties = []
 
-    for token, count in token_counts.items():
-        if token < vocab_size and count > 1:
-            valid_tokens.append(token)
-            penalties.append(penalty * (1.0 - 1.0 / count))
+    for cur_token, cur_count in token_counts.items():
+        valid_tokens.append(cur_token)
 
-    if not valid_tokens:
-        return logits
+        cur_penalty = frequency_penalty * cur_count
+
+        penalties.append(cur_penalty)
 
     valid_tokens_tensor = torch.tensor(valid_tokens, device=logits.device)
     penalties_tensor = torch.tensor(penalties, device=logits.device)
 
-    logits_modified = logits.clone()
+    token_logits = logits.clone()
 
-    logits_modified[valid_tokens_tensor] -= penalties_tensor
+    token_logits[valid_tokens_tensor] -= penalties_tensor
 
-    return logits_modified
+    return token_logits
 
 
 def top_k_top_p_filtering(
@@ -784,34 +736,3 @@ def top_k_top_p_filtering(
             logits[i, indices_to_remove] = filter_value
 
     return logits
-
-
-def locally_typical_sampling(
-    logits: torch.Tensor,
-    tau: float = 0.95,
-    filter_value: float = -float("Inf"),
-) -> torch.Tensor:
-    filtered_logits = logits.clone()
-
-    probs = F.softmax(filtered_logits, dim=-1)
-
-    eps = 1e-10
-
-    # Calculate entropy of the distribution
-    entropy = -torch.sum(probs * torch.log(probs + eps), dim=-1, keepdim=True)
-
-    # Calculate typicality score
-    typical_score = torch.abs(torch.log(probs + eps) + entropy)
-
-    # Keep only tokens with typicality score below threshold
-    sorted_scores, _ = torch.sort(typical_score, dim=-1)
-
-    for i in range(filtered_logits.size(0)):
-        num_tokens = sorted_scores[i].size(-1)
-        threshold_idx = int((num_tokens - 1) * tau)
-
-        threshold = sorted_scores[i, threshold_idx]
-
-        filtered_logits[i, typical_score[i] > threshold] = filter_value
-
-    return filtered_logits
