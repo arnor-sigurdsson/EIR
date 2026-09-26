@@ -302,4 +302,55 @@ These responses demonstrate the model's ability to generate text sequences based
     :language: json
     :caption: predictions.json
 
+Appendix A: Prediction with latents.
+-----------------------------------------------------------
+
+Besides just generating token sequences, we might also be interested in
+analyzing the latent representations produced by the model on input sequences.
+
+For this we use the ``latent_sampling`` configuration in the global config,
+where we specify which layers we want to extract the latents from:
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/apx_01_globals_with_latent.yaml
+    :language: yaml
+    :caption: apx_01_globals_with_latent.yaml
+    :emphasize-lines: 13-15
+
+
+Below we can see the output configuration, notice the difference here compared to
+the previous output config, where the ``output_source`` was set to ``null``.
+In that case, we were focusing on generating
+new sequences from scratch, whereas here we are interested in analyzing the latent
+representations of existing sequences.
+Therefore, we make the ``output_source`` point to the test data we are interested
+in extracting the latents from.
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/apx_01_output_test_with_samples.yaml
+    :language: yaml
+    :caption: apx_01_output_test_with_samples.yaml
+
+Now we run the ``eirpredict`` command with these configurations:
+
+.. literalinclude:: ../tutorial_files/c_sequence_output/01_sequence_generation/commands/APX_1_PREDICT_LATENTS.txt
+    :language: console
+
+.. note::
+    The latents are saved under the run folder of the model we predict with,
+    in ``latents/latent_outputs/predict/<layer name>``, and not under the
+    folder we pass to ``--output_folder``.
+
+Besides the raw latents, saved as ``batch_*.npy`` files together with a
+``metadata.json`` file, we get visualizations of the latent space. Here is
+the t-SNE visualization:
+
+.. image:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/apx_01_latents_tsne.png
+    :width: 100%
+    :align: center
+
+And here is the PCA visualization:
+
+.. image:: ../tutorial_files/c_sequence_output/01_sequence_generation/figures/apx_01_latents_pca.png
+    :width: 100%
+    :align: center
+
 If you made it this far, I want to thank you for reading!

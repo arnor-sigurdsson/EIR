@@ -10,7 +10,7 @@ input_type_info:
   min_freq: 10
 
 model_config:
-    model_type: "prajjwal1/bert-tiny"
+    model_type: "google/bert_uncased_L-2_H-128_A-2"
     pretrained_model: true
     freeze_pretrained_model: true
     position: embed

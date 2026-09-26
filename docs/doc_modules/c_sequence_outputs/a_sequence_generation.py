@@ -294,6 +294,56 @@ def _get_example_request_bash_args():
     }
 
 
+def get_sequence_apx_01_latent_batch_predict() -> AutoDocExperimentInfo:
+    base_path = f"docs/tutorials/tutorial_files/{CR}/{TN}"
+
+    conf_output_path = f"eir_tutorials/{CR}/{TN}/conf"
+
+    run_1_output_path = f"eir_tutorials/tutorial_runs/{CR}/{TN}/test_results"
+    ensure_path_exists(path=Path(run_1_output_path), is_folder=True)
+
+    command = [
+        "eirpredict",
+        "--global_configs",
+        f"{conf_output_path}/apx_01_globals_with_latent.yaml",
+        "--fusion_configs",
+        f"{conf_output_path}/fusion.yaml",
+        "--output_configs",
+        f"{conf_output_path}/apx_01_output_test_with_samples.yaml",
+        "--model_path",
+        "FILL_MODEL",
+        "--output_folder",
+        run_1_output_path,
+    ]
+
+    data_output_path = Path(f"eir_tutorials/{CR}/{TN}/data/imdb.zip")
+
+    latent_folder = (
+        "latents/latent_outputs/predict/"
+        "output_modules.imdb_output.output_transformer.layers.5"
+    )
+
+    mapping = [
+        (f"{latent_folder}/tsne.png", "figures/apx_01_latents_tsne.png"),
+        (f"{latent_folder}/pca.png", "figures/apx_01_latents_pca.png"),
+    ]
+
+    ade = AutoDocExperimentInfo(
+        name="APX_1_PREDICT_LATENTS",
+        data_url="https://drive.google.com/file/d/1u6bkIr9sECkU9z3Veutjn8cx6Mu3GP3Z",
+        data_output_path=data_output_path,
+        conf_output_path=Path(conf_output_path),
+        base_path=Path(base_path),
+        command=command,
+        files_to_copy_mapping=mapping,
+        pre_run_command_modifications=(_add_model_path_to_command,),
+        post_run_functions=(),
+        force_run_command=True,
+    )
+
+    return ade
+
+
 def _get_model_path_for_predict() -> str:
     run_1_output_path = f"eir_tutorials/tutorial_runs/{CR}/{TN}"
     model_path = get_saved_model_path(run_folder=Path(run_1_output_path))
@@ -312,10 +362,12 @@ def get_experiments() -> Sequence[AutoDocExperimentInfo]:
     exp_2 = get_sequence_gen_01_imdb_generation_predict()
     exp_3 = get_sequence_gen_02_imdb_generation_bpe()
     exp_4 = get_sequence_gen_02_imdb_generation_serve()
+    exp_5 = get_sequence_apx_01_latent_batch_predict()
 
     return [
         exp_1,
         exp_2,
         exp_3,
         exp_4,
+        exp_5,
     ]

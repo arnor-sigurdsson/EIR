@@ -2,7 +2,8 @@ eir_tutorials/tutorial_runs/a_using_eir/tutorial_01_run/
 ├── configs
 ├── meta
 │   └── eir_version.txt
-├── model_info.txt
+├── model_architecture
+│   └── model_info.txt
 ├── results
 │   └── ancestry_output
 │       └── Origin

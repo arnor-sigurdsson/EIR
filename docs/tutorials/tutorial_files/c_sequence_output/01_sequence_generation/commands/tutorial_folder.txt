@@ -7,4 +7,7 @@ eir_tutorials/c_sequence_output/01_sequence_generation
 │   └── output.yaml
 └── data
     └── IMDB
-        └── IMDB_Reviews
+        ├── conf
+        ├── imdb_labels.csv
+        ├── IMDB_Reviews
+        └── imdb.vocab

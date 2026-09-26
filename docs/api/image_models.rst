@@ -54,7 +54,15 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.cpubone.CPUBone
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.crossvit.CrossVit
+   :members:
+   :exclude-members: forward
+
+.. autoclass:: timm.models.csatv2.CSATv2
    :members:
    :exclude-members: forward
 
@@ -126,6 +134,10 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.gemma4_vit.Gemma4VitEncoder
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.ghostnet.GhostNet
    :members:
    :exclude-members: forward
@@ -158,7 +170,15 @@ For example, the ``ResNet`` architecture includes the ``layers`` and ``block`` p
    :members:
    :exclude-members: forward
 
+.. autoclass:: timm.models.lcnetv2.LCNetV2
+   :members:
+   :exclude-members: forward
+
 .. autoclass:: timm.models.levit.Levit
+   :members:
+   :exclude-members: forward
+
+.. autoclass:: timm.models.lowformer.LowFormer
    :members:
    :exclude-members: forward
 

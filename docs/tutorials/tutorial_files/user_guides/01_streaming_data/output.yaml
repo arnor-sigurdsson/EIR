@@ -17,5 +17,4 @@ model_config:
     num_layers: 2
 
 sampling_config:
-  generated_sequence_length: 64
   n_eval_inputs: 3

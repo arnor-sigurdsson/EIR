@@ -14,7 +14,7 @@ def download_google_drive_file(
     if "/d/" in url:
         url = _parse_google_url(url_to_parse=url)
 
-    gdown.download(url=url, output=str(output_path), quiet=False, fuzzy=True)
+    gdown.download(url=url, output=str(output_path), quiet=False)
 
 
 def _parse_google_url(url_to_parse: str):
