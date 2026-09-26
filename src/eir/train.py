@@ -36,6 +36,7 @@ from eir.setup.output_setup import (
 )
 from eir.setup.output_setup_modules.sequence_output_setup import (
     converge_sequence_input_and_output,
+    validate_manual_prompt_lengths,
 )
 from eir.setup.streaming_data_setup.streaming_data_adapters import (
     patch_configs_for_local_data,
@@ -169,6 +170,8 @@ def get_default_experiment(
         input_objects=inputs_as_dict,
         target_transformers=getattr(target_labels, "label_transformers", None),
     )
+    validate_manual_prompt_lengths(output_objects=outputs_as_dict)
+
     serialize_output_objects(output_objects=outputs_as_dict, run_folder=run_folder)
 
     inputs_as_dict = converge_sequence_input_and_output(

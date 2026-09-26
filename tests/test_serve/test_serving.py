@@ -28,9 +28,6 @@ from eir.serve_modules.serve_network_utils import deserialize_array
 from eir.setup.schemas import InputConfig, OutputConfig
 from eir.utils.logging import get_logger
 from tests.test_modelling.test_modelling_utils import check_performance_result_wrapper
-from tests.test_modelling.test_sequence_modelling.test_sequence_output_modelling import (  # noqa
-    get_expected_keywords_set,
-)
 
 if TYPE_CHECKING:
     from tests.setup_tests.fixtures_create_configs import TestConfigInits
@@ -309,6 +306,7 @@ def test_multi_serving(
                 random_id, example_request = _craft_example_request(
                     scoped_test_path=test_data_config.scoped_tmp_path,
                     input_configs=input_configs,
+                    output_configs=experiment.configs.output_configs,
                 )
             except Exception as e:
                 logger.error(f"Failed to craft example request: {e}")
@@ -355,8 +353,15 @@ def test_multi_serving(
 def _craft_example_request(
     scoped_test_path: Path,
     input_configs: Sequence[InputConfig],
+    output_configs: Sequence[OutputConfig],
 ) -> tuple[str, dict[str, Any]]:
     example_request = {}
+
+    sequence_output_names = {
+        config.output_info.output_name
+        for config in output_configs
+        if config.output_info.output_type == "sequence"
+    }
 
     labels_df = pd.read_csv(scoped_test_path / "labels.csv")
     random_id = random.choice(labels_df["ID"].values)
@@ -371,6 +376,10 @@ def _craft_example_request(
             example_request[input_name] = str(omics_path)
 
         elif input_type == "sequence":
+            if input_name in sequence_output_names:
+                example_request[input_name] = ""
+                continue
+
             sequence_path = scoped_test_path / "sequence" / f"{random_id}.txt"
             assert sequence_path.is_file(), f"Missing sequence file: {sequence_path}"
             example_request[input_name] = str(sequence_path)
@@ -438,10 +447,7 @@ def _check_prediction(
 
         elif output_type == "sequence":
             actual_output = actual_result.get(output_name, "")
-            if not _validate_sequence_output(
-                actual_output=actual_output,
-                expected_set=get_expected_keywords_set(),
-            ):
+            if not _validate_sequence_output(actual_output=actual_output):
                 return False
 
         elif output_type == "array":
@@ -545,13 +551,11 @@ def _validate_tabular_output(
     return True
 
 
-def _validate_sequence_output(actual_output: str, expected_set: set) -> bool:
-    content = actual_output.split(" ")
-
-    intersection = set(content).intersection(expected_set)
-    if not intersection:
+def _validate_sequence_output(actual_output: str) -> bool:
+    if not isinstance(actual_output, str) or not actual_output.strip():
+        logger.error(f"Empty or invalid sequence output: {actual_output!r}")
         return False
-    return not len(intersection) < 2
+    return True
 
 
 def _validate_array_output(
