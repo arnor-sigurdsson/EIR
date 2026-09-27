@@ -2,10 +2,18 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from eir.data_load.data_streaming.streaming_dataset_utils import (
+    streamline_sequence_manual_data,
+)
 from eir.models.input.sequence.transformer_models import SequenceModelConfig
 from eir.setup.input_setup_modules import setup_sequence
 from eir.setup.input_setup_modules.torchtext_port.vocab import Vocab
-from eir.setup.schemas import InputConfig, OutputConfig, SequenceOutputTypeConfig
+from eir.setup.schemas import (
+    InputConfig,
+    OutputConfig,
+    SequenceOutputSamplingConfig,
+    SequenceOutputTypeConfig,
+)
 from eir.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -148,3 +156,39 @@ def converge_sequence_input_and_output(
         inputs_copy[output_name] = cur_input
 
     return inputs_copy
+
+
+def validate_manual_prompt_lengths(
+    output_objects: "al_output_objects_as_dict",
+) -> None:
+    for output_name, output_object in output_objects.items():
+        if not isinstance(output_object, ComputedSequenceOutputInfo):
+            continue
+
+        sampling_config = output_object.output_config.sampling_config
+        if not isinstance(sampling_config, SequenceOutputSamplingConfig):
+            continue
+
+        output_type_info = output_object.output_config.output_type_info
+        assert isinstance(output_type_info, SequenceOutputTypeConfig)
+
+        max_prompt_length = output_object.computed_max_length - 1
+
+        for manual_input in sampling_config.manual_inputs:
+            prompt = manual_input.get(output_name)
+            if prompt is None:
+                continue
+
+            prompt_streamlined = streamline_sequence_manual_data(
+                data=prompt,
+                split_on=output_type_info.split_on,
+            )
+            n_tokens = len(output_object.encode_func(prompt_streamlined))
+
+            if n_tokens > max_prompt_length:
+                raise ValueError(
+                    f"Manual prompt for output '{output_name}' has {n_tokens} tokens, "
+                    f"but the maximum is {max_prompt_length} "
+                    f"(max_length {output_object.computed_max_length} minus one token "
+                    f"for the generated output). Prompt: '{prompt}'."
+                )

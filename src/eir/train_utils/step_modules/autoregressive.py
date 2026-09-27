@@ -49,45 +49,33 @@ def sample_autoregressive_batch(
     """
     st = special_tokens
 
-    inputs = []
-    targets = []
-
-    batch_tensor = pad_batch_with_bos(
+    # note this returns a new tensor, so we don't modify the original batch_tensor
+    batch_tensor_w_pad = pad_batch_with_bos(
         batch_tensor=batch_tensor,
         bos_value=st.bos_idx,
     )
 
-    for idx in range(batch_size):
-        cur_sample = batch_tensor[idx]
+    _switch_first_pad_with_eos(
+        batch_tensor_w_pad=batch_tensor_w_pad, pad_idx=st.pad_idx, eos_idx=st.eos_idx
+    )
 
-        cur_sample = _switch_first_pad_with_eos(
-            sample=cur_sample,
-            pad_value=st.pad_idx,
-            eos_value=st.eos_idx,
-        )
+    inputs_tensor = batch_tensor_w_pad[:, :-1]
+    target_tensor = batch_tensor_w_pad[:, 1:]
 
-        cur_target = cur_sample[1:]
-        cur_sample = cur_sample[:-1]
-
-        inputs.append(cur_sample)
-        targets.append(cur_target)
-
-    inputs_tensor = torch.stack(tensors=inputs)
-    target_tensor = torch.stack(tensors=targets)
     return inputs_tensor, target_tensor
 
 
 def _switch_first_pad_with_eos(
-    sample: torch.Tensor,
-    pad_value: int,
-    eos_value: int,
+    batch_tensor_w_pad: torch.Tensor, pad_idx: int, eos_idx: int
 ) -> torch.Tensor:
-    first_pad_match = (sample == pad_value).nonzero(as_tuple=False)
-    if len(first_pad_match) != 0:
-        first_pad_index = first_pad_match[0]
-        sample[first_pad_index] = eos_value
+    is_pad = batch_tensor_w_pad == pad_idx
+    first_pad = is_pad.int().argmax(dim=1)
+    has_pad = is_pad.any(dim=1)
 
-    return sample
+    pad_index = first_pad[has_pad]
+    batch_tensor_w_pad[has_pad, pad_index] = eos_idx
+
+    return batch_tensor_w_pad
 
 
 def pad_batch_with_bos(

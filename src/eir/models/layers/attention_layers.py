@@ -108,6 +108,7 @@ class TransformerBlock(nn.Module):
         n_head: int,
         dim_feedforward: int,
         dropout: float = 0.1,
+        ls_init: float = 1e-05,
         norm_first: bool = True,
         block_config: TransformerBlockConfig | None = None,
     ):
@@ -119,6 +120,7 @@ class TransformerBlock(nn.Module):
         self.d_model = d_model
         self.n_head = n_head
         self.head_dim = d_model // n_head
+        self.ls_init = ls_init
         self.norm_first = norm_first
         self.config = block_config or TransformerBlockConfig()
 
@@ -139,8 +141,8 @@ class TransformerBlock(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-        self.ls1 = LayerScale(dim=d_model, init_values=1e-05)
-        self.ls2 = LayerScale(dim=d_model, init_values=1e-05)
+        self.ls1 = LayerScale(dim=d_model, init_values=self.ls_init)
+        self.ls2 = LayerScale(dim=d_model, init_values=self.ls_init)
 
         self.rope_freqs: torch.Tensor
         self._init_rope()
@@ -170,7 +172,7 @@ class TransformerBlock(nn.Module):
 
         return rotated
 
-    def _attention(self, x: Tensor, attn_mask: Tensor | None = None) -> Tensor:
+    def _attention(self, x: Tensor, is_causal: bool = False) -> Tensor:
         batch_size, seq_len, _ = x.shape
 
         # Project to queries, keys, values and reshape
@@ -189,7 +191,7 @@ class TransformerBlock(nn.Module):
             query=q,
             key=k,
             value=v,
-            attn_mask=attn_mask,
+            is_causal=is_causal,
             dropout_p=self.dropout.p if self.training else 0.0,
         )
 
@@ -200,12 +202,12 @@ class TransformerBlock(nn.Module):
         )
         return self.dropout(self.out_proj(attn_output))
 
-    def forward(self, x: Tensor, attn_mask: Tensor | None = None) -> Tensor:
+    def forward(self, x: Tensor, is_causal: bool = False) -> Tensor:
         if self.norm_first:
-            x = x + self.ls1(self._attention(self.norm1(x), attn_mask))
+            x = x + self.ls1(self._attention(self.norm1(x), is_causal=is_causal))
             x = x + self.ls2(self.ffn(self.norm2(x)))
         else:
-            x = self.norm1(x + self.ls1(self._attention(x, attn_mask)))
+            x = self.norm1(x + self.ls1(self._attention(x, is_causal=is_causal)))
             x = self.norm2(x + self.ls2(self.ffn(x)))
         return x
 
@@ -235,7 +237,7 @@ class Transformer(nn.Module):
             ]
         )
 
-    def forward(self, x: Tensor, mask: Tensor | None = None) -> Tensor:
+    def forward(self, x: Tensor, is_causal: bool = False) -> Tensor:
         for layer in self.layers:
-            x = layer(x, mask)
+            x = layer(x, is_causal=is_causal)
         return x

@@ -3,36 +3,36 @@
         {
             "ancestry_output": {
                 "Origin": {
-                    "Asia": 0.02098943665623665,
-                    "Eastern_Asia": 0.0013298417907208204,
-                    "Europe": 0.8540359735488892,
-                    "Latin_America_and_the_Caribbean": 0.008817272260785103,
-                    "Middle_East": 0.11245758831501007,
-                    "Sub-Saharan_Africa": 0.0023699328303337097
+                    "Asia": 0.008886052295565605,
+                    "Eastern_Asia": 0.0006112212431617081,
+                    "Europe": 0.9558948278427124,
+                    "Latin_America_and_the_Caribbean": 0.006980075966566801,
+                    "Middle_East": 0.026364630088210106,
+                    "Sub-Saharan_Africa": 0.0012631505960598588
                 }
             }
         },
         {
             "ancestry_output": {
                 "Origin": {
-                    "Asia": 0.0021390619222074747,
-                    "Eastern_Asia": 0.006619654130190611,
-                    "Europe": 0.006717908661812544,
-                    "Latin_America_and_the_Caribbean": 0.025056252256035805,
-                    "Middle_East": 0.015498695895075798,
-                    "Sub-Saharan_Africa": 0.9439684748649597
+                    "Asia": 0.0019719116389751434,
+                    "Eastern_Asia": 0.005613035522401333,
+                    "Europe": 0.008898886851966381,
+                    "Latin_America_and_the_Caribbean": 0.02305135503411293,
+                    "Middle_East": 0.013370211236178875,
+                    "Sub-Saharan_Africa": 0.9470945596694946
                 }
             }
         },
         {
             "ancestry_output": {
                 "Origin": {
-                    "Asia": 0.23304493725299835,
-                    "Eastern_Asia": 0.0018496549455448985,
-                    "Europe": 0.4726637303829193,
-                    "Latin_America_and_the_Caribbean": 0.015884920954704285,
-                    "Middle_East": 0.2620217800140381,
-                    "Sub-Saharan_Africa": 0.014534981921315193
+                    "Asia": 0.1097031980752945,
+                    "Eastern_Asia": 0.0012634890154004097,
+                    "Europe": 0.7781996726989746,
+                    "Latin_America_and_the_Caribbean": 0.014681028202176094,
+                    "Middle_East": 0.08531270176172256,
+                    "Sub-Saharan_Africa": 0.010839952155947685
                 }
             }
         }

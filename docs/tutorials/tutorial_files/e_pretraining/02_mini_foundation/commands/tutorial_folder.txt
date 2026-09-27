@@ -17,17 +17,10 @@ eir_tutorials/e_pretraining/02_mini_foundation
 │   └── output_sequence.yaml
 └── data
     ├── 02_mini_foundation
-    │   ├── configs
-    │   ├── logging_history.log
     │   ├── meta
     │   ├── model_info.txt
-    │   ├── results
     │   ├── saved_models
-    │   ├── serializations
-    │   ├── train_average_history.log
-    │   ├── training_curve_LOSS-AVERAGE.pdf
-    │   ├── training_curve_PERF-AVERAGE.pdf
-    │   └── validation_average_history.log
+    │   └── serializations
     ├── CIFAR10
     │   ├── images
     │   └── images_classes.csv

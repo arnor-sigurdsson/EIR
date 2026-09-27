@@ -1,0 +1,496 @@
+{
+    "experiments": {
+        "a_using_eir/tutorial_01_run": {
+            "final_loss_average": 0.500096321105957,
+            "final_perf_average": 0.8629265211507178,
+            "log_file": "a_using_eir/tutorial_01_run/validation_average_history.log",
+            "max_perf_average": 0.8629265211507178,
+            "min_loss_average": 0.500096321105957,
+            "total_iterations": 600
+        },
+        "a_using_eir/tutorial_01_run_lr-0.002_epochs-20": {
+            "final_loss_average": 0.5892615914344788,
+            "final_perf_average": 0.8755140418861721,
+            "log_file": "a_using_eir/tutorial_01_run_lr-0.002_epochs-20/validation_average_history.log",
+            "max_perf_average": 0.8816624252676366,
+            "min_loss_average": 0.4549946188926697,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_02_run": {
+            "final_loss_average": 0.07300390303134918,
+            "final_perf_average": 0.8073776216248293,
+            "log_file": "a_using_eir/tutorial_02_run/validation_average_history.log",
+            "max_perf_average": 0.8073776216248293,
+            "min_loss_average": 0.07300390303134918,
+            "total_iterations": 16000
+        },
+        "a_using_eir/tutorial_03_anti_breast_cancer_peptides_run": {
+            "final_loss_average": 0.42599061131477356,
+            "final_perf_average": 0.6825618340085122,
+            "log_file": "a_using_eir/tutorial_03_anti_breast_cancer_peptides_run/validation_average_history.log",
+            "max_perf_average": 0.6852393460829223,
+            "min_loss_average": 0.386066734790802,
+            "total_iterations": 2400
+        },
+        "a_using_eir/tutorial_03_imdb_run": {
+            "final_loss_average": 0.5383253693580627,
+            "final_perf_average": 0.7920806919717521,
+            "log_file": "a_using_eir/tutorial_03_imdb_run/validation_average_history.log",
+            "max_perf_average": 0.8003199655997848,
+            "min_loss_average": 0.423829585313797,
+            "total_iterations": 8500
+        },
+        "a_using_eir/tutorial_04_imdb_run": {
+            "final_loss_average": 0.358639657497406,
+            "final_perf_average": 0.8487655119875108,
+            "log_file": "a_using_eir/tutorial_04_imdb_run/validation_average_history.log",
+            "max_perf_average": 0.8549373775938124,
+            "min_loss_average": 0.33719730377197266,
+            "total_iterations": 7500
+        },
+        "a_using_eir/tutorial_04_imdb_run_combined": {
+            "final_loss_average": 0.5284483432769775,
+            "final_perf_average": 0.8328808087009715,
+            "log_file": "a_using_eir/tutorial_04_imdb_run_combined/validation_average_history.log",
+            "max_perf_average": 0.8903564496839511,
+            "min_loss_average": 0.29983848333358765,
+            "total_iterations": 4000
+        },
+        "a_using_eir/tutorial_04_imdb_run_local": {
+            "final_loss_average": 0.28881198167800903,
+            "final_perf_average": 0.8924871915015514,
+            "log_file": "a_using_eir/tutorial_04_imdb_run_local/validation_average_history.log",
+            "max_perf_average": 0.9041691234622198,
+            "min_loss_average": 0.2656504511833191,
+            "total_iterations": 5500
+        },
+        "a_using_eir/tutorial_04_imdb_run_longformer": {
+            "final_loss_average": 0.27060645818710327,
+            "final_perf_average": 0.8984900810617615,
+            "log_file": "a_using_eir/tutorial_04_imdb_run_longformer/validation_average_history.log",
+            "max_perf_average": 0.9048186950823813,
+            "min_loss_average": 0.2515659034252167,
+            "total_iterations": 7500
+        },
+        "a_using_eir/tutorial_04_imdb_run_tiny-bert": {
+            "final_loss_average": 0.5316344499588013,
+            "final_perf_average": 0.8496895268760217,
+            "log_file": "a_using_eir/tutorial_04_imdb_run_tiny-bert/validation_average_history.log",
+            "max_perf_average": 0.89102709853541,
+            "min_loss_average": 0.2859453856945038,
+            "total_iterations": 4000
+        },
+        "a_using_eir/tutorial_05_is_it_a_hot_dog": {
+            "final_loss_average": 0.6819668412208557,
+            "final_perf_average": 0.5038444817904942,
+            "log_file": "a_using_eir/tutorial_05_is_it_a_hot_dog/validation_average_history.log",
+            "max_perf_average": 0.617857782406847,
+            "min_loss_average": 0.5790112018585205,
+            "total_iterations": 2200
+        },
+        "a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_combined": {
+            "final_loss_average": 0.17748184502124786,
+            "final_perf_average": 0.9551661718528119,
+            "log_file": "a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_combined/validation_average_history.log",
+            "max_perf_average": 0.9795908831893348,
+            "min_loss_average": 0.10783310979604721,
+            "total_iterations": 1900
+        },
+        "a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_resnet": {
+            "final_loss_average": 0.2545076012611389,
+            "final_perf_average": 0.9074362220750887,
+            "log_file": "a_using_eir/tutorial_05_is_it_a_hot_dog_pretrained_resnet/validation_average_history.log",
+            "max_perf_average": 0.910545905884797,
+            "min_loss_average": 0.2545076012611389,
+            "total_iterations": 2700
+        },
+        "a_using_eir/tutorial_06_imdb_sentiment_binary": {
+            "final_loss_average": 0.8252976536750793,
+            "final_perf_average": 0.5054719149316315,
+            "log_file": "a_using_eir/tutorial_06_imdb_sentiment_binary/validation_average_history.log",
+            "max_perf_average": 0.5619459226313017,
+            "min_loss_average": 0.6302474737167358,
+            "total_iterations": 17000
+        },
+        "a_using_eir/tutorial_07-apx-a_multimodal_tabular_description_pretrained": {
+            "final_loss_average": 1.6233083009719849,
+            "final_perf_average": 0.39331663858928523,
+            "log_file": "a_using_eir/tutorial_07-apx-a_multimodal_tabular_description_pretrained/validation_average_history.log",
+            "max_perf_average": 0.41694350496522387,
+            "min_loss_average": 1.3018178939819336,
+            "total_iterations": 3400
+        },
+        "a_using_eir/tutorial_07-apx-b_multimodal_tabular_description_multi_task": {
+            "final_loss_average": 0.8676838874816895,
+            "final_perf_average": 0.4761745612755248,
+            "log_file": "a_using_eir/tutorial_07-apx-b_multimodal_tabular_description_multi_task/validation_average_history.log",
+            "max_perf_average": 0.4788339363540171,
+            "min_loss_average": 0.8490822315216064,
+            "total_iterations": 3200
+        },
+        "a_using_eir/tutorial_07a_multimodal_tabular": {
+            "final_loss_average": 1.3637667894363403,
+            "final_perf_average": 0.3881097222138182,
+            "log_file": "a_using_eir/tutorial_07a_multimodal_tabular/validation_average_history.log",
+            "max_perf_average": 0.4080831422901172,
+            "min_loss_average": 1.3151787519454956,
+            "total_iterations": 5200
+        },
+        "a_using_eir/tutorial_07b_multimodal_tabular_description": {
+            "final_loss_average": 1.6255204677581787,
+            "final_perf_average": 0.402610273465315,
+            "log_file": "a_using_eir/tutorial_07b_multimodal_tabular_description/validation_average_history.log",
+            "max_perf_average": 0.4166167935785927,
+            "min_loss_average": 1.3151582479476929,
+            "total_iterations": 3200
+        },
+        "a_using_eir/tutorial_07c_multimodal_tabular_description_image": {
+            "final_loss_average": 1.5635055303573608,
+            "final_perf_average": 0.3995722809901361,
+            "log_file": "a_using_eir/tutorial_07c_multimodal_tabular_description_image/validation_average_history.log",
+            "max_perf_average": 0.4219042191653267,
+            "min_loss_average": 1.3015965223312378,
+            "total_iterations": 3400
+        },
+        "a_using_eir/tutorial_08_run_cnn-1d": {
+            "final_loss_average": 0.836317241191864,
+            "final_perf_average": 0.8633708466129136,
+            "log_file": "a_using_eir/tutorial_08_run_cnn-1d/validation_average_history.log",
+            "max_perf_average": 0.8773033810553355,
+            "min_loss_average": 0.49967116117477417,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_cnn-2d": {
+            "final_loss_average": 0.7006381154060364,
+            "final_perf_average": 0.7981813780293265,
+            "log_file": "a_using_eir/tutorial_08_run_cnn-2d/validation_average_history.log",
+            "max_perf_average": 0.8026994193458861,
+            "min_loss_average": 0.6529808044433594,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_cnn-3d": {
+            "final_loss_average": 0.6554461121559143,
+            "final_perf_average": 0.8194538379951152,
+            "log_file": "a_using_eir/tutorial_08_run_cnn-3d/validation_average_history.log",
+            "max_perf_average": 0.8242322518417798,
+            "min_loss_average": 0.6164314150810242,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_lcl-1d": {
+            "final_loss_average": 0.869648814201355,
+            "final_perf_average": 0.8612275186393387,
+            "log_file": "a_using_eir/tutorial_08_run_lcl-1d/validation_average_history.log",
+            "max_perf_average": 0.8792408979971624,
+            "min_loss_average": 0.47077053785324097,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_lcl-2d": {
+            "final_loss_average": 0.8105916976928711,
+            "final_perf_average": 0.8620767641119256,
+            "log_file": "a_using_eir/tutorial_08_run_lcl-2d/validation_average_history.log",
+            "max_perf_average": 0.8796982685163829,
+            "min_loss_average": 0.46477118134498596,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_lcl-3d": {
+            "final_loss_average": 0.9871127605438232,
+            "final_perf_average": 0.8478604483405617,
+            "log_file": "a_using_eir/tutorial_08_run_lcl-3d/validation_average_history.log",
+            "max_perf_average": 0.8805204125757726,
+            "min_loss_average": 0.4695495069026947,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_transformer-1d": {
+            "final_loss_average": 0.7488465309143066,
+            "final_perf_average": 0.8778971726820006,
+            "log_file": "a_using_eir/tutorial_08_run_transformer-1d/validation_average_history.log",
+            "max_perf_average": 0.8923394873162304,
+            "min_loss_average": 0.4457796812057495,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_transformer-2d": {
+            "final_loss_average": 0.7664898037910461,
+            "final_perf_average": 0.8730215623707938,
+            "log_file": "a_using_eir/tutorial_08_run_transformer-2d/validation_average_history.log",
+            "max_perf_average": 0.8991796796940045,
+            "min_loss_average": 0.4331217408180237,
+            "total_iterations": 1400
+        },
+        "a_using_eir/tutorial_08_run_transformer-3d": {
+            "final_loss_average": 0.9319474697113037,
+            "final_perf_average": 0.8613230222568176,
+            "log_file": "a_using_eir/tutorial_08_run_transformer-3d/validation_average_history.log",
+            "max_perf_average": 0.8967071529923223,
+            "min_loss_average": 0.41226693987846375,
+            "total_iterations": 1400
+        },
+        "b_customizing_eir/tutorial_01_run": {
+            "final_loss_average": 0.4599384069442749,
+            "final_perf_average": 0.8764634061219092,
+            "log_file": "b_customizing_eir/tutorial_01_run/validation_average_history.log",
+            "max_perf_average": 0.8764634061219092,
+            "min_loss_average": 0.4599384069442749,
+            "total_iterations": 1000
+        },
+        "c_sequence_output/01_sequence_generation": {
+            "final_loss_average": 1.309388744354248,
+            "final_perf_average": -0.30938874435424807,
+            "log_file": "c_sequence_output/01_sequence_generation/validation_average_history.log",
+            "max_perf_average": -0.30938874435424807,
+            "min_loss_average": 1.309388744354248,
+            "total_iterations": 9500
+        },
+        "c_sequence_output/01_sequence_generation_bpe": {
+            "final_loss_average": 3.6097904815673827,
+            "final_perf_average": -2.6097904815673827,
+            "log_file": "c_sequence_output/01_sequence_generation_bpe/validation_average_history.log",
+            "max_perf_average": -2.6097904815673827,
+            "min_loss_average": 3.6097904815673827,
+            "total_iterations": 9500
+        },
+        "c_sequence_output/02_seq_to_seq": {
+            "final_loss_average": 1.1201519837379457,
+            "final_perf_average": -0.12015198373794556,
+            "log_file": "c_sequence_output/02_seq_to_seq/validation_average_history.log",
+            "max_perf_average": -0.11408125400543213,
+            "min_loss_average": 1.1140812540054321,
+            "total_iterations": 5000
+        },
+        "c_sequence_output/02_seq_to_seq_eng_only": {
+            "final_loss_average": 3.2375069026947023,
+            "final_perf_average": -2.2375069026947023,
+            "log_file": "c_sequence_output/02_seq_to_seq_eng_only/validation_average_history.log",
+            "max_perf_average": -2.2375069026947023,
+            "min_loss_average": 3.2375069026947023,
+            "total_iterations": 5000
+        },
+        "c_sequence_output/03_image_captioning": {
+            "final_loss_average": 2.5102419834136964,
+            "final_perf_average": -1.5102419834136962,
+            "log_file": "c_sequence_output/03_image_captioning/validation_average_history.log",
+            "max_perf_average": -1.5102419834136962,
+            "min_loss_average": 2.5102419834136964,
+            "total_iterations": 11000
+        },
+        "c_sequence_output/03_image_captioning_text_only": {
+            "final_loss_average": 2.786436820983887,
+            "final_perf_average": -1.7864368209838868,
+            "log_file": "c_sequence_output/03_image_captioning_text_only/validation_average_history.log",
+            "max_perf_average": -1.786171230316162,
+            "min_loss_average": 2.786171230316162,
+            "total_iterations": 11000
+        },
+        "c_sequence_output/04_protein_sequence_generation_sequence_only": {
+            "final_loss_average": 2.6630163192749023,
+            "final_perf_average": -1.6630163192749023,
+            "log_file": "c_sequence_output/04_protein_sequence_generation_sequence_only/validation_average_history.log",
+            "max_perf_average": -1.6630163192749023,
+            "min_loss_average": 2.6630163192749023,
+            "total_iterations": 5500
+        },
+        "c_sequence_output/04_protein_sequence_generation_tabular": {
+            "final_loss_average": 2.6134644746780396,
+            "final_perf_average": -1.6134644746780396,
+            "log_file": "c_sequence_output/04_protein_sequence_generation_tabular/validation_average_history.log",
+            "max_perf_average": -1.6134644746780396,
+            "min_loss_average": 2.6134644746780396,
+            "total_iterations": 5500
+        },
+        "d_array_output/01_array_mnist_generation": {
+            "final_loss_average": 0.03201645597815514,
+            "final_perf_average": 0.9679835440218448,
+            "log_file": "d_array_output/01_array_mnist_generation/validation_average_history.log",
+            "max_perf_average": 0.9679835440218448,
+            "min_loss_average": 0.03201645597815514,
+            "total_iterations": 9000
+        },
+        "d_array_output/02_array_mnist_generation_with_labels": {
+            "final_loss_average": 0.03972712543606758,
+            "final_perf_average": 0.9602728745639324,
+            "log_file": "d_array_output/02_array_mnist_generation_with_labels/validation_average_history.log",
+            "max_perf_average": 0.9602728745639324,
+            "min_loss_average": 0.03972712543606758,
+            "total_iterations": 9000
+        },
+        "e_pretraining/01_checkpointing": {
+            "final_loss_average": 0.44910523295402527,
+            "final_perf_average": 0.7696102972362562,
+            "log_file": "e_pretraining/01_checkpointing/validation_average_history.log",
+            "max_perf_average": 0.7696102972362562,
+            "min_loss_average": 0.44910523295402527,
+            "total_iterations": 1800
+        },
+        "e_pretraining/01_checkpointing_imdb_from_pretrained_global": {
+            "final_loss_average": 0.48485228419303894,
+            "final_perf_average": 0.7715273211562363,
+            "log_file": "e_pretraining/01_checkpointing_imdb_from_pretrained_global/validation_average_history.log",
+            "max_perf_average": 0.7781508807013322,
+            "min_loss_average": 0.4570295810699463,
+            "total_iterations": 1800
+        },
+        "e_pretraining/01_checkpointing_imdb_from_pretrained_global_non_strict": {
+            "final_loss_average": 0.45715880393981934,
+            "final_perf_average": 0.7804071400424282,
+            "log_file": "e_pretraining/01_checkpointing_imdb_from_pretrained_global_non_strict/validation_average_history.log",
+            "max_perf_average": 0.7828747928149421,
+            "min_loss_average": 0.4563677906990051,
+            "total_iterations": 1800
+        },
+        "e_pretraining/02_mini_foundation": {
+            "final_loss_average": 0.7463120371103287,
+            "final_perf_average": 0.2536879628896713,
+            "log_file": "e_pretraining/02_mini_foundation/validation_average_history.log",
+            "max_perf_average": 0.2536879628896713,
+            "min_loss_average": 0.7463120371103287,
+            "total_iterations": 18000
+        },
+        "e_pretraining/02_mini_foundation_cifar_from_pretrained": {
+            "final_loss_average": 0.6602140665054321,
+            "final_perf_average": 0.845985844293909,
+            "log_file": "e_pretraining/02_mini_foundation_cifar_from_pretrained/validation_average_history.log",
+            "max_perf_average": 0.8488184583003647,
+            "min_loss_average": 0.641708493232727,
+            "total_iterations": 10100
+        },
+        "e_pretraining/02_mini_foundation_cifar_from_scratch": {
+            "final_loss_average": 0.6749904155731201,
+            "final_perf_average": 0.8364983819575135,
+            "log_file": "e_pretraining/02_mini_foundation_cifar_from_scratch/validation_average_history.log",
+            "max_perf_average": 0.8522003666895019,
+            "min_loss_average": 0.6280671954154968,
+            "total_iterations": 12400
+        },
+        "e_pretraining/02_mini_foundation_imdb_from_pretrained": {
+            "final_loss_average": 0.6771396994590759,
+            "final_perf_average": 0.4431456968931211,
+            "log_file": "e_pretraining/02_mini_foundation_imdb_from_pretrained/validation_average_history.log",
+            "max_perf_average": 0.4516747896615006,
+            "min_loss_average": 0.6763131618499756,
+            "total_iterations": 3800
+        },
+        "e_pretraining/02_mini_foundation_imdb_from_scratch": {
+            "final_loss_average": 0.6792880296707153,
+            "final_perf_average": 0.434027842480773,
+            "log_file": "e_pretraining/02_mini_foundation_imdb_from_scratch/validation_average_history.log",
+            "max_perf_average": 0.45058598184040793,
+            "min_loss_average": 0.67765212059021,
+            "total_iterations": 3300
+        },
+        "f_image_output/01_image_foundation": {
+            "final_loss_average": 0.02570313448086381,
+            "final_perf_average": 0.9742968655191362,
+            "log_file": "f_image_output/01_image_foundation/validation_average_history.log",
+            "max_perf_average": 0.9742968655191362,
+            "min_loss_average": 0.02570313448086381,
+            "total_iterations": 36500
+        },
+        "f_image_output/02_image_colorization": {
+            "final_loss_average": 0.07238984457217157,
+            "final_perf_average": 0.9276101554278284,
+            "log_file": "f_image_output/02_image_colorization/validation_average_history.log",
+            "max_perf_average": 0.9276101554278284,
+            "min_loss_average": 0.07238984457217157,
+            "total_iterations": 9000
+        },
+        "f_image_output/02_image_colorization_and_super_resolution": {
+            "final_loss_average": 0.1266244906000793,
+            "final_perf_average": 0.8733755093999207,
+            "log_file": "f_image_output/02_image_colorization_and_super_resolution/validation_average_history.log",
+            "max_perf_average": 0.8733924734406173,
+            "min_loss_average": 0.12660752655938268,
+            "total_iterations": 36500
+        },
+        "f_image_output/02_image_super_resolution": {
+            "final_loss_average": 0.05890839779749513,
+            "final_perf_average": 0.9410916022025049,
+            "log_file": "f_image_output/02_image_super_resolution/validation_average_history.log",
+            "max_perf_average": 0.9410916022025049,
+            "min_loss_average": 0.05890839779749513,
+            "total_iterations": 9000
+        },
+        "f_image_output/03_mnist_diffusion": {
+            "final_loss_average": 0.3694919105619192,
+            "final_perf_average": 0.6305080894380808,
+            "log_file": "f_image_output/03_mnist_diffusion/validation_average_history.log",
+            "max_perf_average": 0.6391247436404228,
+            "min_loss_average": 0.3608752563595772,
+            "total_iterations": 9000
+        },
+        "f_image_output/03_mnist_diffusion_guided": {
+            "final_loss_average": 0.30261853337287903,
+            "final_perf_average": 0.697381466627121,
+            "log_file": "f_image_output/03_mnist_diffusion_guided/validation_average_history.log",
+            "max_perf_average": 0.7135296417400241,
+            "min_loss_average": 0.2864703582599759,
+            "total_iterations": 9000
+        },
+        "g_time_series/01_time_series_power_transformer_real": {
+            "final_loss_average": 2.936842540529968,
+            "final_perf_average": -1.9368425405299676,
+            "log_file": "g_time_series/01_time_series_power_transformer_real/validation_average_history.log",
+            "max_perf_average": -1.8853851137652193,
+            "min_loss_average": 2.8853851137652193,
+            "total_iterations": 3100
+        },
+        "g_time_series/01_time_series_power_transformer_sim": {
+            "final_loss_average": 1.0582448225205154,
+            "final_perf_average": -0.058244822520515396,
+            "log_file": "g_time_series/01_time_series_power_transformer_sim/validation_average_history.log",
+            "max_perf_average": -0.058244822520515396,
+            "min_loss_average": 1.0582448225205154,
+            "total_iterations": 9500
+        },
+        "g_time_series/02_time_series_stocks_diffusion": {
+            "final_loss_average": 0.02620118321478367,
+            "final_perf_average": 0.9737988167852163,
+            "log_file": "g_time_series/02_time_series_stocks_diffusion/validation_average_history.log",
+            "max_perf_average": 0.9743383225947618,
+            "min_loss_average": 0.025661677405238153,
+            "total_iterations": 19000
+        },
+        "g_time_series/02_time_series_stocks_one_shot": {
+            "final_loss_average": 0.024988998107612133,
+            "final_perf_average": 0.9750110018923879,
+            "log_file": "g_time_series/02_time_series_stocks_one_shot/validation_average_history.log",
+            "max_perf_average": 0.9756378316283226,
+            "min_loss_average": 0.024362168371677397,
+            "total_iterations": 20000
+        },
+        "g_time_series/02_time_series_stocks_transformer": {
+            "final_loss_average": 0.09548351973295212,
+            "final_perf_average": 0.9045164802670479,
+            "log_file": "g_time_series/02_time_series_stocks_transformer/validation_average_history.log",
+            "max_perf_average": 0.9045164802670479,
+            "min_loss_average": 0.09548351973295212,
+            "total_iterations": 25000
+        },
+        "h_survival_analysis/01_flchain": {
+            "final_loss_average": 1.1219402551651,
+            "final_perf_average": 0.814284086227417,
+            "log_file": "h_survival_analysis/01_flchain/validation_average_history.log",
+            "max_perf_average": 0.8149005174636841,
+            "min_loss_average": 1.1071455478668213,
+            "total_iterations": 5200
+        },
+        "h_survival_analysis/02_flchain_cox": {
+            "final_loss_average": 5.756710052490234,
+            "final_perf_average": 0.8078738451004028,
+            "log_file": "h_survival_analysis/02_flchain_cox/validation_average_history.log",
+            "max_perf_average": 0.8093714118003845,
+            "min_loss_average": 5.742744445800781,
+            "total_iterations": 5200
+        },
+        "user_guides/01_streaming": {
+            "final_loss_average": 3.141850580215454,
+            "final_perf_average": -2.141850580215454,
+            "log_file": "user_guides/01_streaming/validation_average_history.log",
+            "max_perf_average": -2.140673797607422,
+            "min_loss_average": 3.140673797607422,
+            "total_iterations": 62500
+        }
+    },
+    "metadata": {
+        "date_generated": "2026-09-15T13:59:49.854316",
+        "num_experiments": 61
+    }
+}

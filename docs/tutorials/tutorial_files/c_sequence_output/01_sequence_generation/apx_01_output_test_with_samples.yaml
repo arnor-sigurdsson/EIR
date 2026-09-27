@@ -1,0 +1,23 @@
+output_info:
+  output_source: eir_tutorials/c_sequence_output/01_sequence_generation/data/IMDB/IMDB_Reviews
+  output_name: imdb_output
+  output_type: sequence
+
+output_type_info:
+  max_length: 64
+  split_on: ""
+  sampling_strategy_if_longer: "uniform"
+  min_freq: 1
+
+model_config:
+  embedding_dim: 64
+  model_init_config:
+    num_layers: 6
+
+sampling_config:
+  n_eval_inputs: 10
+
+  manual_inputs:
+    - imdb_output: "This movie is the most"
+
+    - imdb_output: "Steven"

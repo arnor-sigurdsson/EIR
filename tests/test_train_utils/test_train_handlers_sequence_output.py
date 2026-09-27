@@ -89,7 +89,7 @@ def test_compute_target_index():
 
 def test_prepare_current_autoregressive_input():
     prepared_sample_inputs = {"a": 1, "b": 2, "c": 3}
-    generated_tokens = [1, 2, 3, 4, 5, 6]
+    generated_tokens = [3, 4, 5, 6]
     seq_output_name = "b"
     max_length = 5
     pad_idx = 0
@@ -107,13 +107,23 @@ def test_prepare_current_autoregressive_input():
     assert torch.equal(result[seq_output_name], expected_output[seq_output_name])
 
 
+def test_prepare_current_autoregressive_input_fails_at_max_length():
+    with pytest.raises(AssertionError):
+        _prepare_current_autoregressive_input(
+            prepared_sample_inputs={"a": 1, "b": 2, "c": 3},
+            generated_tokens=[3, 4, 5, 6, 7, 8],
+            seq_output_name="b",
+            max_length=5,
+            pad_idx=0,
+        )
+
+
 def test_sample_next_token_index_from_output():
     outputs = {"seq_output": {"seq_output": torch.rand(1, 5, 5)}}
     seq_output_name = "seq_output"
     sampling_config = SequenceOutputSamplingConfig(
         manual_inputs=[{"token": "hello"}],
         n_eval_inputs=10,
-        generated_sequence_length=64,
         top_k=5,
         top_p=0.9,
     )
@@ -201,7 +211,6 @@ def test_autoregressive_sequence_generation(
     sampling_config = SequenceOutputSamplingConfig(
         manual_inputs=[],
         n_eval_inputs=10,
-        generated_sequence_length=20,
         top_k=5,
         top_p=0.5,
     )
@@ -232,7 +241,6 @@ def test_autoregressive_sequence_generation(
     item_result = batch_result[0]
     assert isinstance(item_result, list)
 
-    assert len(item_result) <= sampling_config.generated_sequence_length
     assert item_result[:3] == base
 
 

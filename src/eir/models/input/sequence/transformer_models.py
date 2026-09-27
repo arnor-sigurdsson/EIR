@@ -522,14 +522,8 @@ class MaskedTransformerFeatureExtractor(TransformerFeatureExtractor):
             max_length=max_length,
         )
 
-        mask = torch.triu(
-            torch.ones(self.max_length, self.max_length) * float("-inf"),
-            diagonal=1,
-        )
-        self.register_buffer("mask", mask)
-
     def forward(self, input: Tensor) -> Tensor:
-        out = self.transformer_encoder(input, mask=self.mask)
+        out = self.transformer_encoder(input, is_causal=True)
         return out
 
 

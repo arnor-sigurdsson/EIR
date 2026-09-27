@@ -24,21 +24,21 @@ def get_configs_object_with_seq_output_configs(
     configs: "Configs",
 ) -> "Configs":
     seq_configs_iter = [asdict(i) for i in configs.output_configs]
-    seq_configs = get_seq_output_configs(
+    seq_output_configs = get_seq_output_configs(
         seq_configs=seq_configs_iter,
         base_output_configs=configs.output_configs,
     )
 
     input_configs = configs.input_configs
     extra_input_configs = converge_sequence_output_configs_to_input_configs(
-        seq_output_configs=seq_configs,
+        seq_output_configs=seq_output_configs,
         input_configs=input_configs,
     )
     # TODO: Filter the duplicated ones where we have original *and* extra
     seq_input_configs = list(input_configs) + list(extra_input_configs)
 
     seq_config_object_kwargs = configs.__dict__
-    seq_config_object_kwargs["output_configs"] = seq_configs
+    seq_config_object_kwargs["output_configs"] = seq_output_configs
     seq_config_object_kwargs["input_configs"] = seq_input_configs
 
     seq_config_object_kwargs.pop("gc")
@@ -78,7 +78,7 @@ def init_seq_output_config(
     base_output_config: schemas.OutputConfig,
 ) -> schemas.OutputConfig:
     """
-    We include the input type here for more fine grained logic later when setting up
+    We include the input type here for more fine-grained logic later when setting up
     the target and input configs.
     """
 

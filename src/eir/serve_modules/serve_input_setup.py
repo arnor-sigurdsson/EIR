@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
 import torch
+from fastapi import HTTPException
 from torch.utils.data._utils.collate import default_collate
 
 from eir.data_load.data_preparation_modules.imputation import (
@@ -29,6 +30,10 @@ from eir.setup.input_setup import (
 )
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
 from eir.setup.input_setup_modules.setup_tabular import ComputedTabularInputInfo
+from eir.setup.output_setup import al_output_objects_as_dict
+from eir.setup.output_setup_modules.sequence_output_setup import (
+    ComputedSequenceOutputInfo,
+)
 from eir.setup.schemas import InputConfig, TabularInputDataConfig, al_input_configs
 from eir.train_utils.utils import call_hooks_stage_iterable
 from eir.utils.logging import get_logger
@@ -210,6 +215,11 @@ def general_pre_process_raw_inputs(
         match input_object:
             case ComputedSequenceInputInfo():
                 cur_input = input_object.encode_func(cur_input)
+                _check_prompt_fits_output_length(
+                    name=name,
+                    tokens=cur_input,
+                    output_objects=experiment.outputs,
+                )
 
             case (
                 ComputedTabularInputInfo()
@@ -235,6 +245,27 @@ def general_pre_process_raw_inputs(
     )
 
     return inputs_final
+
+
+def _check_prompt_fits_output_length(
+    name: str,
+    tokens: Sequence[int],
+    output_objects: al_output_objects_as_dict,
+) -> None:
+    output_object = output_objects.get(name, None)
+    if not isinstance(output_object, ComputedSequenceOutputInfo):
+        return None
+
+    max_prompt_length = output_object.computed_max_length - 1
+    if len(tokens) > max_prompt_length:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Prompt for '{name}' has {len(tokens)} tokens, "
+                f"but the maximum is {max_prompt_length}."
+            ),
+        )
+    return None
 
 
 def _impute_missing_tabular_values(

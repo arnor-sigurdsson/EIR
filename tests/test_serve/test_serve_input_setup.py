@@ -3,9 +3,11 @@ from unittest.mock import Mock, create_autospec, patch
 
 import pytest
 import torch
+from fastapi import HTTPException
 
 from eir.serve_modules.serve_input_setup import (
     ServeBatch,
+    _check_prompt_fits_output_length,
     _impute_missing_tabular_values,
     _setup_tabular_input_for_serve,
     general_pre_process,
@@ -16,6 +18,9 @@ from eir.serve_modules.serve_input_setup import (
 )
 from eir.serve_modules.serve_schemas import ComputedServeTabularInputInfo, InputConfig
 from eir.setup.input_setup_modules.setup_sequence import ComputedSequenceInputInfo
+from eir.setup.output_setup_modules.sequence_output_setup import (
+    ComputedSequenceOutputInfo,
+)
 from eir.setup.schemas import InputDataConfig, TabularInputDataConfig
 
 
@@ -217,6 +222,32 @@ def test_general_pre_process_raw_inputs(mock_serve_experiment):
         assert "sequence_input" in result
         assert torch.all(result["tabular_input"].eq(torch.tensor([1.0, 0])))
         assert torch.all(result["sequence_input"].eq(torch.tensor([1, 2, 3, 4])))
+
+
+def test_check_prompt_fits_output_length():
+    output_object = Mock(spec=ComputedSequenceOutputInfo)
+    output_object.computed_max_length = 5
+    output_objects = {"sequence_output": output_object}
+
+    _check_prompt_fits_output_length(
+        name="sequence_output",
+        tokens=[1, 2, 3, 4],
+        output_objects=output_objects,
+    )
+
+    _check_prompt_fits_output_length(
+        name="sequence_input",
+        tokens=[1, 2, 3, 4, 5, 6],
+        output_objects=output_objects,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        _check_prompt_fits_output_length(
+            name="sequence_output",
+            tokens=[1, 2, 3, 4, 5],
+            output_objects=output_objects,
+        )
+    assert exc_info.value.status_code == 400
 
 
 def test_impute_missing_tabular_values():
