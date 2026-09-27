@@ -30,20 +30,6 @@ Supervised modelling, sequence generation, image generation, array output and su
 
 **WARNING:** This project is in alpha phase. Expect backwards incompatible changes and API changes between minor versions.
 
-## What's New
-
-
-- **July 2025**: More docs added
-  - [Frequently Asked Questions](https://eir.readthedocs.io/en/stable/user_guides/frequently_asked_questions.html)
-  - [Streaming Data Hands-On Guide](https://eir.readthedocs.io/en/stable/user_guides/streaming_implementation.html)
-- **June 2025**: Overhaul, expand and restructure [documenation](https://eir.readthedocs.io/en/stable/index.html)
-- **April 2025**: More scaling related tutorials
-  - [Scaling Diffusion: Image Generation from Text](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/03_diffusion.html) - Exploring artistic styles from historical collections
-  - [Supervised Fine Tuning of GPT Style Model](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/02_compute_gpt.html#e-supervised-fine-tuning-from-a-pretrained-model) - Fine tuning a pre-trained model for instruction following
-- **March 2025**: Scaling tutorials added
-  - [Streaming Data: Training with FineWeb](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/01_streaming.html) - Train models via continuous data streaming
-  - [Scaling Compute: Training a BabyGPT](https://eir.readthedocs.io/en/stable/tutorials/i_scaling/02_compute_gpt.html) - Examples of training GPT-style models
-
 # Table of Contents
 1. [Install](#install)
 2. [Usage](#usage)
