@@ -11,8 +11,6 @@ from typing import (
 
 import numpy as np
 import polars as pl
-
-pl.enable_string_cache()
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 from tqdm import tqdm
@@ -344,12 +342,11 @@ def chunked_label_df_parse_wrapper(
 
     assert isinstance(label_file_tabular_info.parsing_chunk_size, int)
 
-    stream = pl.read_csv_batched(
+    stream = pl.scan_csv(
         source=label_file_tabular_info.file_path,
         schema_overrides=dtypes,
         has_header=True,
-        batch_size=label_file_tabular_info.parsing_chunk_size,
-    )
+    ).collect_batches(chunk_size=label_file_tabular_info.parsing_chunk_size)
 
     supplied_columns = get_passed_in_columns(tabular_info=label_file_tabular_info)
 
@@ -374,20 +371,16 @@ def chunked_label_df_parse_wrapper(
 
     processed_chunks: list[pl.DataFrame] = []
 
-    while True:
-        next_batches = stream.next_batches(1)
+    for chunk in stream:
+        processed_chunk = process_chunk(chunk=chunk)
+        if processed_chunk is None:
+            continue
 
-        if not next_batches:
-            break
-
-        for chunk in next_batches:
-            processed_chunk = process_chunk(chunk=chunk)
-            if processed_chunk is not None:
-                pre_check_label_df(
-                    df=processed_chunk,
-                    name=f"{label_file_tabular_info.file_path}:chunk",
-                )
-                processed_chunks.append(processed_chunk)
+        pre_check_label_df(
+            df=processed_chunk,
+            name=f"{label_file_tabular_info.file_path}:chunk",
+        )
+        processed_chunks.append(processed_chunk)
 
     if not processed_chunks:
         return pl.DataFrame(schema=dtypes)
